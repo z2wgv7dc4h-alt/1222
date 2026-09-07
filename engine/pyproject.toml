@@ -1,0 +1,12 @@
+[build-system]
+requires = ["setuptools>=45", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "god-tier-metal"
+version = "0.1.0"
+description = "Local engine that writes djent / tech-death / slam"
+dependencies = []
+
+[project.scripts]
+god-tier-metal = "engine.__main__:main"

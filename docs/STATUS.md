@@ -7,7 +7,7 @@ Update only after grep or pytest. No memory claims.
 | Area | State | Evidence |
 |---|---|---|
 | Repo layout | MISSING | |
-| pytest smoke | MISSING | |
+| pytest smoke | WIRED+TESTED | 1 passed in 0.01s |
 | Fretboard + pitch_to_fret | MISSING | |
 | Scale library | MISSING | |
 | Preset loader+schema | MISSING | |

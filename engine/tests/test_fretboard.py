@@ -1,6 +1,6 @@
 import pytest
 
-from engine.fretboard import Fretboard
+from fretboard import Fretboard
 
 STANDARD_6 = [40, 45, 50, 55, 59, 64]  # E2 A2 D3 G3 B3 E4
 DROP_G_7 = [31, 38, 43, 48, 53, 57, 62]  # Born of Osiris "Discovery" tuning

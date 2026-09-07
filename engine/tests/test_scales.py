@@ -1,6 +1,6 @@
 import pytest
 
-from engine.scales import ALIASES, SCALES, get_scale
+from scales import ALIASES, SCALES, get_scale
 
 
 def test_cluster_and_power_present():

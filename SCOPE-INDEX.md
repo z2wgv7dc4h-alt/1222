@@ -9,7 +9,7 @@ Rule: `grep` or read **only** the heading named here. Never the full 1130 lines.
 | P1 | `## 2. Tonal/Harmonic`, `### 18.2`, and `### 12.3` (chord-shape solver) |
 | P2 | `## 3. Rhythm` and `### 8.1` `### 8.2` `### 8.3` |
 | P3 | `## 4. Riff-writing`, `### 17.1`, and `## 6` (P3.12 only, second guitar) |
-| P4 | `### 11.6` `### 11.7` |
+| P4 | `### 11.6` `### 11.7`, and `### 18.6` (P4.4 only, reference-MIDI vocabulary) |
 | P5 | `### 14.2` (item 2, bass fretboard) |
 | P6 | `## 5. Song-structure`, `### 10.3`, and `## 3. Rhythm` (P6.7 only, tempo automation) |
 | P7 | `## 16. Atmospheric` |

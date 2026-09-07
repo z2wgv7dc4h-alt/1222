@@ -19,6 +19,7 @@ P1+ : open `SCOPE-INDEX.md`, then only those headings in `god-tier-metal-scope.m
 13. [ ] P4.1 Role → kit MIDI + fallback
 14. [ ] P4.2 Kick follows guitar accents on breakdown
 15. [ ] P4.3 Fills/blasts use shared-sequence
+15b. [ ] P4.4 Mine reference MIDI packs for drum-fill vocabulary (§18.6) -- after P4.1-P4.3 land
 16. [ ] P5.1 Own 4/5-string fretboard
 17. [ ] P5.2 Follows guitar rhythm; own playability
 
@@ -76,6 +77,7 @@ Scope: `### 11.6` `### 11.7`.
 - [ ] P4.1 Role → kit MIDI + fallback
 - [ ] P4.2 Kick follows guitar accents on breakdown
 - [ ] P4.3 Fills/blasts use shared-sequence
+- [ ] P4.4 Mine `reference/ww-forge-prior-attempt/user/midi/{whack_breakdown,jj_lakeside,jj_lamb,jj_dreaming,forge_grooves}` (63 real, legally-clean groove/breakdown MIDIs) for drum-fill density/placement vocabulary per §18.6 -- reference data only, never copied riffs; the symbolic engine (P4.1-P4.3) stays the actual writer. Queued after P4.1-P4.3 land to avoid touching drums.py while it's mid-build.
 
 ## Phase 5 — Bass
 Scope: `### 14.2` (item 2, bass fretboard).

@@ -43,9 +43,20 @@ def test_compose_song_end_to_end_for_every_preset(preset_id):
             if not cell["is_rest"]:
                 bass_fb.pitch_to_fret(cell["midi"], max_fret=20)
 
-        # Lead line: one note per guitar hit, every note within the
-        # generated register span.
-        assert len(section["lead"]) == max(1, m.hit_count)
+        # Lead behavior is role-dependent (song.py's lead_mode branches):
+        # solo -> dense featured line, chill/interlude -> harmonized
+        # doubling of the rhythm's own theme, everything else -> silent
+        # (a busy independent lead would clash with a dense chug section).
+        role = section["role"]
+        if role == "solo":
+            assert section["lead_mode"] == "solo"
+            assert len(section["lead"]) >= 1
+        elif role in ("chill", "interlude"):
+            assert section["lead_mode"] == "harmony"
+            assert len(section["lead"]) == max(1, m.hit_count)
+        else:
+            assert section["lead_mode"] == "silent"
+            assert section["lead"] == []
 
 
 def test_compose_song_reproducible_with_same_seed():
@@ -82,6 +93,21 @@ def test_pitches_per_cell_none_on_rests_and_real_pitch_on_hits():
     assert len(result) == 3
     assert result[1] is None
     assert result[0] is not None and result[2] is not None
+
+
+def test_solo_sections_get_a_denser_featured_lead():
+    """A solo must actually be a featured lead, not the same background
+    doubling line every other section gets."""
+    song = compose_song("djent", seed=11, num_sections=10)
+    solo_sections = [s for s in song["sections"] if s["role"] == "solo"]
+    non_solo_sections = [s for s in song["sections"] if s["role"] != "solo"]
+    assert solo_sections, "need at least one solo section to test -- try a different seed/length if this fires"
+
+    for solo in solo_sections:
+        # A solo's note count is driven by total_beats*2, not the rhythm
+        # section's own hit_count, so it should clearly exceed a typical
+        # non-solo section's lead length for the same song.
+        assert len(solo["lead"]) > max(len(s["lead"]) for s in non_solo_sections)
 
 
 def test_compose_song_judge_result_is_present_and_shaped():

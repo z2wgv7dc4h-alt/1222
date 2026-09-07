@@ -2,7 +2,7 @@
 
 <!-- Compact: keep active task id, files touched, pytest command. Drop reference hunting. -->
 
-Local engine that writes djent / tech-death / slam. Bar: Infant Annihilator, Born of Osiris. Python writes notes. React later. Reaper renders. No cloud writer.
+Local engine that writes djent / tech-death / slam. Bar: Infant Annihilator, Born of Osiris, Veil of Maya. Periphery is a major influence -- their level of musicianship (odd-grouping displacement, legato/technical lead lines, extended-chord ambient sections, metric modulation) is a standing goal, not just a tuning reference. Python writes notes. React later. Reaper renders. No cloud writer.
 
 ## Law
 - Grid is the writer. Audio models are paint after the score.

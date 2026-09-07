@@ -6,3 +6,4 @@
 - One class per job. Delete the twin before DONE.
 - Two scale names, one interval set: aliases only, documented.
 - STATUS.md and CURRENT.md may only claim what grep or pytest just showed.
+- One `engine/` folder only — the one with `pyproject.toml`. Source modules go directly inside it. Never `engine/engine/`.

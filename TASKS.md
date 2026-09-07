@@ -14,6 +14,7 @@ P1+ : open `SCOPE-INDEX.md`, then only those headings in `god-tier-metal-scope.m
 8. [ ] P1.8 Schema validator called by loader. TEST malformed raises
 9. [ ] P1.9 TEST glob `*.json` loads every file
 10. [ ] P1.10 Port VoiceLeader, shade(), ARC
+11. [ ] P1.11 Chord-shape solver (ground-up, no lookup tables)
 
 ---
 
@@ -25,7 +26,7 @@ P1+ : open `SCOPE-INDEX.md`, then only those headings in `god-tier-metal-scope.m
 - [x] P0.5 STATUS template
 
 ## Phase 1 — Tonal + presets
-Scope: `## 2. Tonal/Harmonic` + `### 18.2`. Then `PORTS.md` Ww.
+Scope: `## 2. Tonal/Harmonic` + `### 18.2` + `### 12.3` (chord-shape solver). Then `PORTS.md` Ww.
 - [x] P1.1 `Fretboard` + MIDI↔(string,fret)
 - [x] P1.2 Port `pitch_to_fret` from `reference/ww-forge-prior-attempt/engine/tab_score.py`
 - [x] P1.3 TEST: unplayable MIDI rejected
@@ -36,6 +37,7 @@ Scope: `## 2. Tonal/Harmonic` + `### 18.2`. Then `PORTS.md` Ww.
 - [ ] P1.8 Schema validator called by loader. TEST malformed raises
 - [ ] P1.9 TEST glob `*.json` loads every file
 - [ ] P1.10 Port VoiceLeader, shade(), ARC
+- [ ] P1.11 Chord-shape solver (ground-up, no lookup tables)
 
 ## Phase 2 — Rhythm
 Scope: `## 3. Rhythm` + `### 8.1` `### 8.2` `### 8.3`.
@@ -66,7 +68,7 @@ Scope: `### 11.6` `### 11.7`.
 - [ ] P4.3 Fills/blasts use shared-sequence
 
 ## Phase 5 — Bass
-Scope: `## 6. New instrument layer`.
+Scope: `### 14.2` (item 2, bass fretboard).
 - [ ] P5.1 Own 4/5-string fretboard
 - [ ] P5.2 Follows guitar rhythm; own playability
 
@@ -85,7 +87,7 @@ Scope: `## 16. Atmospheric`.
 - [ ] P7.3 Accent-synced hits
 
 ## Phase 8 — Reaper
-Scope: `## 11. Audio rendering`.
+Scope: `## 11. Audio rendering` + `### 14.1` (reapy-boost, Surge XT, Supermassive).
 - [ ] P8.1 reapy-boost
 - [ ] P8.2 Separate buses
 - [ ] P8.3 .RfxChain per track
@@ -105,7 +107,7 @@ Scope: `## 10. Application / Editor`.
 - [ ] P9.6 VexFlow tab
 
 ## Phase 10 — Export
-Scope: `### 17.6`.
+Scope: `### 17.6` + `### 14.2` (items 10-11, project format + export matrix). JSON skeleton already in `### 18.2`.
 - [ ] P10.1 MIDI stems, mix, tab, .rpp
 - [ ] P10.2 Song JSON
 - [ ] P10.3 Preset calibration

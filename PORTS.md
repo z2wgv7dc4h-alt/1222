@@ -10,7 +10,7 @@ Paths are under `/reference/`.
 | `shade()` | `style_packs.py` | 0–1 dissonance reweight; never zero an interval. |
 | IRVD | `style_packs.py` | Intro 1 bar; Destruction last quarter; rest Rep/Var. |
 | ARC | `style_packs.py` | energy/register/dissonance/start-degree. density = `0.28 + 0.62 * energy`. |
-| tunings | `theory.py` / packs | `drop_g_7` BoO, `drop_ab_7` Periphery, `drop_a_7` SOTS, `drop_b_7` VoM, `drop_c_6`, `standard_6`. MIDI from source. |
+| tunings | `theory.py` / packs | `drop_g_7` BoO, `drop_ab_7` Periphery, `drop_a_7` SOTS, `drop_b_7` VoM, `drop_e_8` (8-string, SoI-ish), `drop_c_6`, `standard_6`. MIDI from source. |
 | `pitch_to_fret` | `tab_score.py` | lowest string, then `abs(fret_diff)+abs(string_diff)*2`. |
 | scales | packs | add `cluster` (0,1,3,6,7,8,11) and `power` (0,5,7). |
 | presets | packs | ids: groovy, djent, chill, tech, slam, melodic. Bands only in descriptions. |

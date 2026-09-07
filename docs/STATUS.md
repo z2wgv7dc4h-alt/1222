@@ -9,7 +9,7 @@ Update only after grep or pytest. No memory claims.
 | Repo layout | MISSING | |
 | pytest smoke | WIRED+TESTED | 1 passed in 0.01s |
 | Fretboard + pitch_to_fret | WIRED+TESTED | 10 passed in 0.03s |
-| Scale library | MISSING | |
+| Scale library | WIRED+TESTED | 14 passed in 0.03s |
 | Preset loader+schema | MISSING | |
 | Rhythm two-layer | MISSING | |
 | Cell-tile polymeter | MISSING | |

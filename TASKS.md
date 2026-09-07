@@ -7,8 +7,8 @@ P1+ : open `SCOPE-INDEX.md`, then only those headings in `god-tier-metal-scope.m
 1. [x] P1.1 `Fretboard` + MIDI↔(string,fret)
 2. [x] P1.2 Port `pitch_to_fret` from `reference/ww-forge-prior-attempt/engine/tab_score.py`
 3. [x] P1.3 TEST: unplayable MIDI rejected
-4. [ ] P1.4 Scale library + cluster + power. Unique intervals
-5. [ ] P1.5 TEST: no duplicate non-alias scales
+4. [x] P1.4 Scale library + cluster + power. Unique intervals
+5. [x] P1.5 TEST: no duplicate non-alias scales
 6. [ ] P1.6 Tuning JSON from source MIDI
 7. [ ] P1.7 Preset ids: groovy, djent, chill, tech, slam, melodic. Strict JSON
 8. [ ] P1.8 Schema validator called by loader. TEST malformed raises
@@ -29,8 +29,8 @@ Scope: `## 2. Tonal/Harmonic` + `### 18.2`. Then `PORTS.md` Ww.
 - [x] P1.1 `Fretboard` + MIDI↔(string,fret)
 - [x] P1.2 Port `pitch_to_fret` from `reference/ww-forge-prior-attempt/engine/tab_score.py`
 - [x] P1.3 TEST: unplayable MIDI rejected
-- [ ] P1.4 Scale library + cluster + power. Unique intervals
-- [ ] P1.5 TEST: no duplicate non-alias scales
+- [x] P1.4 Scale library + cluster + power. Unique intervals
+- [x] P1.5 TEST: no duplicate non-alias scales
 - [ ] P1.6 Tuning JSON from source MIDI
 - [ ] P1.7 Preset ids: groovy, djent, chill, tech, slam, melodic. Strict JSON
 - [ ] P1.8 Schema validator called by loader. TEST malformed raises

@@ -1,8 +1,8 @@
 # CURRENT
 
-task: P4.1-P4.3, P5.1-P5.2
-phase: 4-5
+task: P3.1-P3.12
+phase: 3
 status: DONE
-last_pytest: 189 passed in 0.30s
-note: Phase 4 (Drums) and Phase 5 (Bass) both complete, built in parallel worktree agents alongside Phase 3 (Motif, still in progress). Drums: role->kit-MIDI map for the real SFZ kit with a wired CHINA->CRASH_2 fallback (no sample on this kit), kick-follows-guitar, blast fills (traditional/gravity/hammer) via the shared RhythmRegistry. Bass: derives its own tuning from the guitar's (anchors the bass's TOP string an octave below the guitar's lowest, then perfect 4ths down -- guarantees the bass sits below the guitar even for wide extended-range tunings), follows the guitar's rhythm exactly but resolves every hit to its own real, playable (string,fret) via the bass's own Fretboard, falling back to the nearest reachable octave rather than raising or fabricating. Also extracted a much larger real MIDI reference corpus (1967 files across jj_dreaming/jj_lakeside/jj_lamb/whack_breakdown, from a zip the user supplied) into reference/midi-corpus/ (gitignored) for the still-open P4.4.
+last_pytest: 236 passed in 0.50s
+note: Phase 3 (Motif/riff) complete, including the optional P3.12. Seven modules (motif.py, groove.py, lead.py, performance.py, interplay.py, slam.py, riff.py): Motif dataclass with cell/delta pairing enforced in __post_init__ (every construction path, not just a standalone check); render_motif proves same contour at two roots; transpose/augment/invert/fragment develop ops; ThemeRegistry for cross-section reuse; gallop/stutter-chug cells; chromatic bias via theory.shade() measurably shifts interval distribution; VoiceLeader-driven lead lines clamped to register; double-tracking with two independently-seeded takes (explicit test guards the historical "just a delayed copy" mistake from scope §18.3); call-and-response; pinch-harmonic marking + chromatic creep; and P3.11 wires chords.solve_chord into an actual riff-generation call path (it had zero callers before this). Phases 1-5 are now all complete: 236 passed. Next: P4.4 (MIDI vocab mining, now unblocked) and Phase 6 (Structure).
 updated: 2026-09-08

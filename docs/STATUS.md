@@ -14,7 +14,7 @@ Update only after grep or pytest. No memory claims.
 | VoiceLeader/shade/ARC (P1.10) | WIRED+TESTED | 159 passed (full suite) |
 | Chord-shape solver (P1.11) | WIRED+TESTED | 159 passed (full suite) |
 | Rhythm two-layer + polymeter/tuplets/blasts/IRVD (Phase 2) | WIRED+TESTED | 159 passed (full suite) |
-| Motif | MISSING | |
+| Motif (P3.1-P3.12, incl. optional P3.12) | WIRED+TESTED | 236 passed in 0.50s |
 | Drums (P4.1-P4.3; P4.4 MIDI-vocab mining still open) | WIRED+TESTED | 172 passed in 0.35s |
 | Bass | WIRED+TESTED | 189 passed in 0.30s |
 | Structure | MISSING | |

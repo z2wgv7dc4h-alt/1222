@@ -43,3 +43,11 @@ Phase 0 complete. Ready for P1.1: Fretboard + MIDI↔(string,fret)
 - P5.1-P5.2: `engine/bass.py` -- derive_bass_tuning anchors the bass's TOP string an octave below the guitar's lowest open string then descends in perfect 4ths (guarantees the bass stays below the guitar even for wide extended-range tunings, unlike naively copying the guitar's lowest 4 strings down an octave); follow_guitar_rhythm locks to the guitar's hit/rest pattern but resolves every hit to the bass's own playable position, searching every octave of the target pitch class and falling back to the nearest reachable one.
 - User supplied a much larger real MIDI corpus (`C:\Forge\user\midi\MIDIS.zip`, 1967 files) -- extracted into `reference/midi-corpus/` (gitignored) for P4.4, superseding the sparse ~63-file sample that shipped in the original reference bundle.
 - 189 passed in 0.30s. Next: Phase 3 (Motif) landing shortly, then P4.4 (MIDI vocab mining), then Phase 6 (Structure).
+
+## 2026-09-08 — Phase 3 (Motif/riff) complete -- Phases 1-5 all done
+- `engine/motif.py`+6 supporting modules (groove/lead/performance/interplay/slam/riff), 47 new tests, 236 passed total.
+- All 12 items done including the optional P3.12 (harmonized second guitar).
+- P3.11 is the standout: wired `chords.solve_chord` (built in Phase 1, P1.11) into a real riff-generation call path via `riff.voice_chord_section` -- it had no caller anywhere until this.
+- P3.8's double-tracking has an explicit regression test against the exact historical mistake documented in god-tier-metal-scope.md §18.3 (an earlier attempt's "double-tracking" was one performance time-shifted +8 ticks, not two independent takes).
+- Caught a bookkeeping gap while ticking boxes: TASKS.md's `## Next` section had been recording progress, but the underlying per-phase sections (Phase 2, Phase 3) were never ticked when `## Next` moved on to the next wave -- fixed now; will keep both in sync going forward.
+- 236 passed in 0.50s. Next: P4.4 (MIDI vocabulary mining, unblocked now that drums.py exists), then Phase 6 (Structure).

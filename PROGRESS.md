@@ -57,3 +57,8 @@ Phase 0 complete. Ready for P1.1: Fretboard + MIDI↔(string,fret)
 - Real finding worth remembering for preset tuning later: density clearly falls as BPM rises across the whole corpus (80-100 BPM: 6.4 hits/beat -> 220-240 BPM: 2.8 hits/beat) -- faster sections are rhythmically sparser in real reference material, not busier.
 - Honest deviations the agent flagged: this corpus has no tempo meta events (BPM comes from folder/file names via regex) and uses channel 0 for drums, not channel 9/10 as initially assumed.
 - 256 passed in 4.48s (main's full corpus is present, unlike the isolated worktree which correctly skipped the corpus-dependent test). Next: Phase 6 (Structure) landing shortly.
+
+## 2026-09-08 — Phase 6 (Structure) complete -- Phases 1-6 + P4.4 all done
+- `engine/structure.py`: weighted section graph, flatten+bridge+pickup (ported from song_writer.py -- pickup was unused dead code in the source, this port wires it in for real, an improvement over the original), half-time-in-a-section, arc()-driven modulation (P6.4 finally calls theory.arc(), which existed since Phase 1 but had no caller), interlude section type, judge/retry (ported from riff_engine.judge's real thresholds), and internal tempo curves.
+- 287 passed in 2.33s. The full pure-Python, pytest-verifiable generation engine (Phases 1-6) is now complete. Remaining work (Phase 7 Atmosphere is still pure-Python; Phases 8 Reaper, 9 Editor, 10 Export need real external tools/human verification and can't be honestly marked WIRED+TESTED without the user present to run/listen/click).
+- Next: Phase 7 (Atmosphere), then a status report before attempting Phase 8+.

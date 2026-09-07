@@ -17,7 +17,7 @@ Update only after grep or pytest. No memory claims.
 | Motif (P3.1-P3.12, incl. optional P3.12) | WIRED+TESTED | 236 passed in 0.50s |
 | Drums + MIDI-vocab mining (P4.1-P4.4) | WIRED+TESTED | 256 passed in 4.48s |
 | Bass | WIRED+TESTED | 189 passed in 0.30s |
-| Structure | MISSING | |
+| Structure (P6.1-P6.7) | WIRED+TESTED | 287 passed in 2.33s |
 | Atmosphere | MISSING | |
 | Reaper | MISSING | |
 | Editor | MISSING | |

@@ -4,14 +4,9 @@ Work only `## Next`. One checkbox per session. Paste pytest before flipping to D
 P1+ : open `SCOPE-INDEX.md`, then only those headings in `god-tier-metal-scope.md`.
 
 ## Next
-1. [x] P4.4 Mine reference MIDI packs for drum-fill vocabulary (§18.6)
-2. [ ] P6.1 Weighted section graph
-3. [ ] P6.2 flatten+pickup
-4. [ ] P6.3 Half-time inside a section
-5. [ ] P6.4 Modulation called from generation
-6. [ ] P6.5 Judge/retry
-7. [ ] P6.6 Tech/atmospheric interlude section type
-8. [ ] P6.7 Tempo curve: mid-song ramps/drops
+1. [ ] P7.1 GM 90 pad / 56 hit
+2. [ ] P7.2 Synth doubles motif
+3. [ ] P7.3 Accent-synced hits
 
 ---
 
@@ -76,13 +71,13 @@ Scope: `### 14.2` (item 2, bass fretboard).
 
 ## Phase 6 — Structure
 Scope: `## 5. Song-structure` + `### 10.3` + `## 3. Rhythm` (tempo-automation paragraph, P6.7 only).
-- [ ] P6.1 Weighted section graph
-- [ ] P6.2 flatten+pickup
-- [ ] P6.3 Half-time inside a section
-- [ ] P6.4 Modulation called from generation
-- [ ] P6.5 Judge/retry
-- [ ] P6.6 Tech/atmospheric interlude section type -- "not present at all currently" per §5
-- [ ] P6.7 Tempo curve: mid-song ramps/drops per §3. Reaper export still uses one constant tempo (§17.5) -- this is an internal song-data property, not a Reaper tempo-map change
+- [x] P6.1 Weighted section graph
+- [x] P6.2 flatten+pickup
+- [x] P6.3 Half-time inside a section
+- [x] P6.4 Modulation called from generation
+- [x] P6.5 Judge/retry
+- [x] P6.6 Tech/atmospheric interlude section type -- "not present at all currently" per §5
+- [x] P6.7 Tempo curve: mid-song ramps/drops per §3. Reaper export still uses one constant tempo (§17.5) -- this is an internal song-data property, not a Reaper tempo-map change
 
 ## Phase 7 — Atmosphere
 Scope: `## 16. Atmospheric`.

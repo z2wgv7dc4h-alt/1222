@@ -8,5 +8,9 @@ Decisions:
 - Engine is writer. No Suno/ACE-Step as composer.
 - New FCC loop: short CLAUDE.md + atomic TASKS + hooks + one task per /clear.
 - Completed P0.1: Created folder structure (engine/, engine/tests/, editor/, docs/, reference/, assets/drums/, assets/nam/)
+- Completed P0.2: Confirmed assets/drums/ has .sfz and assets/nam/ has .nam files
+- Completed P0.3: Set up pytest with test_smoke.py asserting True (1 passed in 0.01s)
+- Completed P0.4: Verified .gitignore from kit is present (no assets/, no reference/)
+- Completed P0.5: Confirmed docs/STATUS.md template exists with no Working claims
 
-Not built yet. Phase 0 is first FCC work.
+Phase 0 complete. Ready for P1.1: Fretboard + MIDI↔(string,fret)

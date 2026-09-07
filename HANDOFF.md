@@ -1,5 +1,5 @@
 # HANDOFF
 
-Next: P0.2 — Confirm assets/drums/ has .sfz and assets/nam/ has .nam. If missing, copy from the reference bundle. Stop if empty.
-Do not read /reference.
+Next: P1.1 — `Fretboard` + MIDI↔(string,fret)
+Read Scope: `## 2. Tonal/Harmonic` + `### 18.2`. Then `PORTS.md` Ww.
 Then /close.

@@ -32,4 +32,4 @@ Paths are under `/reference/`.
 - metalerator: section pipeline concept, riff→bass, kick-follows-guitar in breakdowns, velocity band 97–103. Do not run the app.
 - Anvil: optional dependency-free WAV preview later.
 - react-chords: ignore; VexFlow is tab target.
-- 123 / first Claude Code: `docs/RHYTHM_ENGINE_FIXES.md` as a bug-pattern note only.
+- 123 / first Claude Code: treat as a bug-pattern cautionary reference only, do not extend it. (A `docs/RHYTHM_ENGINE_FIXES.md` was referenced here previously; it does not exist anywhere in this repo or `/reference` -- likely lives only inside the separate `123` repo itself, which isn't checked out here. Unverified; don't chase it.)

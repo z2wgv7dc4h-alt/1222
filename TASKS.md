@@ -4,9 +4,13 @@ Work only `## Next`. One checkbox per session. Paste pytest before flipping to D
 P1+ : open `SCOPE-INDEX.md`, then only those headings in `god-tier-metal-scope.md`.
 
 ## Next
-1. [ ] P7.1 GM 90 pad / 56 hit
-2. [ ] P7.2 Synth doubles motif
-3. [ ] P7.3 Accent-synced hits
+1. [ ] X.2 Consume remaining preset fields: `kick` (style name -- branch drum generation on "bounce"/"sparse"/"lock"/"euclid", not one fixed algorithm), `group` (djent's 3-against-4 displacement), `pedal` (pedal-note return frequency), `octave_stab` (whether a style uses VoiceLeader.stab() accents)
+
+---
+
+## Cross-cutting (spans multiple phases, not one Phase N)
+- [x] X.1 `engine/song.py` `compose_song(preset_id, seed)` -- full pipeline integration. Gap found on review: every phase (1-7) built and tested its own mechanism in isolation; nothing had ever taken a real `Preset` and threaded it through a real end-to-end generation run (rhythm guitar x2 double-tracked, lead, bass, drums+fills, atmosphere, judge/retry). `engine/tests/test_song.py` verifies this for every real preset -- passed first try, confirming the independently-built phases actually compose.
+- [ ] X.2 Consume remaining preset fields (see `## Next` above) -- `compose_song` only wires `tuning_key`/`scale`/`dissonance`/`open_chance`/`bpm`/`bars`/`vocab`; `kick`/`group`/`pedal`/`octave_stab` are validated (Phase 1) and stored but nothing branches on them yet.
 
 ---
 
@@ -81,9 +85,9 @@ Scope: `## 5. Song-structure` + `### 10.3` + `## 3. Rhythm` (tempo-automation pa
 
 ## Phase 7 — Atmosphere
 Scope: `## 16. Atmospheric`.
-- [ ] P7.1 GM 90 pad / 56 hit
-- [ ] P7.2 Synth doubles motif
-- [ ] P7.3 Accent-synced hits
+- [x] P7.1 GM 90 pad / 56 hit
+- [x] P7.2 Synth doubles motif
+- [x] P7.3 Accent-synced hits
 
 ## Phase 8 — Reaper
 Scope: `## 11. Audio rendering` + `### 14.1` (reapy-boost, Surge XT, Supermassive).

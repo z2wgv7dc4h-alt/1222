@@ -7,5 +7,6 @@ Decisions:
 - Ww/Forge: port named symbols in PORTS.md; do not run Ww.
 - Engine is writer. No Suno/ACE-Step as composer.
 - New FCC loop: short CLAUDE.md + atomic TASKS + hooks + one task per /clear.
+- Completed P0.1: Created folder structure (engine/, engine/tests/, editor/, docs/, reference/, assets/drums/, assets/nam/)
 
 Not built yet. Phase 0 is first FCC work.

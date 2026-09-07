@@ -4,7 +4,7 @@ Work only `## Next`. One checkbox per session. Paste pytest before flipping to D
 P1+ : open `SCOPE-INDEX.md`, then only those headings in `god-tier-metal-scope.md`.
 
 ## Next
-1. [ ] P0.1 Create folders: `engine/`, `engine/tests/`, `editor/`, `docs/`, `reference/`, `assets/drums/`, `assets/nam/`
+1. [x] P0.1 Create folders: `engine/`, `engine/tests/`, `editor/`, `docs/`, `reference/`, `assets/drums/`, `assets/nam/`
 2. [ ] P0.2 Confirm `assets/drums/` has `.sfz` and `assets/nam/` has `.nam`. If missing, copy from the reference bundle. Stop if empty.
 3. [ ] P0.3 `engine/pyproject.toml` or `engine/requirements.txt` + pytest. `engine/tests/test_smoke.py` asserts `True`. `python -m pytest -q` passes.
 4. [ ] P0.4 Confirm `.gitignore` from the kit is present. First commit of docs + kit. No `assets/`, no `reference/`.

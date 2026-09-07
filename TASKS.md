@@ -4,7 +4,7 @@ Work only `## Next`. One checkbox per session. Paste pytest before flipping to D
 P1+ : open `SCOPE-INDEX.md`, then only those headings in `god-tier-metal-scope.md`.
 
 ## Next
-1. [ ] P4.4 Mine reference MIDI packs for drum-fill vocabulary (§18.6)
+1. [x] P4.4 Mine reference MIDI packs for drum-fill vocabulary (§18.6)
 2. [ ] P6.1 Weighted section graph
 3. [ ] P6.2 flatten+pickup
 4. [ ] P6.3 Half-time inside a section
@@ -67,7 +67,7 @@ Scope: `### 11.6` `### 11.7`.
 - [x] P4.1 Role → kit MIDI + fallback
 - [x] P4.2 Kick follows guitar accents on breakdown
 - [x] P4.3 Fills/blasts use shared-sequence
-- [ ] P4.4 Mine `reference/ww-forge-prior-attempt/user/midi/{whack_breakdown,jj_lakeside,jj_lamb,jj_dreaming,forge_grooves}` (63 real, legally-clean groove/breakdown MIDIs) for drum-fill density/placement vocabulary per §18.6 -- reference data only, never copied riffs; the symbolic engine (P4.1-P4.3) stays the actual writer. Queued after P4.1-P4.3 land to avoid touching drums.py while it's mid-build.
+- [x] P4.4 Mine `reference/midi-corpus/` (1967 real, legally-clean groove/breakdown MIDIs, user-supplied superset of the original 63-file sample) for drum-fill density/placement vocabulary per §18.6 -- reference data only, never copied riffs; the symbolic engine (P4.1-P4.3) stays the actual writer. Queued after P4.1-P4.3 land to avoid touching drums.py while it's mid-build.
 
 ## Phase 5 — Bass
 Scope: `### 14.2` (item 2, bass fretboard).

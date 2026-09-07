@@ -1,8 +1,8 @@
 # CURRENT
 
-task: P3.1-P3.12
-phase: 3
+task: P4.4
+phase: 4
 status: DONE
-last_pytest: 236 passed in 0.50s
-note: Phase 3 (Motif/riff) complete, including the optional P3.12. Seven modules (motif.py, groove.py, lead.py, performance.py, interplay.py, slam.py, riff.py): Motif dataclass with cell/delta pairing enforced in __post_init__ (every construction path, not just a standalone check); render_motif proves same contour at two roots; transpose/augment/invert/fragment develop ops; ThemeRegistry for cross-section reuse; gallop/stutter-chug cells; chromatic bias via theory.shade() measurably shifts interval distribution; VoiceLeader-driven lead lines clamped to register; double-tracking with two independently-seeded takes (explicit test guards the historical "just a delayed copy" mistake from scope §18.3); call-and-response; pinch-harmonic marking + chromatic creep; and P3.11 wires chords.solve_chord into an actual riff-generation call path (it had zero callers before this). Phases 1-5 are now all complete: 236 passed. Next: P4.4 (MIDI vocab mining, now unblocked) and Phase 6 (Structure).
+last_pytest: 256 passed in 4.48s
+note: P4.4 complete -- engine/midi_vocab.py mines reference/midi-corpus/ (1967 real files) for hits-per-beat/fill-length density stats, cached to engine/data/midi_vocab.json, wired into drums.py via generate_vocabulary_informed_blast_fill. Real finding: density clearly decreases as BPM rises (6.4 hits/beat at 80-100 BPM down to 2.8 at 220-240 BPM). Added mido>=1.3.0 dependency (already installed). Phases 1-5 + P4.4 all done. Phase 6 (Structure) still in progress in a parallel worktree.
 updated: 2026-09-08

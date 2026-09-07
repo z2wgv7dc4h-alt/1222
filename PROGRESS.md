@@ -51,3 +51,9 @@ Phase 0 complete. Ready for P1.1: Fretboard + MIDI↔(string,fret)
 - P3.8's double-tracking has an explicit regression test against the exact historical mistake documented in god-tier-metal-scope.md §18.3 (an earlier attempt's "double-tracking" was one performance time-shifted +8 ticks, not two independent takes).
 - Caught a bookkeeping gap while ticking boxes: TASKS.md's `## Next` section had been recording progress, but the underlying per-phase sections (Phase 2, Phase 3) were never ticked when `## Next` moved on to the next wave -- fixed now; will keep both in sync going forward.
 - 236 passed in 0.50s. Next: P4.4 (MIDI vocabulary mining, unblocked now that drums.py exists), then Phase 6 (Structure).
+
+## 2026-09-08 — P4.4 complete: MIDI corpus density vocabulary
+- `engine/midi_vocab.py`: parses the 1967-file real corpus with `mido` (new dependency, already installed), extracts hits-per-beat/fill-length/distinct-note stats per file, aggregates into 20-BPM-wide buckets + per-pack summaries, caches to `engine/data/midi_vocab.json`. `vocabulary_informed_hit_chance(bpm)` maps a target BPM to a density-informed `hit_chance`, wired into `drums.py` via `generate_vocabulary_informed_blast_fill` (a real call path, not a dead function).
+- Real finding worth remembering for preset tuning later: density clearly falls as BPM rises across the whole corpus (80-100 BPM: 6.4 hits/beat -> 220-240 BPM: 2.8 hits/beat) -- faster sections are rhythmically sparser in real reference material, not busier.
+- Honest deviations the agent flagged: this corpus has no tempo meta events (BPM comes from folder/file names via regex) and uses channel 0 for drums, not channel 9/10 as initially assumed.
+- 256 passed in 4.48s (main's full corpus is present, unlike the isolated worktree which correctly skipped the corpus-dependent test). Next: Phase 6 (Structure) landing shortly.

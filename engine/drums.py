@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import random
 
+from midi_vocab import vocabulary_informed_hit_chance
 from rhythm import RhythmRegistry, pick_blast_type
 
 _EPS = 1e-9
@@ -266,3 +267,46 @@ def generate_blast_fill(
             f"(no renderer wired for it in drums._BLAST_RENDERERS)"
         )
     return {"blast_type": blast_type, "cells": renderer(skeleton)}
+
+
+# --- P4.4: reference-MIDI density vocabulary informs fill hit_chance --------
+
+
+def generate_vocabulary_informed_blast_fill(
+    rhythm_id: str,
+    registry: RhythmRegistry,
+    total_beats: float,
+    allowed_lengths: list[float],
+    bpm: float,
+    blast_weights: dict[str, float],
+    rng: random.Random,
+    vocab: dict | None = None,
+) -> dict:
+    """`generate_blast_fill`, but `hit_chance` comes from the real
+    reference-MIDI corpus's density vocabulary for `bpm` (P4.4,
+    god-tier-metal-scope.md sec. 18.6) instead of being chosen by the
+    caller.
+
+    This is the real, wired call path for `midi_vocab.
+    vocabulary_informed_hit_chance` -- it is not a standalone function
+    nothing uses (anti-patterns.md: "a validator that is not called is not
+    done"). The corpus (1967 real GM drum-groove/fill MIDI files) is mined
+    once into `engine/data/midi_vocab.json` -- see `midi_vocab.
+    build_vocabulary` -- and never re-parsed here; this function only reads
+    that cache (or an explicitly-passed `vocab` dict, mainly for tests).
+
+    The grid itself is still `rhythm.RhythmRegistry`/`generate_blast_fill`
+    -- CLAUDE.md's law that the grid is the writer and audio/reference data
+    is only paint on top holds here too: the corpus never contributes an
+    actual note or cell, only a `hit_chance` density parameter.
+    """
+    hit_chance = vocabulary_informed_hit_chance(bpm, vocab=vocab)
+    return generate_blast_fill(
+        rhythm_id,
+        registry,
+        total_beats,
+        allowed_lengths,
+        hit_chance,
+        blast_weights,
+        rng,
+    )

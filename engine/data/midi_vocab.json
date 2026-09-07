@@ -1,0 +1,141 @@
+{
+  "bucket_width_bpm": 20,
+  "by_bpm_bucket": {
+    "100-120": {
+      "avg_distinct_notes_per_file": 5.4286,
+      "avg_hits_per_beat": 4.5043,
+      "file_count": 266,
+      "fill_length_beats": {
+        "count": 82,
+        "max": 14.0,
+        "median": 3.0,
+        "min": 2.0
+      }
+    },
+    "120-140": {
+      "avg_distinct_notes_per_file": 4.9516,
+      "avg_hits_per_beat": 5.107,
+      "file_count": 248,
+      "fill_length_beats": {
+        "count": 73,
+        "max": 8.0,
+        "median": 4.0,
+        "min": 2.0
+      }
+    },
+    "140-160": {
+      "avg_distinct_notes_per_file": 5.4434,
+      "avg_hits_per_beat": 4.1697,
+      "file_count": 433,
+      "fill_length_beats": {
+        "count": 104,
+        "max": 8.0,
+        "median": 4.0,
+        "min": 2.0
+      }
+    },
+    "160-180": {
+      "avg_distinct_notes_per_file": 5.625,
+      "avg_hits_per_beat": 3.1352,
+      "file_count": 112,
+      "fill_length_beats": {
+        "count": 26,
+        "max": 16.0,
+        "median": 4.0,
+        "min": 2.0
+      }
+    },
+    "180-200": {
+      "avg_distinct_notes_per_file": 4.7939,
+      "avg_hits_per_beat": 3.8452,
+      "file_count": 296,
+      "fill_length_beats": {
+        "count": 111,
+        "max": 12.0,
+        "median": 4.0,
+        "min": 2.0
+      }
+    },
+    "200-220": {
+      "avg_distinct_notes_per_file": 4.9352,
+      "avg_hits_per_beat": 3.3476,
+      "file_count": 386,
+      "fill_length_beats": {
+        "count": 105,
+        "max": 30.0,
+        "median": 4.0,
+        "min": 2.0
+      }
+    },
+    "220-240": {
+      "avg_distinct_notes_per_file": 5.5158,
+      "avg_hits_per_beat": 2.8331,
+      "file_count": 190,
+      "fill_length_beats": {
+        "count": 60,
+        "max": 8.0,
+        "median": 4.0,
+        "min": 2.0
+      }
+    },
+    "80-100": {
+      "avg_distinct_notes_per_file": 6.9444,
+      "avg_hits_per_beat": 6.3785,
+      "file_count": 36,
+      "fill_length_beats": {
+        "count": 18,
+        "max": 8.0,
+        "median": 4.0,
+        "min": 2.0
+      }
+    }
+  },
+  "by_pack": {
+    "jj_dreaming": {
+      "avg_distinct_notes_per_file": 5.7143,
+      "avg_hits_per_beat": 4.0681,
+      "file_count": 658,
+      "fill_length_beats": {
+        "count": 202,
+        "max": 30.0,
+        "median": 4.0,
+        "min": 2.0
+      }
+    },
+    "jj_lakeside": {
+      "avg_distinct_notes_per_file": 5.1483,
+      "avg_hits_per_beat": 3.7683,
+      "file_count": 681,
+      "fill_length_beats": {
+        "count": 229,
+        "max": 12.0,
+        "median": 4.0,
+        "min": 2.0
+      }
+    },
+    "jj_lamb": {
+      "avg_distinct_notes_per_file": 4.7118,
+      "avg_hits_per_beat": 4.2717,
+      "file_count": 524,
+      "fill_length_beats": {
+        "count": 148,
+        "max": 8.0,
+        "median": 4.0,
+        "min": 2.0
+      }
+    },
+    "whack_breakdown": {
+      "avg_distinct_notes_per_file": 5.25,
+      "avg_hits_per_beat": 3.2522,
+      "file_count": 104,
+      "fill_length_beats": {
+        "count": 0,
+        "max": null,
+        "median": null,
+        "min": null
+      }
+    }
+  },
+  "skipped_files": 0,
+  "total_files_parsed": 1967
+}

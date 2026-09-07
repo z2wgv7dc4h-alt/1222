@@ -8,6 +8,7 @@ from rhythm import (
     generate_rhythm,
     irvd_split,
     metric_polyrhythm,
+    phrase_plan,
     pick_blast_type,
     tile_cell,
     tuplet_grid,
@@ -231,30 +232,54 @@ def test_different_rhythm_ids_generate_independently():
 
 
 # --- P2.7: IRVD --------------------------------------------------------
+# Ported verbatim from reference/ww-forge-prior-attempt/engine/theory.py's
+# `phrase_plan` (PORTS.md originally pointed IRVD at style_packs.py, which
+# does not contain it -- corrected to theory.py after finding the real
+# source via riff_engine.py's "see theory.phrase_plan" comment).
 
 
-@pytest.mark.parametrize("total_bars", [2, 4, 5, 8, 13, 16, 32])
+@pytest.mark.parametrize("bars,expected", [
+    (1, ["I"]),
+    (2, ["I", "D"]),
+    (4, ["I", "R", "V", "D"]),
+    (6, ["I", "R", "R", "V", "V", "D"]),
+    (10, ["I", "R", "R", "R", "V", "V", "V", "V", "D", "D"]),
+])
+def test_phrase_plan_matches_source_worked_examples(bars, expected):
+    assert phrase_plan(bars) == expected
+
+
+def test_phrase_plan_clamps_rather_than_rejects_small_input():
+    # The real source clamps (`bars = max(1, int(bars))`) rather than
+    # raising -- this is a port, so behavioral fidelity to the source wins
+    # over the project's usual fail-closed convention.
+    assert phrase_plan(1) == phrase_plan(0) == phrase_plan(-5) == ["I"]
+
+
+@pytest.mark.parametrize("total_bars", [1, 2, 4, 5, 8, 13, 16, 32])
 def test_irvd_intro_always_one_bar(total_bars):
     split = irvd_split(total_bars)
     start, end = split["introduction"]
     assert (start, end) == (0, 1)
 
 
-@pytest.mark.parametrize("total_bars", [4, 8, 12, 16, 32])
-def test_irvd_destruction_is_last_quarter_rounded_half_up(total_bars):
+@pytest.mark.parametrize("total_bars", [2, 4, 6, 8, 12, 16, 32])
+def test_irvd_destruction_is_last_quarter_floor_min_one(total_bars):
     split = irvd_split(total_bars)
     start, end = split["destruction"]
     assert end == total_bars
-    expected_len = max(1, int(total_bars * 0.25 + 0.5))
+    expected_len = max(1, total_bars // 4)
     assert end - start == expected_len
 
 
-@pytest.mark.parametrize("total_bars", [2, 3, 4, 5, 6, 7, 8, 9, 13, 16, 20, 32])
-def test_irvd_phases_are_contiguous_and_cover_total(total_bars):
+@pytest.mark.parametrize("total_bars", [1, 2, 3, 4, 5, 6, 7, 8, 9, 13, 16, 20, 32])
+def test_irvd_phases_present_are_contiguous_and_cover_total(total_bars):
     split = irvd_split(total_bars)
     order = ["introduction", "repetition", "variation", "destruction"]
     prev_end = 0
     for phase in order:
+        if phase not in split:
+            continue
         start, end = split[phase]
         assert start == prev_end
         assert end >= start
@@ -262,8 +287,5 @@ def test_irvd_phases_are_contiguous_and_cover_total(total_bars):
     assert prev_end == total_bars
 
 
-def test_irvd_rejects_too_small_total():
-    with pytest.raises(ValueError):
-        irvd_split(1)
-    with pytest.raises(ValueError):
-        irvd_split(0)
+def test_irvd_split_single_bar_has_only_introduction():
+    assert irvd_split(1) == {"introduction": (0, 1)}

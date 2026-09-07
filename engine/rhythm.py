@@ -263,54 +263,47 @@ class RhythmRegistry:
 # --- P2.7: IRVD (Introduction / Repetition / Variation / Destruction) ------
 
 
-def irvd_split(total_bars: int) -> dict[str, tuple[int, int]]:
-    """Bar-range boundaries (half-open [start, end), 0-indexed) for the four
-    IRVD development phases of a single section.
+def phrase_plan(bars: int) -> list[str]:
+    """One label per bar: what that bar does to the section's single idea.
 
-    Ported per PORTS.md's IRVD row ("Intro 1 bar; Destruction last quarter;
-    rest Rep/Var") -- the source file named for this port,
-    reference/ww-forge-prior-attempt/engine/style_packs.py, does not
-    actually contain IRVD logic to port verbatim (it only holds PACKS/
-    ALIASES/VOCAB), so this implements the documented split rule directly
-    rather than inventing a different one. See the deviation note in the
-    task report.
+      I  Introduction -- state the cell once.
+      R  Repetition   -- play it again, verbatim, so the ear locks on.
+      V  Variation    -- same skeleton, moved/re-voiced notes.
+      D  Destruction  -- fragment and densify into the next section.
 
-    Rules (documented, since "last quarter" and the Rep/Var split need an
-    explicit rounding rule to be testable):
-      - Introduction is always exactly 1 bar.
-      - Destruction is the last quarter of `total_bars`, rounded HALF UP
-        (`int(total_bars * 0.25 + 0.5)`), with a minimum of 1 bar.
-      - Whatever bars remain after Introduction and Destruction are split
-        evenly between Repetition and Variation, Repetition getting the
-        extra bar if the remainder is odd (Repetition is listed first in
-        IRVD's own name, so it gets priority on a tie).
-      - `total_bars` must be >= 2 (1 bar for Introduction + at least 1 bar
-        for Destruction).
+    Ported verbatim from reference/ww-forge-prior-attempt/engine/theory.py's
+    `phrase_plan` (found via riff_engine.py's "see theory.phrase_plan"
+    comment -- PORTS.md originally pointed IRVD at style_packs.py, which
+    turned out to hold only PACKS/ALIASES/VOCAB; PORTS.md has been corrected).
+
+    Introduction is always exactly one bar; Destruction takes the last
+    quarter (floor division, minimum 1 bar); the remainder splits between
+    Repetition and Variation with the odd bar going to Variation. `bars`
+    is clamped to >= 1 rather than rejected, matching the source exactly.
     """
-    if total_bars < 2:
-        raise ValueError("total_bars must be >= 2 (need room for Intro + Destruction)")
+    bars = max(1, int(bars))
+    if bars == 1:
+        return ["I"]
+    d = max(1, bars // 4)
+    rem = max(0, bars - 1 - d)
+    v = (rem + 1) // 2
+    r = rem - v
+    return ["I"] + ["R"] * r + ["V"] * v + ["D"] * d
 
-    intro_bars = 1
-    destruction_bars = max(1, int(total_bars * 0.25 + 0.5))
-    remaining = total_bars - intro_bars - destruction_bars
-    if remaining < 0:
-        # total_bars is small enough that quarter-rounding + the 1-bar floor
-        # would overlap Introduction; shrink Destruction to fit.
-        destruction_bars = total_bars - intro_bars
-        remaining = 0
 
-    repetition_bars = (remaining + 1) // 2
-    variation_bars = remaining - repetition_bars
-
-    intro_end = intro_bars
-    rep_end = intro_end + repetition_bars
-    var_end = rep_end + variation_bars
-    destruction_end = var_end + destruction_bars
-    assert destruction_end == total_bars
-
-    return {
-        "introduction": (0, intro_end),
-        "repetition": (intro_end, rep_end),
-        "variation": (rep_end, var_end),
-        "destruction": (var_end, destruction_end),
-    }
+def irvd_split(total_bars: int) -> dict[str, tuple[int, int]]:
+    """Convenience wrapper over `phrase_plan`: half-open [start, end) bar
+    ranges for each phase actually present, 0-indexed, derived by scanning
+    the same label list `phrase_plan` returns (never computed separately,
+    so the two can't drift apart)."""
+    labels = phrase_plan(total_bars)
+    ranges: dict[str, tuple[int, int]] = {}
+    names = {"I": "introduction", "R": "repetition", "V": "variation", "D": "destruction"}
+    i = 0
+    while i < len(labels):
+        j = i
+        while j < len(labels) and labels[j] == labels[i]:
+            j += 1
+        ranges[names[labels[i]]] = (i, j)
+        i = j
+    return ranges

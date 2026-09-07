@@ -1,0 +1,13 @@
+origin: https://github.com/z2wgv7dc4h-alt/1222.git
+
+On the PC, inside Desktop\god-tier-metal after copying the kit:
+
+git init
+git add CLAUDE.md TASKS.md PLAN.md PORTS.md HANDOFF.md PROGRESS.md MAP.md SESSION.txt README-SETUP.txt .gitignore docs .claude
+git commit -m "P0: kit"
+git branch -M main
+git remote add origin https://github.com/z2wgv7dc4h-alt/1222.git
+git push -u origin main
+
+Do not add assets/ or reference/.
+After this, FCC close will push when origin exists.

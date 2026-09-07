@@ -1,0 +1,29 @@
+# God Tier Metal
+
+<!-- Compact: keep active task id, files touched, pytest command. Drop reference hunting. -->
+
+Local engine that writes djent / tech-death / slam. Bar: Infant Annihilator, Born of Osiris. Python writes notes. React later. Reaper renders. No cloud writer.
+
+## Law
+- Grid is the writer. Audio models are paint after the score.
+- Note must be scale-legal and a real `(string, fret)`. Unwired checks do not count.
+- Seeded RNG. Same seed = same bytes.
+- Guided = sliders on the same params as Pro.
+- No vocals. Do not edit `../Ww`. Do not extend `123/` or `reference/claude-code-first-attempt/`.
+- Do not bulk-read `/reference`. Open the one path the task names (`PORTS.md`).
+
+## Build
+```
+cd engine && python -m pytest -q
+```
+Presets: strict JSON, discover with `*.json` glob, never a name list.
+
+## Session
+1. Read `docs/CURRENT.md` then `TASKS.md` `## Next` — one box.
+2. Plan mode. Implement that box only.
+3. Run pytest. Paste output.
+4. Stop auto-runs the close skill. You do not have to type `/close`.
+5. Type `/clear` only when you want a fresh session. Do not leave auto mode on overnight.
+
+Before a P1+ task: open `SCOPE-INDEX.md`, then only those headings in `god-tier-metal-scope.md`. Never the whole scope file.
+Skills: `/close`, `/port`. Ports in `PORTS.md`.

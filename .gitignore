@@ -1,0 +1,17 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+node_modules/
+*.rpp
+*.RPP
+*.wav
+*.mp3
+*.flac
+render/
+.claude/logs/
+.claude/settings.local.json
+CLAUDE.local.md
+assets/
+reference/
+*.nam

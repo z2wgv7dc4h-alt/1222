@@ -1,0 +1,14 @@
+{
+  "id": "chill",
+  "description": "Low-density breather, consonant. Airy, Periphery slow-part feel.",
+  "tuning_key": "drop_ab_7",
+  "scale": "minor",
+  "dissonance": 0.05,
+  "bpm": 128,
+  "bars": 4,
+  "feel": "bounce",
+  "open_chance": 0.55,
+  "octave_stab": true,
+  "kick": "sparse",
+  "vocab": {"weights": {"0": 5, "3": 4, "7": 4, "8": 3, "10": 2, "5": 1}, "motion": 0.55}
+}

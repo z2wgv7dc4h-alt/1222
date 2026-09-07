@@ -1,0 +1,16 @@
+{
+  "id": "djent",
+  "description": "Fast alternate-picked palm mutes grouped in threes over a Euclidean kick, open low string ringing out on the strong points. Heavier on the pedal than groovy, faster and far less scalar than tech.",
+  "tuning_key": "drop_a_7",
+  "scale": "phrygian",
+  "dissonance": 0.35,
+  "bpm": 170,
+  "bars": 4,
+  "feel": "bounce",
+  "open_chance": 0.50,
+  "octave_stab": true,
+  "kick": "euclid",
+  "group": 3,
+  "pedal": 0.85,
+  "vocab": {"weights": {"0": 20, "1": 3, "7": 3, "8": 1, "5": 1}, "motion": 0.12}
+}

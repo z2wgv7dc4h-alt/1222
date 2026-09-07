@@ -1,0 +1,14 @@
+{
+  "id": "tech",
+  "description": "Extreme technical/dissonant deathcore. Kick-locked triplet chug on an 8-string, b2 and tritone weighted as heavily as the root.",
+  "tuning_key": "drop_e_8",
+  "scale": "cluster",
+  "dissonance": 0.85,
+  "bpm": 160,
+  "bars": 4,
+  "feel": "triplet",
+  "open_chance": 0.10,
+  "octave_stab": false,
+  "kick": "lock",
+  "vocab": {"weights": {"0": 6, "1": 5, "6": 5, "11": 3, "8": 3, "3": 2, "7": 1}, "motion": 0.35}
+}

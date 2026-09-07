@@ -4,26 +4,31 @@ Work only `## Next`. One checkbox per session. Paste pytest before flipping to D
 P1+ : open `SCOPE-INDEX.md`, then only those headings in `god-tier-metal-scope.md`.
 
 ## Next
-1. [x] P0.1 Create folders: `engine/`, `engine/tests/`, `editor/`, `docs/`, `reference/`, `assets/drums/`, `assets/nam/`
-2. [x] P0.2 Confirm `assets/drums/` has `.sfz` and `assets/nam/` has `.nam`. If missing, copy from the reference bundle. Stop if empty.
-3. [x] P0.3 `engine/pyproject.toml` or `engine/requirements.txt` + pytest. `engine/tests/test_smoke.py` asserts `True`. `python -m pytest -q` passes.
-4. [x] P0.4 Confirm `.gitignore` from the kit is present. First commit of docs + kit. No `assets/`, no `reference/`.
-5. [x] P0.5 Confirm `docs/STATUS.md` template. No Working claims.
+1. [x] P1.1 `Fretboard` + MIDI↔(string,fret)
+2. [x] P1.2 Port `pitch_to_fret` from `reference/ww-forge-prior-attempt/engine/tab_score.py`
+3. [x] P1.3 TEST: unplayable MIDI rejected
+4. [ ] P1.4 Scale library + cluster + power. Unique intervals
+5. [ ] P1.5 TEST: no duplicate non-alias scales
+6. [ ] P1.6 Tuning JSON from source MIDI
+7. [ ] P1.7 Preset ids: groovy, djent, chill, tech, slam, melodic. Strict JSON
+8. [ ] P1.8 Schema validator called by loader. TEST malformed raises
+9. [ ] P1.9 TEST glob `*.json` loads every file
+10. [ ] P1.10 Port VoiceLeader, shade(), ARC
 
 ---
 
 ## Phase 0 — Repo
-- [ ] P0.1 folders
-- [ ] P0.2 assets present
-- [ ] P0.3 pytest smoke
-- [ ] P0.4 gitignore / commit
-- [ ] P0.5 STATUS template
+- [x] P0.1 folders
+- [x] P0.2 assets present
+- [x] P0.3 pytest smoke
+- [x] P0.4 gitignore / commit
+- [x] P0.5 STATUS template
 
 ## Phase 1 — Tonal + presets
 Scope: `## 2. Tonal/Harmonic` + `### 18.2`. Then `PORTS.md` Ww.
-- [ ] P1.1 `Fretboard` + MIDI↔(string,fret)
-- [ ] P1.2 Port `pitch_to_fret` from `reference/ww-forge-prior-attempt/engine/tab_score.py`
-- [ ] P1.3 TEST: unplayable MIDI rejected
+- [x] P1.1 `Fretboard` + MIDI↔(string,fret)
+- [x] P1.2 Port `pitch_to_fret` from `reference/ww-forge-prior-attempt/engine/tab_score.py`
+- [x] P1.3 TEST: unplayable MIDI rejected
 - [ ] P1.4 Scale library + cluster + power. Unique intervals
 - [ ] P1.5 TEST: no duplicate non-alias scales
 - [ ] P1.6 Tuning JSON from source MIDI

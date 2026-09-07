@@ -1,7 +1,14 @@
 {
   "id": "groovy",
-  "description": "Plain groove/bounce baseline. Power chords, fixed kick, pedal root answered on the 5th. Formerly a band-named preset (see PORTS.md), renamed to a mood id.",
+  "description": "Plain groove/bounce baseline. Power chords, fixed kick, pedal root answered on the 5th. The baseline archetype.",
   "tuning_key": "drop_g_7",
   "scale": "minor",
-  "dissonance": 0.15
+  "dissonance": 0.15,
+  "bpm": 148,
+  "bars": 4,
+  "feel": "bounce",
+  "open_chance": 0.42,
+  "octave_stab": true,
+  "kick": "bounce",
+  "vocab": {"weights": {"0": 12, "7": 4}, "motion": 0.0}
 }

@@ -1,7 +1,14 @@
 {
   "id": "melodic",
-  "description": "Higher register, 3rds and 6ths ringing over the mutes -- After the Burial-style atmosphere, kept out of the id per the mood-naming lesson.",
+  "description": "Higher register, 3rds and 6ths over the mutes -- After the Burial-style atmosphere.",
   "tuning_key": "drop_ab_7",
   "scale": "minor",
-  "dissonance": 0.20
+  "dissonance": 0.20,
+  "bpm": 145,
+  "bars": 4,
+  "feel": "bounce",
+  "open_chance": 0.60,
+  "octave_stab": true,
+  "kick": "bounce",
+  "vocab": {"weights": {"0": 4, "3": 5, "7": 3, "8": 4, "10": 2, "5": 2, "2": 1}, "motion": 0.60}
 }

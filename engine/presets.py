@@ -18,7 +18,30 @@ from scales import get_scale
 PRESETS_DIR = Path(__file__).resolve().parent / "presets"
 TUNINGS_PATH = PRESETS_DIR / "tunings.json"
 
-REQUIRED_PRESET_KEYS = {"id", "description", "tuning_key", "scale", "dissonance"}
+REQUIRED_PRESET_KEYS = {
+    "id", "description", "tuning_key", "scale", "dissonance",
+    "bpm", "bars", "feel", "open_chance", "octave_stab", "kick", "vocab",
+}
+# Old band-linked ids from the ported project, kept working per its own
+# documented lesson: "started with band-named presets... deliberately moved
+# away from them to mood/archetype names... keeping the old band-linked ids
+# as ALIASES purely for backward compatibility." Never a second preset id,
+# only a resolver.
+ALIASES = {
+    "psycho": "tech",
+    "sots": "tech",
+    "soi": "tech",
+    "boo": "djent",
+    "vom": "groovy",
+    "atb": "melodic",
+    "periphery": "chill",
+}
+
+
+def resolve_preset_id(name: str) -> str:
+    """Canonical preset id for a name or a stale band-linked alias."""
+    key = (name or "").strip().lower()
+    return ALIASES.get(key, key)
 
 
 @dataclass(frozen=True)
@@ -29,12 +52,27 @@ class Tuning:
 
 
 @dataclass(frozen=True)
+class Vocab:
+    weights: dict[int, int]
+    motion: float
+
+
+@dataclass(frozen=True)
 class Preset:
     id: str
     description: str
     tuning_key: str
     scale: str
     dissonance: float
+    bpm: int
+    bars: int
+    feel: str
+    open_chance: float
+    octave_stab: bool
+    kick: str
+    vocab: Vocab
+    group: int | None = None
+    pedal: float | None = None
 
 
 def load_tunings(path: Path | None = None) -> dict[str, Tuning]:
@@ -107,6 +145,47 @@ def validate_preset(
     if not (0.0 <= float(dissonance) <= 1.0):
         raise ValueError(f"preset '{preset_id}': 'dissonance' must be within [0, 1]")
 
+    if not isinstance(data["bpm"], (int, float)) or isinstance(data["bpm"], bool) or data["bpm"] <= 0:
+        raise ValueError(f"preset '{preset_id}': 'bpm' must be a positive number")
+    if not isinstance(data["bars"], int) or isinstance(data["bars"], bool) or data["bars"] <= 0:
+        raise ValueError(f"preset '{preset_id}': 'bars' must be a positive int")
+    if not isinstance(data["feel"], str) or not data["feel"]:
+        raise ValueError(f"preset '{preset_id}': 'feel' must be a non-empty string")
+    open_chance = data["open_chance"]
+    if isinstance(open_chance, bool) or not isinstance(open_chance, (int, float)) or not (0.0 <= float(open_chance) <= 1.0):
+        raise ValueError(f"preset '{preset_id}': 'open_chance' must be a number within [0, 1]")
+    if not isinstance(data["octave_stab"], bool):
+        raise ValueError(f"preset '{preset_id}': 'octave_stab' must be a bool")
+    if not isinstance(data["kick"], str) or not data["kick"]:
+        raise ValueError(f"preset '{preset_id}': 'kick' must be a non-empty string")
+
+    vocab = data["vocab"]
+    if not isinstance(vocab, dict) or "weights" not in vocab or "motion" not in vocab:
+        raise ValueError(f"preset '{preset_id}': 'vocab' must have 'weights' and 'motion'")
+    weights = vocab["weights"]
+    if not isinstance(weights, dict) or not weights:
+        raise ValueError(f"preset '{preset_id}': 'vocab.weights' must be a non-empty object")
+    for interval_str, weight in weights.items():
+        try:
+            interval = int(interval_str)
+        except (TypeError, ValueError):
+            raise ValueError(f"preset '{preset_id}': vocab interval key '{interval_str}' is not an int") from None
+        if not (0 <= interval <= 11):
+            raise ValueError(f"preset '{preset_id}': vocab interval {interval} out of 0-11 range")
+        if isinstance(weight, bool) or not isinstance(weight, (int, float)) or weight < 0:
+            raise ValueError(f"preset '{preset_id}': vocab weight for interval {interval} must be >= 0")
+    motion = vocab["motion"]
+    if isinstance(motion, bool) or not isinstance(motion, (int, float)) or not (0.0 <= float(motion) <= 1.0):
+        raise ValueError(f"preset '{preset_id}': 'vocab.motion' must be within [0, 1]")
+
+    if "group" in data and data["group"] is not None:
+        if not isinstance(data["group"], int) or isinstance(data["group"], bool) or data["group"] <= 0:
+            raise ValueError(f"preset '{preset_id}': 'group' must be a positive int when present")
+    if "pedal" in data and data["pedal"] is not None:
+        pedal = data["pedal"]
+        if isinstance(pedal, bool) or not isinstance(pedal, (int, float)) or not (0.0 <= float(pedal) <= 1.0):
+            raise ValueError(f"preset '{preset_id}': 'pedal' must be within [0, 1] when present")
+
 
 def load_preset(path: Path, tunings: dict[str, Tuning] | None = None) -> Preset:
     """Load and validate one preset JSON file. The validator runs here, on
@@ -114,12 +193,25 @@ def load_preset(path: Path, tunings: dict[str, Tuning] | None = None) -> Preset:
     table = tunings if tunings is not None else load_tunings()
     data = json.loads(path.read_text())
     validate_preset(data, table, expected_id=path.stem)
+    vocab_data = data["vocab"]
     return Preset(
         id=data["id"],
         description=data["description"],
         tuning_key=data["tuning_key"],
         scale=data["scale"],
         dissonance=float(data["dissonance"]),
+        bpm=data["bpm"],
+        bars=data["bars"],
+        feel=data["feel"],
+        open_chance=float(data["open_chance"]),
+        octave_stab=data["octave_stab"],
+        kick=data["kick"],
+        vocab=Vocab(
+            weights={int(k): v for k, v in vocab_data["weights"].items()},
+            motion=float(vocab_data["motion"]),
+        ),
+        group=data.get("group"),
+        pedal=(float(data["pedal"]) if data.get("pedal") is not None else None),
     )
 
 

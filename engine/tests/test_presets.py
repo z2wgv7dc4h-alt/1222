@@ -10,8 +10,24 @@ from presets import (
     load_all_presets,
     load_preset,
     load_tunings,
+    resolve_preset_id,
     validate_preset,
 )
+
+BASE_VALID_PRESET = {
+    "id": "bogus",
+    "description": "a valid base preset for mutation in tests",
+    "tuning_key": "drop_g_7",
+    "scale": "minor",
+    "dissonance": 0.5,
+    "bpm": 140,
+    "bars": 4,
+    "feel": "bounce",
+    "open_chance": 0.5,
+    "octave_stab": True,
+    "kick": "bounce",
+    "vocab": {"weights": {"0": 10, "7": 4}, "motion": 0.2},
+}
 
 EXPECTED_TUNINGS = {
     "drop_b_7": (["B", "F#", "B", "E", "G#", "C#", "F#"], [35, 42, 47, 52, 56, 61, 66]),
@@ -146,6 +162,65 @@ def test_validate_preset_standalone_also_rejects_bad_data():
     tunings = load_tunings()
     with pytest.raises(ValueError):
         validate_preset({"id": "x"}, tunings)
+
+
+def test_load_preset_rejects_bad_vocab_interval(tmp_path):
+    tunings = load_tunings()
+    bad = dict(BASE_VALID_PRESET, vocab={"weights": {"15": 5}, "motion": 0.2})
+    path = tmp_path / "bogus.json"
+    path.write_text(json.dumps(bad))
+    with pytest.raises(ValueError):
+        load_preset(path, tunings)
+
+
+def test_load_preset_rejects_negative_vocab_weight(tmp_path):
+    tunings = load_tunings()
+    bad = dict(BASE_VALID_PRESET, vocab={"weights": {"0": -1}, "motion": 0.2})
+    path = tmp_path / "bogus.json"
+    path.write_text(json.dumps(bad))
+    with pytest.raises(ValueError):
+        load_preset(path, tunings)
+
+
+def test_load_preset_rejects_bpm_out_of_range(tmp_path):
+    tunings = load_tunings()
+    bad = dict(BASE_VALID_PRESET, bpm=0)
+    path = tmp_path / "bogus.json"
+    path.write_text(json.dumps(bad))
+    with pytest.raises(ValueError):
+        load_preset(path, tunings)
+
+
+def test_load_preset_accepts_valid_full_preset(tmp_path):
+    tunings = load_tunings()
+    path = tmp_path / "bogus.json"
+    path.write_text(json.dumps(BASE_VALID_PRESET))
+    preset = load_preset(path, tunings)
+    assert preset.bpm == 140
+    assert preset.vocab.weights == {0: 10, 7: 4}
+    assert preset.group is None
+    assert preset.pedal is None
+
+
+# -- preset id aliases: old band-linked ids resolve, never a second preset --
+
+def test_resolve_preset_id_maps_old_band_ids():
+    assert resolve_preset_id("periphery") == "chill"
+    assert resolve_preset_id("psycho") == "tech"
+    assert resolve_preset_id("boo") == "djent"
+
+
+def test_resolve_preset_id_passes_through_real_ids():
+    for real_id in EXPECTED_PRESET_IDS:
+        assert resolve_preset_id(real_id) == real_id
+
+
+def test_resolve_preset_id_aliases_never_shadow_a_real_preset_file():
+    # every alias target must be a real, loadable preset id
+    from presets import ALIASES
+    real_ids = set(load_all_presets())
+    for target in ALIASES.values():
+        assert target in real_ids
 
 
 # -- P1.9: glob discovery, never a hardcoded filename list -------------------

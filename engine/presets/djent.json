@@ -1,0 +1,7 @@
+{
+  "id": "djent",
+  "description": "Fast open-string palm-mute chug over a Euclidean kick, b2 leaning on the pedal harder than groovy. Reference-band feel: Periphery/Animals as Leaders style displacement, without naming a band as the id.",
+  "tuning_key": "drop_a_7",
+  "scale": "phrygian",
+  "dissonance": 0.35
+}

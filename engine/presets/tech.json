@@ -1,0 +1,7 @@
+{
+  "id": "tech",
+  "description": "Extreme technical/dissonant deathcore. Kick-locked triplet chug on an 8-string, b2 and tritone weighted as heavily as the root. Bar set by Infant Annihilator-tier output.",
+  "tuning_key": "drop_e_8",
+  "scale": "cluster",
+  "dissonance": 0.85
+}

@@ -1,0 +1,7 @@
+{
+  "id": "melodic",
+  "description": "Higher register, 3rds and 6ths ringing over the mutes -- After the Burial-style atmosphere, kept out of the id per the mood-naming lesson.",
+  "tuning_key": "drop_ab_7",
+  "scale": "minor",
+  "dissonance": 0.20
+}

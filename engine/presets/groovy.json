@@ -1,0 +1,7 @@
+{
+  "id": "groovy",
+  "description": "Plain groove/bounce baseline. Power chords, fixed kick, pedal root answered on the 5th. Formerly a band-named preset (see PORTS.md), renamed to a mood id.",
+  "tuning_key": "drop_g_7",
+  "scale": "minor",
+  "dissonance": 0.15
+}

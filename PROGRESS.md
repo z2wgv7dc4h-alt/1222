@@ -36,3 +36,10 @@ Phase 0 complete. Ready for P1.1: Fretboard + MIDI↔(string,fret)
 - Expanded TASKS.md against a full re-read of god-tier-metal-scope.md: added P3.9-P3.12 (call-and-response, slam devices, chord-solver wiring, optional 2nd guitar), P6.6-P6.7 (atmospheric interlude section type, tempo curve), P9.7 (section-level presets) -- all real scope items that had no task box.
 - Deleted stray empty "New Text Document.txt".
 - 159 passed in 0.24s. Next: Phase 3 (Motif/riff), Phase 4 (Drums), Phase 5 (Bass) -- dispatching as parallel agents next.
+
+## 2026-09-08 — Phase 4 (Drums) + Phase 5 (Bass) complete; Phase 3 (Motif) in progress
+- Both merged cleanly from separate worktrees, no conflicts (distinct new files: drums.py, bass.py).
+- P4.1-P4.3: `engine/drums.py` -- role->MIDI map for the real SFZ kit (god-tier-metal-scope.md sec.11.7), wired CHINA->CRASH_2 fallback (this kit has no china sample), kick_follows_guitar (exact hit-position match), generate_blast_fill using the shared RhythmRegistry + pick_blast_type, three blast renderers (traditional/gravity/hammer).
+- P5.1-P5.2: `engine/bass.py` -- derive_bass_tuning anchors the bass's TOP string an octave below the guitar's lowest open string then descends in perfect 4ths (guarantees the bass stays below the guitar even for wide extended-range tunings, unlike naively copying the guitar's lowest 4 strings down an octave); follow_guitar_rhythm locks to the guitar's hit/rest pattern but resolves every hit to the bass's own playable position, searching every octave of the target pitch class and falling back to the nearest reachable one.
+- User supplied a much larger real MIDI corpus (`C:\Forge\user\midi\MIDIS.zip`, 1967 files) -- extracted into `reference/midi-corpus/` (gitignored) for P4.4, superseding the sparse ~63-file sample that shipped in the original reference bundle.
+- 189 passed in 0.30s. Next: Phase 3 (Motif) landing shortly, then P4.4 (MIDI vocab mining), then Phase 6 (Structure).

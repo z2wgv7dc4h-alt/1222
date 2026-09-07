@@ -15,8 +15,8 @@ Update only after grep or pytest. No memory claims.
 | Chord-shape solver (P1.11) | WIRED+TESTED | 159 passed (full suite) |
 | Rhythm two-layer + polymeter/tuplets/blasts/IRVD (Phase 2) | WIRED+TESTED | 159 passed (full suite) |
 | Motif | MISSING | |
-| Drums | MISSING | |
-| Bass | MISSING | |
+| Drums (P4.1-P4.3; P4.4 MIDI-vocab mining still open) | WIRED+TESTED | 172 passed in 0.35s |
+| Bass | WIRED+TESTED | 189 passed in 0.30s |
 | Structure | MISSING | |
 | Atmosphere | MISSING | |
 | Reaper | MISSING | |

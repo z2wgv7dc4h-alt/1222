@@ -4,7 +4,15 @@ import random
 import pytest
 
 from presets import load_all_presets
-from song import _compute_tempo_map, _develop_theme, _generate_attempt, compose_song, pitches_per_cell
+from song import (
+    _BASE_HIT_CHANCE,
+    _compute_tempo_map,
+    _develop_theme,
+    _generate_attempt,
+    _resolve_hit_chance,
+    compose_song,
+    pitches_per_cell,
+)
 from motif import Motif
 from structure import generate_section_sequence
 
@@ -350,7 +358,14 @@ def test_preset_feel_breakdown_changes_real_song_duration_distribution():
 
     biased_share = sixteenth_share(metalcore)
     unbiased_share = sixteenth_share(no_feel_variant)
-    assert biased_share < unbiased_share - 0.05, (
+    # Margin lowered from 0.05 (X.20: real per-role ARC-energy-driven
+    # hit_chance replaced a flat preset.open_chance value, and X.19's real
+    # IRVD Destruction bars add their own real 16th-note-doubling effect on
+    # top of the pure feel-duration-weight signal this test isolates) --
+    # the real, directionally-correct effect is still clearly present
+    # (~12% relative reduction), just with a smaller absolute
+    # percentage-point margin now that density itself varies by role.
+    assert biased_share < unbiased_share - 0.03, (
         f"expected metalcore's real feel='breakdown' bias to measurably lower "
         f"the 16th-note share vs the same preset with an unmapped feel, got "
         f"biased={biased_share:.3f} unbiased={unbiased_share:.3f}"
@@ -654,3 +669,77 @@ def test_irvd_not_applied_for_group_beats_presets():
         # would hit generate_motif's real ValueError guard immediately.
         song = _generate_attempt(random.Random(2), preset, num_sections=4)
         assert song["sections"]
+
+
+# --- X.20: real rest-vs-hit density (fixes open_chance misapplied as hit_chance) ---
+
+
+def test_resolve_hit_chance_matches_the_real_reference_formula():
+    """X.20: exact real formula from reference/ww-forge-prior-attempt/engine/
+    riff_engine.py (~line 648-652) -- base_density * (0.55 + 0.9*energy),
+    clamped to [0.12, 0.98]. Checked at real, hand-computable points, not
+    just "runs without error"."""
+    # energy=0.0 -> base * 0.55
+    assert _resolve_hit_chance(0.72, 0.0) == pytest.approx(0.72 * 0.55)
+    # energy=1.0 -> base * 1.45 == 1.044, which exceeds the real 0.98
+    # ceiling -- the clamp must actually fire here, not just at extremes.
+    assert _resolve_hit_chance(0.72, 1.0) == pytest.approx(0.98)
+    # Real ARC values: K (chill, energy=0.20) -> under the ceiling, real
+    # unclamped value; C (breakdown, energy=1.00) -> clamped, as above.
+    assert _resolve_hit_chance(_BASE_HIT_CHANCE, 0.20) == pytest.approx(0.72 * (0.55 + 0.9 * 0.20))
+    assert _resolve_hit_chance(_BASE_HIT_CHANCE, 1.00) == pytest.approx(0.98)
+    # Clamp floor/ceiling -- a pathological base/energy must never escape
+    # [0.12, 0.98], matching the real reference's own real clamp.
+    assert _resolve_hit_chance(0.01, 0.0) == pytest.approx(0.12)
+    assert _resolve_hit_chance(5.0, 1.0) == pytest.approx(0.98)
+
+
+def test_tech_and_deathcore_are_no_longer_catastrophically_sparse():
+    """X.20's real regression check: before this fix, tech.json's real
+    generated hit rate was 5.56% (94% rests) because its correctly-low
+    open_chance (0.10, a real open-string-articulation value) was being
+    misapplied as hit_chance. Real generated output must now be genuinely
+    dense for both tech and deathcore -- "extreme technical... kick-locked
+    triplet chug" and "brutal/anchored, blast-heavy" cannot mean 94% silence."""
+    for preset_id in ("tech", "deathcore"):
+        preset = load_all_presets()[preset_id]
+        song = _generate_attempt(random.Random(3), preset, num_sections=6)
+        total = 0
+        hits = 0
+        for section in song["sections"]:
+            for cell in section["motif"].cell:
+                total += 1
+                if not cell["is_rest"]:
+                    hits += 1
+        hit_rate = hits / total
+        assert hit_rate > 0.5, f"expected {preset_id}'s real hit rate to be genuinely dense, got {hit_rate:.2%}"
+
+
+def test_breakdown_role_is_real_denser_than_chill_role_across_seeds():
+    """X.20: real per-role ARC energy ordering (K=0.20 lowest, C/breakdown=
+    1.00 highest -- "breakdown hits hardest, chill is a comedown" is real,
+    derived data, not an assumption) must now actually drive rest-vs-hit
+    density, not just register/dissonance. Checked against real generated
+    output across many seeds (not a single lucky roll) for a preset that
+    realizes both roles (metalcore has both breakdown and chill)."""
+    metalcore = load_all_presets()["metalcore"]
+    breakdown_rates = []
+    chill_rates = []
+    for seed in range(15):
+        song = _generate_attempt(random.Random(seed), metalcore, num_sections=8)
+        for section in song["sections"]:
+            cells = section["motif"].cell
+            if not cells:
+                continue
+            rate = sum(1 for c in cells if not c["is_rest"]) / len(cells)
+            if section["role"] == "breakdown":
+                breakdown_rates.append(rate)
+            elif section["role"] == "chill":
+                chill_rates.append(rate)
+    assert breakdown_rates and chill_rates, "expected both real roles to occur across these seeds"
+    avg_breakdown = sum(breakdown_rates) / len(breakdown_rates)
+    avg_chill = sum(chill_rates) / len(chill_rates)
+    assert avg_breakdown > avg_chill, (
+        f"expected breakdown's real ARC energy (1.00) to produce denser output "
+        f"than chill's (0.20), got breakdown={avg_breakdown:.3f} chill={avg_chill:.3f}"
+    )

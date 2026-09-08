@@ -115,6 +115,44 @@ _THEME_DEVELOP_TRANSPOSE_DEGREES = 2
 # claim that 0.5 is musically special, just a single consistent cutoff.
 _CHROMATIC_DISSONANCE_THRESHOLD = 0.5
 
+# X.20 -- real rest-vs-hit density, ported from the real reference
+# implementation (reference/ww-forge-prior-attempt/engine/riff_engine.py,
+# ~line 646-652: `base_density = float(knobs.get("density", 0.72))`, then
+# `density = max(0.12, min(0.98, base_density * (0.55 + 0.9 *
+# arcv["energy"])))`). Fixes a real, previously-uncaught bug: this project
+# had been passing `preset.open_chance` as `hit_chance` -- but the real
+# source's `open_chance` is a completely different axis (`wants_open =
+# rng.random() < open_chance`, an OPEN-ringing-vs-muted PITCH/articulation
+# choice per hit, not a rest-vs-hit density knob at all). Verified via real
+# generated output before this fix: tech.json ("extreme technical...
+# kick-locked triplet chug") had a REAL 5.56% hit rate -- 94% rests --
+# because its correctly-low open_chance (0.10, "rarely open/ringing, mostly
+# muted") was being misapplied as "almost never even a hit." The real
+# source never gave presets their own density number either (grepped
+# style_packs.py -- no per-pack "density" key exists); per-preset character
+# comes through feel/group/pedal/vocab instead, consistent with this
+# project's own existing architecture, so `_BASE_HIT_CHANCE` is a single
+# shared baseline, real per-ROLE variation comes from `theory.arc()`'s
+# already-computed `"energy"` field (previously computed for every section,
+# never consumed -- same "capability exists, never used" pattern as
+# IRVD/X.19). `preset.open_chance` itself is untouched (still a real,
+# validated preset field) but no longer wired here -- its real purpose
+# (open-string articulation) is a genuine, separate, deliberately deferred
+# gap; this project's pitch model has no muted-vs-open axis to wire it into
+# yet.
+_BASE_HIT_CHANCE = 0.72
+
+
+def _resolve_hit_chance(base: float, energy: float) -> float:
+    """The real rest-vs-hit probability for one section: `base` (this
+    project's `_BASE_HIT_CHANCE`) scaled by real ARC energy, clamped to
+    `[0.12, 0.98]` -- the exact real formula from `riff_engine.py` (see
+    module-level comment above `_BASE_HIT_CHANCE`), not invented. `energy`
+    ranges `[0.0, 1.0]` in `theory.ARC`'s real table (K=0.20 lowest,
+    C/breakdown=1.00 highest -- "breakdown hits hardest" is real, derived
+    data, not an assumption)."""
+    return max(0.12, min(0.98, base * (0.55 + 0.9 * energy)))
+
 # X.6c/X.12 -- real metric modulation, wired into a real per-section
 # trigger. Originally wired as a single one-shot switch at the first
 # "build" -> "breakdown" transition, held for the rest of the song -- real
@@ -309,7 +347,8 @@ def _generate_attempt(rng: random.Random, preset: Preset, num_sections: int) -> 
         role_occurrences[role] = occurrence + 1
 
         base_theme = themes.get_or_create(
-            f"theme-{role}", total_beats, _ALLOWED_LENGTHS, preset.open_chance,
+            f"theme-{role}", total_beats, _ALLOWED_LENGTHS,
+            _resolve_hit_chance(_BASE_HIT_CHANCE, arc_row["energy"]),
             rng, scale, preset.vocab.weights, chromatic=chromatic,
             dissonance=arc_row["dissonance"],
             base_degree=arc_row["start_degree"],

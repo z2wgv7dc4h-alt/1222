@@ -40,6 +40,7 @@ Update only after grep or pytest. No memory claims.
 | Cross-preset audit + real "airy" feel for chill (X.17); doc/hook cleanup | WIRED+TESTED | 516 passed, 1 skipped in 13.47s |
 | Real mid-section tempo/half-time drops (X.18) + scope gaps tracker | WIRED+TESTED | 520 passed, 1 skipped in 13.94s |
 | Real IRVD phrase development, wired for the first time (X.19) | WIRED+TESTED | 525 passed, 1 skipped in 13.94s |
+| Fixed severe density bug: open_chance was misapplied as hit_chance (X.20) | WIRED+TESTED | 528 passed, 1 skipped in 16.45s |
 | Reaper | MISSING | |
 | Editor | MISSING | |
 

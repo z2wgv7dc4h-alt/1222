@@ -5,6 +5,7 @@ import pytest
 
 from rhythm import (
     RhythmRegistry,
+    duration_bias_for_feel,
     generate_rhythm,
     irvd_split,
     metric_polyrhythm,
@@ -289,3 +290,81 @@ def test_irvd_phases_present_are_contiguous_and_cover_total(total_bars):
 
 def test_irvd_split_single_bar_has_only_introduction():
     assert irvd_split(1) == {"introduction": (0, 1)}
+
+
+# ---------------------------------------------------------------------------
+# Feel-driven duration weighting (real, ported from Metalerator's actual
+# breakdown generator -- reference/metalerator/metalerator/rhythm_guitar/
+# breakdown/default_melodic.py -- not invented). weights=None/
+# no_singular_short=None must be a complete no-op (byte-identical output to
+# the pre-existing uniform behavior); the real "breakdown" table must
+# measurably shift the duration distribution and eliminate isolated 0.25s.
+# ---------------------------------------------------------------------------
+
+
+def test_generate_rhythm_weights_none_is_byte_identical_to_old_uniform_behavior():
+    for seed in range(20):
+        cells_default = generate_rhythm(16.0, [0.25, 0.5, 1.0], 0.7, random.Random(seed))
+        cells_explicit_none = generate_rhythm(
+            16.0, [0.25, 0.5, 1.0], 0.7, random.Random(seed), weights=None, no_singular_short=None
+        )
+        assert cells_default == cells_explicit_none
+
+
+def test_generate_rhythm_weights_biases_the_real_duration_distribution():
+    allowed = [0.25, 0.5, 1.0]
+    weights = {0.25: 1.0, 0.5: 3.0, 1.0: 3.0}
+    counts = {0.25: 0, 0.5: 0, 1.0: 0}
+    rng = random.Random(1)
+    for _ in range(400):
+        cells = generate_rhythm(16.0, allowed, hit_chance=1.0, rng=rng, weights=weights)
+        # Skip the final cell: it may be clamped to whatever span remains
+        # (e.g. 0.75), which is real, correct exact-total behavior, not a
+        # drawn duration this distribution check cares about.
+        for c in cells[:-1]:
+            counts[c["duration"]] += 1
+    total = sum(counts.values())
+    # 0.25's real share (weight 1 of 7) must be clearly below 0.5/1.0's
+    # share (weight 3 of 7 each) -- a real, measurable bias, not noise.
+    assert counts[0.25] / total < 0.25
+    assert counts[0.5] / total > 0.25
+    assert counts[1.0] / total > 0.25
+
+
+def test_generate_rhythm_weights_zero_for_every_allowed_length_rejected():
+    with pytest.raises(ValueError):
+        generate_rhythm(4.0, [0.25, 0.5], 0.5, random.Random(0), weights={1.0: 5.0})
+
+
+def test_generate_rhythm_no_singular_short_eliminates_isolated_hits():
+    allowed = [0.25, 0.5, 1.0]
+    for seed in range(50):
+        cells = generate_rhythm(
+            16.0, allowed, hit_chance=1.0, rng=random.Random(seed),
+            weights={0.25: 1.0, 0.5: 1.0, 1.0: 1.0}, no_singular_short=0.25,
+        )
+        durations = [c["duration"] for c in cells]
+        # No 0.25 run of odd length -- every 0.25 is paired (Metalerator's
+        # real "no isolated 16th note" rule).
+        run = 0
+        for d in durations:
+            if d == 0.25:
+                run += 1
+            else:
+                assert run % 2 == 0, f"isolated 0.25 run (length {run}) in {durations}"
+                run = 0
+        assert run % 2 == 0, f"trailing isolated 0.25 run (length {run}) in {durations}"
+
+
+def test_duration_bias_for_feel_breakdown_is_the_real_ported_table():
+    weights, no_singular_short = duration_bias_for_feel("breakdown")
+    assert weights == {0.25: 1.0, 0.5: 3.0, 1.0: 3.0}
+    assert no_singular_short == 0.25
+
+
+def test_duration_bias_for_feel_unmapped_feel_is_a_real_no_op():
+    # "bounce"/"triplet"/etc. have no real ported reference data yet -- must
+    # return (None, None), which generate_rhythm treats as fully uniform,
+    # never a fabricated guess at what those feels "should" weight toward.
+    assert duration_bias_for_feel("bounce") == (None, None)
+    assert duration_bias_for_feel(None) == (None, None)

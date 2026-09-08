@@ -26,7 +26,7 @@ from __future__ import annotations
 import random
 from dataclasses import dataclass, field
 
-from rhythm import generate_rhythm, tile_cell
+from rhythm import duration_bias_for_feel, generate_rhythm, tile_cell
 from theory import Scale, shade
 
 __all__ = [
@@ -216,10 +216,19 @@ def generate_motif(
     base_degree: int = 0,
     group_beats: float | None = None,
     pedal: float | None = None,
+    feel: str | None = None,
 ) -> Motif:
     """Generate a fresh Motif: a rhythm cell (via `rhythm.generate_rhythm`)
     plus a scale-degree contour drawn from `vocab_weights` (a preset's
     `vocab.weights`, semitone-interval -> weight).
+
+    `feel`, when it names a style with real ported duration-bias data
+    (currently only `"breakdown"` -- see `rhythm.FEEL_DURATION_WEIGHTS`),
+    threads that bias into the underlying `generate_rhythm` call so a
+    preset's declared `.feel` actually changes its rhythm's duration
+    mix, not just its label. `feel=None` or an unmapped name (the
+    default) keeps rhythm generation exactly as before this parameter
+    existed -- uniform duration selection, no forced pairing.
 
     `chromatic=True` reshapes `vocab_weights` through `theory.shade()` at
     `dissonance` before picking, biasing draws toward the dissonant interval
@@ -248,11 +257,18 @@ def generate_motif(
     resolved against the degree the previous pick landed on), so a chromatic
     contour can wander instead of always leaping from the same anchor.
     """
+    duration_weights, no_singular_short = duration_bias_for_feel(feel)
     if group_beats is not None:
-        short_cell = generate_rhythm(group_beats, allowed_lengths, hit_chance, rng)
+        short_cell = generate_rhythm(
+            group_beats, allowed_lengths, hit_chance, rng,
+            weights=duration_weights, no_singular_short=no_singular_short,
+        )
         cell = tile_cell(short_cell, total_beats)
     else:
-        cell = generate_rhythm(total_beats, allowed_lengths, hit_chance, rng)
+        cell = generate_rhythm(
+            total_beats, allowed_lengths, hit_chance, rng,
+            weights=duration_weights, no_singular_short=no_singular_short,
+        )
     hits = _count_hits(cell)
     weights = shade(vocab_weights, dissonance) if chromatic else dict(vocab_weights)
     if pedal is not None:
@@ -298,6 +314,7 @@ class ThemeRegistry:
         base_degree: int = 0,
         group_beats: float | None = None,
         pedal: float | None = None,
+        feel: str | None = None,
     ) -> Motif:
         if theme_id not in self._cache:
             self._cache[theme_id] = generate_motif(
@@ -312,6 +329,7 @@ class ThemeRegistry:
                 base_degree=base_degree,
                 group_beats=group_beats,
                 pedal=pedal,
+                feel=feel,
             )
         return self._cache[theme_id]
 

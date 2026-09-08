@@ -28,6 +28,8 @@ Update only after grep or pytest. No memory claims.
 | Metric modulation, real tempo_map (X.6c) | WIRED+TESTED | 428 passed in 12.19s |
 | Preset lineup: djent/tech/metalcore/deathcore/melodic/chill/groovy (no slam) | WIRED+TESTED | 333 passed (full suite) |
 | Real MIDI export, Reaper-importable (P10.1) | WIRED+TESTED | 443 passed in 11.19s |
+| preset.feel wiring, real ported breakdown duration-weighting (X.8) | WIRED+TESTED | 450 passed in 10.76s |
+| Reaper live-scripting bridge (reapy-boost, P8.1) | SCAFFOLD | reapy-boost installed (MIT, confirmed via pip metadata) and Reaper located on this machine; no bridge/connection code written yet |
 | Reaper | MISSING | |
 | Editor | MISSING | |
 

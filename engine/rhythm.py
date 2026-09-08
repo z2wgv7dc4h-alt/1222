@@ -28,6 +28,55 @@ import random
 _EPS = 1e-9
 
 
+# --- Feel-driven duration weighting (real, ported technique) ----------------
+#
+# Ported from the real reference implementation "Metalerator" (reference/
+# metalerator/metalerator/rhythm_guitar/breakdown/default_melodic.py,
+# RGuitarDefaultMelodicBreakdown.randomize_duration): its breakdown generator
+# draws from durations [0.25, 0.5, 1, 2] (16th/8th/quarter/half, in the same
+# "1 bar = 4 position-units" convention this project already uses for
+# beats) with weights [1, 3, 3, 1] -- clearly biased toward 8th/quarter-note
+# chugging over rapid 16ths or held half notes, which is exactly what makes
+# a real breakdown riff read as "breakdown" rather than generic chug. This
+# project's own rhythm vocabulary (`song._ALLOWED_LENGTHS`) deliberately
+# caps at quarter notes (no half notes), so the half-note weight is DROPPED
+# and the remaining three weights are kept in their original 1:3:3 ratio --
+# adapted for a different duration vocabulary, not invented from scratch.
+#
+# Metalerator's `feel` concept is really "which song SECTION generator is
+# active" (verse/chorus/breakdown/intro/outro are separate Python classes
+# there), not a named, swappable table the way this project's
+# `preset.feel` field is -- so only "breakdown" has real ported data behind
+# it below. Other feel names (bounce/triplet/chug/wall/etc.) stay on the
+# uniform default until a real reference technique exists for them too;
+# inventing weight tables for those without a real source would violate
+# this project's own "port, don't invent" discipline.
+FEEL_DURATION_WEIGHTS: dict[str, dict[float, float]] = {
+    "breakdown": {0.25: 1.0, 0.5: 3.0, 1.0: 3.0},
+}
+
+# Metalerator's companion rule (same method): a single isolated 16th note
+# never occurs alone -- if the previous draw was a lone 16th, the next draw
+# is FORCED to also be a 16th, pairing them up. This reads as a real
+# realism fix (isolated 16ths sound like a stray flam, not a phrase) rather
+# than a breakdown-specific quirk, but is only ever exercised here via the
+# same real source method, so it travels together with "breakdown" above
+# rather than being applied unconditionally to every feel.
+FEEL_NO_SINGULAR_SHORT: dict[str, float] = {
+    "breakdown": 0.25,
+}
+
+
+def duration_bias_for_feel(feel: str | None) -> tuple[dict[float, float] | None, float | None]:
+    """Real, ported `(weights, no_singular_short)` pair for `feel`, or
+    `(None, None)` for a feel with no real reference data yet (see
+    `FEEL_DURATION_WEIGHTS`'s docstring) -- callers pass these straight
+    through to `generate_rhythm`'s own `weights`/`no_singular_short`
+    parameters, which already treat `None` as "uniform, unchanged
+    behavior", so an unmapped feel is never a fabricated guess."""
+    return FEEL_DURATION_WEIGHTS.get(feel), FEEL_NO_SINGULAR_SHORT.get(feel)
+
+
 # --- P2.1: two-layer generation model ---------------------------------------
 
 
@@ -36,16 +85,26 @@ def generate_rhythm(
     allowed_lengths: list[float],
     hit_chance: float,
     rng: random.Random,
+    weights: dict[float, float] | None = None,
+    no_singular_short: float | None = None,
 ) -> list[dict]:
     """Generate a flat list of rhythm cells summing EXACTLY to `total_beats`.
 
     Each non-final cell recursively (i.e. one draw at a time, consuming the
-    remaining span) picks a length from `allowed_lengths` with uniform
-    probability (`rng.choice`) -- every allowed length is equally likely to
-    be picked at each step, regardless of how many cells have already been
-    placed. This is a deliberate, documented choice; a weighted variant
-    would take a parallel `weights` argument rather than silently changing
-    this function's contract.
+    remaining span) picks a length from `allowed_lengths`. `weights=None`
+    (the default) keeps the original uniform `rng.choice` behavior --
+    every allowed length equally likely, unchanged from before this
+    parameter existed. When `weights` is given (a real, ported example:
+    `duration_bias_for_feel`'s output), the pick uses `rng.choices` with
+    those weights instead -- lengths in `allowed_lengths` missing from
+    `weights` get weight 0 (never picked), never a silent fallback.
+
+    `no_singular_short`, when given, enforces "this length never appears
+    alone" (ported from Metalerator's no-isolated-16th-notes rule -- see
+    `FEEL_NO_SINGULAR_SHORT`): if the previous draw was `no_singular_short`
+    and this draw's natural pick is a different length, this draw is
+    forced to also be `no_singular_short`, pairing them. `None` (the
+    default) leaves every draw exactly as picked.
 
     Each cell independently rolls `hit_chance` (rng.random() < hit_chance)
     to decide hit vs rest.
@@ -65,11 +124,25 @@ def generate_rhythm(
         raise ValueError("allowed_lengths must all be > 0")
     if not (0.0 <= hit_chance <= 1.0):
         raise ValueError("hit_chance must be within [0, 1]")
+    if weights is not None and not any(weights.get(length, 0.0) > 0 for length in allowed_lengths):
+        raise ValueError("weights must assign a positive weight to at least one allowed_length")
 
     cells: list[dict] = []
     remaining = total_beats
+    consecutive_short = 0
     while remaining > _EPS:
-        length = rng.choice(allowed_lengths)
+        if weights is None:
+            length = rng.choice(allowed_lengths)
+        else:
+            length = rng.choices(
+                allowed_lengths, weights=[weights.get(l, 0.0) for l in allowed_lengths], k=1
+            )[0]
+
+        if no_singular_short is not None:
+            if consecutive_short % 2 != 0 and length != no_singular_short:
+                length = no_singular_short
+            consecutive_short = consecutive_short + 1 if length == no_singular_short else 0
+
         if length > remaining:
             length = remaining
         is_hit = rng.random() < hit_chance

@@ -8,6 +8,7 @@ node_modules/
 *.wav
 *.mp3
 *.flac
+*.mid
 render/
 .claude/logs/
 .claude/settings.local.json

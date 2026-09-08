@@ -209,6 +209,7 @@ def _generate_attempt(rng: random.Random, preset: Preset, num_sections: int) -> 
             base_degree=arc_row["start_degree"],
             group_beats=(float(preset.group) if preset.group is not None else None),
             pedal=preset.pedal,
+            feel=preset.feel,
         )
         m: Motif = invert(base_theme) if occurrence % 2 == 1 else base_theme
         guitar_cells = m.cell

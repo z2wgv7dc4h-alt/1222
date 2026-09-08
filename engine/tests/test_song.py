@@ -319,3 +319,34 @@ def test_tempo_map_shows_real_bpm_change_at_a_real_build_to_breakdown_transition
     assert tempo_map[transition_at] == pytest.approx(float(tech.bpm) * 0.5)
     # a real, non-trivial change -- not a no-op modulation
     assert tempo_map[transition_at] != pytest.approx(tempo_map[transition_at - 1])
+
+
+def test_preset_feel_breakdown_changes_real_song_duration_distribution():
+    """preset.feel == "breakdown" (metalcore, deathcore's "chug" is
+    unmapped so it's excluded) must measurably bias metalcore's actual
+    compose_song output toward 8th/quarter durations over isolated 16ths,
+    via the real ported rhythm.FEEL_DURATION_WEIGHTS table -- not just
+    unit-level correctness in rhythm.py in isolation."""
+    metalcore = load_all_presets()["metalcore"]
+    assert metalcore.feel == "breakdown"
+    no_feel_variant = dataclasses.replace(metalcore, feel="unmapped-placeholder")
+
+    def sixteenth_share(preset, n_seeds=40):
+        total = 0
+        sixteenths = 0
+        for seed in range(n_seeds):
+            result = _generate_attempt(random.Random(seed), preset, num_sections=4)
+            for section in result["sections"]:
+                for cell in section["motif"].cell:
+                    total += 1
+                    if cell["duration"] == 0.25:
+                        sixteenths += 1
+        return sixteenths / total if total else 0.0
+
+    biased_share = sixteenth_share(metalcore)
+    unbiased_share = sixteenth_share(no_feel_variant)
+    assert biased_share < unbiased_share - 0.05, (
+        f"expected metalcore's real feel='breakdown' bias to measurably lower "
+        f"the 16th-note share vs the same preset with an unmapped feel, got "
+        f"biased={biased_share:.3f} unbiased={unbiased_share:.3f}"
+    )

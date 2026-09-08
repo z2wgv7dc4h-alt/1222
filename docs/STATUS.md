@@ -35,6 +35,8 @@ Update only after grep or pytest. No memory claims.
 | Tempo-map half-time reversion fix (X.12) | WIRED+TESTED | 499 passed in 13.18s |
 | Hihat variation: open-hat accents + transition crashes (X.13) | WIRED+TESTED | 504 passed, 1 skipped in 12.75s |
 | Real 4-state theme-development rotation (X.14) | WIRED+TESTED | 506 passed, 1 skipped in 12.73s |
+| Real triplet + chug feel generation (X.15) | WIRED+TESTED | 513 passed, 1 skipped in 13.52s |
+| Real "bounce" density fix + minor-third vocab (X.16) | WIRED+TESTED | 515 passed, 1 skipped in 13.80s |
 | Reaper | MISSING | |
 | Editor | MISSING | |
 

@@ -7,6 +7,7 @@ from rhythm import (
     RhythmRegistry,
     duration_bias_for_feel,
     generate_rhythm,
+    generate_triplet_rhythm,
     irvd_split,
     metric_polyrhythm,
     phrase_plan,
@@ -362,9 +363,75 @@ def test_duration_bias_for_feel_breakdown_is_the_real_ported_table():
     assert no_singular_short == 0.25
 
 
+def test_duration_bias_for_feel_chug_is_the_real_dense_table():
+    # X.15: real, deliberately un-ported entry (no source to port from --
+    # constant 16th-note chugging is generic, textbook music knowledge) --
+    # heavily favors 16ths, the deliberate inverse of breakdown's bias.
+    weights, no_singular_short = duration_bias_for_feel("chug")
+    assert weights == {0.25: 6.0, 0.5: 2.0, 1.0: 1.0}
+    assert no_singular_short == 0.25
+
+
+def test_duration_bias_for_feel_bounce_is_the_real_measured_table():
+    # X.16: real, EXACT ground truth (not textbook genericity) -- parsed
+    # from a real user-supplied original MIDI file with mido (no
+    # transcription uncertainty). Guitar 1 measured 57.5% 16ths, 36.9%
+    # 8ths, 0% quarters across 1464 real notes.
+    weights, no_singular_short = duration_bias_for_feel("bounce")
+    assert weights == {0.25: 6.0, 0.5: 4.0, 1.0: 0.3}
+    assert no_singular_short == 0.25
+
+
 def test_duration_bias_for_feel_unmapped_feel_is_a_real_no_op():
-    # "bounce"/"triplet"/etc. have no real ported reference data yet -- must
-    # return (None, None), which generate_rhythm treats as fully uniform,
-    # never a fabricated guess at what those feels "should" weight toward.
-    assert duration_bias_for_feel("bounce") == (None, None)
+    # A genuinely unmapped feel name (not a real preset's own declared
+    # feel) must return (None, None), which generate_rhythm treats as
+    # fully uniform, never a fabricated guess at what it "should" weight
+    # toward. "triplet" is handled by a real, separate dispatch
+    # (generate_triplet_rhythm) in motif.generate_motif instead of this
+    # weighted-duration-menu path, so it correctly stays unmapped HERE
+    # too -- not the same as "no real handling at all".
+    assert duration_bias_for_feel("not-a-real-feel") == (None, None)
     assert duration_bias_for_feel(None) == (None, None)
+
+
+# ---------------------------------------------------------------------------
+# X.15: real triplet-feel rhythm generation (tech.json's declared feel was
+# completely unwired -- a genuine eighth-note-triplet subdivision, not a
+# reweighting of the standard duration menu).
+# ---------------------------------------------------------------------------
+
+
+def test_generate_triplet_rhythm_produces_real_third_beat_durations():
+    cells = generate_triplet_rhythm(4.0, hit_chance=1.0, rng=random.Random(1))
+    assert len(cells) == 12  # 4 beats * 3 triplet-eighths each
+    for c in cells:
+        assert math.isclose(c["duration"], 1.0 / 3, rel_tol=0, abs_tol=1e-9)
+    assert math.isclose(sum(c["duration"] for c in cells), 4.0, abs_tol=1e-9)
+
+
+def test_generate_triplet_rhythm_offsets_match_real_tuplet_grid():
+    """The real triplet spacing must come from the same tuplet_grid law
+    every other genuine tuplet in this project uses -- not an
+    independently hand-picked 1/3 constant that happens to match."""
+    real_offsets = tuplet_grid(3, 2, 1.0)
+    real_spacing = real_offsets[1] - real_offsets[0]
+    cells = generate_triplet_rhythm(1.0, hit_chance=1.0, rng=random.Random(1))
+    assert math.isclose(cells[0]["duration"], real_spacing, abs_tol=1e-9)
+
+
+def test_generate_triplet_rhythm_hit_chance_extremes():
+    all_rests = generate_triplet_rhythm(2.0, hit_chance=0.0, rng=random.Random(1))
+    all_hits = generate_triplet_rhythm(2.0, hit_chance=1.0, rng=random.Random(1))
+    assert all(c["is_rest"] for c in all_rests)
+    assert all(not c["is_rest"] for c in all_hits)
+
+
+def test_generate_triplet_rhythm_rejects_bad_input():
+    with pytest.raises(ValueError):
+        generate_triplet_rhythm(0.0, 0.5, random.Random(1))
+    with pytest.raises(ValueError):
+        generate_triplet_rhythm(-1.0, 0.5, random.Random(1))
+    with pytest.raises(ValueError):
+        generate_triplet_rhythm(2.5, 0.5, random.Random(1))  # not a whole beat count
+    with pytest.raises(ValueError):
+        generate_triplet_rhythm(4.0, 1.5, random.Random(1))

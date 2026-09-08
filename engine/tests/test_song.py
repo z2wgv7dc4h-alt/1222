@@ -492,3 +492,50 @@ def test_a_role_recurring_many_times_gets_real_pitch_variety_not_just_two_states
         f"expected more than 2 distinct pitch-content states across "
         f"{len(delta_sets)} real occurrences of {frequent_role!r}, got {len(distinct)}"
     )
+
+
+def test_tech_preset_real_feel_triplet_produces_genuine_triplet_durations():
+    """X.15: tech.json's real declared feel ("triplet") must actually
+    produce genuine eighth-note-triplet durations in real compose_song
+    output, not the old uniform [0.25, 0.5, 1.0] menu."""
+    tech = load_all_presets()["tech"]
+    assert tech.feel == "triplet"
+    song = _generate_attempt(random.Random(3), tech, num_sections=4)
+    for section in song["sections"]:
+        for cell in section["motif"].cell:
+            assert abs(cell["duration"] - 1.0 / 3) < 1e-9
+
+
+def test_deathcore_preset_real_feel_chug_is_16th_note_dominant():
+    """X.15: deathcore.json's real declared feel ("chug") must measurably
+    bias real compose_song output toward 16th notes, matching the real,
+    deliberately-inverse-of-breakdown weighting."""
+    deathcore = load_all_presets()["deathcore"]
+    assert deathcore.feel == "chug"
+    total = 0
+    sixteenths = 0
+    for seed in range(20):
+        result = _generate_attempt(random.Random(seed), deathcore, num_sections=4)
+        for section in result["sections"]:
+            for cell in section["motif"].cell:
+                total += 1
+                if abs(cell["duration"] - 0.25) < 1e-9:
+                    sixteenths += 1
+    assert sixteenths / total > 0.5, f"expected 16th notes to dominate deathcore's real chug feel, got {sixteenths}/{total}"
+
+
+def test_bounce_feel_presets_now_produce_real_dense_rhythm():
+    """X.16: "bounce" (djent/groovy/melodic/progressive's real declared
+    feel) previously fell through to fully uniform duration selection --
+    roughly a third quarter notes. Real measured reference data (a real
+    user-supplied original MIDI file, parsed exactly) showed 0% quarter
+    notes and 16th-note dominance; real compose_song output for a real
+    bounce-feel preset must now measurably reflect that."""
+    djent = load_all_presets()["djent"]
+    assert djent.feel == "bounce"
+    song = _generate_attempt(random.Random(3), djent, num_sections=6)
+    durations = [c["duration"] for s in song["sections"] for c in s["motif"].cell]
+    sixteenths = sum(1 for d in durations if abs(d - 0.25) < 1e-9)
+    quarters = sum(1 for d in durations if abs(d - 1.0) < 1e-9)
+    assert sixteenths / len(durations) > 0.5, "expected 16th notes to dominate real bounce-feel output"
+    assert quarters / len(durations) < 0.1, "expected quarter notes to be rare in real bounce-feel output"

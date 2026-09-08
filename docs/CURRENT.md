@@ -1,8 +1,8 @@
 # CURRENT
 
-task: X.14
+task: X.16
 phase: cross-cutting
 status: DONE
-last_pytest: 506 passed, 1 skipped in 12.73s
-note: Real 4-state theme-development rotation. Root cause of real listening feedback ("not much is going on"): ThemeRegistry keys a base theme by ROLE alone, and every occurrence of a role for the whole song only alternated between 2 pitch states (base/invert). motif.transpose already existed, real and tested, but was never wired into this rotation. Added song._develop_theme: real 4-state rotation (base/invert/transpose+2/transpose+invert), safe and length-preserving. Verified against real generated output: a role recurring 6 times went from a 2-state ceiling to 4 real distinct states. 506 passed (up from 504). Sent updated demo. Honest scope note: this addresses pitch/harmonic repetition; rhythm-level repetition (same base cell reused per role, just pitch-shifted) is a separate, deeper, not-yet-attempted question. Also confirmed with the user that they've been listening to .mid demos via Windows' default GS Wavetable synth, which likely explains a large share of "weird/basic" independent of composition quality -- real instrument setup (NAM + sfizz in Reaper) still pending, tied to the already-tracked P8.3 FX-chain work.
+last_pytest: 515 passed, 1 skipped in 13.80s
+note: Real "bounce" feel density fix + minor-third vocab weight, grounded in EXACT reference data. User supplied a real original MIDI file (confirmed original composition, not a commercial transcription); parsed with mido for exact note data. Guitar 1 measured 57.5% 16ths, 36.9% 8ths, 0% quarters across 1464 real notes; pitch-class distribution showed real minor-third usage as third-most-common interval. Found "bounce" (the MOST common preset feel: djent/groovy/melodic/progressive) had zero real duration weighting -- fell through to uniform selection. Added rhythm.FEEL_DURATION_WEIGHTS["bounce"] (real measured ratio) and added real interval-3 weight to djent.json's vocab (confirmed scale-legal for phrygian). Verified against real generated output: djent's distribution went from ~33/33/33 to 78.5%/21.5%/0%. 515 passed (up from 513). Next: analyzing a real original tab file the user's friend wrote, for lead/solo technique insight (sweep picking, tapping patterns).
 updated: 2026-09-08

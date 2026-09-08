@@ -26,7 +26,7 @@ from __future__ import annotations
 import random
 from dataclasses import dataclass, field
 
-from rhythm import duration_bias_for_feel, generate_rhythm, tile_cell
+from rhythm import duration_bias_for_feel, generate_rhythm, generate_triplet_rhythm, tile_cell
 from theory import Scale, shade
 
 __all__ = [
@@ -257,18 +257,28 @@ def generate_motif(
     resolved against the degree the previous pick landed on), so a chromatic
     contour can wander instead of always leaping from the same anchor.
     """
-    duration_weights, no_singular_short = duration_bias_for_feel(feel)
-    if group_beats is not None:
-        short_cell = generate_rhythm(
-            group_beats, allowed_lengths, hit_chance, rng,
-            weights=duration_weights, no_singular_short=no_singular_short,
-        )
-        cell = tile_cell(short_cell, total_beats)
+    if feel == "triplet":
+        # X.15: a real triplet feel is a genuinely different subdivision
+        # device, not a duration-weight reshaping of the standard
+        # [0.25, 0.5, 1.0] menu (see generate_triplet_rhythm's own
+        # docstring) -- dispatched here instead of through
+        # duration_bias_for_feel/generate_rhythm's weighted-choice path.
+        span = float(group_beats) if group_beats is not None else total_beats
+        short_cell = generate_triplet_rhythm(span, hit_chance, rng)
+        cell = tile_cell(short_cell, total_beats) if group_beats is not None else short_cell
     else:
-        cell = generate_rhythm(
-            total_beats, allowed_lengths, hit_chance, rng,
-            weights=duration_weights, no_singular_short=no_singular_short,
-        )
+        duration_weights, no_singular_short = duration_bias_for_feel(feel)
+        if group_beats is not None:
+            short_cell = generate_rhythm(
+                group_beats, allowed_lengths, hit_chance, rng,
+                weights=duration_weights, no_singular_short=no_singular_short,
+            )
+            cell = tile_cell(short_cell, total_beats)
+        else:
+            cell = generate_rhythm(
+                total_beats, allowed_lengths, hit_chance, rng,
+                weights=duration_weights, no_singular_short=no_singular_short,
+            )
     hits = _count_hits(cell)
     weights = shade(vocab_weights, dissonance) if chromatic else dict(vocab_weights)
     if pedal is not None:

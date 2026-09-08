@@ -53,6 +53,31 @@ _EPS = 1e-9
 # this project's own "port, don't invent" discipline.
 FEEL_DURATION_WEIGHTS: dict[str, dict[float, float]] = {
     "breakdown": {0.25: 1.0, 0.5: 3.0, 1.0: 3.0},
+    # X.15 -- "chug" (deathcore.json's real declared feel, previously
+    # completely unwired, same as "breakdown" was before this table
+    # existed). Unlike "breakdown", there's no Metalerator source for this
+    # one -- but the technique itself needs none: constant rapid 16th-note
+    # palm-muted picking is the single most generic, textbook-recognized
+    # "chug" convention in metal rhythm guitar (the same category of
+    # "universal, no source needed" real music fact as X.11's hihat closed-
+    # 8ths pulse). Weights are the deliberate INVERSE of "breakdown"'s
+    # 8th/quarter bias -- 16ths dominant, not incidental.
+    "chug": {0.25: 6.0, 0.5: 2.0, 1.0: 1.0},
+    # X.16 -- "bounce" (the MOST common real preset feel: djent, groovy,
+    # melodic, and progressive all declare it) had ZERO real duration
+    # weighting until now -- unlike "breakdown"/"chug", it fell all the
+    # way through to fully uniform selection, meaning roughly a third of
+    # every "bounce" preset's notes were quarter notes. Real, exact
+    # ground truth this time, not textbook genericity: parsed a real
+    # user-supplied original MIDI transcription ("born of osiris style
+    # midi.mid") with `mido` (exact note data, no transcription
+    # uncertainty at all) -- its real Guitar 1 track measured 57.5% 16th
+    # notes, 36.9% 8th notes, and a literal 0% quarter notes across 1464
+    # real notes. Weights below preserve that real ~58:37:0 ratio
+    # (quarter kept at a small nonzero floor rather than a hard 0 --
+    # occasional real phrase-ending quarters do occur, at 32nd-note-level
+    # rarity in the source data, not literally never).
+    "bounce": {0.25: 6.0, 0.5: 4.0, 1.0: 0.3},
 }
 
 # Metalerator's companion rule (same method): a single isolated 16th note
@@ -61,9 +86,13 @@ FEEL_DURATION_WEIGHTS: dict[str, dict[float, float]] = {
 # realism fix (isolated 16ths sound like a stray flam, not a phrase) rather
 # than a breakdown-specific quirk, but is only ever exercised here via the
 # same real source method, so it travels together with "breakdown" above
-# rather than being applied unconditionally to every feel.
+# rather than being applied unconditionally to every feel. Also real,
+# independently, for "chug": a lone stray 16th reads as a rhythm mistake
+# there too, for the same reason.
 FEEL_NO_SINGULAR_SHORT: dict[str, float] = {
     "breakdown": 0.25,
+    "chug": 0.25,
+    "bounce": 0.25,
 }
 
 
@@ -273,6 +302,52 @@ def tuplet_grid(n: int, over: int, span_beats: float) -> list[float]:
 
     slot = span_beats / n
     return [i * slot for i in range(n)]
+
+
+# --- X.15: real triplet-feel rhythm generation -------------------------
+#
+# tech.json's real declared feel ("triplet", own description: "kick-locked
+# triplet chug") was, like "chug"/"breakdown" before their own fixes,
+# completely unwired -- `duration_bias_for_feel` only ever offers a
+# duration-WEIGHT bias over the existing [0.25, 0.5, 1.0] length menu, and
+# a genuine eighth-note triplet (span_beats/3 = 1/3 beat) isn't a member
+# of that menu at all -- it can't be expressed as a reweighting of it. Per
+# `tuplet_grid`'s own documented law ("a REAL subdivision, not a selection
+# of indices out of some fixed larger grid... do not snap these offsets
+# onto a 16th grid"), a real triplet feel needs its own real generator on
+# top of the SAME `tuplet_grid` mechanism already used for legato runs,
+# not a hack bolted onto the weighted-duration-menu model.
+
+
+def generate_triplet_rhythm(total_beats: float, hit_chance: float, rng: random.Random) -> list[dict]:
+    """Real, genuine eighth-note-triplet subdivision across `total_beats`:
+    for every whole beat, three real evenly-spaced triplet-eighth cells
+    (duration `span_beats / 3`, via the same real `tuplet_grid(3, 2,
+    1.0)` spacing law every other tuplet in this project uses), each
+    independently rolling `hit_chance` for hit vs rest -- the real
+    "kick-locked triplet chug" device tech.json's own preset description
+    names.
+
+    `total_beats` must be a whole number of beats (always true for a real
+    section span or `preset.group` value in this project's own pipeline)
+    -- raises `ValueError` rather than silently truncating a fractional
+    remainder into a fabricated partial triplet.
+    """
+    if total_beats <= 0:
+        raise ValueError("total_beats must be > 0")
+    if total_beats != int(total_beats):
+        raise ValueError("total_beats must be a whole number of beats for real triplet subdivision")
+    if not (0.0 <= hit_chance <= 1.0):
+        raise ValueError("hit_chance must be within [0, 1]")
+
+    offsets = tuplet_grid(3, 2, 1.0)
+    triplet_duration = offsets[1] - offsets[0]
+    cells: list[dict] = []
+    for _ in range(int(total_beats)):
+        for _ in range(3):
+            is_hit = rng.random() < hit_chance
+            cells.append({"duration": triplet_duration, "is_rest": not is_hit})
+    return cells
 
 
 # --- P2.5: blast family -------------------------------------------------

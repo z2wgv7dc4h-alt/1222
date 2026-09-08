@@ -394,3 +394,59 @@ def test_tempo_at_rejects_bad_curve():
         tempo_at(0, 140.0, {"type": "warp"})
     with pytest.raises(ValueError):
         tempo_at(0, 140.0, {"type": "ramp", "start": 5, "end": 5, "bpm": 200.0})
+
+
+# ---------------------------------------------------------------------------
+# X.6c -- metric modulation curve: a REAL branch in tempo_at's dispatch,
+# not a separate parallel function nothing calls.
+# ---------------------------------------------------------------------------
+
+
+def test_tempo_metric_modulation_holds_base_bpm_before_the_transition():
+    curve = {
+        "type": "metric_modulation", "at": 4,
+        "old_subdivision": (3, 2), "new_subdivision": (1, 1),
+    }
+    assert tempo_at(0, 140.0, curve) == 140.0
+    assert tempo_at(3, 140.0, curve) == 140.0
+
+
+def test_tempo_metric_modulation_scales_correctly_from_the_transition():
+    # dotted quarter (3,2) = new quarter (1,1) -> ratio 1.5 (the same
+    # hard-verified real-world example as metric_modulation.py's own docs).
+    curve = {
+        "type": "metric_modulation", "at": 4,
+        "old_subdivision": (3, 2), "new_subdivision": (1, 1),
+    }
+    assert tempo_at(4, 140.0, curve) == pytest.approx(210.0)
+    assert tempo_at(9, 140.0, curve) == pytest.approx(210.0)  # holds after too
+
+
+def test_tempo_metric_modulation_half_time_case():
+    # straight eighth (1,2) = new quarter (1,1) -> ratio 0.5, the half-time
+    # breakdown treatment song.py's real trigger uses.
+    curve = {
+        "type": "metric_modulation", "at": 2,
+        "old_subdivision": (1, 2), "new_subdivision": (1, 1),
+    }
+    assert tempo_at(1, 160.0, curve) == 160.0
+    assert tempo_at(2, 160.0, curve) == pytest.approx(80.0)
+
+
+def test_tempo_metric_modulation_bad_subdivision_still_raises_value_error():
+    # The existing dispatch's fail-closed behavior must survive: a
+    # malformed metric_modulation curve raises the same ValueError type as
+    # every other unknown/malformed curve, not a different exception.
+    curve = {
+        "type": "metric_modulation", "at": 2,
+        "old_subdivision": (0, 2), "new_subdivision": (1, 1),
+    }
+    with pytest.raises(ValueError):
+        tempo_at(2, 140.0, curve)
+
+
+def test_tempo_at_still_rejects_unknown_curve_type_alongside_new_branch():
+    # Adding the metric_modulation branch must not have disturbed the
+    # existing fail-closed default for a genuinely unknown curve type.
+    with pytest.raises(ValueError):
+        tempo_at(0, 140.0, {"type": "not-a-real-curve"})

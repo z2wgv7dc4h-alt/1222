@@ -32,6 +32,7 @@ Update only after grep or pytest. No memory claims.
 | Snare backbeat, wired for every preset (X.9) | WIRED+TESTED | 464 passed in 10.96s |
 | Real Reaper .rpp project generation (P8.1) | WIRED+TESTED | 477 passed in 22.27s; verified opening in the user's real installed Reaper (screenshot confirmed) |
 | Hihat/cymbal layer + varied kick overlay, wired for every preset (X.11) | WIRED+TESTED | 500 passed in 12.59s |
+| Tempo-map half-time reversion fix (X.12) | WIRED+TESTED | 499 passed in 13.18s |
 | Reaper | MISSING | |
 | Editor | MISSING | |
 

@@ -96,52 +96,47 @@ _BEATS_PER_BAR = 4
 # claim that 0.5 is musically special, just a single consistent cutoff.
 _CHROMATIC_DISSONANCE_THRESHOLD = 0.5
 
-# X.6c -- real metric modulation, wired into a real trigger condition.
-# "build" -> "breakdown" is the natural tension-into-release seam in
-# DEFAULT_GRAPH (a build's whole job is to lead into a breakdown -- see
-# structure.DEFAULT_GRAPH's edge weights), so it is where a genuine metric
-# modulation is genre-idiomatic: the straight eighth notes the build was
-# just playing become the new quarter-note pulse -- the classic djent/
-# deathcore half-time breakdown treatment, done with real modulation math
-# (metric_modulation.modulation_ratio) instead of an arbitrary hand-picked
-# BPM. Only the FIRST such transition in a sequence triggers a modulation
-# (a documented, deliberate simplification -- see _build_to_breakdown_index).
+# X.6c/X.12 -- real metric modulation, wired into a real per-section
+# trigger. Originally wired as a single one-shot switch at the first
+# "build" -> "breakdown" transition, held for the rest of the song -- real
+# listening feedback on a longer generated song ("drums are too slow...
+# not really metal") confirmed this was a real bug, not a stylistic
+# choice: for a song whose sequence revisits "breakdown" many times (real
+# for any longer song), the tempo dropped once and NEVER RECOVERED,
+# spending the rest of the song at half-time. Fixed to the real, genre-
+# correct behavior instead: the half-time modulation applies
+# INDEPENDENTLY to every "breakdown"-role section (the classic djent/
+# deathcore half-time-under-the-breakdown treatment, real and temporary,
+# same as an actual arrangement), and every other role stays at the
+# preset's own full `base_bpm` -- a build, solo, or interlude immediately
+# after a breakdown is back at full tempo, not still halved.
 _METRIC_MOD_OLD_SUBDIVISION = (1, 2)  # straight eighth
 _METRIC_MOD_NEW_SUBDIVISION = (1, 1)  # new quarter -> ratio 0.5, a half-time feel
 
 
-def _build_to_breakdown_index(sequence: list[str]) -> int | None:
-    """Index of the first section in `sequence` immediately following a
-    "build" -> "breakdown" transition, or `None` if the sequence never
-    makes that transition. Only the first occurrence is used (a documented
-    simplification: a song with several build->breakdown seams still gets
-    exactly one real metric modulation, at the first one, rather than
-    stacking several curves)."""
-    for i in range(1, len(sequence)):
-        if sequence[i - 1] == "build" and sequence[i] == "breakdown":
-            return i
-    return None
-
-
 def _compute_tempo_map(sequence: list[str], base_bpm: float) -> list[float]:
-    """Per-section effective BPM for every section in `sequence`, real and
-    checkable for EVERY composed song (not just the ones where a
-    build->breakdown transition happens to occur): `base_bpm` for every
-    section when no trigger fires, or `base_bpm` up to the transition and
-    the real metric-modulation-scaled tempo from the transition onward,
-    computed via `structure.tempo_at`'s `"metric_modulation"` curve --
-    never a separate parallel calculation that skips that dispatch path.
+    """Per-section effective BPM for every section in `sequence`: the
+    preset's own real `base_bpm` for every role, EXCEPT "breakdown",
+    which independently gets the real metric-modulation-scaled half-time
+    tempo (X.6c) every time it occurs -- computed via `structure.
+    tempo_at`'s `"metric_modulation"` curve for that one section (`at`
+    equal to the section's own index, so the curve's own "hold base_bpm
+    before `at`" branch never applies), never a separate parallel
+    calculation that skips that dispatch path.
     """
-    at = _build_to_breakdown_index(sequence)
-    if at is None:
-        return [float(base_bpm) for _ in sequence]
-    curve = {
-        "type": "metric_modulation",
-        "at": at,
-        "old_subdivision": _METRIC_MOD_OLD_SUBDIVISION,
-        "new_subdivision": _METRIC_MOD_NEW_SUBDIVISION,
-    }
-    return [tempo_at(i, base_bpm, curve) for i in range(len(sequence))]
+    tempos: list[float] = []
+    for i, role in enumerate(sequence):
+        if role != "breakdown":
+            tempos.append(float(base_bpm))
+            continue
+        curve = {
+            "type": "metric_modulation",
+            "at": i,
+            "old_subdivision": _METRIC_MOD_OLD_SUBDIVISION,
+            "new_subdivision": _METRIC_MOD_NEW_SUBDIVISION,
+        }
+        tempos.append(tempo_at(i, base_bpm, curve))
+    return tempos
 
 
 def pitches_per_cell(motif: Motif, scale: Scale, start_degree: int = 0) -> list[int | None]:

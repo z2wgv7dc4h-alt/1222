@@ -90,7 +90,7 @@ from drums import (
 from fretboard import Fretboard
 from lead import generate_lead_line
 from legato import generate_legato_lick
-from motif import Motif, ThemeRegistry, invert, render_motif
+from motif import Motif, ThemeRegistry, invert, render_motif, transpose
 from performance import double_track
 from presets import Preset, get_tuning, load_all_presets, load_tunings, resolve_preset_id
 from riff import harmonize_line
@@ -103,6 +103,11 @@ __all__ = ["compose_song", "pitches_per_cell"]
 # notes -- a reasonable default vocabulary for chug-driven metal rhythm.
 _ALLOWED_LENGTHS = [0.25, 0.5, 1.0]
 _BEATS_PER_BAR = 4
+# X.14 -- real diatonic-third "repeat and lift" interval for theme
+# development (see _develop_theme). Degrees, not semitones (Motif deltas
+# are scale-degree offsets, so this stays scale-legal automatically
+# regardless of which scale is active).
+_THEME_DEVELOP_TRANSPOSE_DEGREES = 2
 # Below this preset dissonance, generation stays in-scale (chromatic=False);
 # at or above it, motif.generate_motif reshapes the interval vocabulary via
 # shade() toward the dissonant set. A simple, documented threshold -- not a
@@ -186,6 +191,40 @@ def _snap_to_playable_octave(fretboard: Fretboard, pitch: int) -> int:
     raise ValueError(f"pitch {pitch} has no reachable octave on this fretboard")
 
 
+# X.14 -- real listening feedback ("not much is going on") traced to a
+# real architectural limitation: ThemeRegistry keys a base theme by ROLE
+# ALONE, so every occurrence of that role for the WHOLE SONG reused just
+# one of two pitch contours (base, or invert() -- alternating). A longer
+# song revisiting a role many times (real for any longer song) heard the
+# same 2 states over and over, no matter how many times the role recurred.
+# `motif.transpose`/`motif.invert` already existed, fully real and tested,
+# but only `invert` was ever wired into this rotation.
+def _develop_theme(base_theme: Motif, occurrence: int) -> Motif:
+    """Real per-occurrence development for a reused role theme: a 4-state
+    rotation using ONLY safe, length-preserving develop ops (`transpose`/
+    `invert` touch pitch deltas alone, never rhythm cell count or
+    duration, so every downstream section-length/timing invariant this
+    file depends on stays untouched):
+
+      0: base theme, unchanged
+      1: `invert(base)` -- contour mirrored around the anchor
+      2: `transpose(base, +2 degrees)` -- a real diatonic-third "repeat
+         and lift", a standard real songwriting development move
+      3: `transpose(invert(base), +2 degrees)` -- both combined
+
+    Quadruples real pitch-content variety per role compared to the
+    previous 2-state (base/invert-only) rotation.
+    """
+    state = occurrence % 4
+    if state == 0:
+        return base_theme
+    if state == 1:
+        return invert(base_theme)
+    if state == 2:
+        return transpose(base_theme, _THEME_DEVELOP_TRANSPOSE_DEGREES)
+    return transpose(invert(base_theme), _THEME_DEVELOP_TRANSPOSE_DEGREES)
+
+
 def _two_child_seeds(rng: random.Random) -> tuple[int, int]:
     """Draw two distinct integer seeds from `rng` for `double_track`'s two
     independent takes -- deterministic given the parent `rng`'s state, so
@@ -243,7 +282,7 @@ def _generate_attempt(rng: random.Random, preset: Preset, num_sections: int) -> 
             pedal=preset.pedal,
             feel=preset.feel,
         )
-        m: Motif = invert(base_theme) if occurrence % 2 == 1 else base_theme
+        m: Motif = _develop_theme(base_theme, occurrence)
         guitar_cells = m.cell
         cell_pitches = [
             (None if p is None else _snap_to_playable_octave(guitar_fb, p))

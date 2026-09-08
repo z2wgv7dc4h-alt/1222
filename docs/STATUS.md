@@ -34,6 +34,7 @@ Update only after grep or pytest. No memory claims.
 | Hihat/cymbal layer + varied kick overlay, wired for every preset (X.11) | WIRED+TESTED | 500 passed in 12.59s |
 | Tempo-map half-time reversion fix (X.12) | WIRED+TESTED | 499 passed in 13.18s |
 | Hihat variation: open-hat accents + transition crashes (X.13) | WIRED+TESTED | 504 passed, 1 skipped in 12.75s |
+| Real 4-state theme-development rotation (X.14) | WIRED+TESTED | 506 passed, 1 skipped in 12.73s |
 | Reaper | MISSING | |
 | Editor | MISSING | |
 

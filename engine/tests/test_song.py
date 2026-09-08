@@ -4,7 +4,7 @@ import random
 import pytest
 
 from presets import load_all_presets
-from song import _compute_tempo_map, _generate_attempt, compose_song, pitches_per_cell
+from song import _compute_tempo_map, _develop_theme, _generate_attempt, compose_song, pitches_per_cell
 from motif import Motif
 from structure import generate_section_sequence
 
@@ -439,3 +439,56 @@ def test_every_preset_gets_a_real_transition_crash_at_the_first_section():
             continue
         assert first["hihat"][0]["role"] == "CRASH_1"
         assert not first["hihat"][0]["is_rest"]
+
+
+def test_develop_theme_real_four_state_rotation():
+    base = Motif(
+        cell=[{"duration": 1.0, "is_rest": False}, {"duration": 1.0, "is_rest": False}],
+        deltas=[3, -1],
+    )
+    assert _develop_theme(base, 0).deltas == [3, -1]           # unchanged
+    assert _develop_theme(base, 1).deltas == [-3, 1]            # invert
+    assert _develop_theme(base, 2).deltas == [5, 1]              # transpose +2
+    assert _develop_theme(base, 3).deltas == [-1, 3]             # invert then +2
+    # Rhythm cells are NEVER touched by any state -- transpose/invert are
+    # pitch-only, so every downstream length/timing invariant holds.
+    for occurrence in range(4):
+        assert _develop_theme(base, occurrence).cell == base.cell
+    # Real cycle: occurrence 4 repeats occurrence 0's state exactly.
+    assert _develop_theme(base, 4).deltas == _develop_theme(base, 0).deltas
+
+
+def test_a_role_recurring_many_times_gets_real_pitch_variety_not_just_two_states():
+    """X.14: real listening feedback ("not much is going on") traced to
+    theme reuse only ever alternating between 2 pitch-contour states
+    (base/invert) no matter how many times a role recurred in a longer
+    song. A real song with many repeats of the same role must now show
+    real distinct pitch content beyond just those 2 states."""
+    # "progressive" (moderate motion=0.45, pedal=0.45) rather than djent
+    # (pedal=0.85, which can produce a near-all-root-degree theme whose
+    # deltas are mostly/all 0 -- invert(0) == 0, so base and invert
+    # states can coincidentally look identical for a heavily-pedaled
+    # theme; that's real, correct invert() behavior on a symmetric input,
+    # not something to test around here).
+    progressive = load_all_presets()["progressive"]
+    song = _generate_attempt(random.Random(9), progressive, num_sections=16)
+
+    role_counts: dict[str, int] = {}
+    for s in song["sections"]:
+        role_counts[s["role"]] = role_counts.get(s["role"], 0) + 1
+    frequent_role = max(role_counts, key=role_counts.get)
+    assert role_counts[frequent_role] >= 3, (
+        "expected some role to recur at least 3 times in a 16-section song "
+        "-- try a different seed if this fires"
+    )
+
+    delta_sets = [
+        tuple(s["motif"].deltas) for s in song["sections"] if s["role"] == frequent_role
+    ]
+    distinct = set(delta_sets)
+    # With the real 4-state rotation, 3+ occurrences of the same role
+    # should show more than the old 2-state ceiling (base/invert only).
+    assert len(distinct) > 2, (
+        f"expected more than 2 distinct pitch-content states across "
+        f"{len(delta_sets)} real occurrences of {frequent_role!r}, got {len(distinct)}"
+    )

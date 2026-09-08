@@ -28,8 +28,19 @@ Paths are under `/reference/`.
 | metric polyrhythm | separate fn | two fixed grids over one bar. Different name + tests. |
 | shared sequence | utils | instruments share a rhythm id; pitch independent. |
 
+## Metalerator — `reference/metalerator/metalerator/`
+
+| Symbol | File | Port as |
+|---|---|---|
+| breakdown duration weights | `rhythm_guitar/breakdown/default_melodic.py` (`RGuitarDefaultMelodicBreakdown.randomize_duration`) | real [0.25,0.5,1,2] draw weights, adapted to this project's [0.25,0.5,1.0] vocab. **Ported (X.8, DONE)**, wired for every preset via `rhythm.FEEL_DURATION_WEIGHTS`. |
+| no-isolated-16th rule | same file, companion rule | a lone 0.25 draw is never followed by a longer one -- forces pairing. **Ported (X.8, DONE)** via `rhythm.FEEL_NO_SINGULAR_SHORT`/`no_singular_short`. |
+| snare styles | `drums/snare/snare.py` (`Snare.snare_step`/`snare_half_step`/`snare_double_time`) | `step`=beat 3 of every bar (`i%4==2`, half-time, not generic "2 and 4"); `half_step`=downbeat of every 2nd bar (`i%8==4`); `double_time`=every beat except the first (`i%1==0 and i!=0`). **Ported (X.9, DONE)**, wired for every preset via `drums.snare_pattern_for_role`. |
+| double bass kick | `drums/kick/kick.py` (`Kick.double_bass`) | continuous straight-16th pulse, four hits/beat unconditionally. **Ported (X.11, DONE)** as `drums._kick_double_kick`, used as the `build`/`solo` role overlay for every preset. |
+| crash-on-pattern-change | `drums/breakdown/default_melodic.py` (`should_add_opening_cymbals`) | fires a crash when the kick/snare pattern differs from the previous section's. **Ported (X.13, DONE)** as `drums.add_transition_crash`/`song._develop_theme`'s role-change check, generalized to this project's role-based arrangement unit. |
+
+Snare ghost notes (quiet grace-note hits around the main snare) are a real Metalerator technique not yet ported -- doesn't fit this project's fixed-cell-array model without a larger rework. Section pipeline concept, riff-follows-bass, and the 97-103 velocity band remain unported ideas only.
+
 ## Keep ideas only
-- metalerator: section pipeline concept, riff→bass, kick-follows-guitar in breakdowns, velocity band 97–103. Do not run the app.
 - Anvil: optional dependency-free WAV preview later.
 - react-chords: ignore; VexFlow is tab target.
 - 123 / first Claude Code: treat as a bug-pattern cautionary reference only, do not extend it. (A `docs/RHYTHM_ENGINE_FIXES.md` was referenced here previously; it does not exist anywhere in this repo or `/reference` -- likely lives only inside the separate `123` repo itself, which isn't checked out here. Unverified; don't chase it.)

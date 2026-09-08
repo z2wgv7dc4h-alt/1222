@@ -6,7 +6,6 @@ god-tier-metal/
   TASKS.md           queue — ## Next only
   PLAN.md            phases
   PORTS.md           named symbols + paths
-  HANDOFF.md         session 1 prompt
   PROGRESS.md        log
   MAP.md             this
   god-tier-metal-scope.md   deep background, one heading at a time

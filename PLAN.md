@@ -12,8 +12,8 @@ preset JSON → Fretboard + Scale + RNG(seed)
 ```
 
 ## Built vs intended
-- Built: Phase 0 (repo), Phase 1 (tonal+presets: fretboard, scales, tunings, presets, VoiceLeader/shade/ARC, chord solver), Phase 2 (rhythm: two-layer gen, polymeter, polyrhythm, tuplets, blasts, shared rhythm id, IRVD). 159 tests passing on `main`. Phases 3-5 (motif, drums, bass) in progress. Reference code exists under `/reference`. Assets exist under `/assets`.
-- Intended: engine complete through Phase 7 before editor or mix polish.
+- Built: Phase 0 (repo); Phase 1 (tonal+presets); Phase 2 (rhythm: two-layer gen, polymeter, polyrhythm, tuplets, blasts, shared rhythm id, IRVD); Phase 3 (motif, incl. theme development); Phase 4 (drums: roles, kick/snare/hihat styles, fills, blasts); Phase 5 (bass); Phase 6 (structure); Phase 7 (atmosphere); Phase 8 partial (real `.rpp` export, P8.1 -- pivoted from the originally-planned live reapy bridge, see PORTS.md/TASKS.md; FX-chain presets, P8.3, still open); Phase 10 partial (real MIDI export, P10.1; song JSON and further calibration, P10.2/P10.3, still open). Real 8-preset lineup (djent/tech/metalcore/deathcore/melodic/chill/groovy/progressive, no slam), each cross-checked against real reference material (an original MIDI, an original tab file, an original sheet-music transcription, all user-confirmed non-commercial). 515+ tests passing on `main` (see docs/STATUS.md for the current exact count). Reference code exists under `/reference`. Assets exist under `/assets`.
+- Intended: engine complete through Phase 7 before editor or mix polish. Phase 7 is now done; remaining engine work is Phase 8/10 cleanup plus Phase 9 (editor UI), not started.
 
 ## Phases (exit test)
 0. Repo + pytest hello — `pytest` collects ≥1 pass; assets present. **DONE.**

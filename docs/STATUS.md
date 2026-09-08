@@ -37,6 +37,7 @@ Update only after grep or pytest. No memory claims.
 | Real 4-state theme-development rotation (X.14) | WIRED+TESTED | 506 passed, 1 skipped in 12.73s |
 | Real triplet + chug feel generation (X.15) | WIRED+TESTED | 513 passed, 1 skipped in 13.52s |
 | Real "bounce" density fix + minor-third vocab (X.16) | WIRED+TESTED | 515 passed, 1 skipped in 13.80s |
+| Cross-preset audit + real "airy" feel for chill (X.17); doc/hook cleanup | WIRED+TESTED | 516 passed, 1 skipped in 13.47s |
 | Reaper | MISSING | |
 | Editor | MISSING | |
 

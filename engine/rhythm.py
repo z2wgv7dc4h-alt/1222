@@ -78,6 +78,16 @@ FEEL_DURATION_WEIGHTS: dict[str, dict[float, float]] = {
     # occasional real phrase-ending quarters do occur, at 32nd-note-level
     # rarity in the source data, not literally never).
     "bounce": {0.25: 6.0, 0.5: 4.0, 1.0: 0.3},
+    # X.17 -- real regression fix: chill.json shared "bounce" with djent/
+    # groovy/melodic/progressive, so the X.16 density fix (correct for
+    # those four energetic presets) also made chill's own duration mix
+    # dense/16th-heavy -- directly contradicting chill's own documented
+    # identity ("Low-density breather... Airy, Periphery slow-part
+    # feel"). "airy" is chill's own real, distinct feel: the deliberate
+    # INVERSE weighting from "bounce" -- longer, sustained durations
+    # dominant, 16ths rare, matching a genuine breather section rather
+    # than constant chugging.
+    "airy": {0.25: 1.0, 0.5: 3.0, 1.0: 4.0},
 }
 
 # Metalerator's companion rule (same method): a single isolated 16th note

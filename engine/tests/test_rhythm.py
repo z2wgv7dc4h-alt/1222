@@ -435,3 +435,17 @@ def test_generate_triplet_rhythm_rejects_bad_input():
         generate_triplet_rhythm(2.5, 0.5, random.Random(1))  # not a whole beat count
     with pytest.raises(ValueError):
         generate_triplet_rhythm(4.0, 1.5, random.Random(1))
+
+
+def test_duration_bias_for_feel_airy_is_the_real_inverse_of_bounce():
+    # X.17: chill.json's own real feel (was incorrectly sharing "bounce"
+    # with djent/groovy/melodic/progressive -- a real regression X.16
+    # introduced, since "bounce" is correctly dense for those four but
+    # wrong for chill's own "low-density breather" identity).
+    weights, no_singular_short = duration_bias_for_feel("airy")
+    assert weights == {0.25: 1.0, 0.5: 3.0, 1.0: 4.0}
+    assert no_singular_short is None
+    bounce_weights, _ = duration_bias_for_feel("bounce")
+    # Real, deliberate inverse: quarters dominant in airy, rare in bounce.
+    assert weights[1.0] > weights[0.25]
+    assert bounce_weights[0.25] > bounce_weights[1.0]

@@ -3,16 +3,6 @@ Folder: Desktop\god-tier-metal
 Remote: https://github.com/z2wgv7dc4h-alt/1222
 
 ==================================================
-ONCE (you)
-==================================================
-1. Kit files in this folder (already done if git add saw them).
-2. Copy god-tier-metal-scope.md into this folder (from the handoff zip).
-3. Unpack reference\ and assets\ from the reference bundle.
-4. git config user.name / user.email, commit, push origin main
-   (you already added origin; commit failed only on identity).
-5. Start FCC server. Open Claude Code IN THIS FOLDER.
-
-==================================================
 EVERY WORK SESSION (almost all you type)
 ==================================================
   /next
@@ -23,7 +13,7 @@ That is the main command. It:
   - enters plan-then-do for THAT box only
 
 When it finishes a turn, Stop hook should:
-  - update CURRENT.md TASKS.md PROGRESS.md HANDOFF.md
+  - update CURRENT.md TASKS.md PROGRESS.md
   - git add / commit
   - git push if origin exists
 

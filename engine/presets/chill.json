@@ -6,7 +6,7 @@
   "dissonance": 0.05,
   "bpm": 128,
   "bars": 4,
-  "feel": "bounce",
+  "feel": "airy",
   "open_chance": 0.55,
   "octave_stab": true,
   "kick": "sparse",

@@ -5,6 +5,7 @@ import pytest
 from motif import (
     Motif,
     ThemeRegistry,
+    apply_pedal_bias,
     augment,
     fragment,
     generate_motif,
@@ -14,7 +15,7 @@ from motif import (
     transpose,
 )
 from presets import load_all_presets
-from rhythm import generate_rhythm
+from rhythm import generate_rhythm, tile_cell
 from theory import DISSONANT, Scale, shade
 
 
@@ -209,6 +210,133 @@ def test_theme_registry_returns_same_base_motif_for_same_id():
     assert second is first
     assert second.cell == first.cell
     assert second.deltas == first.deltas
+
+
+# --- preset.group: N-against-4 displacement via tile_cell -------------------
+
+
+def test_generate_motif_group_beats_tiles_a_short_cell_across_the_section():
+    rng_grouped = random.Random(77)
+    rng_reference = random.Random(77)
+    scale = Scale(52, "phrygian")
+    weights = {0: 20, 1: 3, 7: 3, 8: 1, 5: 1}
+
+    grouped = generate_motif(
+        16.0, [0.25, 0.5, 1.0], 0.5, rng_grouped, scale, weights, group_beats=3.0,
+    )
+    # Reproduce the same construction by hand (same rng state going in) to
+    # prove generate_motif's group_beats path really is "generate a
+    # group-beat cell, then rhythm.tile_cell it across total_beats" and not
+    # some other mechanism.
+    rng_manual = random.Random(77)
+    short_cell = generate_rhythm(3.0, [0.25, 0.5, 1.0], 0.5, rng_manual)
+    expected_cell = tile_cell(short_cell, 16.0)
+    assert grouped.cell == expected_cell
+
+    # Sanity: the section-filling ungrouped path produces a DIFFERENT cell
+    # shape from the same rng seed (since it draws directly for 16 beats
+    # instead of tiling a 3-beat cell) -- group_beats really changes
+    # something, it isn't a silent no-op.
+    ungrouped = generate_motif(16.0, [0.25, 0.5, 1.0], 0.5, rng_reference, scale, weights)
+    assert ungrouped.cell != grouped.cell
+
+
+def test_generate_motif_group_beats_none_is_unchanged_behavior():
+    rng_a = random.Random(3)
+    rng_b = random.Random(3)
+    scale = Scale(52, "minor")
+    weights = {0: 10, 7: 4}
+    a = generate_motif(8.0, [0.5, 1.0], 0.6, rng_a, scale, weights, group_beats=None)
+    b = generate_motif(8.0, [0.5, 1.0], 0.6, rng_b, scale, weights)
+    assert a.cell == b.cell
+    assert a.deltas == b.deltas
+
+
+# --- preset.pedal: bias delta selection toward the root ---------------------
+
+
+def test_apply_pedal_bias_zero_leaves_weights_unchanged():
+    weights = {0: 10, 7: 4, 3: 2}
+    assert apply_pedal_bias(weights, 0.0) == weights
+
+
+def test_apply_pedal_bias_one_sends_almost_all_mass_to_root():
+    weights = {0: 1, 7: 4, 3: 2}
+    biased = apply_pedal_bias(weights, 1.0)
+    total = sum(biased.values())
+    assert biased[0] / total > 0.999
+
+
+def test_apply_pedal_bias_never_zeroes_out_other_intervals():
+    weights = {0: 1, 7: 4, 3: 2}
+    for pedal in (0.2, 0.5, 0.85):
+        biased = apply_pedal_bias(weights, pedal)
+        assert set(biased) == set(weights)
+        assert all(w > 0 for w in biased.values())
+
+
+def test_apply_pedal_bias_handles_empty_weights_without_crashing():
+    # Bad/edge input: nothing to bias toward -- must not raise or fabricate
+    # an interval that was never in the input.
+    assert apply_pedal_bias({}, 0.5) == {}
+
+
+def test_apply_pedal_bias_rejects_out_of_range_pedal_by_clamping():
+    weights = {0: 1, 7: 1}
+    # Out-of-range pedal values are clamped into [0, 1] rather than
+    # producing negative/garbage weights.
+    low = apply_pedal_bias(weights, -5.0)
+    high = apply_pedal_bias(weights, 5.0)
+    assert low == apply_pedal_bias(weights, 0.0)
+    assert high == apply_pedal_bias(weights, 1.0)
+
+
+def test_generate_motif_pedal_raises_root_degree_fraction_statistically():
+    """The real, wired claim: a high `pedal` must measurably increase the
+    fraction of root-degree (delta == 0) hits versus no pedal bias at all,
+    across many independent draws -- not a single-seed fluke."""
+    djent = load_all_presets()["djent"]
+    scale = Scale(52, djent.scale)
+
+    def root_fraction(pedal, n_seeds=300):
+        total_deltas = 0
+        root_deltas = 0
+        for seed in range(n_seeds):
+            rng = random.Random(seed)
+            m = generate_motif(
+                4.0, [0.25, 0.5, 1.0], 0.7, rng, scale, djent.vocab.weights,
+                pedal=pedal,
+            )
+            total_deltas += len(m.deltas)
+            root_deltas += sum(1 for d in m.deltas if d == 0)
+        return root_deltas / total_deltas if total_deltas else 0.0
+
+    no_pedal_fraction = root_fraction(None)
+    high_pedal_fraction = root_fraction(djent.pedal)  # 0.85
+    assert high_pedal_fraction > no_pedal_fraction + 0.1, (
+        f"expected pedal={djent.pedal} to noticeably raise the root-degree "
+        f"fraction, got no_pedal={no_pedal_fraction:.3f} "
+        f"high_pedal={high_pedal_fraction:.3f}"
+    )
+
+
+def test_theme_registry_group_and_pedal_are_threaded_through():
+    djent = load_all_presets()["djent"]
+    scale = Scale(52, djent.scale)
+    registry = ThemeRegistry()
+    rng = random.Random(1)
+    m = registry.get_or_create(
+        "grouped-theme", 16.0, [0.25, 0.5, 1.0], 0.5, rng, scale, djent.vocab.weights,
+        group_beats=float(djent.group), pedal=djent.pedal,
+    )
+    # Same construction, by hand, from an identical rng seed.
+    rng_manual = random.Random(1)
+    expected = generate_motif(
+        16.0, [0.25, 0.5, 1.0], 0.5, rng_manual, scale, djent.vocab.weights,
+        group_beats=float(djent.group), pedal=djent.pedal,
+    )
+    assert m.cell == expected.cell
+    assert m.deltas == expected.deltas
 
 
 def test_theme_registry_different_ids_generate_independently():

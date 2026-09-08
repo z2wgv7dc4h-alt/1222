@@ -162,6 +162,196 @@ def kick_follows_guitar(guitar_cells: list[dict]) -> list[dict]:
     return kick_cells
 
 
+# --- kick-style dispatch (closes the real, tracked gap: preset.kick was ---
+# --- declared per style but nothing branched on it) -------------------------
+
+
+def _kick_sparse(guitar_cells: list[dict]) -> list[dict]:
+    """"sparse" kick style: a reduced subset of the guitar's own hit
+    positions -- every OTHER guitar hit becomes a kick (hit index 0, 2, 4,
+    ... among the guitar's hits, 0-indexed), the rest stay silent. Lower
+    density than "bounce"/"lock" (which double every guitar hit 1:1), but
+    still anchored to real guitar hit positions rather than an independent
+    grid -- a thinned-out lock, not a different rhythm entirely.
+    """
+    out: list[dict] = []
+    hit_index = 0
+    for cell in guitar_cells:
+        is_rest = bool(cell["is_rest"])
+        if is_rest:
+            out.append({"duration": cell["duration"], "is_rest": True, "role": None})
+            continue
+        keep = (hit_index % 2 == 0)
+        hit_index += 1
+        out.append(
+            {
+                "duration": cell["duration"],
+                "is_rest": not keep,
+                "role": "KICK" if keep else None,
+            }
+        )
+    return out
+
+
+def _euclidean_hits(pulses: int, steps: int) -> list[bool]:
+    """`pulses` hits distributed as evenly as possible across `steps` slots.
+
+    Uses the modular/"Bresenham" construction -- hit at step `i` (0-indexed)
+    iff `(i * pulses) % steps < pulses` -- which is a well-known equivalent
+    to Bjorklund's algorithm for generating maximally-even distributions
+    (e.g. `_euclidean_hits(3, 8)` gives the canonical E(3,8) tresillo
+    X..X..X., hits at indices 0, 3, 6). `pulses` is clamped into
+    `[0, steps]` first so a caller can never overshoot (more "pulses" than
+    slots is meaningless for this construction).
+    """
+    if steps <= 0:
+        raise ValueError("steps must be > 0")
+    if pulses < 0:
+        raise ValueError("pulses must be >= 0")
+    pulses = min(pulses, steps)
+    if pulses == 0:
+        return [False] * steps
+    if pulses == steps:
+        return [True] * steps
+    return [((i * pulses) % steps) < pulses for i in range(steps)]
+
+
+def _kick_euclid(guitar_cells: list[dict]) -> list[dict]:
+    """"euclid" kick style: a genuine Euclidean rhythm (see
+    `_euclidean_hits`) placed across exactly `len(guitar_cells)` slots, with
+    the pulse COUNT derived from the guitar's own hit count (so density is
+    comparable to the guitar part) but the PLACEMENT computed independently
+    via the even-distribution formula -- deliberately NOT a copy of the
+    guitar's own hit positions, which is the whole point of "euclid" as a
+    distinct style from "bounce"/"lock".
+    """
+    steps = len(guitar_cells)
+    pulses = sum(1 for c in guitar_cells if not c["is_rest"])
+    hits = _euclidean_hits(pulses, steps)
+    return [
+        {
+            "duration": cell["duration"],
+            "is_rest": not is_hit,
+            "role": "KICK" if is_hit else None,
+        }
+        for cell, is_hit in zip(guitar_cells, hits)
+    ]
+
+
+def _kick_two_step(guitar_cells: list[dict]) -> list[dict]:
+    """"two_step" kick style: this project's documented interpretation of
+    the metalcore breakdown "two-step" convention (no single universally
+    rigid definition exists in the genre, so this one is deliberately
+    concrete and testable): a half-time stepping feel where the kick lands
+    twice per 2-beat cycle -- on the cycle's downbeat (beat offset 0.0) and
+    on the "and" of the second beat (beat offset 1.5), the classic
+    kick-into-the-snare-on-3 breakdown step. This is a fixed metric overlay
+    on the SAME cell/duration grid the guitar used (like "blast" is), not a
+    copy of the guitar's own hit/rest layout -- so it reads as genuinely
+    different from "sparse"/"bounce" rather than a thinned or exact copy.
+
+    Cell durations come straight from `guitar_cells` (same length, same
+    duration per slot); only which cells count as a "hit" is decided by
+    this pattern. A target time that does not land inside any cell's span
+    (e.g. a very short section) is simply skipped rather than fabricating
+    an extra slot.
+    """
+    if not guitar_cells:
+        raise ValueError("guitar_cells must be non-empty")
+
+    starts: list[float] = []
+    cumulative = 0.0
+    for cell in guitar_cells:
+        starts.append(cumulative)
+        cumulative += cell["duration"]
+    total_beats = cumulative
+
+    hit_indices: set[int] = set()
+    cycle_start = 0.0
+    while cycle_start < total_beats - _EPS:
+        for offset in (0.0, 1.5):
+            t = cycle_start + offset
+            if t >= total_beats - _EPS:
+                continue
+            idx = None
+            for i, s in enumerate(starts):
+                if s <= t + _EPS:
+                    idx = i
+                else:
+                    break
+            if idx is not None:
+                hit_indices.add(idx)
+        cycle_start += 2.0
+
+    return [
+        {
+            "duration": cell["duration"],
+            "is_rest": i not in hit_indices,
+            "role": "KICK" if i in hit_indices else None,
+        }
+        for i, cell in enumerate(guitar_cells)
+    ]
+
+
+def _kick_blast(guitar_cells: list[dict]) -> list[dict]:
+    """"blast" kick style: kick on every single cell, continuous and dense,
+    regardless of the guitar's own rest positions -- the "constant blast
+    under a brutal chug" convention (deathcore.json's straightforward
+    brutal-chugging archetype)."""
+    return [
+        {"duration": cell["duration"], "is_rest": False, "role": "KICK"}
+        for cell in guitar_cells
+    ]
+
+
+_KICK_STYLES = {
+    "bounce": kick_follows_guitar,
+    "lock": kick_follows_guitar,
+    "sparse": _kick_sparse,
+    "euclid": _kick_euclid,
+    "two_step": _kick_two_step,
+    "blast": _kick_blast,
+}
+
+
+def kick_pattern_for_style(
+    guitar_cells: list[dict], style: str, rng: random.Random | None = None
+) -> list[dict]:
+    """Real dispatch on a preset's declared `.kick` style name -- the wired
+    replacement for always calling `kick_follows_guitar` regardless of what
+    style a preset actually declares (see this module's and song.py's
+    docstrings on the gap this closes).
+
+    `"bounce"` and `"lock"` share `kick_follows_guitar`'s exact-match
+    behavior: the real presets that declare them (groovy/melodic for
+    "bounce", tech for "lock" -- tech.json's own description says
+    "kick-locked triplet chug") both want the kick doubling the guitar's
+    hits 1:1; there is no real preset asking for a different mechanical
+    behavior between the two names, just a different genre label for the
+    same lock convention. `"sparse"`, `"euclid"`, `"two_step"` and
+    `"blast"` are real, distinct mechanisms -- see `_kick_sparse`/
+    `_kick_euclid`/`_kick_two_step`/`_kick_blast`.
+
+    `rng` is accepted for interface symmetry with the rest of this
+    project's generation calls (every real style here is currently fully
+    deterministic given `guitar_cells`, same as `kick_follows_guitar`
+    itself), but is not required by any current style.
+
+    Raises `ValueError` on an unrecognized style name rather than silently
+    falling back to a default style -- per project law (anti-patterns.md),
+    an unrecognized input must fail closed, never guess.
+    """
+    if not guitar_cells:
+        raise ValueError("guitar_cells must be non-empty")
+    handler = _KICK_STYLES.get(style)
+    if handler is None:
+        raise ValueError(
+            f"unknown kick style {style!r} "
+            f"(no handler wired for it in drums._KICK_STYLES)"
+        )
+    return handler(guitar_cells)
+
+
 # --- P4.3: fills/blasts via shared-sequence + blast-type rendering ----------
 
 

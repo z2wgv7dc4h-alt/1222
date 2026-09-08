@@ -26,7 +26,7 @@ from __future__ import annotations
 import random
 from dataclasses import dataclass, field
 
-from rhythm import generate_rhythm
+from rhythm import generate_rhythm, tile_cell
 from theory import Scale, shade
 
 __all__ = [
@@ -37,6 +37,7 @@ __all__ = [
     "invert",
     "fragment",
     "pick_pitch_interval",
+    "apply_pedal_bias",
     "generate_motif",
     "ThemeRegistry",
 ]
@@ -163,6 +164,46 @@ def _degree_delta_for_interval(scale: Scale, base_degree_index: int, semitone_in
     return scale.index_of(target) - base_degree_index
 
 
+def apply_pedal_bias(weights: dict, pedal: float) -> dict:
+    """Re-weight `weights` (semitone-interval -> weight) toward the root
+    (interval 0) proportional to `pedal` in `[0, 1]` -- the mechanism this
+    project uses to make `preset.pedal` (documented in presets.py as "how
+    often a phrase returns to the open low string") measurably change
+    `generate_motif`'s output: picking semitone interval 0 always resolves
+    to scale-degree DELTA 0 (see `_degree_delta_for_interval` -- interval 0
+    added to the current pitch snaps right back to that same degree), so
+    biasing the interval-0 draw probability directly biases the fraction of
+    root/pedal (`delta == 0`) hits a motif ends up with.
+
+    `pedal=0` leaves `weights` unchanged. `pedal=1` sends effectively all
+    probability mass onto interval 0. In between, interval 0's SHARE of the
+    total weight mass moves linearly from its existing share toward 1.0 by
+    `pedal`:
+
+        target_share = existing_share + pedal * (1 - existing_share)
+
+    every other interval keeps its relative proportions to each other, just
+    scaled down to make room -- the same "rebalance, never zero out" design
+    `theory.shade()` already uses, applied to a single interval instead of
+    the dissonant/consonant split.
+    """
+    d = max(0.0, min(1.0, float(pedal)))
+    out = dict(weights)
+    total = sum(out.values())
+    if total <= 0 or d <= 0:
+        return out
+    root_w = out.get(0, 0.0)
+    existing_share = root_w / total
+    target_share = existing_share + d * (1.0 - existing_share)
+    if target_share >= 1.0:
+        return {0: total}
+    rest = total - root_w
+    if rest <= 0:
+        return out
+    out[0] = target_share * rest / (1.0 - target_share)
+    return out
+
+
 def generate_motif(
     total_beats: float,
     allowed_lengths: list[float],
@@ -173,6 +214,8 @@ def generate_motif(
     chromatic: bool = False,
     dissonance: float = 0.85,
     base_degree: int = 0,
+    group_beats: float | None = None,
+    pedal: float | None = None,
 ) -> Motif:
     """Generate a fresh Motif: a rhythm cell (via `rhythm.generate_rhythm`)
     plus a scale-degree contour drawn from `vocab_weights` (a preset's
@@ -183,13 +226,37 @@ def generate_motif(
     set (1, 2, 6, 11 semitones) -- see tests/test_motif.py for the
     distribution-level check. `chromatic=False` uses the raw preset weights.
 
+    `group_beats`, when not `None`, realizes `preset.group`'s djent-style
+    N-against-4 displacement: instead of drawing one rhythm cell that spans
+    `total_beats` directly, a SHORT cell of length `group_beats` is drawn
+    first and then tiled across `total_beats` via `rhythm.tile_cell`. Since
+    `group_beats` need not evenly divide `total_beats` (e.g. 3 into 16),
+    each successive repeat of the short cell starts at a different phase
+    against the underlying pulse -- the same "cell doesn't evenly divide
+    the total, so accents drift against the beat" polymeter device
+    `tile_cell` already documents, applied here to a preset's own riff cell
+    rather than a hand-built fixture. `group_beats=None` (the default)
+    keeps the previous, ungrouped behavior exactly (`generate_rhythm`
+    filling the whole section directly).
+
+    `pedal`, when not `None`, biases delta selection toward the root via
+    `apply_pedal_bias` before picking (see that function's docstring) --
+    the wired realization of `preset.pedal`'s "how often a phrase returns
+    to the pedal note".
+
     Deltas walk from `base_degree` (each pick's semitone interval is
     resolved against the degree the previous pick landed on), so a chromatic
     contour can wander instead of always leaping from the same anchor.
     """
-    cell = generate_rhythm(total_beats, allowed_lengths, hit_chance, rng)
+    if group_beats is not None:
+        short_cell = generate_rhythm(group_beats, allowed_lengths, hit_chance, rng)
+        cell = tile_cell(short_cell, total_beats)
+    else:
+        cell = generate_rhythm(total_beats, allowed_lengths, hit_chance, rng)
     hits = _count_hits(cell)
     weights = shade(vocab_weights, dissonance) if chromatic else dict(vocab_weights)
+    if pedal is not None:
+        weights = apply_pedal_bias(weights, pedal)
 
     deltas: list[int] = []
     degree_index = int(base_degree)
@@ -229,6 +296,8 @@ class ThemeRegistry:
         chromatic: bool = False,
         dissonance: float = 0.85,
         base_degree: int = 0,
+        group_beats: float | None = None,
+        pedal: float | None = None,
     ) -> Motif:
         if theme_id not in self._cache:
             self._cache[theme_id] = generate_motif(
@@ -241,6 +310,8 @@ class ThemeRegistry:
                 chromatic=chromatic,
                 dissonance=dissonance,
                 base_degree=base_degree,
+                group_beats=group_beats,
+                pedal=pedal,
             )
         return self._cache[theme_id]
 

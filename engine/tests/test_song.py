@@ -1,7 +1,10 @@
+import dataclasses
+import random
+
 import pytest
 
 from presets import load_all_presets
-from song import compose_song, pitches_per_cell
+from song import _generate_attempt, compose_song, pitches_per_cell
 from motif import Motif
 
 
@@ -115,3 +118,118 @@ def test_compose_song_judge_result_is_present_and_shaped():
     j = song["judge"]
     assert set(j.keys()) == {"ok", "hits", "pm_ratio", "kick_lock"}
     assert isinstance(j["ok"], bool)
+
+
+# ---------------------------------------------------------------------------
+# Closing the real gap: preset.kick/group/pedal/octave_stab now actually
+# change compose_song's output. Every test below starts from a REAL preset
+# (djent, via load_all_presets()) and, where a controlled A/B comparison is
+# needed, mutates exactly ONE field with dataclasses.replace -- never a
+# synthetic hand-built preset -- then drives the same real
+# song._generate_attempt(rng, preset, num_sections) call compose_song itself
+# uses for one attempt, with an identically-seeded rng on both sides so any
+# difference is attributable to the field, not RNG noise.
+# ---------------------------------------------------------------------------
+
+DJENT = load_all_presets()["djent"]
+assert DJENT.kick == "euclid" and DJENT.group == 3 and DJENT.pedal == 0.85 and DJENT.octave_stab is True
+
+
+def test_kick_style_field_changes_real_song_kick_output():
+    bounce_variant = dataclasses.replace(DJENT, kick="bounce")
+
+    euclid_song = _generate_attempt(random.Random(5), DJENT, num_sections=6)
+    bounce_song = _generate_attempt(random.Random(5), bounce_variant, num_sections=6)
+
+    # Same seed -> identical guitar motifs (kick style doesn't touch
+    # guitar/motif generation), so any kick difference is real.
+    assert [s["motif"].cell for s in euclid_song["sections"]] == [
+        s["motif"].cell for s in bounce_song["sections"]
+    ]
+    assert [s["motif"].deltas for s in euclid_song["sections"]] == [
+        s["motif"].deltas for s in bounce_song["sections"]
+    ]
+
+    differed = False
+    for euclid_sec, bounce_sec in zip(euclid_song["sections"], bounce_song["sections"]):
+        guitar_hits = [i for i, c in enumerate(euclid_sec["motif"].cell) if not c["is_rest"]]
+        bounce_kick_hits = [i for i, c in enumerate(bounce_sec["kick"]) if not c["is_rest"]]
+        euclid_kick_hits = [i for i, c in enumerate(euclid_sec["kick"]) if not c["is_rest"]]
+        # "bounce" still locks exactly to the guitar (unchanged behavior).
+        assert bounce_kick_hits == guitar_hits
+        if euclid_kick_hits != guitar_hits:
+            differed = True
+    assert differed, "expected djent's real 'euclid' kick style to differ from a guitar-locked kick in at least one section"
+
+
+def test_group_field_changes_real_song_guitar_cell():
+    ungrouped_variant = dataclasses.replace(DJENT, group=None)
+
+    grouped_song = _generate_attempt(random.Random(9), DJENT, num_sections=4)
+    ungrouped_song = _generate_attempt(random.Random(9), ungrouped_variant, num_sections=4)
+
+    grouped_cells = [s["motif"].cell for s in grouped_song["sections"]]
+    ungrouped_cells = [s["motif"].cell for s in ungrouped_song["sections"]]
+    assert grouped_cells != ungrouped_cells, (
+        "expected djent's real group=3 displacement to produce a different "
+        "guitar rhythm cell than the same preset with group unset, same seed"
+    )
+
+
+def test_pedal_field_raises_root_degree_fraction_in_real_song_output():
+    no_pedal_variant = dataclasses.replace(DJENT, pedal=None)
+
+    def root_fraction(preset, n_seeds=60, num_sections=4):
+        total = 0
+        roots = 0
+        for seed in range(n_seeds):
+            result = _generate_attempt(random.Random(seed), preset, num_sections)
+            for section in result["sections"]:
+                deltas = section["motif"].deltas
+                total += len(deltas)
+                roots += sum(1 for d in deltas if d == 0)
+        return roots / total if total else 0.0
+
+    pedal_fraction = root_fraction(DJENT)
+    no_pedal_fraction = root_fraction(no_pedal_variant)
+    assert pedal_fraction > no_pedal_fraction + 0.1, (
+        f"expected djent's real pedal=0.85 to noticeably raise the "
+        f"root-degree fraction in actual compose_song output, got "
+        f"no_pedal={no_pedal_fraction:.3f} pedal={pedal_fraction:.3f}"
+    )
+
+
+def test_octave_stab_field_changes_real_song_output():
+    no_stab_variant = dataclasses.replace(DJENT, octave_stab=False)
+
+    stab_on = _generate_attempt(random.Random(13), DJENT, num_sections=6)
+    stab_off = _generate_attempt(random.Random(13), no_stab_variant, num_sections=6)
+
+    # octave_stab must not affect anything else about generation, same seed.
+    assert [s["motif"].cell for s in stab_on["sections"]] == [
+        s["motif"].cell for s in stab_off["sections"]
+    ]
+
+    assert all(section["octave_stabs"] == [] for section in stab_off["sections"])
+    sections_with_accents = [s for s in stab_on["sections"] if s["accents"]]
+    assert sections_with_accents, "need at least one accented section to prove the wiring -- try a different seed if this fires"
+    for section in sections_with_accents:
+        assert len(section["octave_stabs"]) == len(section["accents"])
+        assert section["octave_stabs"], "octave_stab=True must produce real stab pitches for an accented section"
+
+
+def test_octave_stab_field_rejected_bad_preset_field_type_fails_closed():
+    # Bad input: octave_stab must be a real bool per presets.validate_preset
+    # (the wired load-time check), so a preset carrying a non-bool value
+    # here can never have been loaded through load_preset/load_all_presets
+    # in the first place -- validate_preset fails closed on it.
+    from presets import validate_preset, load_tunings
+    tunings = load_tunings()
+    bad = {
+        "id": "bogus", "description": "bad octave_stab", "tuning_key": "drop_g_7",
+        "scale": "minor", "dissonance": 0.5, "bpm": 140, "bars": 4, "feel": "bounce",
+        "open_chance": 0.5, "octave_stab": "yes", "kick": "bounce",
+        "vocab": {"weights": {"0": 1}, "motion": 0.2},
+    }
+    with pytest.raises(ValueError):
+        validate_preset(bad, tunings)

@@ -15,13 +15,25 @@ existing generation modules (rhythm/motif/drums/bass/structure/atmosphere);
 this module only wires them together in the right order and shape, adding
 no new note-choice logic of its own.
 
-Honest scope note (documented, not silently dropped): `preset.group`,
-`preset.pedal`, `preset.kick` (the kick-STYLE name, e.g. "euclid"/"lock"),
-and `preset.octave_stab` are still not consumed anywhere in the engine --
-`kick_follows_guitar` is a single fixed algorithm, and nothing yet
-branches on a preset's kick-style name or djent's displacement-group
-value. That remains a real, tracked gap (see TASKS.md) beyond what this
-module closes.
+`preset.kick` (the kick-style name, e.g. "euclid"/"lock"), `preset.group`
+(djent-style N-against-4 displacement), `preset.pedal` (pedal-note return
+frequency) and `preset.octave_stab` are now wired through here too:
+  - `preset.kick` selects the real kick mechanism via `drums.
+    kick_pattern_for_style` (see that function for the per-style
+    mechanisms) instead of always running the fixed `kick_follows_guitar`
+    algorithm regardless of what a preset declares.
+  - `preset.group`, when set, is threaded into `motif.generate_motif` as
+    `group_beats` -- a `group`-beat cell is generated and tiled via
+    `rhythm.tile_cell` across the section instead of one cell spanning the
+    whole section directly, producing the N-against-4 phase-drift effect.
+  - `preset.pedal`, when set, is threaded into `motif.generate_motif` as
+    `pedal`, biasing delta selection toward the root/anchor degree (see
+    `motif.apply_pedal_bias`).
+  - `preset.octave_stab`, when true, adds a real `theory.VoiceLeader.stab()`
+    leap at each of a section's `atmosphere.find_accents` positions
+    (`section["octave_stabs"]`); when false, that list stays empty -- a
+    section's use of the octave-stab device is now conditional on the
+    preset actually declaring it, not applied (or not) unconditionally.
 """
 from __future__ import annotations
 
@@ -29,7 +41,7 @@ import random
 
 from atmosphere import find_accents, pad_voicing
 from bass import build_bass_fretboard, follow_guitar_rhythm
-from drums import RhythmRegistry, generate_vocabulary_informed_blast_fill, kick_follows_guitar
+from drums import RhythmRegistry, generate_vocabulary_informed_blast_fill, kick_pattern_for_style
 from fretboard import Fretboard
 from lead import generate_lead_line
 from legato import generate_legato_lick
@@ -38,7 +50,7 @@ from performance import double_track
 from presets import Preset, get_tuning, load_all_presets, load_tunings, resolve_preset_id
 from riff import harmonize_line
 from structure import generate_section_sequence, judge
-from theory import Scale, arc
+from theory import Scale, VoiceLeader, arc
 
 __all__ = ["compose_song", "pitches_per_cell"]
 
@@ -139,6 +151,8 @@ def _generate_attempt(rng: random.Random, preset: Preset, num_sections: int) -> 
             rng, scale, preset.vocab.weights, chromatic=chromatic,
             dissonance=arc_row["dissonance"],
             base_degree=arc_row["start_degree"],
+            group_beats=(float(preset.group) if preset.group is not None else None),
+            pedal=preset.pedal,
         )
         m: Motif = invert(base_theme) if occurrence % 2 == 1 else base_theme
         guitar_cells = m.cell
@@ -152,7 +166,7 @@ def _generate_attempt(rng: random.Random, preset: Preset, num_sections: int) -> 
             guitar_cells, random.Random(seed_a), random.Random(seed_b)
         )
 
-        kick_cells = kick_follows_guitar(guitar_cells)
+        kick_cells = kick_pattern_for_style(guitar_cells, preset.kick, rng=rng)
 
         fill = None
         if role in ("breakdown", "solo"):
@@ -171,6 +185,32 @@ def _generate_attempt(rng: random.Random, preset: Preset, num_sections: int) -> 
         pad_root = scale.root + arc_row["register"]
         pad = pad_voicing(pad_root)
         accents = find_accents(guitar_cells, pad_root)
+
+        # preset.octave_stab wiring: a real theory.VoiceLeader.stab() leap
+        # (a deliberate wide interval jump, explicitly exempt from
+        # VoiceLeader's normal voice-leading smoothing -- see theory.py's
+        # docstring) at each of this section's structurally-accented
+        # positions, but ONLY for presets that actually declare
+        # octave_stab=True. A False preset gets an empty list here, never a
+        # fabricated stab -- the boolean now measurably changes
+        # compose_song's output instead of being validated and stored only.
+        #
+        # `stab()` itself draws no randomness at all (it is a deterministic
+        # leap from `prev`, see theory.py), so the VoiceLeader built here
+        # deliberately does NOT consume the section's shared `rng` (it is
+        # constructed with `rng=None`, which VoiceLeader defaults to its
+        # own throwaway `random.Random(0)`) -- octave_stab's effect on a
+        # song must stay isolated to the stab pitches themselves, never
+        # silently reseed every later section's independent rng draws just
+        # because the boolean flipped.
+        if preset.octave_stab and accents:
+            voice_leader = VoiceLeader(
+                scale, weights=preset.vocab.weights, rng=None,
+                anchor=pad_root, motion=preset.vocab.motion,
+            )
+            octave_stabs = [voice_leader.stab(prev=pad_root) for _ in accents]
+        else:
+            octave_stabs = []
 
         # The lead guitar is NOT the same busy melodic voice in every
         # section all song long -- a real second guitar changes role by
@@ -256,6 +296,7 @@ def _generate_attempt(rng: random.Random, preset: Preset, num_sections: int) -> 
             "bass": bass_cells,
             "pad": pad,
             "accents": accents,
+            "octave_stabs": octave_stabs,
         })
 
         guitar_track.extend(take_a)

@@ -8,7 +8,7 @@ Paths are under `/reference/`.
 |---|---|---|
 | `VoiceLeader` | `theory.py` | pick / walk / move / stab. Do not rewrite. **Ported (P1.10, DONE).** |
 | `shade()` | `theory.py` | 0–1 dissonance reweight; never zero an interval. Corrected from `style_packs.py` (only holds PACKS/VOCAB) after reading the file. **Ported (P1.10, DONE).** |
-| IRVD | `theory.py` (`phrase_plan`) | Intro 1 bar; Destruction = `bars // 4` floor, min 1; remainder splits Rep/Var, odd bar to Variation. Corrected from `style_packs.py` -- real source found via a `riff_engine.py` comment ("see theory.phrase_plan"). **Ported (P2.7, DONE).** |
+| IRVD | `theory.py` (`phrase_plan`) | Intro 1 bar; Destruction = `bars // 4` floor, min 1; remainder splits Rep/Var, odd bar to Variation. Corrected from `style_packs.py` -- real source found via a `riff_engine.py` comment ("see theory.phrase_plan"). **Ported (P2.7, DONE); actually WIRED (X.19, DONE)** -- the P2.7 port sat completely unconsumed (found via a whole-engine grep) until X.19 built `motif._generate_irvd_motif` to call it. |
 | ARC | `theory.py` | energy/register/dissonance/start-degree. density = `0.28 + 0.62 * energy`. Corrected from `style_packs.py`. **Ported (P1.10, DONE).** |
 | tunings | `tab_score.py` (`TUNINGS`) | `drop_g_7` BoO, `drop_ab_7` Periphery, `drop_a_7` SOTS, `drop_b_7` VoM, `drop_e_8` (8-string, SoI-ish), `drop_c_6`, `standard_6`. MIDI from source. **Ported (P1.6, DONE).** |
 | `pitch_to_fret` | `tab_score.py` | lowest string, then `abs(fret_diff)+abs(string_diff)*2`. **Ported (P1.2, DONE).** |

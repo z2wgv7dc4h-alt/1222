@@ -316,6 +316,13 @@ def _generate_attempt(rng: random.Random, preset: Preset, num_sections: int) -> 
             group_beats=(float(preset.group) if preset.group is not None else None),
             pedal=preset.pedal,
             feel=preset.feel,
+            # X.19 -- real IRVD phrase development (bar-by-bar
+            # intro/repeat/vary/destroy shape) for every preset EXCEPT
+            # djent/progressive, whose real `group_beats` polymeter tiling
+            # is a different, already-real "something happens across the
+            # section" device that IRVD's verbatim-repeat structure would
+            # directly fight (see motif.generate_motif's docstring).
+            irvd_bars=(preset.bars if preset.group is None else None),
         )
         m: Motif = _develop_theme(base_theme, occurrence)
         guitar_cells = m.cell

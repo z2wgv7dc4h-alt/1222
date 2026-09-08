@@ -26,7 +26,7 @@ from __future__ import annotations
 import random
 from dataclasses import dataclass, field
 
-from rhythm import duration_bias_for_feel, generate_rhythm, generate_triplet_rhythm, tile_cell
+from rhythm import duration_bias_for_feel, generate_rhythm, generate_triplet_rhythm, phrase_plan, tile_cell
 from theory import Scale, shade
 
 __all__ = [
@@ -217,6 +217,7 @@ def generate_motif(
     group_beats: float | None = None,
     pedal: float | None = None,
     feel: str | None = None,
+    irvd_bars: int | None = None,
 ) -> Motif:
     """Generate a fresh Motif: a rhythm cell (via `rhythm.generate_rhythm`)
     plus a scale-degree contour drawn from `vocab_weights` (a preset's
@@ -256,7 +257,25 @@ def generate_motif(
     Deltas walk from `base_degree` (each pick's semitone interval is
     resolved against the degree the previous pick landed on), so a chromatic
     contour can wander instead of always leaping from the same anchor.
+
+    `irvd_bars`, when not `None`, replaces the single flat rhythm+pitch draw
+    above with real IRVD phrase development (X.19, scope sec.18.2's
+    Introduction/Repetition/Variation/Destruction) via `rhythm.phrase_plan`
+    -- see `_generate_irvd_motif`'s own docstring for the real bar-by-bar
+    construction. Mutually exclusive with `group_beats`: raises `ValueError`
+    if both are given, since `group_beats`'s own phase-drift polymeter
+    device (the tile length deliberately NOT dividing evenly into the
+    section) would directly fight IRVD's verbatim-repeat-then-vary bar
+    structure -- a preset uses one real device or the other, never both.
     """
+    if irvd_bars is not None and group_beats is not None:
+        raise ValueError("irvd_bars and group_beats are mutually exclusive")
+    if irvd_bars is not None:
+        return _generate_irvd_motif(
+            irvd_bars, total_beats, allowed_lengths, hit_chance, rng, scale,
+            vocab_weights, chromatic=chromatic, dissonance=dissonance,
+            base_degree=base_degree, pedal=pedal, feel=feel,
+        )
     if feel == "triplet":
         # X.15: a real triplet feel is a genuinely different subdivision
         # device, not a duration-weight reshaping of the standard
@@ -295,6 +314,85 @@ def generate_motif(
     return Motif(cell=cell, deltas=deltas)
 
 
+# X.19 -- real IRVD phrase development (Introduction/Repetition/Variation/
+# Destruction, scope sec.18.2), the modest, real, audible pitch shift used
+# for the Variation bar. A different device from song.py's own cross-
+# SECTION `_THEME_DEVELOP_TRANSPOSE_DEGREES` (that one develops a whole
+# section's theme across multiple reuses of a role; this one develops
+# PITCH within a single section's own bars) -- doesn't need to share the
+# same number, chosen independently.
+_IRVD_VARIATION_DEGREES = 2
+
+
+def _generate_irvd_motif(
+    irvd_bars: int,
+    total_beats: float,
+    allowed_lengths: list[float],
+    hit_chance: float,
+    rng: random.Random,
+    scale: Scale,
+    vocab_weights: dict,
+    chromatic: bool,
+    dissonance: float,
+    base_degree: int,
+    pedal: float | None,
+    feel: str | None,
+) -> Motif:
+    """Real bar-by-bar IRVD construction (see `generate_motif`'s docstring
+    for why this exists and when it's used). `rhythm.phrase_plan(irvd_bars)`
+    gives one label per bar; each bar is built from already-real, already-
+    tested primitives, never a fresh, uncontrolled pitch/rhythm-choice path:
+
+      I  a real `generate_motif` call for ONE bar's worth of beats
+         (`total_beats / irvd_bars`) -- the stated idea.
+      R  a literal deep copy of the "I" bar -- "play it again, verbatim."
+      V  `transpose(I_bar, _IRVD_VARIATION_DEGREES)` -- same rhythm
+         skeleton as "I", pitches shifted -- "same skeleton, re-voiced".
+      D  `augment(previous_bar, 0.5)` (halves every cell's duration,
+         preserving hit count/deltas exactly) concatenated with a deep
+         copy of itself -- the same rhythmic/pitch content played twice as
+         fast, refilling the bar exactly (0.5 + 0.5 == 1.0 of the bar) --
+         real "fragment and densify", derived from whatever bar came
+         immediately before it (real forward momentum into the next
+         section), not always reaching back to "I".
+
+    Every bar's cell/deltas are concatenated in label order into one Motif
+    spanning the full `total_beats` -- exactly what a non-IRVD
+    `generate_motif` call would have returned, so nothing downstream needs
+    to know IRVD was involved at all.
+    """
+    labels = phrase_plan(irvd_bars)
+    bar_beats = total_beats / irvd_bars
+
+    base_bar: Motif | None = None
+    previous_bar: Motif | None = None
+    cells: list[dict] = []
+    deltas: list[int] = []
+    for label in labels:
+        if label == "I":
+            bar = generate_motif(
+                bar_beats, allowed_lengths, hit_chance, rng, scale, vocab_weights,
+                chromatic=chromatic, dissonance=dissonance, base_degree=base_degree,
+                group_beats=None, pedal=pedal, feel=feel,
+            )
+            base_bar = bar
+        elif label == "R":
+            bar = Motif(cell=[dict(c) for c in base_bar.cell], deltas=list(base_bar.deltas))
+        elif label == "V":
+            bar = transpose(base_bar, _IRVD_VARIATION_DEGREES)
+        else:  # "D"
+            half = augment(previous_bar, 0.5)
+            bar = Motif(
+                cell=half.cell + [dict(c) for c in half.cell],
+                deltas=half.deltas + list(half.deltas),
+            )
+        cells.extend(bar.cell)
+        deltas.extend(bar.deltas)
+        previous_bar = bar
+
+    return Motif(cell=cells, deltas=deltas)
+
+
 # --- P3.4: cross-section theme registry --------------------------------------
 
 
@@ -325,6 +423,7 @@ class ThemeRegistry:
         group_beats: float | None = None,
         pedal: float | None = None,
         feel: str | None = None,
+        irvd_bars: int | None = None,
     ) -> Motif:
         if theme_id not in self._cache:
             self._cache[theme_id] = generate_motif(
@@ -340,6 +439,7 @@ class ThemeRegistry:
                 group_beats=group_beats,
                 pedal=pedal,
                 feel=feel,
+                irvd_bars=irvd_bars,
             )
         return self._cache[theme_id]
 

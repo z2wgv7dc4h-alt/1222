@@ -351,3 +351,90 @@ def test_theme_registry_different_ids_generate_independently():
     # Not asserting a != b (could coincidentally match) -- just that both
     # were generated and cached independently under their own ids.
     assert isinstance(a, Motif) and isinstance(b, Motif)
+
+
+# --- X.19: real IRVD phrase development ---------------------------------------
+
+
+def _bar_slices(cells: list[dict], deltas: list[int], bar_beats: float, num_bars: int):
+    """Test-only helper: split a flat (cells, deltas) pair into per-bar
+    (cells, deltas) pairs by cumulative duration -- mirrors the same real
+    cell-boundary bookkeeping this project's drums.py cell-timeline
+    helpers already use elsewhere, just local to this test."""
+    bars = []
+    ci = 0
+    di = 0
+    for _ in range(num_bars):
+        acc = 0.0
+        bar_cells: list[dict] = []
+        bar_deltas: list[int] = []
+        while acc < bar_beats - 1e-9:
+            c = cells[ci]
+            bar_cells.append(c)
+            if not c["is_rest"]:
+                bar_deltas.append(deltas[di])
+                di += 1
+            acc += c["duration"]
+            ci += 1
+        bars.append((bar_cells, bar_deltas))
+    return bars
+
+
+def test_generate_motif_irvd_bars_produces_real_irvd_shape():
+    """X.19: real IRVD phrase development. rhythm.phrase_plan(4) ==
+    ["I","R","V","D"] for every real preset's bars=4 -- each bar must show
+    the exact structural relationship the design implies, built from
+    already-real primitives (transpose/augment), never fabricated."""
+    scale = Scale(52, "minor")
+    weights = {0: 10, 3: 5, 7: 5}
+    rng = random.Random(9)
+    m = generate_motif(16.0, [0.25, 0.5, 1.0], 0.6, rng, scale, weights, irvd_bars=4)
+
+    assert m.hit_count == len(m.deltas)
+    assert sum(c["duration"] for c in m.cell) == pytest.approx(16.0)
+
+    bars = _bar_slices(m.cell, m.deltas, 4.0, 4)
+    (i_cells, i_deltas), (r_cells, r_deltas), (v_cells, v_deltas), (d_cells, d_deltas) = bars
+
+    # R: a literal verbatim repeat of I -- "play it again, so the ear locks on".
+    assert r_cells == i_cells
+    assert r_deltas == i_deltas
+
+    # V: the SAME rhythm skeleton as I (durations/rest positions untouched),
+    # pitches shifted by the real, already-tested transpose op.
+    assert [c["duration"] for c in v_cells] == [c["duration"] for c in i_cells]
+    assert [c["is_rest"] for c in v_cells] == [c["is_rest"] for c in i_cells]
+    assert v_deltas == [d + 2 for d in i_deltas]
+
+    # D: derived from V (the bar immediately before it), played twice as
+    # fast -- double the hit count, each duration exactly half of V's, the
+    # same real pitch content repeated (augment(0.5) + a deep copy of itself).
+    assert len(d_cells) == 2 * len(v_cells)
+    assert [c["duration"] for c in d_cells] == [c["duration"] / 2 for c in v_cells] * 2
+    assert d_deltas == v_deltas + v_deltas
+
+
+def test_generate_motif_irvd_bars_single_bar_matches_plain_generation():
+    """phrase_plan(1) == ["I"] only -- IRVD with a single bar must reduce
+    to exactly the same construction (and rng consumption) as not using
+    IRVD at all, a real regression-safety check on the dispatch itself."""
+    scale = Scale(52, "minor")
+    weights = {0: 10, 7: 5}
+    m = generate_motif(4.0, [0.25, 0.5, 1.0], 0.6, random.Random(4), scale, weights, irvd_bars=1)
+    expected = generate_motif(4.0, [0.25, 0.5, 1.0], 0.6, random.Random(4), scale, weights)
+    assert m.cell == expected.cell
+    assert m.deltas == expected.deltas
+
+
+def test_generate_motif_irvd_bars_and_group_beats_together_raises():
+    """X.19: mutually exclusive by design (see generate_motif's docstring)
+    -- IRVD's verbatim-repeat bar structure would directly fight
+    group_beats' deliberate phase-drift polymeter tiling. Fails closed
+    rather than silently picking one."""
+    scale = Scale(52, "minor")
+    weights = {0: 10, 7: 5}
+    with pytest.raises(ValueError):
+        generate_motif(
+            16.0, [0.25, 0.5, 1.0], 0.6, random.Random(1), scale, weights,
+            group_beats=3.0, irvd_bars=4,
+        )

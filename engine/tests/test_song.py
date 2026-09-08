@@ -497,13 +497,24 @@ def test_a_role_recurring_many_times_gets_real_pitch_variety_not_just_two_states
 def test_tech_preset_real_feel_triplet_produces_genuine_triplet_durations():
     """X.15: tech.json's real declared feel ("triplet") must actually
     produce genuine eighth-note-triplet durations in real compose_song
-    output, not the old uniform [0.25, 0.5, 1.0] menu."""
+    output, not the old uniform [0.25, 0.5, 1.0] menu. tech.json has no
+    "group", so X.19's real IRVD phrase development also applies -- every
+    cell must be the real 1/3 triplet value, OR exactly half that (1/6,
+    X.19's real Destruction-bar densification: augment(0.5) on a genuine
+    triplet base), never any other value (i.e. never falling back to the
+    old uniform menu anywhere in the real IRVD construction, including its
+    own recursive per-bar calls)."""
     tech = load_all_presets()["tech"]
     assert tech.feel == "triplet"
+    assert tech.group is None
     song = _generate_attempt(random.Random(3), tech, num_sections=4)
     for section in song["sections"]:
         for cell in section["motif"].cell:
-            assert abs(cell["duration"] - 1.0 / 3) < 1e-9
+            duration = cell["duration"]
+            assert abs(duration - 1.0 / 3) < 1e-9 or abs(duration - 1.0 / 6) < 1e-9, (
+                f"expected a real triplet (1/3) or IRVD-Destruction-halved triplet "
+                f"(1/6) duration, got {duration}"
+            )
 
 
 def test_deathcore_preset_real_feel_chug_is_16th_note_dominant():
@@ -587,3 +598,59 @@ def test_tempo_drop_never_fires_for_ineligible_roles_or_too_few_bars():
                 "expected no tempo_drop with only 2 bars -- not enough room "
                 "for a real 2-bar full-tempo lead-in plus a 2-bar drop"
             )
+
+
+def _bars_by_cumulative_duration(cells, bar_beats, num_bars):
+    """Split a real motif's flat cell array into per-bar cell lists by
+    cumulative duration -- same technique test_motif.py's own IRVD test
+    uses, applied here to a real composed song's actual section data."""
+    bars = []
+    ci = 0
+    for _ in range(num_bars):
+        acc = 0.0
+        bar_cells = []
+        while acc < bar_beats - 1e-9:
+            c = cells[ci]
+            bar_cells.append(c)
+            acc += c["duration"]
+            ci += 1
+        bars.append(bar_cells)
+    return bars
+
+
+def test_irvd_wired_for_every_preset_without_group_beats():
+    """X.19: real IRVD phrase development, end-to-end against actual
+    compose_song output (not just the isolated motif.py functions). For a
+    preset with no `group` (metalcore -- polymeter tiling doesn't apply),
+    every real section's bar 2 must be a literal verbatim repeat of bar 1
+    (IRVD's real "R" bar), and bar 4 must show real double density vs bar 1
+    (IRVD's real "D" bar) -- the exact structural signature that was
+    completely absent before this fix (one flat, undifferentiated draw)."""
+    metalcore = load_all_presets()["metalcore"]
+    assert metalcore.group is None
+    song = _generate_attempt(random.Random(6), metalcore, num_sections=4)
+    for section in song["sections"]:
+        cells = section["motif"].cell
+        bar1, bar2, bar3, bar4 = _bars_by_cumulative_duration(cells, 4.0, 4)
+        assert bar2 == bar1, "expected IRVD's Repetition bar to be a literal copy of the Introduction bar"
+        hits1 = sum(1 for c in bar1 if not c["is_rest"])
+        hits4 = sum(1 for c in bar4 if not c["is_rest"])
+        assert hits4 == 2 * sum(1 for c in bar3 if not c["is_rest"]), (
+            "expected IRVD's Destruction bar to have exactly double the "
+            "Variation bar's real hit count"
+        )
+        assert hits4 >= hits1, "expected the Destruction bar to be at least as dense as the Introduction bar"
+
+
+def test_irvd_not_applied_for_group_beats_presets():
+    """djent/progressive use real group_beats polymeter tiling instead --
+    IRVD must never override that (see motif.generate_motif's docstring
+    for why the two are mutually exclusive)."""
+    for preset_id in ("djent", "progressive"):
+        preset = load_all_presets()[preset_id]
+        assert preset.group is not None
+        # A real compose_song call must not raise -- if song.py ever
+        # regressed into passing irvd_bars alongside group_beats, this
+        # would hit generate_motif's real ValueError guard immediately.
+        song = _generate_attempt(random.Random(2), preset, num_sections=4)
+        assert song["sections"]

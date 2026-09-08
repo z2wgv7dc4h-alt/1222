@@ -68,3 +68,59 @@ def test_humanize_take_rejects_bad_input():
         humanize_take(cell, random.Random(0), timing_jitter=-1.0)
     with pytest.raises(ValueError):
         humanize_take(cell, random.Random(0), velocity_jitter=-1.0)
+
+
+# --- X.21: real open-string-vs-muted articulation via velocity ---------------
+
+
+def test_open_chance_none_is_byte_identical_to_flat_velocity_base():
+    """open_chance=None (the default) must reproduce the exact prior
+    flat-velocity_base behavior -- zero regression risk for every existing
+    caller that doesn't pass it."""
+    cell = _riff_cell()
+    with_none = humanize_take(cell, random.Random(42), open_chance=None)
+    without_param = humanize_take(cell, random.Random(42))
+    assert with_none == without_param
+
+
+def test_open_chance_one_always_produces_open_velocity():
+    """A real, exact distributional check: open_chance=1.0 means every real
+    hit rolls open, so every velocity must land at/above the real
+    PALM_MUTE_VELOCITY_THRESHOLD (110), never below."""
+    cell = _riff_cell()
+    take = humanize_take(cell, random.Random(3), open_chance=1.0)
+    hit_velocities = [c["velocity"] for c in take if not c["is_rest"]]
+    assert hit_velocities, "expected at least one real hit in this fixture"
+    assert all(v >= 110 for v in hit_velocities), f"expected every open hit >= 110, got {hit_velocities}"
+
+
+def test_open_chance_zero_always_produces_muted_velocity():
+    """The real inverse: open_chance=0.0 means every real hit rolls muted,
+    so every velocity must land strictly below the real threshold."""
+    cell = _riff_cell()
+    take = humanize_take(cell, random.Random(3), open_chance=0.0)
+    hit_velocities = [c["velocity"] for c in take if not c["is_rest"]]
+    assert hit_velocities, "expected at least one real hit in this fixture"
+    assert all(v < 110 for v in hit_velocities), f"expected every muted hit < 110, got {hit_velocities}"
+
+
+def test_open_chance_midrange_produces_a_real_mix_of_both_bands():
+    """A real, seeded, non-degenerate open_chance must produce a genuine
+    mix of both velocity bands across enough hits -- not silently
+    collapsing to all-one-value."""
+    cell = generate_rhythm(32.0, [0.25, 0.5], hit_chance=0.9, rng=random.Random(1))
+    take = humanize_take(cell, random.Random(7), open_chance=0.5)
+    hit_velocities = [c["velocity"] for c in take if not c["is_rest"]]
+    opens = sum(1 for v in hit_velocities if v >= 110)
+    muted = sum(1 for v in hit_velocities if v < 110)
+    assert opens > 0 and muted > 0, f"expected a real mix of both bands, got opens={opens} muted={muted}"
+
+
+def test_double_track_forwards_open_chance_to_both_takes():
+    """double_track's **humanize_kwargs pass-through must actually reach
+    both real takes, not just one."""
+    cell = generate_rhythm(16.0, [0.25, 0.5], hit_chance=0.9, rng=random.Random(1))
+    take_a, take_b = double_track(cell, random.Random(1), random.Random(2), open_chance=1.0)
+    for take in (take_a, take_b):
+        hit_velocities = [c["velocity"] for c in take if not c["is_rest"]]
+        assert hit_velocities and all(v >= 110 for v in hit_velocities)

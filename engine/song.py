@@ -371,8 +371,15 @@ def _generate_attempt(rng: random.Random, preset: Preset, num_sections: int) -> 
         ]
 
         seed_a, seed_b = _two_child_seeds(rng)
+        # X.21 -- real open-string-vs-muted articulation (see performance.
+        # humanize_take's own docstring for the full real citation). Each
+        # take independently rolls its own open/muted pattern (separate
+        # rng instances, same as their existing independent timing/velocity
+        # jitter) -- a deliberate choice consistent with double_track's own
+        # "two independently-humanized takes" philosophy, not an oversight.
         take_a, take_b = double_track(
-            guitar_cells, random.Random(seed_a), random.Random(seed_b)
+            guitar_cells, random.Random(seed_a), random.Random(seed_b),
+            open_chance=preset.open_chance,
         )
 
         kick_cells = kick_pattern_for_role(guitar_cells, role, preset.kick, rng=rng)

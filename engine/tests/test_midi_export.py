@@ -173,9 +173,19 @@ def test_drum_track_uses_real_gm_kick_snare_and_hihat_notes():
 
 
 def test_solo_lead_track_gets_real_notes_when_a_solo_section_exists():
-    song = compose_song("djent", seed=11, num_sections=10)
+    # X.21: real open/muted velocity now genuinely affects judge()'s
+    # pm_ratio scoring, so compose_song's internal seed-retry loop can land
+    # on a different real sequence for the same nominal seed than before --
+    # a real, expected consequence, not a bug. Seed-search rather than
+    # trusting one hardcoded value.
+    song = None
+    for seed in range(11, 30):
+        candidate = compose_song("djent", seed=seed, num_sections=10)
+        if any(s["role"] == "solo" for s in candidate["sections"]):
+            song = candidate
+            break
+    assert song is not None, "expected at least one seed in range(11, 30) to produce a real solo section"
     solo_sections = [s for s in song["sections"] if s["role"] == "solo"]
-    assert solo_sections, "need a solo section to test -- try a different seed if this fires"
 
     out_path = _write_tmp(song, "djent_solo")
     parsed = _read_back(out_path)

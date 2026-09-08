@@ -111,10 +111,20 @@ def test_pitches_per_cell_none_on_rests_and_real_pitch_on_hits():
 def test_solo_sections_get_a_denser_featured_lead():
     """A solo must actually be a featured lead, not the same background
     doubling line every other section gets."""
-    song = compose_song("djent", seed=11, num_sections=10)
+    # X.21: real open/muted velocity now genuinely affects judge()'s
+    # pm_ratio scoring, so compose_song's internal seed-retry loop can land
+    # on a different real sequence for the same nominal seed than before --
+    # a real, expected consequence of a real fix, not a bug. Seed-search
+    # over the external seed rather than trusting one hardcoded value.
+    song = None
+    for seed in range(11, 30):
+        candidate = compose_song("djent", seed=seed, num_sections=10)
+        if any(s["role"] == "solo" for s in candidate["sections"]):
+            song = candidate
+            break
+    assert song is not None, "expected at least one seed in range(11, 30) to produce a real solo section"
     solo_sections = [s for s in song["sections"] if s["role"] == "solo"]
     non_solo_sections = [s for s in song["sections"] if s["role"] != "solo"]
-    assert solo_sections, "need at least one solo section to test -- try a different seed/length if this fires"
 
     for solo in solo_sections:
         # A solo's note count is driven by total_beats*2, not the rhythm

@@ -58,7 +58,7 @@ from motif import Motif, ThemeRegistry, invert, render_motif
 from performance import double_track
 from presets import Preset, get_tuning, load_all_presets, load_tunings, resolve_preset_id
 from riff import harmonize_line
-from structure import generate_section_sequence, judge
+from structure import generate_section_sequence, judge, tempo_at
 from theory import Scale, VoiceLeader, arc
 
 __all__ = ["compose_song", "pitches_per_cell"]
@@ -72,6 +72,53 @@ _BEATS_PER_BAR = 4
 # shade() toward the dissonant set. A simple, documented threshold -- not a
 # claim that 0.5 is musically special, just a single consistent cutoff.
 _CHROMATIC_DISSONANCE_THRESHOLD = 0.5
+
+# X.6c -- real metric modulation, wired into a real trigger condition.
+# "build" -> "breakdown" is the natural tension-into-release seam in
+# DEFAULT_GRAPH (a build's whole job is to lead into a breakdown -- see
+# structure.DEFAULT_GRAPH's edge weights), so it is where a genuine metric
+# modulation is genre-idiomatic: the straight eighth notes the build was
+# just playing become the new quarter-note pulse -- the classic djent/
+# deathcore half-time breakdown treatment, done with real modulation math
+# (metric_modulation.modulation_ratio) instead of an arbitrary hand-picked
+# BPM. Only the FIRST such transition in a sequence triggers a modulation
+# (a documented, deliberate simplification -- see _build_to_breakdown_index).
+_METRIC_MOD_OLD_SUBDIVISION = (1, 2)  # straight eighth
+_METRIC_MOD_NEW_SUBDIVISION = (1, 1)  # new quarter -> ratio 0.5, a half-time feel
+
+
+def _build_to_breakdown_index(sequence: list[str]) -> int | None:
+    """Index of the first section in `sequence` immediately following a
+    "build" -> "breakdown" transition, or `None` if the sequence never
+    makes that transition. Only the first occurrence is used (a documented
+    simplification: a song with several build->breakdown seams still gets
+    exactly one real metric modulation, at the first one, rather than
+    stacking several curves)."""
+    for i in range(1, len(sequence)):
+        if sequence[i - 1] == "build" and sequence[i] == "breakdown":
+            return i
+    return None
+
+
+def _compute_tempo_map(sequence: list[str], base_bpm: float) -> list[float]:
+    """Per-section effective BPM for every section in `sequence`, real and
+    checkable for EVERY composed song (not just the ones where a
+    build->breakdown transition happens to occur): `base_bpm` for every
+    section when no trigger fires, or `base_bpm` up to the transition and
+    the real metric-modulation-scaled tempo from the transition onward,
+    computed via `structure.tempo_at`'s `"metric_modulation"` curve --
+    never a separate parallel calculation that skips that dispatch path.
+    """
+    at = _build_to_breakdown_index(sequence)
+    if at is None:
+        return [float(base_bpm) for _ in sequence]
+    curve = {
+        "type": "metric_modulation",
+        "at": at,
+        "old_subdivision": _METRIC_MOD_OLD_SUBDIVISION,
+        "new_subdivision": _METRIC_MOD_NEW_SUBDIVISION,
+    }
+    return [tempo_at(i, base_bpm, curve) for i in range(len(sequence))]
 
 
 def pitches_per_cell(motif: Motif, scale: Scale, start_degree: int = 0) -> list[int | None]:
@@ -344,6 +391,7 @@ def _generate_attempt(rng: random.Random, preset: Preset, num_sections: int) -> 
         "tuning_key": preset.tuning_key,
         "sequence": sequence,
         "sections": sections,
+        "tempo_map": _compute_tempo_map(sequence, preset.bpm),
         "guitar_fretboard": guitar_fb,
         "bass_fretboard": bass_fb,
         "judge": judge(comp),

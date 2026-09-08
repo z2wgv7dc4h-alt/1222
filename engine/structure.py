@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import random
 
+from metric_modulation import apply_metric_modulation, modulation_ratio
 from motif import Motif, generate_motif, render_motif
 from rhythm import generate_rhythm
 from theory import Scale, arc
@@ -484,6 +485,17 @@ def tempo_at(section_index: int, base_bpm: float, curve: dict) -> float:
         `base_bpm` at/before `start`, linearly interpolated up to `bpm` by
         `end` (inclusive), holding `bpm` from `end` onward -- a gradual,
         monotonic change across `[start, end]`, never a single step.
+
+      {"type": "metric_modulation", "at": int,
+       "old_subdivision": (int, int), "new_subdivision": (int, int)}
+        `base_bpm` for every section before `at`; from `at` onward, the
+        tempo is `base_bpm` scaled by
+        `metric_modulation.modulation_ratio(old_subdivision, new_subdivision)`
+        via `metric_modulation.apply_metric_modulation` -- a REAL metric
+        modulation (the pulse itself reinterprets), not a `"drop"`/`"ramp"`
+        toward an arbitrary hand-picked BPM. See `metric_modulation.py`'s
+        module docstring for the subdivision convention and worked
+        examples (e.g. dotted-quarter-becomes-quarter is ratio 1.5).
     """
     kind = curve.get("type")
     if kind == "drop":
@@ -503,5 +515,12 @@ def tempo_at(section_index: int, base_bpm: float, curve: dict) -> float:
             return target
         frac = (section_index - start) / (end - start)
         return base + frac * (target - base)
+
+    if kind == "metric_modulation":
+        at = int(curve["at"])
+        if section_index < at:
+            return float(base_bpm)
+        ratio = modulation_ratio(curve["old_subdivision"], curve["new_subdivision"])
+        return apply_metric_modulation(float(base_bpm), ratio)
 
     raise ValueError(f"unknown tempo curve type: {kind!r}")

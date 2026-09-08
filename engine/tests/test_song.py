@@ -4,8 +4,9 @@ import random
 import pytest
 
 from presets import load_all_presets
-from song import _generate_attempt, compose_song, pitches_per_cell
+from song import _build_to_breakdown_index, _compute_tempo_map, _generate_attempt, compose_song, pitches_per_cell
 from motif import Motif
+from structure import generate_section_sequence
 
 
 ALL_PRESET_IDS = sorted(load_all_presets().keys())
@@ -233,3 +234,88 @@ def test_octave_stab_field_rejected_bad_preset_field_type_fails_closed():
     }
     with pytest.raises(ValueError):
         validate_preset(bad, tunings)
+
+
+# ---------------------------------------------------------------------------
+# X.6c -- metric modulation, wired into compose_song's real generation path.
+# Trigger: the first "build" -> "breakdown" transition in the section
+# sequence (structure.DEFAULT_GRAPH's own tension-into-release seam) gets a
+# real metric modulation -- straight eighth (old pulse) becomes the new
+# quarter beat, a half-time breakdown feel computed via
+# metric_modulation.modulation_ratio/apply_metric_modulation through
+# structure.tempo_at, never a separate parallel calculation.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("preset_id", ALL_PRESET_IDS)
+def test_compose_song_tempo_map_has_one_entry_per_section(preset_id):
+    song = compose_song(preset_id, seed=42, num_sections=6)
+    assert len(song["tempo_map"]) == len(song["sequence"])
+    assert all(isinstance(bpm, float) and bpm > 0 for bpm in song["tempo_map"])
+
+
+def test_compute_tempo_map_defaults_to_preset_bpm_with_no_transition():
+    sequence = ["intro", "chill", "solo"]
+    tempo_map = _compute_tempo_map(sequence, 140.0)
+    assert tempo_map == [140.0, 140.0, 140.0]
+
+
+def test_compute_tempo_map_applies_real_modulation_at_build_to_breakdown():
+    sequence = ["intro", "build", "breakdown", "breakdown"]
+    tempo_map = _compute_tempo_map(sequence, 160.0)
+    # base_bpm holds through "intro" and "build" (indices 0, 1)...
+    assert tempo_map[0] == pytest.approx(160.0)
+    assert tempo_map[1] == pytest.approx(160.0)
+    # ...and from the breakdown onward (index 2+) the tempo is the real
+    # straight-eighth-becomes-quarter half-time modulation: ratio 0.5.
+    assert tempo_map[2] == pytest.approx(80.0)
+    assert tempo_map[3] == pytest.approx(80.0)
+
+
+def test_build_to_breakdown_index_finds_first_transition_only():
+    assert _build_to_breakdown_index(["intro", "build", "breakdown", "build", "breakdown"]) == 2
+    assert _build_to_breakdown_index(["intro", "chill", "solo"]) is None
+    assert _build_to_breakdown_index([]) is None
+
+
+def test_tempo_map_shows_real_bpm_change_at_a_real_build_to_breakdown_transition():
+    """Prove the real (not just the isolated helper's) wiring: find a seed
+    whose section sequence genuinely contains a build->breakdown
+    transition, then confirm _generate_attempt's own tempo_map output --
+    the exact dict compose_song returns -- reflects the modulation there.
+
+    Seed search uses structure.generate_section_sequence directly rather
+    than trying many compose_song seeds blind: _generate_attempt's very
+    first RNG draw IS generate_section_sequence(rng, num_sections), so a
+    seed found this way reproduces byte-identically inside
+    _generate_attempt (documented choice, per this task's brief, over a
+    blind seed sweep on the full pipeline -- this is deterministic and
+    fast rather than hoping a full song-generation retry loop happens to
+    land on a matching sequence).
+    """
+    tech = load_all_presets()["tech"]
+    num_sections = 10
+    found_seed = None
+    found_sequence = None
+    for seed in range(200):
+        sequence = generate_section_sequence(random.Random(seed), num_sections)
+        if _build_to_breakdown_index(sequence) is not None:
+            found_seed = seed
+            found_sequence = sequence
+            break
+    assert found_seed is not None, (
+        "expected at least one seed in range(200) to produce a real "
+        "build->breakdown transition -- try a larger range if this fires"
+    )
+
+    result = _generate_attempt(random.Random(found_seed), tech, num_sections)
+    assert result["sequence"] == found_sequence
+
+    tempo_map = result["tempo_map"]
+    assert len(tempo_map) == len(result["sequence"])
+
+    transition_at = _build_to_breakdown_index(result["sequence"])
+    assert tempo_map[transition_at - 1] == pytest.approx(float(tech.bpm))
+    assert tempo_map[transition_at] == pytest.approx(float(tech.bpm) * 0.5)
+    # a real, non-trivial change -- not a no-op modulation
+    assert tempo_map[transition_at] != pytest.approx(tempo_map[transition_at - 1])

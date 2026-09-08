@@ -197,7 +197,12 @@ def _tempo_track(song: dict, ppq: int) -> "mido.MidiTrack":
     """Real tempo-map track (X.6c): one `set_tempo` meta event at the
     start of each section, at that section's real cumulative start tick,
     scaled to `song["tempo_map"]`'s real per-section BPM -- never a flat,
-    single-tempo assumption."""
+    single-tempo assumption. Plus (X.18) a real SECOND `set_tempo` event
+    partway through any section carrying a `tempo_drop` (a mid-section
+    half-time slam moment, distinct from the per-section value above) --
+    note tick positions elsewhere are unaffected, since MIDI ticks are
+    beat-based, not time-based; only this tempo track gains an extra
+    point."""
     track = mido.MidiTrack()
     track.append(mido.MetaMessage("track_name", name="Tempo Map", time=0))
 
@@ -206,6 +211,10 @@ def _tempo_track(song: dict, ppq: int) -> "mido.MidiTrack":
     for section, bpm in zip(song["sections"], song["tempo_map"]):
         tick = _beats_to_ticks(start_beat, ppq)
         events.append((tick, mido.bpm2tempo(bpm)))
+        drop = section.get("tempo_drop")
+        if drop is not None:
+            drop_tick = _beats_to_ticks(start_beat + drop["trigger_beat"], ppq)
+            events.append((drop_tick, mido.bpm2tempo(drop["bpm"])))
         start_beat += _section_beats(section)
 
     last_tick = 0

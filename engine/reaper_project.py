@@ -184,12 +184,15 @@ def _track_block(
     return lines
 
 
-def _tempo_envelope_block(section_start_seconds: list[float], section_bpms: list[float]) -> list[str]:
-    """Real `<TEMPOENVEX>` points, one per section, at that section's real
-    cumulative start time (seconds) and real bpm -- verified against the
-    ground-truth file's own points, which land at exactly `section_beats *
-    60 / bpm` from each other, confirming `PT`'s time field is seconds,
-    not beats."""
+def _tempo_envelope_block(points: list[tuple[float, float]]) -> list[str]:
+    """Real `<TEMPOENVEX>` points at real cumulative time (seconds) and
+    real bpm -- verified against the ground-truth file's own points, which
+    land at exactly `section_beats * 60 / bpm` from each other, confirming
+    `PT`'s time field is seconds, not beats. `points` is already flattened
+    and in order: one per section (X.6c's `tempo_map`) PLUS one real extra
+    point for any section carrying a mid-section `tempo_drop` (X.18) --
+    this function itself doesn't know or care which points came from
+    where, it just emits them."""
     lines = [
         "  <TEMPOENVEX",
         f"    EGUID {_new_guid()}",
@@ -199,7 +202,7 @@ def _tempo_envelope_block(section_start_seconds: list[float], section_bpms: list
         "    ARM 0",
         "    DEFSHAPE 1 -1 -1",
     ]
-    for i, (t, bpm) in enumerate(zip(section_start_seconds, section_bpms)):
+    for i, (t, bpm) in enumerate(points):
         if i == 0:
             lines.append(f"    PT {t:.12f} {bpm:.10f} 1 262148 0 1 0 \"\" 0 0 0 ")
         else:
@@ -231,11 +234,13 @@ def song_to_rpp(song: dict, path: str | Path) -> None:
 
     section_start_beats: list[float] = []
     section_start_seconds: list[float] = []
+    tempo_points: list[tuple[float, float]] = []
     start_beat = 0.0
     start_seconds = 0.0
     for section, bpm in zip(song["sections"], song["tempo_map"]):
         section_start_beats.append(start_beat)
         section_start_seconds.append(start_seconds)
+        tempo_points.append((start_seconds, bpm))
 
         guitar_a_events += _cell_events(
             section["guitar_take_a"], section["pitches_per_cell"], start_beat, _PPQ
@@ -256,7 +261,19 @@ def song_to_rpp(song: dict, path: str | Path) -> None:
 
         beats = _section_beats(section)
         start_beat += beats
-        start_seconds += beats * 60.0 / bpm
+        # X.18: a section with a mid-section `tempo_drop` spends its real
+        # elapsed time in two parts -- the portion before the trigger at
+        # this section's own `bpm`, and the remainder at the dropped bpm --
+        # so every LATER section's start time still lands correctly in
+        # real time (not just this section's own drop point).
+        drop = section.get("tempo_drop")
+        if drop is not None:
+            trigger_beat = drop["trigger_beat"]
+            drop_seconds = start_seconds + trigger_beat * 60.0 / bpm
+            tempo_points.append((drop_seconds, drop["bpm"]))
+            start_seconds = drop_seconds + (beats - trigger_beat) * 60.0 / drop["bpm"]
+        else:
+            start_seconds += beats * 60.0 / bpm
 
     total_seconds = start_seconds
     base_bpm = song["tempo_map"][0] if song["tempo_map"] else 120.0
@@ -356,7 +373,7 @@ def song_to_rpp(song: dict, path: str | Path) -> None:
         "    DEFSHAPE 0 -1 -1",
         "  >",
     ]
-    lines += _tempo_envelope_block(section_start_seconds, list(song["tempo_map"]))
+    lines += _tempo_envelope_block(tempo_points)
     lines += [
         "  RULERHEIGHT 86 86",
         '  RULERLANE 1 4 "" 0 -1 0',

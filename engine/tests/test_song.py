@@ -539,3 +539,51 @@ def test_bounce_feel_presets_now_produce_real_dense_rhythm():
     quarters = sum(1 for d in durations if abs(d - 1.0) < 1e-9)
     assert sixteenths / len(durations) > 0.5, "expected 16th notes to dominate real bounce-feel output"
     assert quarters / len(durations) < 0.1, "expected quarter notes to be rare in real bounce-feel output"
+
+
+def test_tempo_drop_triggers_for_eligible_sections_and_halves_that_sections_own_tempo():
+    """X.18 (scope sec.14.2 item 4): a real mid-section half-time drop --
+    distinct from X.6c/X.12's BETWEEN-section modulation. Seed search over
+    djent's own real bars=4 (>= the real min-bars requirement) for a
+    section that actually triggers one, then check its shape against the
+    real, already-tested `apply_metric_modulation`/`modulation_ratio`
+    machinery -- never a hand-picked expected bpm."""
+    found = None
+    for seed in range(50):
+        song = _generate_attempt(random.Random(seed), DJENT, num_sections=8)
+        for i, section in enumerate(song["sections"]):
+            if section["tempo_drop"] is not None:
+                found = (song, i, section)
+                break
+        if found:
+            break
+    assert found is not None, (
+        "expected at least one seed in range(50) to produce a real "
+        "tempo_drop on djent (bars=4) -- try a larger range if this fires"
+    )
+    song, i, section = found
+    assert section["role"] in ("build", "breakdown")
+    total_beats = float(DJENT.bars * 4)
+    assert section["tempo_drop"]["trigger_beat"] == pytest.approx(total_beats - 2 * 4)
+    assert section["tempo_drop"]["bpm"] == pytest.approx(song["tempo_map"][i] * 0.5)
+
+
+def test_tempo_drop_never_fires_for_ineligible_roles_or_too_few_bars():
+    """Fails-closed side of X.18: a role outside {build, breakdown} never
+    gets a tempo_drop regardless of seed, and a preset with too few bars
+    for a real 2-bar tail never gets one either -- `None`, never a
+    fabricated/undersized drop."""
+    for seed in range(20):
+        song = _generate_attempt(random.Random(seed), DJENT, num_sections=6)
+        for section in song["sections"]:
+            if section["role"] not in ("build", "breakdown"):
+                assert section["tempo_drop"] is None
+
+    too_short = dataclasses.replace(DJENT, bars=2)
+    for seed in range(20):
+        song = _generate_attempt(random.Random(seed), too_short, num_sections=6)
+        for section in song["sections"]:
+            assert section["tempo_drop"] is None, (
+                "expected no tempo_drop with only 2 bars -- not enough room "
+                "for a real 2-bar full-tempo lead-in plus a 2-bar drop"
+            )

@@ -1,7 +1,15 @@
 # Scope headings (not the whole file)
 
 File: `god-tier-metal-scope.md` in the repo root (copy from the handoff zip).
-Rule: `grep` or read **only** the heading named here. Never the full 1130 lines.
+Rule: `grep` or read **only** the heading named here. Never the full 1130 lines
+for ordinary task work.
+
+**Reconciliation exception**: a full read IS sanctioned specifically to
+refresh TASKS.md's `## Scope gaps tracker` against this file's own numbered
+"still open" lists (§14.2, §16, §17) -- do this after a batch of cross-cutting
+X.* items lands, or whenever TASKS.md's `## Next` runs dry, not on every task.
+This is narrow: it does not license skipping the per-task heading rule below
+for normal box work.
 
 | Task prefix | Heading to open |
 |---|---|

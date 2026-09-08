@@ -81,14 +81,53 @@ def test_tempo_track_reflects_the_real_tempo_map():
     assert tempo_track.name == "Tempo Map"
     # One real set_tempo event per section (no dedup attempted -- harmless
     # to restate an unchanged tempo, and it keeps every section boundary
-    # independently checkable), each matching song["tempo_map"] exactly.
+    # independently checkable), each matching song["tempo_map"] exactly --
+    # PLUS (X.18) one real extra event for any section carrying a
+    # mid-section `tempo_drop`, in the same section order.
     real_tempos = [round(mido.tempo2bpm(m.tempo)) for m in tempo_track if m.type == "set_tempo"]
-    expected_tempos = [round(bpm) for bpm in song["tempo_map"]]
+    expected_tempos = []
+    for section, bpm in zip(song["sections"], song["tempo_map"]):
+        expected_tempos.append(round(bpm))
+        drop = section.get("tempo_drop")
+        if drop is not None:
+            expected_tempos.append(round(drop["bpm"]))
     assert real_tempos == expected_tempos
     # This preset/seed/length must actually exercise a real tempo change
     # somewhere (X.6c's build->breakdown trigger), not just constant bpm --
     # otherwise this test wouldn't be checking anything beyond a flat file.
     assert len(set(real_tempos)) > 1, "expected a real metric-modulation tempo change -- try a different seed/length if this fires"
+
+
+def test_tempo_drop_event_lands_at_the_real_mid_section_tick():
+    """X.18: the real extra set_tempo event for a section with a
+    tempo_drop must land at the exact tick this section's own
+    trigger_beat implies (start-of-section tick + trigger_beat*ppq),
+    not just somewhere in the track."""
+    song = compose_song("djent", seed=11, num_sections=8)
+    dropped = [(i, s) for i, s in enumerate(song["sections"]) if s.get("tempo_drop") is not None]
+    assert dropped, "expected djent seed=11/8 sections to include a real tempo_drop (see test_tempo_track_reflects_the_real_tempo_map)"
+
+    out_path = _write_tmp(song, "djent_tempo_drop")
+    parsed = _read_back(out_path)
+    tempo_track = parsed.tracks[0]
+
+    ppq = parsed.ticks_per_beat
+    start_beat = 0.0
+    expected_drop_ticks = []
+    for section in song["sections"]:
+        drop = section.get("tempo_drop")
+        if drop is not None:
+            expected_drop_ticks.append(round((start_beat + drop["trigger_beat"]) * ppq))
+        start_beat += sum(c["duration"] for c in section["guitar_take_a"])
+
+    ticks = []
+    t = 0
+    for m in tempo_track:
+        t += m.time
+        if m.type == "set_tempo":
+            ticks.append(t)
+    for expected_tick in expected_drop_ticks:
+        assert expected_tick in ticks, f"expected a real set_tempo event at tick {expected_tick}"
 
 
 def test_drum_track_uses_real_gm_kick_snare_and_hihat_notes():

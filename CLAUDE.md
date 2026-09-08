@@ -19,7 +19,7 @@ cd engine && python -m pytest -q
 Presets: strict JSON, discover with `*.json` glob, never a name list.
 
 ## Session
-1. Read `docs/CURRENT.md` then `TASKS.md` `## Next` — one box.
+1. Read `docs/CURRENT.md` then `TASKS.md` `## Next` and `## Scope gaps tracker` — one box. The tracker mirrors the scope doc's own numbered open items so gaps aren't missed without a full re-read (see SCOPE-INDEX.md's reconciliation exception).
 2. Plan mode. Implement that box only.
 3. Run pytest. Paste output.
 4. Stop auto-runs the close skill. You do not have to type `/close`.

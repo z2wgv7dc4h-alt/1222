@@ -89,9 +89,57 @@ def test_rpp_tempo_envelope_matches_real_tempo_map(tmp_path):
 
     tempo_block = text[text.index("<TEMPOENVEX"):text.index(">", text.index("<TEMPOENVEX"))]
     pt_bpms = [float(m) for m in re.findall(r"^    PT [\d.]+ ([\d.]+)", tempo_block, flags=re.MULTILINE)]
-    expected = [round(bpm, 6) for bpm in song["tempo_map"]]
+    # (X.18) one real extra point for any section carrying a mid-section
+    # `tempo_drop`, in the same section order -- same real-data contract
+    # as the MIDI tempo-track test.
+    expected = []
+    for section, bpm in zip(song["sections"], song["tempo_map"]):
+        expected.append(round(bpm, 6))
+        drop = section.get("tempo_drop")
+        if drop is not None:
+            expected.append(round(drop["bpm"], 6))
     assert [round(b, 6) for b in pt_bpms] == expected
     assert len(set(pt_bpms)) > 1, "expected a real tempo change for this seed -- try another if this fires"
+
+
+def test_rpp_tempo_drop_point_lands_at_the_real_time_and_shifts_later_sections(tmp_path):
+    """X.18: the real extra TEMPOENVEX point for a dropped section must
+    land at real elapsed seconds (pre-drop bpm up to the trigger), AND
+    every later section's own point must reflect the slower real time the
+    dropped portion actually took -- not just the flat `beats*60/bpm`
+    every section used before this feature existed."""
+    song = compose_song("djent", seed=11, num_sections=8)
+    dropped_indices = [i for i, s in enumerate(song["sections"]) if s.get("tempo_drop") is not None]
+    assert dropped_indices, "expected djent seed=11/8 sections to include a real tempo_drop"
+
+    text = _write(song, tmp_path, "djent_tempo_drop")
+    tempo_block = text[text.index("<TEMPOENVEX"):text.index(">", text.index("<TEMPOENVEX"))]
+    pt_points = [
+        (float(t), float(bpm))
+        for t, bpm in re.findall(r"^    PT ([\d.]+) ([\d.]+)", tempo_block, flags=re.MULTILINE)
+    ]
+
+    # Independently re-derive expected (time, bpm) points the same way a
+    # real DAW would accumulate elapsed time -- section by section, with
+    # the dropped portion split into its pre-drop and post-drop halves.
+    expected_points = []
+    t = 0.0
+    for section, bpm in zip(song["sections"], song["tempo_map"]):
+        expected_points.append((t, bpm))
+        beats = sum(c["duration"] for c in section["guitar_take_a"])
+        drop = section.get("tempo_drop")
+        if drop is not None:
+            trigger = drop["trigger_beat"]
+            drop_t = t + trigger * 60.0 / bpm
+            expected_points.append((drop_t, drop["bpm"]))
+            t = drop_t + (beats - trigger) * 60.0 / drop["bpm"]
+        else:
+            t += beats * 60.0 / bpm
+
+    assert len(pt_points) == len(expected_points)
+    for (actual_t, actual_bpm), (exp_t, exp_bpm) in zip(pt_points, expected_points):
+        assert actual_t == pytest.approx(exp_t, abs=1e-6)
+        assert actual_bpm == pytest.approx(exp_bpm, abs=1e-6)
 
 
 def test_song_to_rpp_rejects_mismatched_tempo_map_length(tmp_path):

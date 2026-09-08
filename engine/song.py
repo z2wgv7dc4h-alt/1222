@@ -90,6 +90,7 @@ from drums import (
 from fretboard import Fretboard
 from lead import generate_lead_line
 from legato import generate_legato_lick
+from metric_modulation import apply_metric_modulation, modulation_ratio
 from motif import Motif, ThemeRegistry, invert, render_motif, transpose
 from performance import double_track
 from presets import Preset, get_tuning, load_all_presets, load_tunings, resolve_preset_id
@@ -130,6 +131,40 @@ _CHROMATIC_DISSONANCE_THRESHOLD = 0.5
 # after a breakdown is back at full tempo, not still halved.
 _METRIC_MOD_OLD_SUBDIVISION = (1, 2)  # straight eighth
 _METRIC_MOD_NEW_SUBDIVISION = (1, 1)  # new quarter -> ratio 0.5, a half-time feel
+
+# X.18 -- real MID-section tempo drops (scope sec.14.2 item 4: "a riff
+# that's blasting, then half-times for 2 bars as a slam moment"), distinct
+# from X.6c/X.12's BETWEEN-section modulation above. Same real device, same
+# real ratio (reuses `modulation_ratio`/`apply_metric_modulation`, not a
+# second modulation mechanism), just triggered partway through one section
+# instead of at a section boundary. Eligible roles are the two genre homes
+# for this move: "build" (blasting energy that suddenly drops, foreshadowing
+# a breakdown) and "breakdown" itself (a breakdown that further drops into
+# its own slam moment). Needs `preset.bars >= _TEMPO_DROP_MIN_BARS` so at
+# least `_TEMPO_DROP_MIN_BARS - _TEMPO_DROP_TAIL_BARS` full-tempo bars play
+# before the drop -- a 1-bar section has no room for a real "blasting, THEN"
+# contrast. Not every eligible section gets one (`_TEMPO_DROP_CHANCE`,
+# rolled per-section on that section's own seeded rng) -- every single
+# breakdown/build dropping would read as mechanical, not a real device.
+_TEMPO_DROP_ROLES = ("build", "breakdown")
+_TEMPO_DROP_MIN_BARS = 4
+_TEMPO_DROP_TAIL_BARS = 2
+_TEMPO_DROP_CHANCE = 0.5
+
+
+def _resolve_tempo_drop(section_bpm: float, trigger_beat: float | None) -> dict | None:
+    """The real, final `section["tempo_drop"]` value: `None` if this
+    section was never eligible/triggered (`trigger_beat is None`), else
+    `{"trigger_beat": ..., "bpm": ...}` where `bpm` is `section_bpm` scaled
+    by the SAME real half-time ratio X.6c's between-section modulation
+    uses (`modulation_ratio(_METRIC_MOD_OLD_SUBDIVISION,
+    _METRIC_MOD_NEW_SUBDIVISION)` == 0.5) via the same real, already-tested
+    `apply_metric_modulation` -- no separate modulation math invented for
+    the mid-section case."""
+    if trigger_beat is None:
+        return None
+    ratio = modulation_ratio(_METRIC_MOD_OLD_SUBDIVISION, _METRIC_MOD_NEW_SUBDIVISION)
+    return {"trigger_beat": trigger_beat, "bpm": apply_metric_modulation(section_bpm, ratio)}
 
 
 def _compute_tempo_map(sequence: list[str], base_bpm: float) -> list[float]:
@@ -450,6 +485,20 @@ def _generate_attempt(rng: random.Random, preset: Preset, num_sections: int) -> 
             lead_notes = []
             legato = None
 
+        # X.18: real mid-section half-time drop trigger -- see module-level
+        # docstring above `_resolve_tempo_drop`. Only the TRIGGER BEAT is
+        # decided here (needs this section's own seeded `rng` and
+        # `preset.bars`); the actual dropped BPM is resolved after
+        # `tempo_map` exists below, since it scales THIS section's own
+        # already-computed tempo, not `preset.bpm` directly.
+        tempo_drop_trigger_beat: float | None = None
+        if (
+            role in _TEMPO_DROP_ROLES
+            and preset.bars >= _TEMPO_DROP_MIN_BARS
+            and rng.random() < _TEMPO_DROP_CHANCE
+        ):
+            tempo_drop_trigger_beat = total_beats - _TEMPO_DROP_TAIL_BARS * _BEATS_PER_BAR
+
         sections.append({
             "role": role,
             "arc": arc_row,
@@ -470,10 +519,15 @@ def _generate_attempt(rng: random.Random, preset: Preset, num_sections: int) -> 
             "octave_stabs": octave_stabs,
             "chord_quality": chord_quality,
             "chord_voicing": chord_voicing,
+            "_tempo_drop_trigger_beat": tempo_drop_trigger_beat,
         })
 
         guitar_track.extend(take_a)
         drum_track.extend(kick_cells)
+
+    tempo_map = _compute_tempo_map(sequence, preset.bpm)
+    for section, bpm in zip(sections, tempo_map):
+        section["tempo_drop"] = _resolve_tempo_drop(bpm, section.pop("_tempo_drop_trigger_beat"))
 
     comp = {"guitar": guitar_track, "drums": drum_track}
     return {
@@ -481,7 +535,7 @@ def _generate_attempt(rng: random.Random, preset: Preset, num_sections: int) -> 
         "tuning_key": preset.tuning_key,
         "sequence": sequence,
         "sections": sections,
-        "tempo_map": _compute_tempo_map(sequence, preset.bpm),
+        "tempo_map": tempo_map,
         "guitar_fretboard": guitar_fb,
         "bass_fretboard": bass_fb,
         "judge": judge(comp),

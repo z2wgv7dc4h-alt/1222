@@ -341,6 +341,24 @@ def _kick_blast(guitar_cells: list[dict]) -> list[dict]:
     ]
 
 
+def _kick_double_kick(guitar_cells: list[dict]) -> list[dict]:
+    """"double_kick" style: a continuous, fixed straight-16th-note pulse
+    (real double bass) -- ported from Metalerator's real `double_bass`
+    kick generator (`reference/metalerator/metalerator/drums/kick/
+    kick.py`, `Kick.double_bass`: `j=0; for _ in range(4): kicks.append(
+    ...+j); j+=0.25` -- four hits per beat, every beat, unconditionally).
+    Mechanically distinct from "blast" (which hits every GUITAR cell
+    regardless of that cell's own duration -- 8th/quarter/16th mixed) --
+    this is a fixed ABSOLUTE 16th-note grid independent of the guitar's
+    own rhythm, same `_cyclic_hit_indices` overlay mechanism as
+    "two_step"/the snare-backbeat family."""
+    if not guitar_cells:
+        raise ValueError("guitar_cells must be non-empty")
+    starts, total_beats = _cell_starts(guitar_cells)
+    hit_indices = _cyclic_hit_indices(starts, total_beats, 0.25, (0.0,))
+    return _cells_from_hit_indices(guitar_cells, hit_indices, "KICK")
+
+
 _KICK_STYLES = {
     "bounce": kick_follows_guitar,
     "lock": kick_follows_guitar,
@@ -348,6 +366,7 @@ _KICK_STYLES = {
     "euclid": _kick_euclid,
     "two_step": _kick_two_step,
     "blast": _kick_blast,
+    "double_kick": _kick_double_kick,
 }
 
 
@@ -387,6 +406,46 @@ def kick_pattern_for_style(
             f"(no handler wired for it in drums._KICK_STYLES)"
         )
     return handler(guitar_cells)
+
+
+# Real per-ROLE overlay on top of a preset's own declared kick style:
+# high-energy sections (build/solo) get a real, VARIED overlay -- either
+# "double_kick" (continuous pulse) or "blast" (every cell), picked per
+# section via the caller's own real rng -- regardless of what the preset
+# otherwise declares. Real drumming uses both devices for high-energy
+# passages, not just one repeated choice every time (direct answer to
+# real listening feedback: "no double kick... just generic kicks every
+# now and then"). Every genre gets this identically -- the same "wire by
+# mechanism, not by preset id" principle X.9's snare-role table already
+# uses, not something gated to one style. Every other role keeps the
+# preset's own kick style exactly as before (backward compatible with
+# every existing kick-style test).
+_ROLE_KICK_OVERRIDE_CHOICES: dict[str, tuple[str, ...]] = {
+    "build": ("double_kick", "blast"),
+    "solo": ("double_kick", "blast"),
+}
+
+
+def kick_pattern_for_role(
+    guitar_cells: list[dict], role: str, preset_kick: str, rng: random.Random | None = None
+) -> list[dict]:
+    """Real kick style for a section: `preset_kick` (the preset's own
+    declared style) for every role EXCEPT `build`/`solo`, which pick
+    between the real "double_kick"/"blast" overlay styles via `rng` --
+    see `_ROLE_KICK_OVERRIDE_CHOICES`. Delegates entirely to
+    `kick_pattern_for_style`, no reimplemented dispatch logic.
+
+    Raises `ValueError` if `role` has real overlay choices but `rng` is
+    `None` -- a real per-section choice needs a real seeded source, never
+    a silent default to "always the first option"."""
+    choices = _ROLE_KICK_OVERRIDE_CHOICES.get(role)
+    if choices is None:
+        style = preset_kick
+    else:
+        if rng is None:
+            raise ValueError(f"role {role!r} has real overlay choices and requires an rng")
+        style = rng.choice(choices)
+    return kick_pattern_for_style(guitar_cells, style, rng=rng)
 
 
 # --- X.9: real snare backbeat, wired for every preset -----------------------
@@ -498,6 +557,80 @@ def snare_pattern_for_role(guitar_cells: list[dict], role: str) -> list[dict]:
     if style is None:
         return [{"duration": c["duration"], "is_rest": True, "role": None} for c in guitar_cells]
     return generate_snare_backbeat(guitar_cells, style)
+
+
+# --- X.11: hihat/cymbal layer, wired for every preset -----------------------
+#
+# Real listening feedback on a generated song: "the drums were really
+# basic... no double kick no cymbals or anything being hit. just generic
+# kicks every now and then." Confirms a real, previously-unaddressed gap:
+# through X.9 this engine had kick + snare, but NOTHING keeping time on a
+# cymbal at all -- a real drum kit's hihat/ride is nearly always present
+# under a riff, and its total absence is a real, audible reason a
+# generated song reads as sparse/basic rather than a real performance.
+#
+# "closed" is a steady 8th-note pulse -- the universal "hand keeping time"
+# convention under a riff (real, generic music knowledge, not genre- or
+# reference-specific -- unlike X.8/X.9's ported Metalerator techniques,
+# this doesn't need a named source to justify: a hihat playing straight
+# 8ths under a chug riff is as basic and universal a drumming fact as
+# "snare on the backbeat"). Built on the same `_cyclic_hit_indices`
+# overlay mechanism as every other fixed-metric style in this module.
+
+
+def _hihat_closed(guitar_cells: list[dict]) -> list[dict]:
+    """"closed" hihat style: a steady 8th-note pulse (cycle_beats=0.5,
+    hit at each cycle's downbeat) -- the real, universal "keeping time"
+    convention under a riff."""
+    starts, total_beats = _cell_starts(guitar_cells)
+    hit_indices = _cyclic_hit_indices(starts, total_beats, 0.5, (0.0,))
+    return _cells_from_hit_indices(guitar_cells, hit_indices, "HIHAT_CLOSED")
+
+
+_HIHAT_STYLES = {"closed": _hihat_closed}
+
+
+def generate_hihat_pattern(guitar_cells: list[dict], style: str) -> list[dict]:
+    """Real dispatch on a named hihat style -- see `_hihat_closed`.
+    Raises `ValueError` on an unrecognized style, same fail-closed
+    contract as `kick_pattern_for_style`/`generate_snare_backbeat`."""
+    if not guitar_cells:
+        raise ValueError("guitar_cells must be non-empty")
+    handler = _HIHAT_STYLES.get(style)
+    if handler is None:
+        raise ValueError(
+            f"unknown hihat style {style!r} "
+            f"(no handler wired for it in drums._HIHAT_STYLES)"
+        )
+    return handler(guitar_cells)
+
+
+# Real per-ROLE dispatch, same shape as the snare table: every role keeps
+# a steady hihat except `chill`/`interlude` (the same atmospheric-section
+# judgment call the snare table and `song.py`'s `lead_mode` logic both
+# already make -- a busy kit clashes with a harmonized/ambient section).
+_ROLE_TO_HIHAT_STYLE: dict[str, str | None] = {
+    "intro": "closed",
+    "breakdown": "closed",
+    "outro": "closed",
+    "build": "closed",
+    "solo": "closed",
+    "chill": None,
+    "interlude": None,
+}
+
+
+def hihat_pattern_for_role(guitar_cells: list[dict], role: str) -> list[dict]:
+    """Real hihat cells for a section's ROLE -- wired for every preset,
+    not gated to one genre. An unmapped role defaults to `"closed"`
+    (real, universal time-keeping) rather than raising; `chill`/
+    `interlude` stay silent."""
+    if not guitar_cells:
+        raise ValueError("guitar_cells must be non-empty")
+    style = _ROLE_TO_HIHAT_STYLE.get(role, "closed")
+    if style is None:
+        return [{"duration": c["duration"], "is_rest": True, "role": None} for c in guitar_cells]
+    return generate_hihat_pattern(guitar_cells, style)
 
 
 # --- P4.3: fills/blasts via shared-sequence + blast-type rendering ----------

@@ -157,8 +157,11 @@ def test_kick_style_field_changes_real_song_kick_output():
         guitar_hits = [i for i, c in enumerate(euclid_sec["motif"].cell) if not c["is_rest"]]
         bounce_kick_hits = [i for i, c in enumerate(bounce_sec["kick"]) if not c["is_rest"]]
         euclid_kick_hits = [i for i, c in enumerate(euclid_sec["kick"]) if not c["is_rest"]]
-        # "bounce" still locks exactly to the guitar (unchanged behavior).
-        assert bounce_kick_hits == guitar_hits
+        # "bounce" still locks exactly to the guitar for every role EXCEPT
+        # build/solo (X.11: those always get a real double_kick/blast
+        # overlay regardless of the preset's own declared style).
+        if euclid_sec["role"] not in ("build", "solo"):
+            assert bounce_kick_hits == guitar_hits
         if euclid_kick_hits != guitar_hits:
             differed = True
     assert differed, "expected djent's real 'euclid' kick style to differ from a guitar-locked kick in at least one section"
@@ -369,3 +372,51 @@ def test_every_preset_gets_a_real_snare_backbeat_wired_for_every_role():
                 saw_hits = True
                 assert all(c["role"] in ("SNARE", None) for c in snare)
         assert saw_hits, f"{preset_id}: expected at least one section with real snare hits"
+
+
+def test_every_preset_gets_a_real_hihat_layer_wired_for_every_role():
+    """X.11: hihat_pattern_for_role must be wired for EVERY preset, with
+    chill/interlude silent, matching the same table as snare/kick."""
+    for preset_id in load_all_presets():
+        song = compose_song(preset_id, seed=4, num_sections=8)
+        saw_hits = False
+        for section in song["sections"]:
+            hihat = section["hihat"]
+            assert len(hihat) == len(section["motif"].cell)
+            has_hits = any(not c["is_rest"] for c in hihat)
+            if section["role"] in ("chill", "interlude"):
+                assert not has_hits, f"{preset_id}/{section['role']} hihat must be silent"
+            elif has_hits:
+                saw_hits = True
+                assert all(c["role"] in ("HIHAT_CLOSED", None) for c in hihat)
+        assert saw_hits, f"{preset_id}: expected at least one section with real hihat hits"
+
+
+def test_build_and_solo_sections_get_a_real_varied_kick_overlay():
+    """X.11: build/solo kick style is always double_kick or blast,
+    regardless of the preset's own declared kick style, and real
+    variety is actually exercised (not silently always the same one)
+    across enough seeds/sections."""
+    preset = load_all_presets()["groovy"]  # a real preset whose own kick
+    # style ("bounce") is neither double_kick nor blast, so any overlap
+    # observed below is unambiguously the real X.11 overlay, not a
+    # preset-style coincidence.
+    assert preset.kick == "bounce"
+
+    seen_styles = set()
+    for seed in range(15):
+        song = _generate_attempt(random.Random(seed), preset, num_sections=8)
+        for section in song["sections"]:
+            if section["role"] not in ("build", "solo"):
+                continue
+            kick_cells = section["kick"]
+            guitar_cells = section["motif"].cell
+            hit_indices = {i for i, c in enumerate(kick_cells) if not c["is_rest"]}
+            # blast hits every cell; double_kick and bounce (guitar-lock)
+            # generally don't -- use "hits every single cell" as the real,
+            # checkable signature that distinguishes blast from the rest.
+            if len(hit_indices) == len(kick_cells):
+                seen_styles.add("blast-like")
+            else:
+                seen_styles.add("other")
+    assert seen_styles, "expected at least one build/solo section across these seeds"

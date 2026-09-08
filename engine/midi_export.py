@@ -254,6 +254,8 @@ def song_to_midi(song: dict, path: str | Path, ppq: int = 480) -> None:
         drum_events += _cell_events(section["kick"], kick_pitches, start_beat, ppq)
         snare_pitches = [None if c["is_rest"] else note_for_role(c["role"]) for c in section["snare"]]
         drum_events += _cell_events(section["snare"], snare_pitches, start_beat, ppq)
+        hihat_pitches = [None if c["is_rest"] else note_for_role(c["role"]) for c in section["hihat"]]
+        drum_events += _cell_events(section["hihat"], hihat_pitches, start_beat, ppq)
         lead_events += _lead_events_for_section(section, start_beat, ppq)
         start_beat += _section_beats(section)
 

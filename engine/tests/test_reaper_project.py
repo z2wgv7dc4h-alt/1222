@@ -77,7 +77,9 @@ def test_rpp_drum_events_use_real_gm_notes_on_channel_nine(tmp_path):
     block = text[drums_block_start:]
     hits = re.findall(r"^\s*E \d+ 99 ([0-9a-f]{2}) ", block, flags=re.MULTILINE)
     assert hits, "expected real drum hits on channel 9 (status 0x99)"
-    assert all(h in ("24", "26") for h in hits)  # 0x24=36=KICK, 0x26=38=SNARE
+    # 0x24=36=KICK, 0x26=38=SNARE, 0x2a=42=HIHAT_CLOSED (X.9/X.11).
+    assert all(h in ("24", "26", "2a") for h in hits)
+    assert "2a" in hits, "expected real hihat hits (X.11)"
 
 
 def test_rpp_tempo_envelope_matches_real_tempo_map(tmp_path):

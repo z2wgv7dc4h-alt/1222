@@ -250,6 +250,8 @@ def song_to_rpp(song: dict, path: str | Path) -> None:
         drum_events += _cell_events(section["kick"], kick_pitches, start_beat, _PPQ)
         snare_pitches = [None if c["is_rest"] else note_for_role(c["role"]) for c in section["snare"]]
         drum_events += _cell_events(section["snare"], snare_pitches, start_beat, _PPQ)
+        hihat_pitches = [None if c["is_rest"] else note_for_role(c["role"]) for c in section["hihat"]]
+        drum_events += _cell_events(section["hihat"], hihat_pitches, start_beat, _PPQ)
         lead_events += _lead_events_for_section(section, start_beat, _PPQ)
 
         beats = _section_beats(section)

@@ -50,6 +50,15 @@ frequency) and `preset.octave_stab` are now wired through here too:
     another's). `chill`/`interlude` sections get no backbeat (silent),
     matching the same judgment call this file's `lead_mode` logic already
     makes for those two atmospheric roles.
+  - X.11: `build`/`solo` sections now get a real, varied kick overlay
+    (`double_kick` or `blast`, picked per section via the real seeded
+    `rng`) via `drums.kick_pattern_for_role`, regardless of what the
+    preset otherwise declares -- direct answer to real listening
+    feedback that generated drums felt too generic/repetitive in
+    high-energy sections. Every section also gets a real steady hihat
+    (`section["hihat"]`) via `drums.hihat_pattern_for_role` -- this
+    engine previously had zero cymbal content at all. `chill`/
+    `interlude` stay silent, same rule as the snare/kick tables.
 """
 from __future__ import annotations
 
@@ -61,7 +70,8 @@ from chord_vocab import quality_for_dissonance, voice_named_chord
 from drums import (
     RhythmRegistry,
     generate_vocabulary_informed_blast_fill,
-    kick_pattern_for_style,
+    hihat_pattern_for_role,
+    kick_pattern_for_role,
     snare_pattern_for_role,
 )
 from fretboard import Fretboard
@@ -236,8 +246,9 @@ def _generate_attempt(rng: random.Random, preset: Preset, num_sections: int) -> 
             guitar_cells, random.Random(seed_a), random.Random(seed_b)
         )
 
-        kick_cells = kick_pattern_for_style(guitar_cells, preset.kick, rng=rng)
+        kick_cells = kick_pattern_for_role(guitar_cells, role, preset.kick, rng=rng)
         snare_cells = snare_pattern_for_role(guitar_cells, role)
+        hihat_cells = hihat_pattern_for_role(guitar_cells, role)
 
         fill = None
         if role in ("breakdown", "solo"):
@@ -389,6 +400,7 @@ def _generate_attempt(rng: random.Random, preset: Preset, num_sections: int) -> 
             "legato": legato,
             "kick": kick_cells,
             "snare": snare_cells,
+            "hihat": hihat_cells,
             "fill": fill,
             "bass": bass_cells,
             "pad": pad,

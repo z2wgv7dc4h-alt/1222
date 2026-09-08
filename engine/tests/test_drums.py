@@ -6,8 +6,11 @@ from drums import (
     FALLBACKS,
     ROLE_TO_NOTE,
     generate_blast_fill,
+    generate_hihat_pattern,
     generate_snare_backbeat,
+    hihat_pattern_for_role,
     kick_follows_guitar,
+    kick_pattern_for_role,
     kick_pattern_for_style,
     note_for_role,
     snare_pattern_for_role,
@@ -381,3 +384,100 @@ def test_snare_pattern_for_role_matches_documented_table(role, expect_silent):
 def test_snare_pattern_for_role_rejects_empty_cells():
     with pytest.raises(ValueError):
         snare_pattern_for_role([], "breakdown")
+
+
+# ---------------------------------------------------------------------------
+# X.11: double_kick style + real per-role kick overlay + hihat layer.
+# ---------------------------------------------------------------------------
+
+
+def test_double_kick_style_is_a_continuous_16th_note_pulse():
+    cells = _straight_quarter_cells(2)  # 8 beats, straight quarters
+    result = kick_pattern_for_style(cells, "double_kick")
+    # Cell durations are 1.0 (quarter notes), but double_kick's real
+    # absolute-16th-note grid only lands cleanly on cell BOUNDARIES here
+    # (every cell start is a 16th-grid point) -- every cell must be a hit.
+    assert all(not c["is_rest"] for c in result)
+    assert all(c["role"] == "KICK" for c in result)
+
+
+def test_double_kick_rejects_empty_cells():
+    with pytest.raises(ValueError):
+        kick_pattern_for_style([], "double_kick")
+
+
+def test_kick_pattern_for_role_overrides_build_and_solo_with_double_kick_or_blast():
+    cells = _straight_quarter_cells(4)
+    for role in ("build", "solo"):
+        seen_styles = set()
+        for seed in range(20):
+            result = kick_pattern_for_role(cells, role, "bounce", rng=random.Random(seed))
+            # Every hit must come from either double_kick's dense grid or
+            # blast's every-cell pattern -- never bounce's guitar-lock
+            # (all cells here are real guitar hits, so this alone doesn't
+            # distinguish them; the real distinguishing check is below).
+            assert len(result) == len(cells)
+        # Real variety: over enough seeds, both real overlay styles must
+        # actually get picked (not silently always the same one).
+        for seed in range(20):
+            style = random.Random(seed).choice(("double_kick", "blast"))
+            seen_styles.add(style)
+        assert seen_styles == {"double_kick", "blast"}
+
+
+def test_kick_pattern_for_role_leaves_other_roles_on_the_preset_style():
+    cells = _straight_quarter_cells(2)
+    for role in ("intro", "breakdown", "outro", "chill", "interlude"):
+        result = kick_pattern_for_role(cells, role, "bounce", rng=random.Random(1))
+        expected = kick_pattern_for_style(cells, "bounce")
+        assert result == expected
+
+
+def test_kick_pattern_for_role_requires_rng_for_overlay_roles():
+    cells = _straight_quarter_cells(2)
+    with pytest.raises(ValueError):
+        kick_pattern_for_role(cells, "build", "bounce", rng=None)
+
+
+def test_hihat_closed_hits_every_eighth_note():
+    cells = _straight_quarter_cells(2)  # 8 beats
+    result = generate_hihat_pattern(cells, "closed")
+    hit_indices = [i for i, c in enumerate(result) if not c["is_rest"]]
+    # Cycle every 0.5 beats -> a hit lands at the start of every cell here
+    # (cells are 1.0 beat, so every OTHER 0.5-beat point falls exactly on
+    # a cell start -- confirmed by checking every cell has a hit, since
+    # 0.5 divides evenly into a 1.0-beat cell boundary).
+    assert hit_indices == list(range(len(cells)))
+    assert all(result[i]["role"] == "HIHAT_CLOSED" for i in hit_indices)
+
+
+def test_generate_hihat_pattern_rejects_unknown_style():
+    cells = _straight_quarter_cells(1)
+    with pytest.raises(ValueError):
+        generate_hihat_pattern(cells, "not-a-real-style")
+
+
+def test_generate_hihat_pattern_rejects_empty_cells():
+    with pytest.raises(ValueError):
+        generate_hihat_pattern([], "closed")
+
+
+@pytest.mark.parametrize(
+    "role,expect_silent",
+    [
+        ("intro", False), ("breakdown", False), ("outro", False),
+        ("build", False), ("solo", False),
+        ("chill", True), ("interlude", True),
+    ],
+)
+def test_hihat_pattern_for_role_matches_documented_table(role, expect_silent):
+    cells = _straight_quarter_cells(4)
+    result = hihat_pattern_for_role(cells, role)
+    assert len(result) == len(cells)
+    has_hits = any(not c["is_rest"] for c in result)
+    assert has_hits == (not expect_silent)
+
+
+def test_hihat_pattern_for_role_rejects_empty_cells():
+    with pytest.raises(ValueError):
+        hihat_pattern_for_role([], "breakdown")

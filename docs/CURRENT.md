@@ -1,8 +1,8 @@
 # CURRENT
 
-task: X.10
+task: X.11
 phase: cross-cutting
 status: DONE
-last_pytest: 482 passed in 13.03s
-note: New preset "progressive" -- a real Periphery-styled melodic technical djent, the first preset to actually adopt X.6d's major-family scales (lydian, added but unused until now). Uses djent's own real mechanisms (group=3 displacement, euclid kick, octave stabs) with lydian's bright color instead of djent's deliberately un-melodic root/5th vocab. Calibrated against the real user-supplied reference track (X.7): drop_a_7 tuning chosen because its open low string is pitch class A, matching the track's real measured A-major key; lydian chosen over plain major for the track's bright/articulate tone. Verified real generated output is genuinely scale-legal (every pitch class fell within A-lydian's exact interval set, zero exceptions). Also fixed the stale "periphery" alias (presets.ALIASES) that pointed at "chill" as a proxy since no real match existed -- now points at "progressive". Two tests updated to match (test_presets.py, test_song.py). 482 passed in 13.03s (up from 477).
+last_pytest: 500 passed in 12.59s
+note: Real hihat/cymbal layer + varied kick overlay for build/solo sections -- direct response to real listening feedback that generated drums felt basic (no cymbals at all, generic occasional kicks). Closed a total gap: through X.9 the engine had kick+snare but zero cymbal content anywhere. Added generate_hihat_pattern/hihat_pattern_for_role (real steady 8th-note pulse, wired for every preset, silent only for chill/interlude) and _kick_double_kick (ported from Metalerator's real double_bass) registered as a new "double_kick" style, plus kick_pattern_for_role/_ROLE_KICK_OVERRIDE_CHOICES so build/solo sections always get a real, varied double_kick-or-blast overlay (picked per section via real rng) regardless of the preset's own kick field. Wired into song.py, midi_export.py, and reaper_project.py's Drums track. Generated and sent two real demos including a 16-section/3:09 song (up from 8-section/1:28) testing whether length also helps. 500 passed in 12.59s (up from 482).
 updated: 2026-09-08

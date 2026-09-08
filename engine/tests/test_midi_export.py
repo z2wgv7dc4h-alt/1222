@@ -91,18 +91,29 @@ def test_tempo_track_reflects_the_real_tempo_map():
     assert len(set(real_tempos)) > 1, "expected a real metric-modulation tempo change -- try a different seed/length if this fires"
 
 
-def test_drum_track_uses_real_gm_kick_note():
+def test_drum_track_uses_real_gm_kick_and_snare_notes():
     song = compose_song("djent", seed=5, num_sections=3)
     out_path = _write_tmp(song, "djent_drums")
+
+    expected_kick_hits = sum(
+        1 for s in song["sections"] for c in s["kick"] if not c["is_rest"]
+    )
+    expected_snare_hits = sum(
+        1 for s in song["sections"] for c in s["snare"] if not c["is_rest"]
+    )
 
     parsed = _read_back(out_path)
     drum_track = _track_by_name(parsed, "Drums")
     note_ons = [m for m in drum_track if m.type == "note_on"]
     assert note_ons, "djent's real euclid kick style must produce at least one hit"
-    # note_for_role("KICK") == 36 (ROLE_TO_NOTE) -- every drum note here
-    # must be that real GM value, never a fabricated one.
-    assert all(m.note == 36 for m in note_ons)
+    # note_for_role("KICK") == 36, note_for_role("SNARE") == 38 (ROLE_TO_NOTE)
+    # -- both real GM values, never fabricated, and every note here must be
+    # one or the other (this track carries both roles, X.9).
+    assert all(m.note in (36, 38) for m in note_ons)
     assert all(m.channel == 9 for m in note_ons)
+    assert sum(1 for m in note_ons if m.note == 36) == expected_kick_hits
+    assert sum(1 for m in note_ons if m.note == 38) == expected_snare_hits
+    assert expected_snare_hits > 0, "djent's breakdown/build/solo sections must produce real snare hits"
 
 
 def test_solo_lead_track_gets_real_notes_when_a_solo_section_exists():

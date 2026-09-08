@@ -350,3 +350,21 @@ def test_preset_feel_breakdown_changes_real_song_duration_distribution():
         f"the 16th-note share vs the same preset with an unmapped feel, got "
         f"biased={biased_share:.3f} unbiased={unbiased_share:.3f}"
     )
+
+
+def test_every_preset_gets_a_real_snare_backbeat_wired_for_every_role():
+    """X.9: snare_pattern_for_role must be wired for EVERY preset (not
+    metalcore-specific) and every section, with chill/interlude silent."""
+    for preset_id in load_all_presets():
+        song = compose_song(preset_id, seed=4, num_sections=8)
+        saw_hits = False
+        for section in song["sections"]:
+            snare = section["snare"]
+            assert len(snare) == len(section["motif"].cell)
+            has_hits = any(not c["is_rest"] for c in snare)
+            if section["role"] in ("chill", "interlude"):
+                assert not has_hits, f"{preset_id}/{section['role']} must be silent"
+            elif has_hits:
+                saw_hits = True
+                assert all(c["role"] in ("SNARE", None) for c in snare)
+        assert saw_hits, f"{preset_id}: expected at least one section with real snare hits"

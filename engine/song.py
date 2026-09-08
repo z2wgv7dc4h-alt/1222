@@ -42,6 +42,14 @@ frequency) and `preset.octave_stab` are now wired through here too:
     god-tier-metal-scope.md calls for on ambient/clean sections, alongside
     (not instead of) the existing `riff.harmonize_line` melodic doubling.
     Every other role leaves both fields `None`.
+  - X.9: every section now also gets a real snare backbeat
+    (`section["snare"]`) via `drums.snare_pattern_for_role` -- wired for
+    every preset, not gated to one genre (breakdown-style backbeats are a
+    shared genre convention; a preset's own `.kick`/`.group`/rhythmic
+    density are what actually differentiate one genre's breakdown from
+    another's). `chill`/`interlude` sections get no backbeat (silent),
+    matching the same judgment call this file's `lead_mode` logic already
+    makes for those two atmospheric roles.
 """
 from __future__ import annotations
 
@@ -50,7 +58,12 @@ import random
 from atmosphere import find_accents, pad_voicing
 from bass import build_bass_fretboard, follow_guitar_rhythm
 from chord_vocab import quality_for_dissonance, voice_named_chord
-from drums import RhythmRegistry, generate_vocabulary_informed_blast_fill, kick_pattern_for_style
+from drums import (
+    RhythmRegistry,
+    generate_vocabulary_informed_blast_fill,
+    kick_pattern_for_style,
+    snare_pattern_for_role,
+)
 from fretboard import Fretboard
 from lead import generate_lead_line
 from legato import generate_legato_lick
@@ -224,6 +237,7 @@ def _generate_attempt(rng: random.Random, preset: Preset, num_sections: int) -> 
         )
 
         kick_cells = kick_pattern_for_style(guitar_cells, preset.kick, rng=rng)
+        snare_cells = snare_pattern_for_role(guitar_cells, role)
 
         fill = None
         if role in ("breakdown", "solo"):
@@ -374,6 +388,7 @@ def _generate_attempt(rng: random.Random, preset: Preset, num_sections: int) -> 
             "lead": lead_notes,
             "legato": legato,
             "kick": kick_cells,
+            "snare": snare_cells,
             "fill": fill,
             "bass": bass_cells,
             "pad": pad,

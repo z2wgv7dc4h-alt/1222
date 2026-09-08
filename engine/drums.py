@@ -238,6 +238,73 @@ def _kick_euclid(guitar_cells: list[dict]) -> list[dict]:
     ]
 
 
+# Shared by every "fixed metric overlay on the guitar's own cell grid"
+# style below (two_step's kick pattern, and the snare-backbeat family
+# further down): compute each cell's cumulative start time, then decide
+# hits by real absolute beat position rather than by copying/thinning the
+# guitar's own hit/rest layout.
+
+
+def _cell_starts(cells: list[dict]) -> tuple[list[float], float]:
+    """Per-cell cumulative start time (beats) and the sequence's total
+    length -- the real timeline every cyclic-overlay style below places
+    its hits against."""
+    starts: list[float] = []
+    cumulative = 0.0
+    for cell in cells:
+        starts.append(cumulative)
+        cumulative += cell["duration"]
+    return starts, cumulative
+
+
+def _time_to_cell_index(starts: list[float], t: float) -> int | None:
+    """Index of the cell whose span contains real time `t`, or `None` if
+    `t` falls before the first cell (never fabricates a position)."""
+    idx = None
+    for i, s in enumerate(starts):
+        if s <= t + _EPS:
+            idx = i
+        else:
+            break
+    return idx
+
+
+def _cyclic_hit_indices(
+    starts: list[float], total_beats: float, cycle_beats: float, offsets: tuple[float, ...]
+) -> set[int]:
+    """Cell indices hit by a pattern that repeats every `cycle_beats`,
+    firing at each of `offsets` (beats from the start of each cycle) --
+    the real, shared mechanism behind "two_step"'s kick pattern and every
+    named snare-backbeat style below. A target time past the sequence's
+    end, or one that doesn't land inside any cell's span, is simply
+    skipped -- never a fabricated extra hit."""
+    hit_indices: set[int] = set()
+    cycle_start = 0.0
+    while cycle_start < total_beats - _EPS:
+        for offset in offsets:
+            t = cycle_start + offset
+            if t >= total_beats - _EPS:
+                continue
+            idx = _time_to_cell_index(starts, t)
+            if idx is not None:
+                hit_indices.add(idx)
+        cycle_start += cycle_beats
+    return hit_indices
+
+
+def _cells_from_hit_indices(cells: list[dict], hit_indices: set[int], role_name: str) -> list[dict]:
+    """Same-length role-tagged cell list from a set of hit indices --
+    shared output shape for every style in this module."""
+    return [
+        {
+            "duration": cell["duration"],
+            "is_rest": i not in hit_indices,
+            "role": role_name if i in hit_indices else None,
+        }
+        for i, cell in enumerate(cells)
+    ]
+
+
 def _kick_two_step(guitar_cells: list[dict]) -> list[dict]:
     """"two_step" kick style: this project's documented interpretation of
     the metalcore breakdown "two-step" convention (no single universally
@@ -258,39 +325,9 @@ def _kick_two_step(guitar_cells: list[dict]) -> list[dict]:
     """
     if not guitar_cells:
         raise ValueError("guitar_cells must be non-empty")
-
-    starts: list[float] = []
-    cumulative = 0.0
-    for cell in guitar_cells:
-        starts.append(cumulative)
-        cumulative += cell["duration"]
-    total_beats = cumulative
-
-    hit_indices: set[int] = set()
-    cycle_start = 0.0
-    while cycle_start < total_beats - _EPS:
-        for offset in (0.0, 1.5):
-            t = cycle_start + offset
-            if t >= total_beats - _EPS:
-                continue
-            idx = None
-            for i, s in enumerate(starts):
-                if s <= t + _EPS:
-                    idx = i
-                else:
-                    break
-            if idx is not None:
-                hit_indices.add(idx)
-        cycle_start += 2.0
-
-    return [
-        {
-            "duration": cell["duration"],
-            "is_rest": i not in hit_indices,
-            "role": "KICK" if i in hit_indices else None,
-        }
-        for i, cell in enumerate(guitar_cells)
-    ]
+    starts, total_beats = _cell_starts(guitar_cells)
+    hit_indices = _cyclic_hit_indices(starts, total_beats, 2.0, (0.0, 1.5))
+    return _cells_from_hit_indices(guitar_cells, hit_indices, "KICK")
 
 
 def _kick_blast(guitar_cells: list[dict]) -> list[dict]:
@@ -350,6 +387,117 @@ def kick_pattern_for_style(
             f"(no handler wired for it in drums._KICK_STYLES)"
         )
     return handler(guitar_cells)
+
+
+# --- X.9: real snare backbeat, wired for every preset -----------------------
+#
+# Closes a real, previously-unaddressed gap: this engine generated a kick
+# (P4.2/X.2) and blast/fill patterns (P4.3) but NO snare or hihat layer at
+# all -- every generated song was missing the backbeat entirely. Ported
+# from the real reference implementation "Metalerator"
+# (reference/metalerator/metalerator/drums/snare/snare.py, `Snare.
+# snare_step`/`snare_half_step`/`snare_double_time`), a genuinely
+# metalcore-and-djent-shared convention per the user's own framing
+# ("breakdowns are kinda universal, djent will just have more chugging")
+# -- so this is wired for EVERY preset via `snare_pattern_for_role` below,
+# not gated to one genre. Ghost notes (Metalerator's quiet grace-note hits
+# around the main snare) are a real technique too but don't fit this
+# project's fixed-cell-array model without a larger rework -- documented
+# here as a deliberate, deferred follow-up, not silently dropped.
+#
+# Built on the same "fixed metric overlay on the guitar's own cell grid"
+# mechanism `_kick_two_step` already uses (`_cyclic_hit_indices`), since
+# Metalerator's own `snare_step`/`snare_half_step` are the identical
+# device: a real absolute-beat-position pattern, not a copy/thinning of
+# the guitar's hit layout.
+
+
+def _snare_step(guitar_cells: list[dict]) -> list[dict]:
+    """"step" snare style: one hit per 4-beat bar, on beat offset 2.0
+    (the third beat, 1-indexed) -- Metalerator's real breakdown backbeat
+    (`Snare.snare_step`, `i % 4 == 2`), a half-time "kick-into-the-snare"
+    feel, NOT the standard rock "2 and 4" (this project checked the real
+    source rather than assuming the generic convention)."""
+    starts, total_beats = _cell_starts(guitar_cells)
+    hit_indices = _cyclic_hit_indices(starts, total_beats, 4.0, (2.0,))
+    return _cells_from_hit_indices(guitar_cells, hit_indices, "SNARE")
+
+
+def _snare_half_step(guitar_cells: list[dict]) -> list[dict]:
+    """"half_step" snare style: one hit per 8-beat (2-bar) cycle, on the
+    downbeat of the second bar -- Metalerator's real sparser breakdown
+    variant (`Snare.snare_half_step`, `i % 8 == 4`)."""
+    starts, total_beats = _cell_starts(guitar_cells)
+    hit_indices = _cyclic_hit_indices(starts, total_beats, 8.0, (4.0,))
+    return _cells_from_hit_indices(guitar_cells, hit_indices, "SNARE")
+
+
+def _snare_double_time(guitar_cells: list[dict]) -> list[dict]:
+    """"double_time" snare style: a hit on every beat except the very
+    first of the section -- Metalerator's real high-energy variant
+    (`Snare.snare_double_time`, `i % 1 == 0 and i != 0`; since Metalerator
+    counts `i` itself in quarter-note/beat units, that condition is simply
+    "every beat", with the explicit `i != 0` exclusion kept here too)."""
+    starts, total_beats = _cell_starts(guitar_cells)
+    hit_indices = _cyclic_hit_indices(starts, total_beats, 1.0, (0.0,))
+    hit_indices.discard(0)
+    return _cells_from_hit_indices(guitar_cells, hit_indices, "SNARE")
+
+
+_SNARE_STYLES = {
+    "step": _snare_step,
+    "half_step": _snare_half_step,
+    "double_time": _snare_double_time,
+}
+
+
+def generate_snare_backbeat(guitar_cells: list[dict], style: str) -> list[dict]:
+    """Real dispatch on a named snare-backbeat style -- see `_snare_step`/
+    `_snare_half_step`/`_snare_double_time`. Raises `ValueError` on an
+    unrecognized style, same fail-closed contract as
+    `kick_pattern_for_style`."""
+    if not guitar_cells:
+        raise ValueError("guitar_cells must be non-empty")
+    handler = _SNARE_STYLES.get(style)
+    if handler is None:
+        raise ValueError(
+            f"unknown snare style {style!r} "
+            f"(no handler wired for it in drums._SNARE_STYLES)"
+        )
+    return handler(guitar_cells)
+
+
+# Real per-ROLE dispatch (not per-preset): every preset's breakdown/intro/
+# outro sections get the same real half-time backbeat ("breakdowns are
+# kinda universal" -- the user's own framing), build/solo sections (rising
+# or featured energy) get the denser double_time variant, and chill/
+# interlude sections get NO backbeat at all -- the same judgment call
+# `song.py`'s `lead_mode` logic already makes for those two roles (a busy
+# kit would clash with an atmospheric/harmonized section).
+_ROLE_TO_SNARE_STYLE: dict[str, str | None] = {
+    "intro": "step",
+    "breakdown": "step",
+    "outro": "step",
+    "build": "double_time",
+    "solo": "double_time",
+    "chill": None,
+    "interlude": None,
+}
+
+
+def snare_pattern_for_role(guitar_cells: list[dict], role: str) -> list[dict]:
+    """Real snare-backbeat cells for a section's ROLE (see
+    `_ROLE_TO_SNARE_STYLE`) -- wired for every preset via `song.py`, not
+    gated to one genre. An unmapped role defaults to `"step"` (the
+    universal breakdown/chug backbeat) rather than raising, since new
+    roles can be added to `structure.DEFAULT_GRAPH` independently of this
+    table; `chill`/`interlude` are the only roles that go silent."""
+    if not guitar_cells:
+        raise ValueError("guitar_cells must be non-empty")
+    style = _ROLE_TO_SNARE_STYLE.get(role, "step")
+    if style is None:
+        return [{"duration": c["duration"], "is_rest": True, "role": None} for c in guitar_cells]
+    return generate_snare_backbeat(guitar_cells, style)
 
 
 # --- P4.3: fills/blasts via shared-sequence + blast-type rendering ----------

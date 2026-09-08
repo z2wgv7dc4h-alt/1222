@@ -6,9 +6,11 @@ from drums import (
     FALLBACKS,
     ROLE_TO_NOTE,
     generate_blast_fill,
+    generate_snare_backbeat,
     kick_follows_guitar,
     kick_pattern_for_style,
     note_for_role,
+    snare_pattern_for_role,
 )
 from presets import load_all_presets
 from rhythm import RhythmRegistry, generate_rhythm
@@ -302,3 +304,80 @@ def test_kick_pattern_for_style_handles_every_real_preset_kick_style(preset_id):
     for cell in result:
         assert cell["role"] in ("KICK", None)
         assert cell["is_rest"] == (cell["role"] is None)
+
+
+# ---------------------------------------------------------------------------
+# X.9: real snare backbeat. Ported from Metalerator's actual snare.py
+# (reference/metalerator/metalerator/drums/snare/snare.py) -- "step" is a
+# half-time hit on beat 3 of every bar (NOT the generic "2 and 4"), verified
+# against a hand-built guitar cell grid with known, checkable hit slots
+# rather than trusting the mechanism blindly.
+# ---------------------------------------------------------------------------
+
+
+def _straight_quarter_cells(n_bars):
+    """n_bars * 4 straight quarter-note hit cells -- so cell index i is
+    exactly beat i, making expected hit positions trivial to check by hand."""
+    return [{"duration": 1.0, "is_rest": False} for _ in range(n_bars * 4)]
+
+
+def test_snare_step_hits_beat_three_of_every_bar():
+    cells = _straight_quarter_cells(3)
+    result = generate_snare_backbeat(cells, "step")
+    assert len(result) == len(cells)
+    hit_indices = [i for i, c in enumerate(result) if not c["is_rest"]]
+    # Beat offset 2.0 within each 4-beat bar -> cell indices 2, 6, 10.
+    assert hit_indices == [2, 6, 10]
+    for i in hit_indices:
+        assert result[i]["role"] == "SNARE"
+    for i, c in enumerate(result):
+        if i not in hit_indices:
+            assert c["role"] is None
+
+
+def test_snare_half_step_hits_once_every_two_bars():
+    cells = _straight_quarter_cells(4)  # 16 beats -> two full 8-beat cycles
+    result = generate_snare_backbeat(cells, "half_step")
+    hit_indices = [i for i, c in enumerate(result) if not c["is_rest"]]
+    # Beat offset 4.0 within each 8-beat (2-bar) cycle -> cell indices 4
+    # (first cycle, beats 0-7) and 12 (second cycle, beats 8-15).
+    assert hit_indices == [4, 12]
+
+
+def test_snare_double_time_hits_every_beat_except_the_first():
+    cells = _straight_quarter_cells(2)
+    result = generate_snare_backbeat(cells, "double_time")
+    hit_indices = [i for i, c in enumerate(result) if not c["is_rest"]]
+    assert hit_indices == list(range(1, 8))
+
+
+def test_generate_snare_backbeat_rejects_unknown_style():
+    cells = _straight_quarter_cells(1)
+    with pytest.raises(ValueError):
+        generate_snare_backbeat(cells, "not-a-real-style")
+
+
+def test_generate_snare_backbeat_rejects_empty_cells():
+    with pytest.raises(ValueError):
+        generate_snare_backbeat([], "step")
+
+
+@pytest.mark.parametrize(
+    "role,expect_silent",
+    [
+        ("intro", False), ("breakdown", False), ("outro", False),
+        ("build", False), ("solo", False),
+        ("chill", True), ("interlude", True),
+    ],
+)
+def test_snare_pattern_for_role_matches_documented_table(role, expect_silent):
+    cells = _straight_quarter_cells(4)
+    result = snare_pattern_for_role(cells, role)
+    assert len(result) == len(cells)
+    has_hits = any(not c["is_rest"] for c in result)
+    assert has_hits == (not expect_silent)
+
+
+def test_snare_pattern_for_role_rejects_empty_cells():
+    with pytest.raises(ValueError):
+        snare_pattern_for_role([], "breakdown")

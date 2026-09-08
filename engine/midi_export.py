@@ -11,9 +11,12 @@ from `song["tempo_map"]` (X.6c) -- never a flat, single-tempo file.
 Tracks written: two double-tracked rhythm-guitar takes, bass (on its OWN
 fretboard's real positions, per Phase 5), drums (the kick pattern actually
 assembled into `song["_comp"]["drums"]`, i.e. exactly what `judge()` also
-scored -- not a separately re-derived pattern), and the second-guitar lead
-voice. A dedicated tempo track (track 0, no notes) carries the real
-`set_tempo` meta events at each section boundary.
+scored -- not a separately re-derived pattern -- PLUS the real per-role
+snare backbeat from X.9's `drums.snare_pattern_for_role`, both sharing one
+"Drums" track on the real GM percussion channel, standard practice for a
+single drum-kit MIDI track), and the second-guitar lead voice. A dedicated
+tempo track (track 0, no notes) carries the real `set_tempo` meta events
+at each section boundary.
 
 Lead-voice timing, and why it's exact (not fabricated):
   - `chill`/`interlude` sections (`lead_mode == "harmony"`, X.6b/P3.12):
@@ -249,6 +252,8 @@ def song_to_midi(song: dict, path: str | Path, ppq: int = 480) -> None:
         )
         kick_pitches = [None if c["is_rest"] else note_for_role(c["role"]) for c in section["kick"]]
         drum_events += _cell_events(section["kick"], kick_pitches, start_beat, ppq)
+        snare_pitches = [None if c["is_rest"] else note_for_role(c["role"]) for c in section["snare"]]
+        drum_events += _cell_events(section["snare"], snare_pitches, start_beat, ppq)
         lead_events += _lead_events_for_section(section, start_beat, ppq)
         start_beat += _section_beats(section)
 

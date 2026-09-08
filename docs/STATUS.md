@@ -27,6 +27,7 @@ Update only after grep or pytest. No memory claims.
 | Extended chord vocabulary, chill/interlude sections (X.6b) | WIRED+TESTED | 428 passed in 12.19s |
 | Metric modulation, real tempo_map (X.6c) | WIRED+TESTED | 428 passed in 12.19s |
 | Preset lineup: djent/tech/metalcore/deathcore/melodic/chill/groovy (no slam) | WIRED+TESTED | 333 passed (full suite) |
+| Real MIDI export, Reaper-importable (P10.1) | WIRED+TESTED | 443 passed in 11.19s |
 | Reaper | MISSING | |
 | Editor | MISSING | |
 

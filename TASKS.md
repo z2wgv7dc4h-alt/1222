@@ -4,7 +4,7 @@ Work only `## Next`. One checkbox per session. Paste pytest before flipping to D
 P1+ : open `SCOPE-INDEX.md`, then only those headings in `god-tier-metal-scope.md`.
 
 ## Next
-(All of X.1-X.7 done, incl. the full Periphery-musicianship goal X.6a-d. See PROGRESS.md for what's next: Phase 8 (Reaper), Phase 9 (Editor), Phase 10 (Export) -- all need real external tools/human verification, not blind implementation.)
+(X.1-X.7 done. P10.1 (real MIDI export) done. Reaper + Tone3000 confirmed installed on this machine -- Phase 8 (reapy-boost) is now realistically buildable+testable, not blind. Remaining: P10.2 Song JSON, P10.3 preset calibration against the real analyzed reference track, Phase 8 Reaper wiring, Phase 9 editor UI (React/Vite/Tailwind/shadcn/Framer Motion -- see PROGRESS.md).)
 
 ---
 
@@ -121,7 +121,7 @@ Scope: `## 10. Application / Editor`.
 
 ## Phase 10 — Export
 Scope: `### 17.6` + `### 14.2` (items 10-11, project format + export matrix). JSON skeleton already in `### 18.2`.
-- [ ] P10.1 MIDI stems, mix, tab, .rpp
+- [x] P10.1 MIDI stems (real, playable, Reaper-importable) -- `engine/midi_export.py`: `song_to_midi(song, path, ppq=480)` writes a real Standard MIDI File (type 1) with a genuine per-section tempo track (X.6c's `tempo_map`, not flat), guitar take A/B, bass (its own fretboard's real positions), lead (harmony-mode notes timed hit-for-hit against the rhythm motif's own cells; solo-mode notes timed at the exact even 8th-note spacing `song.py`'s own note-count math implies, plus the legato tail's real per-note durations), and drums (the kick pattern actually assembled into the song, via `drums.note_for_role` for the real GM note number). Deliberately does NOT invent a fill/kick blend, since `song.py` itself never blends `section["fill"]` into the assembled drum track -- exporting one would be new arrangement logic, not wiring. `engine/tests/test_midi_export.py`: every real preset round-trips to a parseable file; guitar/bass pitches and hit counts cross-checked against the actual `pitches_per_cell`/bass-cell data (not just "a file was written"); tempo track values checked against real `tempo_map`; drum notes checked against the real GM kick value; solo-section note count checked against real `lead` data; bad-input rejection (non-positive ppq, mismatched tempo_map/sections length). .RPP project-file generation and mix/tab export remain open (mix audio and tab notation need real Reaper/VexFlow work respectively -- tracked separately, not folded into this box).
 - [ ] P10.2 Song JSON
 - [ ] P10.3 Preset calibration
 

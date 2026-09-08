@@ -1,0 +1,14 @@
+{
+  "id": "deathcore",
+  "description": "Straightforward brutal chugging -- heavier and less scalar than tech (which is the extreme technical/dissonant end), mostly anchored on the root with blast-beat sections rather than constant technical movement.",
+  "tuning_key": "drop_c_6",
+  "scale": "phrygian",
+  "dissonance": 0.65,
+  "bpm": 130,
+  "bars": 4,
+  "feel": "chug",
+  "open_chance": 0.15,
+  "octave_stab": false,
+  "kick": "blast",
+  "vocab": {"weights": {"0": 10, "1": 4, "3": 2, "6": 4, "7": 2, "8": 2}, "motion": 0.15}
+}

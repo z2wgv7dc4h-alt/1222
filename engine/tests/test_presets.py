@@ -39,7 +39,7 @@ EXPECTED_TUNINGS = {
     "standard_6": (["E", "A", "D", "G", "B", "E"], [40, 45, 50, 55, 59, 64]),
 }
 
-EXPECTED_PRESET_IDS = {"groovy", "djent", "chill", "tech", "slam", "melodic"}
+EXPECTED_PRESET_IDS = {"groovy", "djent", "chill", "tech", "melodic", "metalcore", "deathcore"}
 
 
 # -- P1.6: tunings -----------------------------------------------------------

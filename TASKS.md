@@ -18,6 +18,8 @@ P1+ : open `SCOPE-INDEX.md`, then only those headings in `god-tier-metal-scope.m
   - [ ] X.6a Legato/technical run generator -- fast hammer-on/pull-off phrasing is a distinct articulation from `VoiceLeader`'s leap-and-settle behavior; nothing models it yet.
   - [ ] X.6b Extended/altered chord vocabulary -- `chords.py`'s solver only enumerates power-chord-style triads; ambient/clean sections need 9th/11th/add-tone voicings.
   - [ ] X.6c Metric modulation as a compositional device (the pulse itself reinterpreting, e.g. a dotted-eighth becoming the new quarter) -- a step beyond the existing `tile_cell`/`metric_polyrhythm` (which stay within one fixed pulse).
+  - [ ] X.6d Major-family scales (lydian, mixolydian, major/ionian, harmonic major) -- `scales.py` is minor-family-only (plus cluster/power). No modal interchange is possible without at least one major-family mode. Confirmed as a real gap, not theoretical: a real reference track (X.7) came back estimated in A major.
+- [x] X.7 `engine/audio_vocab.py` -- real-audio structural/tonal vocabulary, the audio analogue of `midi_vocab.py`'s MIDI mining. Tempo, harmonic/percussive rhythm-density split, spectral-centroid brightness descriptor, per-section relative density curve, key/tonal-center estimate (Krumhansl-Schmuckler correlation), real structural segmentation (MFCC self-similarity, not equal slices), tempo-stability check, drum-onset role classification (KICK/SNARE/HIHAT_OR_CYMBAL by frequency band), and guitar-rhythm-pattern detection (straight/gallop/syncopated from onset timing alone, never pitch). Never transcribes notes/chords, only extracts numeric statistics -- same "reference data, not composer" boundary as the MIDI vocabulary. Optional local `demucs` pre-processing (`pip install demucs`, MIT-licensed, run locally -- never upload audio to a third-party "online demucs" site) gives real per-instrument stems. Validated against a real user-supplied track (a friend's original song): found the guitar/bass has more section-to-section dynamic range than the drums (validates `theory.arc()`'s design), the track sits in A MAJOR (a real data point that the scale library's lack of major-family modes, X.6b-adjacent, is a real gap), and the drum-role classifier's own output (implausibly few detected snares) honestly demonstrates a real ceiling -- a hand-built frequency-band heuristic isn't reliable on a dense, cymbal-heavy mix; a proper trained drum-transcription model would be needed to do better, not just more analysis code.
 
 ---
 
@@ -36,7 +38,7 @@ Scope: `## 2. Tonal/Harmonic` + `### 18.2` + `### 12.3` (chord-shape solver). Th
 - [x] P1.4 Scale library + cluster + power. Unique intervals
 - [x] P1.5 TEST: no duplicate non-alias scales
 - [ ] P1.6 Tuning JSON from source MIDI
-- [ ] P1.7 Preset ids: groovy, djent, chill, tech, slam, melodic. Strict JSON
+- [x] P1.7 Preset ids: groovy, djent, chill, tech, melodic, metalcore, deathcore (`slam` removed per user direction -- targets djent/deathcore/metalcore/technical deathcore, not slam). Strict JSON
 - [ ] P1.8 Schema validator called by loader. TEST malformed raises
 - [ ] P1.9 TEST glob `*.json` loads every file
 - [ ] P1.10 Port VoiceLeader, shade(), ARC

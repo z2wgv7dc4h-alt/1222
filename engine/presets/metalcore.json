@@ -1,0 +1,14 @@
+{
+  "id": "metalcore",
+  "description": "Melodic-hardcore-adjacent riffing built around the 2-step breakdown -- syncopated chugging punctuated by octave stabs, balancing open ringing chords against palm-muted hits rather than staying anchored on the root the whole time.",
+  "tuning_key": "drop_b_7",
+  "scale": "minor",
+  "dissonance": 0.35,
+  "bpm": 155,
+  "bars": 4,
+  "feel": "breakdown",
+  "open_chance": 0.45,
+  "octave_stab": true,
+  "kick": "two_step",
+  "vocab": {"weights": {"0": 14, "1": 2, "3": 3, "6": 2, "7": 5, "8": 1}, "motion": 0.25}
+}

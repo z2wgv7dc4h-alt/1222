@@ -200,7 +200,7 @@ class VoiceLeader:
 
     def move(self, prev: int | None = None, exclude_root: bool = False) -> int:
         """`motion` decides stepwise walk vs. a fresh weighted pick. Active
-        styles (melodic, chill) walk the scale; anchored styles (slam,
+        styles (melodic, chill) walk the scale; anchored styles (deathcore,
         groovy) mostly re-pick and land back on the pedal note."""
         if self.rng.random() < self.motion:
             return self.walk(prev)

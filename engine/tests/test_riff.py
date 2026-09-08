@@ -14,8 +14,8 @@ from theory import Scale
 
 
 def test_voice_chord_section_returns_real_fingering_for_power_chord():
-    slam = load_all_presets()["slam"]
-    tuning = load_tunings()[slam.tuning_key]
+    deathcore = load_all_presets()["deathcore"]
+    tuning = load_tunings()[deathcore.tuning_key]
     fb = Fretboard(tuning.open, max_fret=24)
 
     fingering = voice_chord_section(root=fb.tuning[0], intervals=(0, 7, 12), fretboard=fb)

@@ -20,7 +20,7 @@ Update only after grep or pytest. No memory claims.
 | Structure (P6.1-P6.7) | WIRED+TESTED | 287 passed in 2.33s |
 | Atmosphere (P7.1-P7.3) | WIRED+TESTED | 302 passed in 2.28s |
 | Full pipeline integration (song.py), incl. ThemeRegistry + realistic lead behavior | WIRED+TESTED | 314 passed in 2.39s |
-| Real-audio structural/tonal/drum-role analysis (audio_vocab.py) | WIRED+TESTED | 333 passed in 13.45s |
+| Real-audio structural/tonal/drum-role/transcription analysis (audio_vocab.py) | WIRED+TESTED | 335 passed in 12.93s |
 | Preset lineup: djent/tech/metalcore/deathcore/melodic/chill/groovy (no slam) | WIRED+TESTED | 333 passed (full suite) |
 | Preset fields kick/group/pedal/octave_stab | MISSING | validated (Phase 1) but no generation code branches on them yet |
 | Reaper | MISSING | |

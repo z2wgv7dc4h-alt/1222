@@ -53,6 +53,7 @@ __all__ = [
     "tempo_stability",
     "classify_drum_onsets",
     "guitar_rhythm_pattern",
+    "transcribe_and_split_registers",
 ]
 
 # Krumhansl-Schmuckler key profiles: relative perceived stability of each
@@ -318,6 +319,78 @@ def guitar_rhythm_pattern(y: np.ndarray, sr: int) -> dict[str, Any]:
         pattern = "syncopated"
 
     return {"pattern": pattern, "n_onsets": int(len(onset_times)), "ratio_counts": counts}
+
+
+def transcribe_and_split_registers(
+    path: str | Path,
+    start_s: float = 0.0,
+    end_s: float | None = None,
+    rhythm_cutoff_midi: int = 52,
+) -> dict[str, Any]:
+    """Real polyphonic audio-to-note transcription (via Spotify's
+    `basic-pitch`, MIT-licensed), then split into a RHYTHM-register layer
+    (below `rhythm_cutoff_midi`) and a LEAD-register layer (at/above it) --
+    guitar chugging and a melodic/lead line read as two different register
+    clusters even when mixed in one stem (e.g. demucs' "no_drums" stem).
+
+    This is the deepest, least reliable analysis in this module -- distorted
+    metal guitar is genuinely hard for any pitch-detection model, so treat
+    individual note pitches as approximate, not ground truth. What IS a
+    real, cross-checkable signal: the rhythm layer's dominant pitch class
+    should roughly agree with `estimate_key`'s independent chroma-based
+    estimate (two different methods agreeing is real evidence, not proof)
+    -- and the two layers' density/note-length statistics (rhythm: fast,
+    short, narrow pitch-class cluster; lead: slower, longer, wider spread)
+    are a meaningful structural signal even when individual notes aren't
+    perfectly accurate.
+
+    Optional: requires `basic_pitch` + `pretty_midi` (NOT in
+    requirements.txt -- this package's own dependency pins are genuinely
+    fragile on newer Python, needed manual dependency resolution to install
+    cleanly with the ONNX backend rather than its pinned old TensorFlow
+    range; install ad hoc, same posture as `demucs`). Raises `ImportError`
+    with a clear message if unavailable, rather than a confusing traceback
+    from a missing transitive dependency.
+
+    Returns `{"rhythm": {"n_notes", "density_per_s", "avg_duration_s",
+    "pitch_class_counts"}, "lead": {same shape}}`.
+    """
+    try:
+        from basic_pitch import ICASSP_2022_MODEL_PATH
+        from basic_pitch.inference import predict
+    except ImportError as exc:
+        raise ImportError(
+            "transcribe_and_split_registers requires 'basic_pitch' (and its "
+            "own dependencies, notably 'pretty_midi'). Not a hard project "
+            "dependency -- install ad hoc: pip install basic-pitch pretty-midi "
+            "mir-eval resampy onnxruntime six importlib_resources "
+            "(the pinned tensorflow<2.15.1 range in basic-pitch's own "
+            "requirements has no wheel for newer Python -- basic_pitch "
+            "auto-detects and uses its ONNX model instead once tensorflow "
+            "is absent, which is the working path)."
+        ) from exc
+
+    _, _, note_events = predict(str(path))
+    window = [e for e in note_events if start_s <= e[0] and (end_s is None or e[0] <= end_s)]
+
+    def _summarize(notes: list) -> dict[str, Any]:
+        if not notes:
+            return {"n_notes": 0, "density_per_s": 0.0, "avg_duration_s": 0.0, "pitch_class_counts": {}}
+        span = max(1e-9, (end_s if end_s is not None else max(e[1] for e in notes)) - start_s)
+        pc_counts: dict[int, int] = {}
+        for e in notes:
+            pc = int(e[2]) % 12
+            pc_counts[pc] = pc_counts.get(pc, 0) + 1
+        return {
+            "n_notes": len(notes),
+            "density_per_s": round(len(notes) / span, 4),
+            "avg_duration_s": round(sum(e[1] - e[0] for e in notes) / len(notes), 4),
+            "pitch_class_counts": dict(sorted(pc_counts.items(), key=lambda kv: -kv[1])),
+        }
+
+    rhythm_notes = [e for e in window if int(e[2]) < rhythm_cutoff_midi]
+    lead_notes = [e for e in window if int(e[2]) >= rhythm_cutoff_midi]
+    return {"rhythm": _summarize(rhythm_notes), "lead": _summarize(lead_notes)}
 
 
 def analyze_track(path: str | Path, n_sections: int = 8) -> dict[str, Any]:

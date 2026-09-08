@@ -34,6 +34,14 @@ frequency) and `preset.octave_stab` are now wired through here too:
     (`section["octave_stabs"]`); when false, that list stays empty -- a
     section's use of the octave-stab device is now conditional on the
     preset actually declaring it, not applied (or not) unconditionally.
+  - X.6b: `chill`/`interlude` sections (the `lead_mode == "harmony"`
+    branch) now also get a real extended chord voicing via
+    `chord_vocab.quality_for_dissonance`/`voice_named_chord`
+    (`section["chord_quality"]`/`section["chord_voicing"]`) -- the named
+    jazz-influenced chord vocabulary (`maj7`/`min7`/`add9`/`sus2`/etc.)
+    god-tier-metal-scope.md calls for on ambient/clean sections, alongside
+    (not instead of) the existing `riff.harmonize_line` melodic doubling.
+    Every other role leaves both fields `None`.
 """
 from __future__ import annotations
 
@@ -41,6 +49,7 @@ import random
 
 from atmosphere import find_accents, pad_voicing
 from bass import build_bass_fretboard, follow_guitar_rhythm
+from chord_vocab import quality_for_dissonance, voice_named_chord
 from drums import RhythmRegistry, generate_vocabulary_informed_blast_fill, kick_pattern_for_style
 from fretboard import Fretboard
 from lead import generate_lead_line
@@ -217,6 +226,10 @@ def _generate_attempt(rng: random.Random, preset: Preset, num_sections: int) -> 
         # section, same as it would in an actual arrangement:
         lead_anchor = pad_root
         lead_mode: str
+        # Only chill/interlude sections ever populate these (X.6b); every
+        # other role leaves them None -- not applicable, never fabricated.
+        chord_quality: str | None = None
+        chord_voicing: list[tuple[int, int]] | None = None
         if role == "solo":
             # A genuine featured lead: denser (roughly 8th-note-rate across
             # the section rather than one note per rhythm hit), more active
@@ -270,6 +283,27 @@ def _generate_attempt(rng: random.Random, preset: Preset, num_sections: int) -> 
             lead_mode = "harmony"
             _lead_line, lead_notes = harmonize_line(m, scale, start_degree=arc_row["start_degree"])
             legato = None
+            # X.6b: these are exactly the ambient/clean sections
+            # god-tier-metal-scope.md names as needing a real extended
+            # chord vocabulary (Periphery-style maj7/add9/sus2/min9 pads,
+            # not just the power-chord/triad tuples used elsewhere in this
+            # file). `arc_row["dissonance"]` -- the SAME per-section value
+            # already threaded into this section's `generate_motif` call
+            # above -- picks a chord quality via `chord_vocab.
+            # quality_for_dissonance` (low dissonance -> open/consonant
+            # sus2/add9/maj7; high -> darker min7/min9; see that function's
+            # docstring for the exact bucketing), voiced at `pad_root` (the
+            # same real, already-computed section root the plain
+            # `atmosphere.pad_voicing` triad above uses). A genuinely
+            # unreachable chord on this preset's tuning/fretboard (e.g. an
+            # extended 5-note voicing that doesn't fit within max_span on a
+            # narrow-range tuning) fails closed to `None` -- never a
+            # fabricated/partial shape.
+            chord_quality = quality_for_dissonance(arc_row["dissonance"])
+            try:
+                chord_voicing = voice_named_chord(pad_root, chord_quality, guitar_fb, max_span=4)
+            except ValueError:
+                chord_voicing = None
         else:
             # Dense chug sections (intro/build/breakdown/outro): a busy
             # independent lead would just clash with the rhythm here --
@@ -297,6 +331,8 @@ def _generate_attempt(rng: random.Random, preset: Preset, num_sections: int) -> 
             "pad": pad,
             "accents": accents,
             "octave_stabs": octave_stabs,
+            "chord_quality": chord_quality,
+            "chord_voicing": chord_voicing,
         })
 
         guitar_track.extend(take_a)

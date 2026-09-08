@@ -1,0 +1,16 @@
+{
+  "id": "progressive",
+  "description": "Melodic technical djent -- Periphery-style. Adds real lydian color (bright, uplifting #4) over djent's own group-3/euclid-kick/pedal mechanisms rather than djent's deliberately un-melodic root/5th vocab. Calibrated against a real user-supplied reference track: its measured A-major key (Krumhansl-Schmuckler estimate, audio_vocab.py) motivated the A-rooted tuning, and its bright/articulate spectral-centroid reading motivated lydian over plain major. First preset to actually adopt X.6d's major-family scales (added but unused until now).",
+  "tuning_key": "drop_a_7",
+  "scale": "lydian",
+  "dissonance": 0.25,
+  "bpm": 152,
+  "bars": 4,
+  "feel": "bounce",
+  "open_chance": 0.55,
+  "octave_stab": true,
+  "kick": "euclid",
+  "group": 3,
+  "pedal": 0.45,
+  "vocab": {"weights": {"0": 8, "4": 5, "7": 5, "9": 3, "2": 3, "11": 2, "6": 2}, "motion": 0.45}
+}

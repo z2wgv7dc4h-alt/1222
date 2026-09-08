@@ -34,7 +34,12 @@ ALIASES = {
     "boo": "djent",
     "vom": "groovy",
     "atb": "melodic",
-    "periphery": "chill",
+    # Was "chill" (the closest available proxy when this alias table was
+    # ported) -- now points at "progressive", the real Periphery-styled
+    # preset (lydian, real user-supplied-reference-calibrated), a better
+    # match than an unrelated low-energy preset just because it shared the
+    # word "atmosphere" in its old description.
+    "periphery": "progressive",
 }
 
 

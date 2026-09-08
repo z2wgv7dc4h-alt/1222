@@ -39,7 +39,7 @@ EXPECTED_TUNINGS = {
     "standard_6": (["E", "A", "D", "G", "B", "E"], [40, 45, 50, 55, 59, 64]),
 }
 
-EXPECTED_PRESET_IDS = {"groovy", "djent", "chill", "tech", "melodic", "metalcore", "deathcore"}
+EXPECTED_PRESET_IDS = {"groovy", "djent", "chill", "tech", "melodic", "metalcore", "deathcore", "progressive"}
 
 
 # -- P1.6: tunings -----------------------------------------------------------
@@ -205,7 +205,10 @@ def test_load_preset_accepts_valid_full_preset(tmp_path):
 # -- preset id aliases: old band-linked ids resolve, never a second preset --
 
 def test_resolve_preset_id_maps_old_band_ids():
-    assert resolve_preset_id("periphery") == "chill"
+    # "periphery" now points at the real Periphery-styled preset
+    # ("progressive", added once X.6d's lydian scale had a real reason to
+    # be adopted) rather than "chill", its original stand-in proxy.
+    assert resolve_preset_id("periphery") == "progressive"
     assert resolve_preset_id("psycho") == "tech"
     assert resolve_preset_id("boo") == "djent"
 

@@ -1,8 +1,8 @@
 # CURRENT
 
-task: P8.1 (superseded -- real .rpp generation, not live reapy)
-phase: 8
+task: X.10
+phase: cross-cutting
 status: DONE
-last_pytest: 477 passed in 22.27s
-note: engine/reaper_project.py -- song_to_rpp(song, path) writes a complete, directly-openable Reaper .rpp project entirely offline. Investigated the scope doc's originally-chosen reapy/reapy-boost live bridge first: made real progress (fully headless one-time bridge activation via HTTP-triggering Reaper's own web control surface, found and fixed two real upstream bugs), but the connection stayed unreliable in this environment with no further diagnostic visibility available. Verified with the user that nothing Phase 8 needs actually requires a live connection (REAPER's real -renderproject CLI flag handles rendering); pivoted to static .rpp generation. Built against REAL ground truth: had REAPER itself import this project's own song_to_midi output and save as .rpp, then reverse-engineered every field from that real file (including base64-decoding the <X> track-name block to confirm it's the standard MIDI meta-event, not assumed). Reuses midi_export's real event-extraction functions. VERIFIED END TO END: generated project opened in the user's real installed Reaper, confirmed via screenshot -- 5 correctly-named tracks, real note content, correct tempo, no errors. 477 passed (up from 464).
+last_pytest: 482 passed in 13.03s
+note: New preset "progressive" -- a real Periphery-styled melodic technical djent, the first preset to actually adopt X.6d's major-family scales (lydian, added but unused until now). Uses djent's own real mechanisms (group=3 displacement, euclid kick, octave stabs) with lydian's bright color instead of djent's deliberately un-melodic root/5th vocab. Calibrated against the real user-supplied reference track (X.7): drop_a_7 tuning chosen because its open low string is pitch class A, matching the track's real measured A-major key; lydian chosen over plain major for the track's bright/articulate tone. Verified real generated output is genuinely scale-legal (every pitch class fell within A-lydian's exact interval set, zero exceptions). Also fixed the stale "periphery" alias (presets.ALIASES) that pointed at "chill" as a proxy since no real match existed -- now points at "progressive". Two tests updated to match (test_presets.py, test_song.py). 482 passed in 13.03s (up from 477).
 updated: 2026-09-08

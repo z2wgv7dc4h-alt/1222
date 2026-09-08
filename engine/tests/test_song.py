@@ -77,9 +77,10 @@ def test_compose_song_rejects_unknown_preset():
 
 
 def test_compose_song_resolves_stale_band_alias():
-    # "periphery" is a documented ALIASES entry resolving to "chill".
+    # "periphery" now resolves to "progressive", the real Periphery-styled
+    # preset, not "chill" (its original stand-in proxy before that preset existed).
     song = compose_song("periphery", seed=1, num_sections=2)
-    assert song["preset_id"] == "chill"
+    assert song["preset_id"] == "progressive"
 
 
 def test_pitches_per_cell_none_on_rests_and_real_pitch_on_hits():

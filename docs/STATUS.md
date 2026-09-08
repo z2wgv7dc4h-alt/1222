@@ -26,7 +26,7 @@ Update only after grep or pytest. No memory claims.
 | Legato/technical run generator (X.6a) | WIRED+TESTED | 382 passed in 10.24s |
 | Extended chord vocabulary, chill/interlude sections (X.6b) | WIRED+TESTED | 428 passed in 12.19s |
 | Metric modulation, real tempo_map (X.6c) | WIRED+TESTED | 428 passed in 12.19s |
-| Preset lineup: djent/tech/metalcore/deathcore/melodic/chill/groovy (no slam) | WIRED+TESTED | 333 passed (full suite) |
+| Preset lineup: djent/tech/metalcore/deathcore/melodic/chill/groovy/progressive (no slam) | WIRED+TESTED | 482 passed in 13.03s |
 | Real MIDI export, Reaper-importable (P10.1) | WIRED+TESTED | 443 passed in 11.19s |
 | preset.feel wiring, real ported breakdown duration-weighting (X.8) | WIRED+TESTED | 450 passed in 10.76s |
 | Snare backbeat, wired for every preset (X.9) | WIRED+TESTED | 464 passed in 10.96s |

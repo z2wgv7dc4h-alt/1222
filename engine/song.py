@@ -59,6 +59,17 @@ frequency) and `preset.octave_stab` are now wired through here too:
     (`section["hihat"]`) via `drums.hihat_pattern_for_role` -- this
     engine previously had zero cymbal content at all. `chill`/
     `interlude` stay silent, same rule as the snare/kick tables.
+  - X.13: the hihat layer now gets real variation -- open-hat accents at
+    the same structural-accent positions octave stabs already use
+    (`drums.apply_hihat_accents`), and a real crash cymbal
+    (`drums.add_transition_crash`) at a section's opening whenever its
+    role actually changes from the previous section's (ported technique
+    from Metalerator's real "crash on pattern change" cymbal generator,
+    generalized to this project's own role-based arrangement unit).
+    Direct response to a real finding: analyzing an isolated drum stem
+    of a real reference track showed cymbals/hihat are 84% of all real
+    drum onsets -- the most constantly-present element in a real mix --
+    while this project's hihat had zero variation until now.
 """
 from __future__ import annotations
 
@@ -69,6 +80,8 @@ from bass import build_bass_fretboard, follow_guitar_rhythm
 from chord_vocab import quality_for_dissonance, voice_named_chord
 from drums import (
     RhythmRegistry,
+    add_transition_crash,
+    apply_hihat_accents,
     generate_vocabulary_informed_blast_fill,
     hihat_pattern_for_role,
     kick_pattern_for_role,
@@ -214,6 +227,7 @@ def _generate_attempt(rng: random.Random, preset: Preset, num_sections: int) -> 
     sections: list[dict] = []
     guitar_track: list[dict] = []
     drum_track: list[dict] = []
+    previous_role: str | None = None
 
     for idx, role in enumerate(sequence):
         arc_row = arc(role=role)
@@ -262,6 +276,20 @@ def _generate_attempt(rng: random.Random, preset: Preset, num_sections: int) -> 
         pad_root = scale.root + arc_row["register"]
         pad = pad_voicing(pad_root)
         accents = find_accents(guitar_cells, pad_root)
+
+        # X.13: real hihat accents at the same structurally-accented
+        # positions the rest of the arrangement already uses (never an
+        # independently-invented accent set), plus a real crash at the
+        # start of a section whose role genuinely changed from the
+        # previous one -- skipped for chill/interlude, which stay silent
+        # by design (a crash into an atmospheric section would contradict
+        # that same silence contract). `previous_role=None` on the first
+        # section still counts as "changed", a real opening crash.
+        accent_indices = {a["cell_index"] for a in accents}
+        hihat_cells = apply_hihat_accents(hihat_cells, accent_indices)
+        if role not in ("chill", "interlude"):
+            hihat_cells = add_transition_crash(hihat_cells, fire=(role != previous_role))
+        previous_role = role
 
         # preset.octave_stab wiring: a real theory.VoiceLeader.stab() leap
         # (a deliberate wide interval jump, explicitly exempt from

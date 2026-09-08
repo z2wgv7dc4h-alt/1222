@@ -5,6 +5,8 @@ import pytest
 from drums import (
     FALLBACKS,
     ROLE_TO_NOTE,
+    add_transition_crash,
+    apply_hihat_accents,
     generate_blast_fill,
     generate_hihat_pattern,
     generate_snare_backbeat,
@@ -481,3 +483,57 @@ def test_hihat_pattern_for_role_matches_documented_table(role, expect_silent):
 def test_hihat_pattern_for_role_rejects_empty_cells():
     with pytest.raises(ValueError):
         hihat_pattern_for_role([], "breakdown")
+
+
+# ---------------------------------------------------------------------------
+# X.13: hihat accents + section-transition crashes.
+# ---------------------------------------------------------------------------
+
+
+def test_apply_hihat_accents_only_swaps_existing_closed_hits():
+    cells = _straight_quarter_cells(4)
+    hihat = generate_hihat_pattern(cells, "closed")
+    hit_indices = [i for i, c in enumerate(hihat) if not c["is_rest"]]
+    assert hit_indices, "need at least one real hihat hit to test accents on"
+    accent_at = hit_indices[0]
+
+    result = apply_hihat_accents(hihat, {accent_at})
+    for i, cell in enumerate(result):
+        if i == accent_at:
+            assert cell["role"] == "HIHAT_OPEN"
+            assert not cell["is_rest"]
+        else:
+            assert cell["role"] == hihat[i]["role"]
+            assert cell["is_rest"] == hihat[i]["is_rest"]
+
+
+def test_apply_hihat_accents_never_fabricates_a_hit_on_a_rest():
+    cells = _straight_quarter_cells(4)
+    hihat = generate_hihat_pattern(cells, "closed")
+    rest_indices = [i for i, c in enumerate(hihat) if c["is_rest"]]
+    if not rest_indices:
+        pytest.skip("this style has no rest cells to test against")
+    result = apply_hihat_accents(hihat, {rest_indices[0]})
+    assert result[rest_indices[0]]["is_rest"]
+    assert result[rest_indices[0]]["role"] is None
+
+
+def test_add_transition_crash_overrides_first_cell_when_firing():
+    cells = _straight_quarter_cells(2)
+    hihat = generate_hihat_pattern(cells, "closed")
+    result = add_transition_crash(hihat, fire=True)
+    assert result[0]["role"] == "CRASH_1"
+    assert not result[0]["is_rest"]
+    # every other cell is untouched
+    assert result[1:] == hihat[1:]
+
+
+def test_add_transition_crash_no_op_when_not_firing():
+    cells = _straight_quarter_cells(2)
+    hihat = generate_hihat_pattern(cells, "closed")
+    result = add_transition_crash(hihat, fire=False)
+    assert result == hihat
+
+
+def test_add_transition_crash_handles_empty_cells():
+    assert add_transition_crash([], fire=True) == []

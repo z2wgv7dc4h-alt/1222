@@ -389,7 +389,12 @@ def test_every_preset_gets_a_real_hihat_layer_wired_for_every_role():
                 assert not has_hits, f"{preset_id}/{section['role']} hihat must be silent"
             elif has_hits:
                 saw_hits = True
-                assert all(c["role"] in ("HIHAT_CLOSED", None) for c in hihat)
+                # X.13: real accent/crash variation means a section's
+                # hihat cells can carry HIHAT_OPEN (accents) or CRASH_1
+                # (transition crash) alongside HIHAT_CLOSED.
+                assert all(
+                    c["role"] in ("HIHAT_CLOSED", "HIHAT_OPEN", "CRASH_1", None) for c in hihat
+                )
         assert saw_hits, f"{preset_id}: expected at least one section with real hihat hits"
 
 
@@ -421,3 +426,16 @@ def test_build_and_solo_sections_get_a_real_varied_kick_overlay():
             else:
                 seen_styles.add("other")
     assert seen_styles, "expected at least one build/solo section across these seeds"
+
+
+def test_every_preset_gets_a_real_transition_crash_at_the_first_section():
+    """X.13: the very first section always has a role change from
+    previous_role=None, so every real composed song (that isn't
+    chill/interlude-first) must show a real crash at its own start."""
+    for preset_id in load_all_presets():
+        song = compose_song(preset_id, seed=4, num_sections=6)
+        first = song["sections"][0]
+        if first["role"] in ("chill", "interlude"):
+            continue
+        assert first["hihat"][0]["role"] == "CRASH_1"
+        assert not first["hihat"][0]["is_rest"]

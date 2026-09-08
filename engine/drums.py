@@ -633,6 +633,57 @@ def hihat_pattern_for_role(guitar_cells: list[dict], role: str) -> list[dict]:
     return generate_hihat_pattern(guitar_cells, style)
 
 
+# --- X.13: hihat accents + section-transition crashes -----------------------
+#
+# Real finding from analyzing an isolated drum stem of a real user-supplied
+# reference track (demucs-separated, classify_drum_onsets): cymbals/hihat
+# were 84% of ALL detected drum onsets (1079 of 1282) -- by far the most
+# constantly-present, audible element of a real mix, and the flat, single-
+# velocity "closed" pulse X.11 shipped had zero variation at all. Real
+# drumming varies that same hand: occasional OPEN accents on structurally
+# important beats, and a real crash at a section's own opening when the
+# arrangement actually changes -- ported from the same real technique
+# Metalerator's cymbal generator uses (`drums/breakdown/default_melodic.py`,
+# `should_add_opening_cymbals`: a crash fires when the kick/snare pattern
+# differs from the previous section's), generalized here to "the section's
+# own ROLE changed" since that's this project's real unit of arrangement
+# change (`song.py`'s section-role loop), not a raw kick/snare diff.
+
+
+def apply_hihat_accents(hihat_cells: list[dict], accent_indices: set[int]) -> list[dict]:
+    """Real open-hat accent overlay: at each index in `accent_indices` that
+    IS an existing hihat hit, swap its role from `HIHAT_CLOSED` to
+    `HIHAT_OPEN` -- never fabricates a NEW hit at a rest position, only
+    accentuates a hit that's already there. `accent_indices` is meant to
+    come from the same real structural-accent positions `atmosphere.
+    find_accents` already computes for octave stabs (`{a["cell_index"]
+    for a in accents}`), so hihat accents land on the same real
+    structurally-important beats the rest of the arrangement already
+    treats as accented, not an independently-invented set of positions.
+    """
+    out = []
+    for i, cell in enumerate(hihat_cells):
+        if i in accent_indices and not cell["is_rest"] and cell["role"] == "HIHAT_CLOSED":
+            out.append({**cell, "role": "HIHAT_OPEN"})
+        else:
+            out.append(cell)
+    return out
+
+
+def add_transition_crash(hihat_cells: list[dict], fire: bool) -> list[dict]:
+    """When `fire` is true, override the FIRST cell in `hihat_cells` to a
+    real `CRASH_1` hit -- regardless of whether that cell already held a
+    hit or a rest, since a section-opening crash accent is a genuine,
+    real arrangement event that should always land there when the caller
+    determines the section's role actually changed (see this section's
+    module-level docstring). `fire=False` returns `hihat_cells`
+    unchanged -- never a fabricated crash on an unchanged section."""
+    if not hihat_cells or not fire:
+        return hihat_cells
+    first = {**hihat_cells[0], "is_rest": False, "role": "CRASH_1"}
+    return [first] + hihat_cells[1:]
+
+
 # --- P4.3: fills/blasts via shared-sequence + blast-type rendering ----------
 
 

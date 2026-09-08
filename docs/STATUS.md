@@ -33,6 +33,7 @@ Update only after grep or pytest. No memory claims.
 | Real Reaper .rpp project generation (P8.1) | WIRED+TESTED | 477 passed in 22.27s; verified opening in the user's real installed Reaper (screenshot confirmed) |
 | Hihat/cymbal layer + varied kick overlay, wired for every preset (X.11) | WIRED+TESTED | 500 passed in 12.59s |
 | Tempo-map half-time reversion fix (X.12) | WIRED+TESTED | 499 passed in 13.18s |
+| Hihat variation: open-hat accents + transition crashes (X.13) | WIRED+TESTED | 504 passed, 1 skipped in 12.75s |
 | Reaper | MISSING | |
 | Editor | MISSING | |
 

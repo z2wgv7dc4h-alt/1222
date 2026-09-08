@@ -1,8 +1,8 @@
 # CURRENT
 
-task: X.12
+task: X.13
 phase: cross-cutting
 status: DONE
-last_pytest: 499 passed in 13.18s
-note: Real, critical bug fix: the tempo_map's metric-modulation half-time (X.6c) modulated once at the first build->breakdown transition and NEVER REVERTED, so any song revisiting the breakdown role (real for any longer song) got stuck at half tempo for the rest of the song. Found via direct listening feedback on a 16-section demo ("drums are too slow... its not really metal") -- confirmed by inspecting the real tempo_map (14 of 16 sections locked at 76 BPM instead of 152), which also explained "no solos" (they were real and present, just playing at half-speed since both solo sections landed inside the permanently-halved zone). Fixed song._compute_tempo_map to apply the real half-time modulation independently to every breakdown-role section and revert to full base_bpm for every other role, including immediately after a breakdown. Removed the now-obsolete _build_to_breakdown_index; rewrote the tempo-map tests to verify real per-section modulation AND real reversion. 499 passed (down 1 from 500 due to test consolidation, not reduced coverage). Regenerated and sent the corrected demo.
+last_pytest: 504 passed, 1 skipped in 12.75s
+note: Real hihat variation (open-hat accents + section-transition crashes), grounded in a real finding: ran demucs on a real user-supplied reference track, then classify_drum_onsets on the isolated drum stem -- cymbals/hihat were 84% of all detected drum onsets, by far the most constantly-present element in a real mix, while the engine's hihat (X.11) had zero variation. Added drums.apply_hihat_accents (real open-hat accents at the same structural-accent positions octave stabs already use) and drums.add_transition_crash (real crash at a section's opening when its role changes, ported from Metalerator's real "crash on pattern change" technique). Wired into song.py for every preset. 504 passed, 1 skipped (up from 499). Regenerated and sent the demo: 14 real crashes, 20 real open-hat accents, 311 closed hihat hits. Guitars ("too simple") flagged by the user as still open, not yet investigated.
 updated: 2026-09-08

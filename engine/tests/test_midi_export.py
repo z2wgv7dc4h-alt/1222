@@ -101,22 +101,33 @@ def test_drum_track_uses_real_gm_kick_snare_and_hihat_notes():
     expected_snare_hits = sum(
         1 for s in song["sections"] for c in s["snare"] if not c["is_rest"]
     )
+    # X.13: a section's "hihat" cells can carry HIHAT_CLOSED, HIHAT_OPEN
+    # (accent), or CRASH_1 (transition) -- count each role separately
+    # rather than lumping every non-rest cell under one GM note.
     expected_hihat_hits = sum(
-        1 for s in song["sections"] for c in s["hihat"] if not c["is_rest"]
+        1 for s in song["sections"] for c in s["hihat"] if c["role"] == "HIHAT_CLOSED"
+    )
+    expected_open_hits = sum(
+        1 for s in song["sections"] for c in s["hihat"] if c["role"] == "HIHAT_OPEN"
+    )
+    expected_crash_hits = sum(
+        1 for s in song["sections"] for c in s["hihat"] if c["role"] == "CRASH_1"
     )
 
     parsed = _read_back(out_path)
     drum_track = _track_by_name(parsed, "Drums")
     note_ons = [m for m in drum_track if m.type == "note_on"]
     assert note_ons, "djent's real euclid kick style must produce at least one hit"
-    # note_for_role("KICK") == 36, note_for_role("SNARE") == 38,
-    # note_for_role("HIHAT_CLOSED") == 42 (ROLE_TO_NOTE) -- all real GM
-    # values, never fabricated, and every note here must be one of the
-    # three (this track carries all three roles, X.9/X.11).
-    assert all(m.note in (36, 38, 42) for m in note_ons)
+    # note_for_role: KICK=36, SNARE=38, HIHAT_CLOSED=42, HIHAT_OPEN=48,
+    # CRASH_1=49 (ROLE_TO_NOTE) -- all real GM values, never fabricated
+    # (this track carries all these roles, X.9/X.11/X.13).
+    assert all(m.note in (36, 38, 42, 48, 49) for m in note_ons)
     assert all(m.channel == 9 for m in note_ons)
     assert sum(1 for m in note_ons if m.note == 36) == expected_kick_hits
     assert sum(1 for m in note_ons if m.note == 38) == expected_snare_hits
+    assert sum(1 for m in note_ons if m.note == 48) == expected_open_hits
+    assert sum(1 for m in note_ons if m.note == 49) == expected_crash_hits
+    assert expected_crash_hits > 0, "expected at least one real section-transition crash"
     assert sum(1 for m in note_ons if m.note == 42) == expected_hihat_hits
     assert expected_snare_hits > 0, "djent's breakdown/build/solo sections must produce real snare hits"
     assert expected_hihat_hits > 0, "djent's sections must produce real hihat hits"

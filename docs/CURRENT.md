@@ -1,8 +1,8 @@
 # CURRENT
 
-task: X.9
-phase: cross-cutting
+task: P8.1 (superseded -- real .rpp generation, not live reapy)
+phase: 8
 status: DONE
-last_pytest: 464 passed in 10.96s
-note: Real snare backbeat, wired for EVERY preset (not metalcore-specific) -- closes a real gap: this engine had kick + blast/fill patterns but zero snare/hihat layer. Ported from the same real reference source as X.8 (reference/metalerator/metalerator/drums/snare/snare.py): "step" (half-time, beat 3 of every bar -- checked the real source, not the generic "2 and 4"), "half_step" (once per 2 bars), "double_time" (every beat except the section's first). Built on the same real cell-timeline mechanism two_step's kick style already used, extracted into shared helpers (_cell_starts/_time_to_cell_index/_cyclic_hit_indices) with two_step refactored onto them -- no duplicated logic. Wired via a real per-role dispatch (drums.snare_pattern_for_role): breakdown/intro/outro get the half-time backbeat, build/solo get double_time, chill/interlude silent (matching lead_mode's existing judgment call for those roles). Wired into song.py (section["snare"]) and midi_export.py's Drums track (real GM 36/38 notes). 464 passed in 10.96s (up from 450).
+last_pytest: 477 passed in 22.27s
+note: engine/reaper_project.py -- song_to_rpp(song, path) writes a complete, directly-openable Reaper .rpp project entirely offline. Investigated the scope doc's originally-chosen reapy/reapy-boost live bridge first: made real progress (fully headless one-time bridge activation via HTTP-triggering Reaper's own web control surface, found and fixed two real upstream bugs), but the connection stayed unreliable in this environment with no further diagnostic visibility available. Verified with the user that nothing Phase 8 needs actually requires a live connection (REAPER's real -renderproject CLI flag handles rendering); pivoted to static .rpp generation. Built against REAL ground truth: had REAPER itself import this project's own song_to_midi output and save as .rpp, then reverse-engineered every field from that real file (including base64-decoding the <X> track-name block to confirm it's the standard MIDI meta-event, not assumed). Reuses midi_export's real event-extraction functions. VERIFIED END TO END: generated project opened in the user's real installed Reaper, confirmed via screenshot -- 5 correctly-named tracks, real note content, correct tempo, no errors. 477 passed (up from 464).
 updated: 2026-09-08

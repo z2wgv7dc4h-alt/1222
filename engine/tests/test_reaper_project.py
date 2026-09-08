@@ -1,0 +1,110 @@
+import base64
+import re
+
+import pytest
+
+from presets import load_all_presets
+from reaper_project import song_to_rpp
+from song import compose_song
+
+ALL_PRESET_IDS = sorted(load_all_presets().keys())
+
+_TRACK_NAMES = ["Guitar (Take A)", "Guitar (Take B)", "Bass", "Lead", "Drums"]
+
+
+def _write(song, tmp_path, name="song"):
+    out = tmp_path / f"{name}.rpp"
+    song_to_rpp(song, out)
+    return out.read_text(encoding="utf-8")
+
+
+@pytest.mark.parametrize("preset_id", ALL_PRESET_IDS)
+def test_song_to_rpp_writes_a_structurally_balanced_project_for_every_preset(preset_id, tmp_path):
+    song = compose_song(preset_id, seed=42, num_sections=4)
+    text = _write(song, tmp_path, preset_id)
+
+    assert text.startswith("<REAPER_PROJECT")
+    assert text.rstrip().endswith(">")
+    # Every '<' opens exactly one matching '>' -- a real, if coarse,
+    # structural-validity check (this project was itself verified by
+    # actually opening a generated file in a real installed REAPER 7.79
+    # and confirming it loads with no error dialog).
+    assert text.count("<") == text.count(">")
+
+    for name in _TRACK_NAMES:
+        assert f'NAME "{name}"' in text
+    assert text.count("<TRACK") == 5
+
+
+def test_rpp_track_name_x_block_decodes_to_the_real_midi_meta_event(tmp_path):
+    song = compose_song("djent", seed=1, num_sections=2)
+    text = _write(song, tmp_path)
+
+    # Every <X ...> block's base64 payload must decode to the real,
+    # standard MIDI sequence/track-name meta-event (0xFF 0x03 <name>) --
+    # verified against a real Reaper-generated ground-truth file, not
+    # assumed.
+    matches = re.findall(r'<X 0 0 0 0 3 "([^"]*)"\n\s+(\S+)\n', text)
+    assert matches, "expected at least one <X> track-name block"
+    for name, b64 in matches:
+        decoded = base64.b64decode(b64)
+        assert decoded == b"\xff\x03" + name.encode("ascii")
+
+
+def test_rpp_guitar_note_count_matches_real_song_data(tmp_path):
+    song = compose_song("djent", seed=5, num_sections=3)
+    text = _write(song, tmp_path)
+
+    expected_hits = sum(
+        1 for s in song["sections"] for c in s["guitar_take_a"] if not c["is_rest"]
+    )
+    # Guitar (Take A)'s SOURCE MIDI block: count real note-on 0x9_ events
+    # (channel 0 -> status byte 90) between its <SOURCE MIDI and the next
+    # track's opening, matching the real generated cell data exactly.
+    block_start = text.index("<SOURCE MIDI")
+    block_end = text.index("<SOURCE MIDI", block_start + 1)
+    block = text[block_start:block_end]
+    note_ons = re.findall(r"^\s*E \d+ 90 ", block, flags=re.MULTILINE)
+    assert len(note_ons) == expected_hits
+    assert expected_hits > 0
+
+
+def test_rpp_drum_events_use_real_gm_notes_on_channel_nine(tmp_path):
+    song = compose_song("djent", seed=5, num_sections=3)
+    text = _write(song, tmp_path)
+
+    drums_block_start = text.rindex("<SOURCE MIDI")  # Drums is the last track
+    block = text[drums_block_start:]
+    hits = re.findall(r"^\s*E \d+ 99 ([0-9a-f]{2}) ", block, flags=re.MULTILINE)
+    assert hits, "expected real drum hits on channel 9 (status 0x99)"
+    assert all(h in ("24", "26") for h in hits)  # 0x24=36=KICK, 0x26=38=SNARE
+
+
+def test_rpp_tempo_envelope_matches_real_tempo_map(tmp_path):
+    song = compose_song("djent", seed=11, num_sections=8)
+    text = _write(song, tmp_path)
+
+    tempo_block = text[text.index("<TEMPOENVEX"):text.index(">", text.index("<TEMPOENVEX"))]
+    pt_bpms = [float(m) for m in re.findall(r"^    PT [\d.]+ ([\d.]+)", tempo_block, flags=re.MULTILINE)]
+    expected = [round(bpm, 6) for bpm in song["tempo_map"]]
+    assert [round(b, 6) for b in pt_bpms] == expected
+    assert len(set(pt_bpms)) > 1, "expected a real tempo change for this seed -- try another if this fires"
+
+
+def test_song_to_rpp_rejects_mismatched_tempo_map_length(tmp_path):
+    song = compose_song("djent", seed=1, num_sections=2)
+    song["tempo_map"] = song["tempo_map"][:1]
+    with pytest.raises(ValueError):
+        song_to_rpp(song, tmp_path / "bad.rpp")
+
+
+def test_song_to_rpp_reproducible_structure_across_calls(tmp_path):
+    """Same song -> same note/timing content every time (GUIDs are the
+    only thing allowed to differ -- this project's own seeded-determinism
+    law applies to the composed song, not to Reaper's own random GUIDs)."""
+    song = compose_song("tech", seed=3, num_sections=3)
+    text_a = _write(song, tmp_path, "a")
+    text_b = _write(song, tmp_path, "b")
+
+    strip_guids = lambda t: re.sub(r"\{[0-9A-F-]+\}", "{GUID}", t)
+    assert strip_guids(text_a) == strip_guids(text_b)

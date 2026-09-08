@@ -102,14 +102,14 @@ Scope: `## 16. Atmospheric`.
 
 ## Phase 8 — Reaper
 Scope: `## 11. Audio rendering` + `### 14.1` (reapy-boost, Surge XT, Supermassive).
-- [ ] P8.1 reapy-boost
-- [ ] P8.2 Separate buses
-- [ ] P8.3 .RfxChain per track
+- [x] P8.1 (superseded) Real Reaper project generation -- `engine/reaper_project.py`: `song_to_rpp(song, path)` writes a complete, directly-openable `.rpp` project file entirely offline, no live Reaper connection at any point. Investigated the scope doc's originally-chosen `reapy`/`reapy-boost` live-bridge approach first: got real, substantial progress (installed reapy-boost, MIT-licensed; automated the ENTIRE one-time bridge setup headlessly via config-file editing + HTTP-triggering Reaper's own built-in web control surface, no GUI clicks needed; found and fixed two real upstream bugs -- a socket-timeout bug causing `WinError 10053` on the first `send()` after `accept()`, and the activation script's `if __name__ == "__main__":` guard never firing under Reaper's script-execution model) but the connection remained unreliable in this environment even after both fixes, with no way to get further diagnostic visibility. Verified directly with the user that nothing Phase 8 actually needs requires a live connection: real REAPER project assembly, FX chains, and tempo automation are all expressible as a static file, and REAPER has a real, documented headless render flag (`-renderproject file.rpp`, confirmed via ReaTeam/Doc's REAPER-CLI.md) for the render step. Pivoted to `.rpp` generation, built against REAL ground truth rather than a guessed format: had REAPER itself (v7.79, already installed) import this project's own `midi_export.song_to_midi` output and save as `.rpp`, then reverse-engineered every field from that real file -- including base64-decoding the `<X>` track-name block to confirm it's the exact standard MIDI `0xFF 0x03 <name>` meta-event, not assumed. Reuses `midi_export`'s real event-extraction functions (one source of truth for per-track note/timing data, two serializers on top). **Verified end-to-end for real**: generated a project, had the user's actual installed Reaper open it, confirmed via screenshot -- 5 correctly-named tracks, real visible note content in every track, correct tempo, no error dialog. `engine/tests/test_reaper_project.py`: structural bracket-balance check across every real preset, the `<X>` block's base64 decoded and checked against the real MIDI meta-event format, guitar/drum note counts cross-checked against actual generated song data, real tempo-envelope values checked against `tempo_map`, reproducibility (same song -> same content, GUIDs excluded), bad-input rejection. 477 passed.
+- [ ] P8.2 Separate buses (tracks already separate per-instrument; bus/send routing not yet added)
+- [ ] P8.3 .RfxChain per track -- needs a small hand-built library of real FX-chain presets (NAM captures + cab IR, dialed in once by the user in Reaper's own GUI, per the scope doc's own §11.5 design) to splice into the generated `.rpp`; the splice mechanism itself is straightforward once real `.RfxChain` files exist
 - [ ] P8.4 sfizz + role map
 - [ ] P8.5 Surge + Supermassive
 - [ ] P8.6 Orchestra
-- [ ] P8.7 Adaptive mix
-- [ ] P8.8 Constant tempo map
+- [ ] P8.7 Adaptive mix -- real per-section automation envelopes, bakeable into the `.rpp` directly (no live connection needed) once a concrete automation target is scoped
+- [ ] P8.8 Constant tempo map (already true: the generated `.rpp`'s `TEMPO`/`TEMPOENVEX` fields are the ONLY tempo data Reaper sees, per scope sec.17.5 -- nothing further needed here)
 
 ## Phase 9 — Editor
 Scope: `## 10. Application / Editor`.

@@ -24,8 +24,9 @@ Update only after grep or pytest. No memory claims.
 | Major-family scales (major/lydian/mixolydian/harmonic_major) | WIRED+TESTED | 335 passed in 10.42s |
 | Preset kick/group/pedal/octave_stab wiring (X.2) | WIRED+TESTED | 382 passed in 10.24s |
 | Legato/technical run generator (X.6a) | WIRED+TESTED | 382 passed in 10.24s |
+| Extended chord vocabulary, chill/interlude sections (X.6b) | WIRED+TESTED | 428 passed in 12.19s |
+| Metric modulation, real tempo_map (X.6c) | WIRED+TESTED | 428 passed in 12.19s |
 | Preset lineup: djent/tech/metalcore/deathcore/melodic/chill/groovy (no slam) | WIRED+TESTED | 333 passed (full suite) |
-| Preset fields kick/group/pedal/octave_stab | MISSING | validated (Phase 1) but no generation code branches on them yet |
 | Reaper | MISSING | |
 | Editor | MISSING | |
 

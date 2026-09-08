@@ -32,6 +32,7 @@ from bass import build_bass_fretboard, follow_guitar_rhythm
 from drums import RhythmRegistry, generate_vocabulary_informed_blast_fill, kick_follows_guitar
 from fretboard import Fretboard
 from lead import generate_lead_line
+from legato import generate_legato_lick
 from motif import Motif, ThemeRegistry, invert, render_motif
 from performance import double_track
 from presets import Preset, get_tuning, load_all_presets, load_tunings, resolve_preset_id
@@ -191,6 +192,35 @@ def _generate_attempt(rng: random.Random, preset: Preset, num_sections: int) -> 
                 num_notes=max(1, round(total_beats * 2)),
                 stab_chance=0.35,
             )
+            # X.6a: a real featured solo needs legato technique too, not
+            # just VoiceLeader's leap-and-settle phrasing -- splice one
+            # genuine contiguous legato run (engine/legato.py) onto the end
+            # of the featured line every solo section (a documented
+            # "always", not a probability roll, so the path is exercised
+            # deterministically by every seed/preset). Direction and
+            # length are drawn from the section's own `rng` so the whole
+            # song stays reproducible for a fixed seed. Length favors the
+            # genuine tuplet counts legato_run_rhythm knows how to frame
+            # (3/5/7); span is one beat, a fast burst rather than a slow
+            # phrase, per the brief's own framing of a legato run as
+            # "often a subdivision within a beat".
+            legato_length = rng.choice((3, 5, 6, 7))
+            legato_direction = rng.choice((1, -1))
+            legato_start = lead_notes[-1] if lead_notes else lead_anchor + 12
+            try:
+                legato = generate_legato_lick(
+                    scale, guitar_fb, legato_start, legato_length,
+                    span_beats=1.0, rng=rng, direction=legato_direction,
+                )
+            except ValueError:
+                # Genuinely unplayable on this preset's tuning/fretboard
+                # (e.g. the run would run off the top of the neck) --
+                # fail closed by skipping the splice rather than
+                # fabricating fret positions. The lead line itself is
+                # untouched either way.
+                legato = None
+            else:
+                lead_notes = list(lead_notes) + legato["pitches"]
         elif role in ("chill", "interlude"):
             # A melodic/atmospheric section: the second guitar harmonizes
             # the rhythm's own theme at a fixed interval (riff.
@@ -199,6 +229,7 @@ def _generate_attempt(rng: random.Random, preset: Preset, num_sections: int) -> 
             # as one arranged part, not two guitars doing unrelated things.
             lead_mode = "harmony"
             _lead_line, lead_notes = harmonize_line(m, scale, start_degree=arc_row["start_degree"])
+            legato = None
         else:
             # Dense chug sections (intro/build/breakdown/outro): a busy
             # independent lead would just clash with the rhythm here --
@@ -208,6 +239,7 @@ def _generate_attempt(rng: random.Random, preset: Preset, num_sections: int) -> 
             # fabricated part filling space it doesn't belong in.
             lead_mode = "silent"
             lead_notes = []
+            legato = None
 
         sections.append({
             "role": role,
@@ -218,6 +250,7 @@ def _generate_attempt(rng: random.Random, preset: Preset, num_sections: int) -> 
             "guitar_take_b": take_b,
             "lead_mode": lead_mode,
             "lead": lead_notes,
+            "legato": legato,
             "kick": kick_cells,
             "fill": fill,
             "bass": bass_cells,

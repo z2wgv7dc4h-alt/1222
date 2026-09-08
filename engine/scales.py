@@ -9,6 +9,17 @@ SCALES: dict[str, tuple[int, ...]] = {
     "whole_tone": (0, 2, 4, 6, 8, 10),
     "cluster": (0, 1, 3, 6, 7, 8, 11),
     "power": (0, 5, 7),
+    # Major-family modes (added for modal interchange -- see
+    # god-tier-metal-scope.md ## 2: "borrowing chords/notes from parallel
+    # major/minor... a big part of what makes Born of Osiris sound
+    # 'smarter' than straight minor-scale riffing." Confirmed as a real,
+    # not just theoretical, gap: analyzing a real reference track
+    # (engine/audio_vocab.py's estimate_key) came back A major, and no
+    # preset/scale in this project could represent that until now.
+    "major": (0, 2, 4, 5, 7, 9, 11),
+    "lydian": (0, 2, 4, 6, 7, 9, 11),
+    "mixolydian": (0, 2, 4, 5, 7, 9, 10),
+    "harmonic_major": (0, 2, 4, 5, 7, 8, 11),
 }
 
 # Aliases: same interval set as a canonical entry above, kept as a documented
@@ -16,6 +27,7 @@ SCALES: dict[str, tuple[int, ...]] = {
 # one interval set drifting apart over time).
 ALIASES: dict[str, str] = {
     "aeolian": "minor",
+    "ionian": "major",
 }
 
 

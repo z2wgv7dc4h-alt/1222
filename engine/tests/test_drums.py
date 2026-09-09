@@ -15,6 +15,7 @@ from drums import (
     kick_pattern_for_role,
     kick_pattern_for_style,
     note_for_role,
+    resolve_kick_style,
     snare_pattern_for_role,
 )
 from presets import load_all_presets
@@ -451,6 +452,27 @@ def test_kick_pattern_for_role_requires_rng_for_overlay_roles():
     cells = _straight_quarter_cells(2)
     with pytest.raises(ValueError):
         kick_pattern_for_role(cells, "build", "bounce", rng=None)
+
+
+def test_resolve_kick_style_matches_kick_pattern_for_roles_own_real_choice():
+    """X.24: resolve_kick_style is the exact real resolution logic
+    kick_pattern_for_role now delegates to internally -- given the SAME
+    rng state, generating cells from the resolved style directly must
+    produce byte-identical output to calling kick_pattern_for_role."""
+    cells = _straight_quarter_cells(2)
+    for role in ("intro", "breakdown", "chill", "interlude", "build", "solo"):
+        style = resolve_kick_style(role, "bounce", rng=random.Random(3))
+        via_role = kick_pattern_for_role(cells, role, "bounce", rng=random.Random(3))
+        if style is None:
+            assert role in ("chill", "interlude")
+            assert all(c["is_rest"] for c in via_role)
+        else:
+            assert kick_pattern_for_style(cells, style) == via_role
+
+
+def test_resolve_kick_style_requires_rng_for_overlay_roles():
+    with pytest.raises(ValueError):
+        resolve_kick_style("solo", "bounce", rng=None)
 
 
 def test_hihat_closed_hits_every_eighth_note():

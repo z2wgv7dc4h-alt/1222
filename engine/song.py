@@ -52,8 +52,13 @@ frequency) and `preset.octave_stab` are now wired through here too:
     makes for those two atmospheric roles.
   - X.11: `build`/`solo` sections now get a real, varied kick overlay
     (`double_kick` or `blast`, picked per section via the real seeded
-    `rng`) via `drums.kick_pattern_for_role`, regardless of what the
-    preset otherwise declares -- direct answer to real listening
+    `rng`) via `drums.resolve_kick_style`/`kick_pattern_for_style`
+    (X.24 split `drums.kick_pattern_for_role`'s real style-resolution
+    logic out into `resolve_kick_style` so the chosen style could be
+    stored and reused for the post-blend kick re-lock -- same real
+    behavior, still delegates to `kick_pattern_for_style` for the cells),
+    regardless of what the preset otherwise declares -- direct answer to
+    real listening
     feedback that generated drums felt too generic/repetitive in
     high-energy sections. Every section also gets a real steady hihat
     (`section["hihat"]`) via `drums.hihat_pattern_for_role` -- this
@@ -84,7 +89,8 @@ from drums import (
     apply_hihat_accents,
     generate_vocabulary_informed_blast_fill,
     hihat_pattern_for_role,
-    kick_pattern_for_role,
+    kick_pattern_for_style,
+    resolve_kick_style,
     snare_pattern_for_role,
 )
 from fretboard import Fretboard
@@ -243,6 +249,69 @@ def pitches_per_cell(motif: Motif, scale: Scale, start_degree: int = 0) -> list[
     return out
 
 
+# X.24 -- real cross-section blending on the main rhythm guitar. Real,
+# ported machinery already exists for this (structure.pickup/bridge/
+# flatten, P6.2 -- "overwrite the last couple of cells of the outgoing
+# section with information from the incoming section's first cells") but
+# was confirmed via grep to be called nowhere, ever: every section
+# transition in every generated song has been a raw, unblended
+# concatenation this whole session.
+#
+# `structure.pickup` isn't reused directly: it returns cells carrying ONLY
+# `duration`/`is_rest` (the real reference source's simpler data model
+# never needed more), but this project's cells carry extra real keys --
+# `role` for drums, `velocity`/`timing_offset` for humanized guitar takes.
+# A naive port would silently STRIP those at every blended boundary,
+# producing a real hit with no role/velocity data (a missing-role KeyError
+# for drums, a silently-orphaned pitch for guitar). `_pickup_cells`/
+# `_pickup_values` below encode the exact same real rule ("last n cells of
+# prev copy first n of next") but copy the FULL source cell/value, never a
+# stripped-down one.
+#
+# Deliberately guitar-only for this pass: bass/kick/snare/hihat all
+# "follow" the guitar's rhythm in various ways (`bass.follow_guitar_rhythm`,
+# `bounce`/`two_step` kick locking) and would desync from a blended guitar
+# unless also regenerated -- real, compounding complexity across 6 parallel
+# per-section cell arrays, scoped out and documented rather than rushed.
+# `structure.bridge()`'s inserted-transition-cell device is also
+# deliberately deferred: inserting new cells changes a section's total
+# beat count, which would desync every other instrument's own beat count
+# too -- a real, coordinated multi-instrument redesign, not a quick add.
+_BLEND_N = 2
+
+
+def _pickup_cells(prev_cells: list[dict], next_cells: list[dict], n: int = _BLEND_N) -> list[dict]:
+    """Key-preserving real reimplementation of `structure.pickup`'s rule:
+    the last `n` cells of `prev_cells` become full copies of `next_cells`'
+    first `n` cells (every key, not just duration/is_rest) -- so a newly
+    created hit always carries real role/velocity/timing_offset data, never
+    an orphaned one. `n` is capped to whatever both lists actually have,
+    matching the source's own bounds-safety; empty inputs return `prev_cells`
+    unchanged (nothing to pick up from/into), matching `structure.pickup`'s
+    own early-return contract."""
+    if not prev_cells or not next_cells:
+        return [dict(c) for c in prev_cells]
+    out = [dict(c) for c in prev_cells]
+    k = min(n, len(out), len(next_cells))
+    for j in range(k):
+        out[len(out) - k + j] = dict(next_cells[j])
+    return out
+
+
+def _pickup_values(prev_values: list, next_values: list, n: int = _BLEND_N) -> list:
+    """Same real rule as `_pickup_cells`, for a plain parallel value list
+    (`pitches_per_cell`, not cell dicts) -- kept in lock-step with
+    `_pickup_cells` so a guitar take's blended hit positions and its
+    blended pitches stay mutually consistent."""
+    if not prev_values or not next_values:
+        return list(prev_values)
+    out = list(prev_values)
+    k = min(n, len(out), len(next_values))
+    for j in range(k):
+        out[len(out) - k + j] = next_values[j]
+    return out
+
+
 def _snap_to_playable_octave(fretboard: Fretboard, pitch: int) -> int:
     """Shift `pitch` by whole octaves (up or down, whichever is closer)
     until it lands on a real, reachable `(string, fret)` on `fretboard`.
@@ -339,6 +408,7 @@ def _generate_attempt(rng: random.Random, preset: Preset, num_sections: int) -> 
     sections: list[dict] = []
     guitar_track: list[dict] = []
     drum_track: list[dict] = []
+    kick_styles: list[str | None] = []
     previous_role: str | None = None
 
     for idx, role in enumerate(sequence):
@@ -382,7 +452,18 @@ def _generate_attempt(rng: random.Random, preset: Preset, num_sections: int) -> 
             open_chance=preset.open_chance,
         )
 
-        kick_cells = kick_pattern_for_role(guitar_cells, role, preset.kick, rng=rng)
+        # X.24 -- resolve the STYLE explicitly (rather than calling
+        # drums.kick_pattern_for_role directly) so it can be stored and
+        # reused later to re-lock kick to the blended guitar rhythm after
+        # the post-loop blending pass, without re-rolling a second random
+        # choice for build/solo roles' real overlay (same rng draw, same
+        # order, as calling kick_pattern_for_role would have made).
+        kick_style = resolve_kick_style(role, preset.kick, rng=rng)
+        if kick_style is None:
+            kick_cells = [{"duration": c["duration"], "is_rest": True, "role": None} for c in guitar_cells]
+        else:
+            kick_cells = kick_pattern_for_style(guitar_cells, kick_style, rng=rng)
+        kick_styles.append(kick_style)
         snare_cells = snare_pattern_for_role(guitar_cells, role)
         hihat_cells = hihat_pattern_for_role(guitar_cells, role)
 
@@ -575,12 +656,61 @@ def _generate_attempt(rng: random.Random, preset: Preset, num_sections: int) -> 
             "_tempo_drop_trigger_beat": tempo_drop_trigger_beat,
         })
 
-        guitar_track.extend(take_a)
-        drum_track.extend(kick_cells)
-
     tempo_map = _compute_tempo_map(sequence, preset.bpm)
     for section, bpm in zip(sections, tempo_map):
         section["tempo_drop"] = _resolve_tempo_drop(bpm, section.pop("_tempo_drop_trigger_beat"))
+
+    # X.24 -- real cross-section blending on the main rhythm guitar, applied
+    # once every section is fully generated (see _pickup_cells/_pickup_
+    # values' own docstrings for the real design). Pure/deterministic --
+    # consumes no rng, so this never affects reproducibility for anything
+    # computed above. Real, found-during-testing exclusion: chill/interlude
+    # (lead_mode == "harmony") tie section["lead"] to the guitar's own
+    # PRE-blend hit count (riff.harmonize_line renders one lead note per
+    # guitar hit, computed before double-tracking/blending) -- blending
+    # those sections' guitar hit pattern would desync that pairing and
+    # crash midi_export's real per-hit harmony zip. Excluded here, matching
+    # the same real role-exclusion pattern used everywhere else this
+    # session (kick/snare/hihat/chord-thickening all already exempt these
+    # two atmospheric roles for their own real reasons).
+    for i in range(len(sections) - 1):
+        this_section, next_section = sections[i], sections[i + 1]
+        if this_section["role"] in ("chill", "interlude"):
+            # Only THIS section's own cells get modified below (next_section
+            # is read-only, used purely as a blend source) -- so only
+            # THIS section's role matters for the real harmony-mode
+            # exclusion described above.
+            continue
+        this_section["guitar_take_a"] = _pickup_cells(this_section["guitar_take_a"], next_section["guitar_take_a"])
+        this_section["guitar_take_b"] = _pickup_cells(this_section["guitar_take_b"], next_section["guitar_take_b"])
+        this_section["pitches_per_cell"] = _pickup_values(
+            this_section["pitches_per_cell"], next_section["pitches_per_cell"]
+        )
+
+        # Real, "do it properly" extension: bass and (the guitar-locking
+        # kick styles) both derive from the guitar's own rhythm/pitches --
+        # left unregenerated, they'd silently desync from the now-blended
+        # guitar at exactly the boundary cells that just changed. Both
+        # regenerations are pure/deterministic (`follow_guitar_rhythm` has
+        # no rng at all; `kick_pattern_for_style`'s own docstring confirms
+        # every real style is deterministic given guitar_cells -- `rng` is
+        # accepted only for interface symmetry), so this re-lock is exact,
+        # not approximated, and consumes no additional rng draws --
+        # `kick_styles[i]` reuses the SAME style already chosen for this
+        # section, never a fresh random re-roll. Styles that don't actually
+        # look at guitar's specific hit/rest positions (`two_step`, `blast`,
+        # `double_kick`, `burst`) regenerate to byte-identical output, so
+        # this is safe to apply uniformly rather than branching per style.
+        this_section["bass"] = follow_guitar_rhythm(
+            this_section["guitar_take_a"], this_section["pitches_per_cell"], bass_fb
+        )
+        kick_style = kick_styles[i]
+        if kick_style is not None:
+            this_section["kick"] = kick_pattern_for_style(this_section["guitar_take_a"], kick_style)
+
+    for section in sections:
+        guitar_track.extend(section["guitar_take_a"])
+        drum_track.extend(section["kick"])
 
     comp = {"guitar": guitar_track, "drums": drum_track}
     return {

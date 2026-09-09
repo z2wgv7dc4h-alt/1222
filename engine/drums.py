@@ -446,16 +446,35 @@ def kick_pattern_for_role(
     Raises `ValueError` if `role` has real overlay choices but `rng` is
     `None` -- a real per-section choice needs a real seeded source, never
     a silent default to "always the first option"."""
-    if role in ("chill", "interlude"):
+    style = resolve_kick_style(role, preset_kick, rng=rng)
+    if style is None:
         return [{"duration": c["duration"], "is_rest": True, "role": None} for c in guitar_cells]
+    return kick_pattern_for_style(guitar_cells, style, rng=rng)
+
+
+def resolve_kick_style(role: str, preset_kick: str, rng: random.Random | None = None) -> str | None:
+    """X.24 -- the real style name `kick_pattern_for_role` would use for
+    `role`, WITHOUT generating the cells: `None` for `chill`/`interlude`
+    (silent), `preset_kick` for every role except `build`/`solo` (which
+    pick between the real overlay choices via `rng` -- see
+    `_ROLE_KICK_OVERRIDE_CHOICES`). Extracted from `kick_pattern_for_role`
+    (which now delegates to this) so a caller that needs to know WHICH
+    style was chosen -- not just its resulting cells -- can reuse the exact
+    same real resolution logic instead of duplicating it (e.g. `song.py`'s
+    post-blend kick re-lock needs to regenerate cells from a blended guitar
+    rhythm using the SAME style already chosen for that section, without
+    re-rolling a fresh random choice).
+
+    Raises `ValueError` if `role` has real overlay choices but `rng` is
+    `None`, same as `kick_pattern_for_role`."""
+    if role in ("chill", "interlude"):
+        return None
     choices = _ROLE_KICK_OVERRIDE_CHOICES.get(role)
     if choices is None:
-        style = preset_kick
-    else:
-        if rng is None:
-            raise ValueError(f"role {role!r} has real overlay choices and requires an rng")
-        style = rng.choice(choices)
-    return kick_pattern_for_style(guitar_cells, style, rng=rng)
+        return preset_kick
+    if rng is None:
+        raise ValueError(f"role {role!r} has real overlay choices and requires an rng")
+    return rng.choice(choices)
 
 
 # --- X.9: real snare backbeat, wired for every preset -----------------------

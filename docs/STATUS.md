@@ -44,6 +44,7 @@ Update only after grep or pytest. No memory claims.
 | Real open-string-vs-muted velocity articulation (X.21) | WIRED+TESTED | 533 passed, 1 skipped in 12.58s |
 | Fixed kick never going silent for chill/interlude (X.22) | WIRED+TESTED | 535 passed, 1 skipped in 11.44s |
 | Real power chords on the main rhythm guitar (X.23) | WIRED+TESTED | 539 passed, 1 skipped in 11.62s |
+| Real cross-section blending -- guitar, bass, guitar-locking kick (X.24) | WIRED+TESTED | 550 passed, 1 skipped in 12.05s |
 | Reaper | MISSING | |
 | Editor | MISSING | |
 

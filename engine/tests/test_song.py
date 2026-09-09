@@ -9,6 +9,8 @@ from song import (
     _compute_tempo_map,
     _develop_theme,
     _generate_attempt,
+    _pickup_cells,
+    _pickup_values,
     _resolve_hit_chance,
     compose_song,
     pitches_per_cell,
@@ -172,7 +174,14 @@ def test_kick_style_field_changes_real_song_kick_output():
 
     differed = False
     for euclid_sec, bounce_sec in zip(euclid_song["sections"], bounce_song["sections"]):
-        guitar_hits = [i for i, c in enumerate(euclid_sec["motif"].cell) if not c["is_rest"]]
+        # X.24: kick now re-locks to the real BLENDED guitar (post cross-
+        # section blending), not the unblended base motif -- use bounce_sec's
+        # own real guitar_take_a as the reference (euclid_song and
+        # bounce_song share the same seed and the same deterministic
+        # blending pass, so their real blended guitar_take_a is identical;
+        # asserted directly below rather than assumed).
+        assert bounce_sec["guitar_take_a"] == euclid_sec["guitar_take_a"]
+        guitar_hits = [i for i, c in enumerate(bounce_sec["guitar_take_a"]) if not c["is_rest"]]
         bounce_kick_hits = [i for i, c in enumerate(bounce_sec["kick"]) if not c["is_rest"]]
         euclid_kick_hits = [i for i, c in enumerate(euclid_sec["kick"]) if not c["is_rest"]]
         # "bounce" still locks exactly to the guitar for every role EXCEPT
@@ -778,3 +787,160 @@ def test_breakdown_role_is_real_denser_than_chill_role_across_seeds():
         f"expected breakdown's real ARC energy (1.00) to produce denser output "
         f"than chill's (0.20), got breakdown={avg_breakdown:.3f} chill={avg_chill:.3f}"
     )
+
+
+# --- X.24: real cross-section blending (guitar-only) --------------------------
+
+
+def test_pickup_cells_copies_full_next_cells_not_just_duration_is_rest():
+    """X.24: unlike structure.pickup (duration/is_rest only), the real
+    replaced cells must be FULL copies of next_cells' corresponding cell --
+    every key preserved (role/velocity/timing_offset), never stripped."""
+    prev = [
+        {"duration": 0.5, "is_rest": False, "velocity": 90, "timing_offset": 0.01},
+        {"duration": 0.5, "is_rest": True, "velocity": 0, "timing_offset": 0.0},
+        {"duration": 0.5, "is_rest": False, "velocity": 95, "timing_offset": -0.02},
+    ]
+    next_ = [
+        {"duration": 0.25, "is_rest": False, "velocity": 120, "timing_offset": 0.03},
+        {"duration": 0.25, "is_rest": False, "velocity": 88, "timing_offset": -0.01},
+    ]
+    out = _pickup_cells(prev, next_, n=2)
+    assert out[0] == prev[0]  # untouched
+    assert out[1] == next_[0]  # full real copy, not just duration/is_rest
+    assert out[2] == next_[1]
+    assert len(out) == len(prev)  # cell count preserved -- no insertion
+
+
+def test_pickup_cells_empty_inputs_return_prev_unchanged():
+    prev = [{"duration": 0.5, "is_rest": False}]
+    assert _pickup_cells(prev, [], n=2) == prev
+    assert _pickup_cells([], [{"duration": 0.5, "is_rest": False}], n=2) == []
+
+
+def test_pickup_values_matches_the_same_real_rule():
+    prev = [1, None, 3, 4]
+    next_ = [10, 11]
+    out = _pickup_values(prev, next_, n=2)
+    assert out == [1, None, 10, 11]
+
+
+def test_real_composed_song_shows_the_real_blend_signature_at_every_boundary():
+    """X.24 end-to-end: a real composed song's section i's last 2 guitar
+    cells (and pitches) must exactly equal section i+1's first 2 -- the
+    real, directly-checkable blend signature -- for every boundary except
+    ones touching chill/interlude (excluded for a real, documented reason:
+    harmony-mode's lead pairing depends on the pre-blend guitar hit count)."""
+    metalcore = load_all_presets()["metalcore"]
+    song = _generate_attempt(random.Random(6), metalcore, num_sections=6)
+    sections = song["sections"]
+    checked_any = False
+    for i in range(len(sections) - 1):
+        if sections[i]["role"] in ("chill", "interlude"):
+            continue
+        checked_any = True
+        this_tail = sections[i]["guitar_take_a"][-2:]
+        next_head = sections[i + 1]["guitar_take_a"][:2]
+        assert this_tail == next_head
+        this_pitch_tail = sections[i]["pitches_per_cell"][-2:]
+        next_pitch_head = sections[i + 1]["pitches_per_cell"][:2]
+        assert this_pitch_tail == next_pitch_head
+    assert checked_any, "expected at least one real non-chill/interlude boundary in this seed"
+
+
+def test_chill_and_interlude_are_excluded_from_real_blending():
+    """The real, found-during-testing exclusion: a chill/interlude
+    section's own guitar_take_a must be untouched by blending (its
+    lead-harmony pairing depends on the pre-blend hit count)."""
+    found = False
+    for seed in range(20):
+        song = _generate_attempt(random.Random(seed), load_all_presets()["metalcore"], num_sections=8)
+        sections = song["sections"]
+        for i, section in enumerate(sections):
+            if section["role"] not in ("chill", "interlude"):
+                continue
+            found = True
+            # A harmony-mode section's real lead must still zip exactly
+            # against its own guitar hit count -- if blending had touched
+            # it, this real invariant (checked independently of blending)
+            # would be violated.
+            hits = sum(1 for c in section["guitar_take_a"] if not c["is_rest"])
+            assert hits == len(section["lead"]), (
+                "expected an untouched chill/interlude section's real hit count "
+                "to still exactly match its real harmonized lead length"
+            )
+    assert found, "expected at least one chill/interlude section across these seeds"
+
+
+def test_snare_and_hihat_are_unchanged_by_x24_blending():
+    """Real, documented scope boundary: X.24 blends only the main rhythm
+    guitar (`guitar_take_a`/`take_b`/`pitches_per_cell`). Snare/hihat must
+    still exactly match what their own real generation functions would
+    produce from the section's base motif cell, confirming this pass
+    didn't touch them (both are computed from `motif.cell`, not
+    `guitar_take_a`, so they're unaffected by design -- checked directly
+    rather than assumed)."""
+    from drums import hihat_pattern_for_role, snare_pattern_for_role
+
+    metalcore = load_all_presets()["metalcore"]
+    song = _generate_attempt(random.Random(6), metalcore, num_sections=6)
+    for section in song["sections"]:
+        guitar_cells = section["motif"].cell
+        expected_snare = snare_pattern_for_role(guitar_cells, section["role"])
+        assert section["snare"] == expected_snare
+        expected_hihat_pre_accent = hihat_pattern_for_role(guitar_cells, section["role"])
+        # hihat gets real accent/crash overlays (X.13) on top of the base
+        # pattern, so only compare real hit POSITIONS, not exact roles.
+        assert [c["is_rest"] for c in section["hihat"]] == [c["is_rest"] for c in expected_hihat_pre_accent]
+
+
+def test_bass_is_re_locked_to_the_real_blended_guitar():
+    """X.24 (done properly, not the guitar-only shortcut): bass must
+    re-lock to the BLENDED guitar rhythm/pitches at every real boundary,
+    not the stale pre-blend motif -- confirmed by regenerating bass
+    independently from each section's own real (already-blended)
+    guitar_take_a/pitches_per_cell via the same real follow_guitar_rhythm
+    the generator itself uses, and requiring an exact match."""
+    from bass import follow_guitar_rhythm
+
+    metalcore = load_all_presets()["metalcore"]
+    song = _generate_attempt(random.Random(6), metalcore, num_sections=6)
+    bass_fb = song["bass_fretboard"]
+    for section in song["sections"]:
+        expected_bass = follow_guitar_rhythm(section["guitar_take_a"], section["pitches_per_cell"], bass_fb)
+        assert section["bass"] == expected_bass
+
+
+def test_guitar_locked_kick_style_is_re_locked_after_blending():
+    """X.24: a real guitar-locking kick style (`bounce`) must match the
+    BLENDED guitar's real hit positions at every boundary, not the
+    unblended base motif's -- the real, direct proof the post-blend
+    kick re-lock actually fires, for a preset with no group_beats tiling
+    (so every section is eligible for blending)."""
+    groovy = dataclasses.replace(load_all_presets()["groovy"], kick="bounce")
+    assert groovy.group is None
+    song = _generate_attempt(random.Random(6), groovy, num_sections=6)
+    for section in song["sections"]:
+        if section["role"] in ("chill", "interlude", "build", "solo"):
+            continue
+        guitar_hits = [i for i, c in enumerate(section["guitar_take_a"]) if not c["is_rest"]]
+        kick_hits = [i for i, c in enumerate(section["kick"]) if not c["is_rest"]]
+        assert kick_hits == guitar_hits
+
+
+def test_kick_styles_independent_of_guitar_shape_are_unaffected_by_blending():
+    """Real regression safety: styles that don't look at guitar's specific
+    hit/rest positions (two_step/blast) must produce byte-identical output
+    whether or not X.24's re-lock touches them -- confirmed by comparing
+    against a fresh, independent call to kick_pattern_for_style on the
+    same (already-blended) guitar cells."""
+    from drums import kick_pattern_for_style
+
+    for style in ("two_step", "blast"):
+        metalcore = dataclasses.replace(load_all_presets()["metalcore"], kick=style)
+        song = _generate_attempt(random.Random(6), metalcore, num_sections=6)
+        for section in song["sections"]:
+            if section["role"] in ("chill", "interlude", "build", "solo"):
+                continue
+            expected = kick_pattern_for_style(section["guitar_take_a"], style)
+            assert section["kick"] == expected

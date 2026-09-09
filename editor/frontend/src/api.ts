@@ -1,4 +1,4 @@
-import type { PresetSummary, RegenEdit, SongSummary, TabCell } from './types'
+import type { EditFields, PresetSummary, RegenEdit, SongSummary, TabCell } from './types'
 
 const BASE_URL = 'http://localhost:8000'
 
@@ -74,4 +74,25 @@ export function fetchSectionTab(params: ComposeParams & { section_position: numb
     method: 'POST',
     body: JSON.stringify(params),
   })
+}
+
+// P9.7 -- real, local-only named section presets: a saved preset IS a
+// complete, reproducible EditFields (mode/role/hit_chance_bias/
+// regen_seed) under a user-given name (see editor/backend/app/
+// section_presets.py).
+export function fetchSectionPresets(): Promise<Record<string, EditFields>> {
+  return requestJson('/api/section-presets')
+}
+
+export function saveSectionPreset(name: string, edit: EditFields): Promise<void> {
+  return requestJson('/api/section-presets', {
+    method: 'POST',
+    body: JSON.stringify({ name, edit }),
+  }).then(() => undefined)
+}
+
+export function deleteSectionPreset(name: string): Promise<void> {
+  return requestJson(`/api/section-presets/${encodeURIComponent(name)}`, {
+    method: 'DELETE',
+  }).then(() => undefined)
 }

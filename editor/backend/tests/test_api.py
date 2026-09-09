@@ -1,8 +1,17 @@
+import pytest
 from fastapi.testclient import TestClient
 
+from app import section_presets
 from app.main import app
 
 client = TestClient(app)
+
+
+@pytest.fixture(autouse=True)
+def _isolated_section_presets(tmp_path, monkeypatch):
+    """Real file-backed persistence, pointed at a throwaway path so these
+    API tests never touch (or depend on) the real local data file."""
+    monkeypatch.setattr(section_presets, "_DATA_PATH", tmp_path / "section_presets.json")
 
 
 def test_list_presets_returns_real_presets():
@@ -91,3 +100,23 @@ def test_section_tab_rejects_out_of_range_position():
         "preset_id": "metalcore", "seed": 1, "num_sections": 4, "section_position": 99,
     })
     assert r.status_code == 400
+
+
+def test_section_presets_round_trip_through_the_real_api():
+    assert client.get("/api/section-presets").json() == {}
+
+    edit = {"mode": "full", "role": "breakdown", "hit_chance_bias": 0.2, "regen_seed": 42}
+    save = client.post("/api/section-presets", json={"name": "heavy breakdown", "edit": edit})
+    assert save.status_code == 200
+
+    listed = client.get("/api/section-presets").json()
+    assert listed["heavy breakdown"] == edit
+
+    delete = client.delete("/api/section-presets/heavy breakdown")
+    assert delete.status_code == 200
+    assert client.get("/api/section-presets").json() == {}
+
+
+def test_section_presets_delete_rejects_unknown_name():
+    r = client.delete("/api/section-presets/does-not-exist")
+    assert r.status_code == 404

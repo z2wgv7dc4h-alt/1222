@@ -45,14 +45,20 @@ export interface SongSummary {
   judge: JudgeResult
 }
 
-// P9.3/P9.4: a real, reproducible description of a single-section
-// regeneration -- mirrors editor/backend/app/main.py's RegenEdit exactly.
-export interface RegenEdit {
+// P9.3/P9.4/P9.7: a real, reproducible description of a single-section
+// regeneration -- mirrors editor/backend/app/main.py's EditFields exactly
+// (no position of its own -- a saved P9.7 preset is exactly this under a
+// user-given name).
+export interface EditFields {
   mode: 'full' | 'pitch' | 'rhythm'
   role: string | null
   hit_chance_bias: number
   regen_seed: number
 }
+
+// Mirrors main.py's RegenEdit: EditFields plus the real position it
+// applies to within a specific arrangement.
+export type RegenEdit = EditFields
 
 // A timeline "block" is a client-side arrangement entry: it points back at
 // one real section from the last composed SongSummary by index, plus a

@@ -1,9 +1,11 @@
-import type { SectionSummary } from '../types'
+import type { EditFields, SectionSummary } from '../types'
 import { roleColor } from '../roleColors'
+import { SectionPresetPanel } from './SectionPresetPanel'
 
 interface SectionDetailPanelProps {
   section: SectionSummary | null
   hasEdit: boolean
+  currentEdit: EditFields | null
   onFullReroll: () => void
   onNewNotes: () => void
   onNewHits: () => void
@@ -11,6 +13,7 @@ interface SectionDetailPanelProps {
   onTooBusy: () => void
   onTooThin: () => void
   onClearEdit: () => void
+  onApplyEdit: (edit: EditFields) => void
 }
 
 function Stat({ label, value }: { label: string; value: string | number }) {
@@ -39,6 +42,7 @@ const CONVERTIBLE_ROLES = ["breakdown", "build", "verse", "chorus", "solo", "chi
 export function SectionDetailPanel({
   section,
   hasEdit,
+  currentEdit,
   onFullReroll,
   onNewNotes,
   onNewHits,
@@ -46,6 +50,7 @@ export function SectionDetailPanel({
   onTooBusy,
   onTooThin,
   onClearEdit,
+  onApplyEdit,
 }: SectionDetailPanelProps) {
   if (!section) {
     return (
@@ -122,6 +127,8 @@ export function SectionDetailPanel({
           ))}
         </div>
       </div>
+
+      <SectionPresetPanel currentEdit={hasEdit ? currentEdit : null} onApplyEdit={onApplyEdit} />
     </div>
   )
 }

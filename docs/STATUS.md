@@ -62,5 +62,7 @@ Update only after grep or pytest. No memory claims.
 | Editor -- P9.5 Preview vs Render (`POST /api/export-rpp`, real `.rpp` download) | WIRED+TESTED | editor/backend/ 19 passed; verified live in browser |
 | Editor -- P9.2 Pro + Guided modes (`blend_presets` reused for a real blend slider, `blast_fill_chance` override, both modes same live params per CLAUDE.md's law) | WIRED+TESTED | engine/ 613 passed, 1 skipped; editor/backend/ 21 passed; verified live in browser |
 | Editor -- P9.6 VexFlow tab notation (real `(string, fret)` per cell via `Fretboard.pitch_to_fret`, `POST /api/section-tab`, `TabView.tsx`) | WIRED+TESTED | engine/ 613 passed, 1 skipped; editor/backend/ 25 passed; verified live in browser |
+| Editor -- P9.7 section-level save/load presets (real local JSON persistence, `EditFields`/`RegenEdit` split, `SectionPresetPanel.tsx`) | WIRED+TESTED | engine/ 613 passed, 1 skipped; editor/backend/ 34 passed; verified live in browser (byte-identical reproduction on load) |
+| Phase 9 editor (P9.1-P9.7) | COMPLETE | all seven sub-parts DONE, "All of them" authorization fully discharged |
 
 Next: TASKS.md ## Next

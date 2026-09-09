@@ -17,3 +17,4 @@ assets/
 reference/
 *.nam
 *.zip
+editor/backend/data/

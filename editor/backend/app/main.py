@@ -36,6 +36,7 @@ from song import compose_song, compose_song_from_preset
 
 from app.arrange import apply_order
 from app.edits import apply_edits
+from app.section_presets import delete_section_preset, list_section_presets, save_section_preset
 from app.serialize import summarize_preset, summarize_song, summarize_tab
 
 app = FastAPI(title="God Tier Metal Editor API")
@@ -50,12 +51,20 @@ app.add_middleware(
 )
 
 
-class RegenEdit(BaseModel):
-    section_position: int
+class EditFields(BaseModel):
+    """The real, reproducible part of a regen edit -- mode/role/density
+    bias/regen seed -- with no position of its own. P9.7's saved section
+    presets are exactly this (a name for a real, complete EditFields),
+    since a preset's real position is wherever the user later applies it,
+    not fixed at save time."""
     mode: str = "full"
     role: str | None = None
     hit_chance_bias: float = 0.0
     regen_seed: int = 0
+
+
+class RegenEdit(EditFields):
+    section_position: int
 
 
 class ComposeRequest(BaseModel):
@@ -82,6 +91,11 @@ class ExportRequest(ComposeRequest):
 
 class TabRequest(ComposeRequest):
     section_position: int
+
+
+class SaveSectionPresetRequest(BaseModel):
+    name: str
+    edit: EditFields
 
 
 def _resolve_preset(preset_id: str, presets: dict):
@@ -174,3 +188,29 @@ def export_rpp(req: ExportRequest):
     arrangement, a different, DAW-importable real output format."""
     rearranged, _preset = _compose(req)
     return _write_and_stream(rearranged, song_to_rpp, "arrangement.rpp", "application/octet-stream")
+
+
+@app.get("/api/section-presets")
+def get_section_presets():
+    """P9.7 -- real, local-only saved section presets (see
+    app/section_presets.py). Every entry is a complete, reproducible
+    RegenEdit under a user-given name."""
+    return list_section_presets()
+
+
+@app.post("/api/section-presets")
+def post_section_preset(req: SaveSectionPresetRequest):
+    try:
+        save_section_preset(req.name, req.edit.model_dump())
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"ok": True}
+
+
+@app.delete("/api/section-presets/{name}")
+def remove_section_preset(name: str):
+    try:
+        delete_section_preset(name)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return {"ok": True}

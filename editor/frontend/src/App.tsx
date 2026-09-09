@@ -6,7 +6,7 @@ import { SectionDetailPanel } from './components/SectionDetailPanel'
 import { TabView } from './components/TabView'
 import { Timeline } from './components/Timeline'
 import { TopBar } from './components/TopBar'
-import type { PresetSummary, SongSummary, TimelineBlock } from './types'
+import type { EditFields, PresetSummary, SongSummary, TimelineBlock } from './types'
 
 function newBlock(sourceIndex: number): TimelineBlock {
   return { blockId: crypto.randomUUID(), sourceIndex, muted: false, soloed: false, edit: null }
@@ -187,6 +187,13 @@ export default function App() {
     updateBlock(blockId, { edit: null })
   }
 
+  // P9.7 -- loading a saved section preset just sets it as the block's
+  // real edit, same as any other regen action -- a preset IS a complete,
+  // reproducible EditFields, so applying one needs no special-casing.
+  function handleApplyEdit(blockId: string, edit: EditFields) {
+    updateBlock(blockId, { edit })
+  }
+
   // P9.5 -- real Render (distinct from Preview): downloads the actual
   // .rpp Reaper project for the CURRENT real arrangement (same order +
   // edits the MIDI preview and detail panel already reflect).
@@ -304,6 +311,7 @@ export default function App() {
             <SectionDetailPanel
               section={selectedSection}
               hasEdit={!!selectedBlock?.edit}
+              currentEdit={selectedBlock?.edit ?? null}
               onFullReroll={() => selectedBlockId && handleRegen(selectedBlockId, 'full')}
               onNewNotes={() => selectedBlockId && handleRegen(selectedBlockId, 'pitch')}
               onNewHits={() => selectedBlockId && handleRegen(selectedBlockId, 'rhythm')}
@@ -311,6 +319,7 @@ export default function App() {
               onTooBusy={() => selectedBlockId && handleDensityNudge(selectedBlockId, -0.15)}
               onTooThin={() => selectedBlockId && handleDensityNudge(selectedBlockId, 0.15)}
               onClearEdit={() => selectedBlockId && handleClearEdit(selectedBlockId)}
+              onApplyEdit={(edit) => selectedBlockId && handleApplyEdit(selectedBlockId, edit)}
             />
           </div>
           <div className="min-w-0 flex-1">

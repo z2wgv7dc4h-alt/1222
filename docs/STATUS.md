@@ -43,6 +43,7 @@ Update only after grep or pytest. No memory claims.
 | Fixed severe density bug: open_chance was misapplied as hit_chance (X.20) | WIRED+TESTED | 528 passed, 1 skipped in 16.45s |
 | Real open-string-vs-muted velocity articulation (X.21) | WIRED+TESTED | 533 passed, 1 skipped in 12.58s |
 | Fixed kick never going silent for chill/interlude (X.22) | WIRED+TESTED | 535 passed, 1 skipped in 11.44s |
+| Real power chords on the main rhythm guitar (X.23) | WIRED+TESTED | 539 passed, 1 skipped in 11.62s |
 | Reaper | MISSING | |
 | Editor | MISSING | |
 

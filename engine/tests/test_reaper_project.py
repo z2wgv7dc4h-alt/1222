@@ -3,6 +3,7 @@ import re
 
 import pytest
 
+from midi_export import _CHORD_THICKENED_ROLES, _guitar_chord_tone_pitches
 from presets import load_all_presets
 from reaper_project import song_to_rpp
 from song import compose_song
@@ -52,12 +53,19 @@ def test_rpp_track_name_x_block_decodes_to_the_real_midi_meta_event(tmp_path):
 
 
 def test_rpp_guitar_note_count_matches_real_song_data(tmp_path):
+    """X.23: chord-thickened roles emit multiple real note-on events per
+    hit (one per chord tone) -- expected count must account for that."""
     song = compose_song("djent", seed=5, num_sections=3)
     text = _write(song, tmp_path)
+    guitar_fb = song["guitar_fretboard"]
 
-    expected_hits = sum(
-        1 for s in song["sections"] for c in s["guitar_take_a"] if not c["is_rest"]
-    )
+    expected_note_events = 0
+    for s in song["sections"]:
+        thickened = s["role"] in _CHORD_THICKENED_ROLES
+        for c, p in zip(s["guitar_take_a"], s["pitches_per_cell"]):
+            if c["is_rest"] or p is None:
+                continue
+            expected_note_events += len(_guitar_chord_tone_pitches(guitar_fb, p)) if thickened else 1
     # Guitar (Take A)'s SOURCE MIDI block: count real note-on 0x9_ events
     # (channel 0 -> status byte 90) between its <SOURCE MIDI and the next
     # track's opening, matching the real generated cell data exactly.
@@ -65,8 +73,8 @@ def test_rpp_guitar_note_count_matches_real_song_data(tmp_path):
     block_end = text.index("<SOURCE MIDI", block_start + 1)
     block = text[block_start:block_end]
     note_ons = re.findall(r"^\s*E \d+ 90 ", block, flags=re.MULTILINE)
-    assert len(note_ons) == expected_hits
-    assert expected_hits > 0
+    assert len(note_ons) == expected_note_events
+    assert expected_note_events > 0
 
 
 def test_rpp_drum_events_use_real_gm_notes_on_channel_nine(tmp_path):

@@ -1,11 +1,30 @@
 import mido
 import pytest
 
-from midi_export import song_to_midi
+from fretboard import Fretboard
+from midi_export import _CHORD_THICKENED_ROLES, _guitar_chord_tone_pitches, song_to_midi
 from presets import load_all_presets
 from song import compose_song
 
 ALL_PRESET_IDS = sorted(load_all_presets().keys())
+
+
+def test_guitar_chord_tone_pitches_returns_real_root_and_fifth():
+    fb = Fretboard([40, 45, 50, 55, 59, 64])  # standard 6-string
+    tones = _guitar_chord_tone_pitches(fb, 40)
+    assert 40 in tones  # the real root itself must be one of the tones
+    assert len(tones) >= 2, "expected a real power chord (root + 5th), not just the root alone"
+    for tone in tones:
+        assert fb.midi_to_frets(tone), f"expected every real chord tone to be reachable on the fretboard, got {tone}"
+
+
+def test_guitar_chord_tone_pitches_falls_back_to_root_when_unreachable():
+    """Fail-closed: a genuinely unreachable interval (e.g. a pitch far
+    beyond the fretboard's max_fret for the 5th) must fall back to the
+    bare root alone -- never fabricate a fingering, never raise."""
+    fb = Fretboard([40], max_fret=1)  # one string, almost no room
+    tones = _guitar_chord_tone_pitches(fb, 41)
+    assert tones == [41]
 
 
 def _read_back(path):
@@ -26,32 +45,78 @@ def test_song_to_midi_writes_a_real_parseable_file_for_every_preset(preset_id, t
 
 
 def test_guitar_track_note_count_matches_real_guitar_hit_count():
+    """X.23: a chord-thickened role's real hit now emits MULTIPLE note_ons
+    (one per real chord tone from `_guitar_chord_tone_pitches`), not one --
+    expected count must account for that real thickening, not assume 1:1."""
     song = compose_song("djent", seed=5, num_sections=3)
     out_path = _write_tmp(song, "djent_hits")
+    guitar_fb = song["guitar_fretboard"]
 
-    expected_hits = sum(
-        1 for section in song["sections"] for c in section["guitar_take_a"] if not c["is_rest"]
-    )
+    expected_note_events = 0
+    for section in song["sections"]:
+        thickened = section["role"] in _CHORD_THICKENED_ROLES
+        for c, p in zip(section["guitar_take_a"], section["pitches_per_cell"]):
+            if c["is_rest"] or p is None:
+                continue
+            expected_note_events += len(_guitar_chord_tone_pitches(guitar_fb, p)) if thickened else 1
 
     parsed = _read_back(out_path)
     guitar_a_track = _track_by_name(parsed, "Guitar (Take A)")
     note_ons = [m for m in guitar_a_track if m.type == "note_on"]
-    assert len(note_ons) == expected_hits
-    assert expected_hits > 0
+    assert len(note_ons) == expected_note_events
+    assert expected_note_events > 0
 
 
 def test_guitar_pitches_match_the_real_pitches_per_cell_data():
+    """X.23: chord-thickened roles emit real chord TONES (root + 5th via
+    `_guitar_chord_tone_pitches`), not just the bare root -- expected
+    pitches must include those real extra tones for eligible roles."""
     song = compose_song("djent", seed=5, num_sections=3)
     out_path = _write_tmp(song, "djent_pitches")
+    guitar_fb = song["guitar_fretboard"]
 
-    expected_pitches = sorted(
-        p for section in song["sections"] for p in section["pitches_per_cell"] if p is not None
-    )
+    expected_pitches = []
+    for section in song["sections"]:
+        thickened = section["role"] in _CHORD_THICKENED_ROLES
+        for p in section["pitches_per_cell"]:
+            if p is None:
+                continue
+            expected_pitches.extend(_guitar_chord_tone_pitches(guitar_fb, p) if thickened else [p])
+    expected_pitches.sort()
 
     parsed = _read_back(out_path)
     guitar_a_track = _track_by_name(parsed, "Guitar (Take A)")
     actual_pitches = sorted(m.note for m in guitar_a_track if m.type == "note_on")
     assert actual_pitches == expected_pitches
+
+
+def test_chord_thickened_role_has_real_simultaneous_chord_tones():
+    """X.23's real, direct proof: a chord-thickened section's exported
+    guitar track must have at least one real hit where multiple note_ons
+    share the exact same tick -- an actual chord, not just a note-count
+    change that could coincidentally match from unrelated causes."""
+    song = compose_song("djent", seed=5, num_sections=3)
+    assert any(s["role"] in _CHORD_THICKENED_ROLES for s in song["sections"])
+    out_path = _write_tmp(song, "djent_chord_proof")
+
+    parsed = _read_back(out_path)
+    guitar_a_track = _track_by_name(parsed, "Guitar (Take A)")
+    tick = 0
+    on_ticks: dict[int, int] = {}
+    for m in guitar_a_track:
+        tick += m.time
+        if m.type == "note_on":
+            on_ticks[tick] = on_ticks.get(tick, 0) + 1
+    assert any(count > 1 for count in on_ticks.values()), "expected at least one real simultaneous chord"
+
+
+def test_chill_and_interlude_are_excluded_from_chord_thickening():
+    """X.23: chill/interlude explicitly stay single-note -- their real,
+    already-established melodic/harmony character (X.6b/P3.12) shouldn't
+    get chugged into power chords, matching the same real exclusion
+    kick/snare/hihat already use (X.9/X.11/X.22)."""
+    assert "chill" not in _CHORD_THICKENED_ROLES
+    assert "interlude" not in _CHORD_THICKENED_ROLES
 
 
 def test_bass_pitches_match_the_real_bass_fretboard_data():

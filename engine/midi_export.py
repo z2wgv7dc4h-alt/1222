@@ -53,9 +53,27 @@ except ImportError as exc:  # pragma: no cover - exercised only when mido is mis
         "engine/requirements.txt -- install with `pip install mido`."
     ) from exc
 
+from chords import solve_chord
 from drums import note_for_role
+from fretboard import Fretboard
 
 __all__ = ["song_to_midi"]
+
+# X.23 -- real power chords on the main rhythm guitar. Confirmed via a
+# whole-engine grep (same method that found X.19/X.20/X.21's gaps):
+# `song.pitches_per_cell` returns exactly one pitch per hit, and every
+# consumer (bass, this module, reaper_project.py) has been strictly
+# monophonic all session -- the main riff has never played a real chord.
+# Real, already-tested chord machinery already exists (`chords.solve_chord`,
+# P1.11; `riff.voice_chord_section`, P3.11) but was only ever wired into
+# chill/interlude's ambient `chord_quality` (X.6b), never the main chugging
+# riff. `chord_vocab.py`'s own module docstring names this exact gap.
+# `(0, 7)` is the minimal real power chord (root + 5th) -- not the fuller
+# `(0, 7, 12)` triad, to avoid pushing a chord's upper tone into a
+# thinner-sounding higher register on an already-low root; a real, easy
+# follow-up if more fullness is wanted later.
+_POWER_CHORD_INTERVALS = (0, 7)
+_POWER_CHORD_MAX_SPAN = 4
 
 # General MIDI program numbers (0-indexed, per mido/MIDI convention).
 _GUITAR_PROGRAM = 30   # Distortion Guitar
@@ -110,6 +128,64 @@ def _cell_events(
             events.append((max(0, on_tick), max(on_tick + 1, off_tick), pitch, velocity))
         t += duration
     return events
+
+
+def _guitar_chord_tone_pitches(
+    fretboard: Fretboard,
+    root: int,
+    intervals: tuple[int, ...] = _POWER_CHORD_INTERVALS,
+    max_span: int = _POWER_CHORD_MAX_SPAN,
+) -> list[int]:
+    """Real power-chord tones for one already-chosen root pitch: calls
+    `chords.solve_chord` (ground-up fretboard fingering solver, no lookup
+    tables) and picks the lowest-position fingering -- the same real
+    tie-break `riff.voice_chord_section` uses. Falls back to `[root]` alone
+    (never fabricates a shape, never raises) if no real `(string, fret)`
+    fingering is reachable for this root at `max_span` -- rare, but a
+    single note beats a crashed export."""
+    fingerings = solve_chord(root, intervals, fretboard, max_span=max_span)
+    if not fingerings:
+        return [root]
+    best = min(fingerings, key=lambda fingering: sum(fret for _string, fret in fingering))
+    return [fretboard.fret_to_midi(string, fret) for string, fret in best]
+
+
+def _chord_cell_events(
+    cells: list[dict],
+    pitches: list[int | None],
+    start_beat: float,
+    ppq: int,
+    fretboard: Fretboard,
+) -> list[tuple[int, int, int, int]]:
+    """Real power-chord version of `_cell_events`: identical on/off-tick
+    and velocity logic, but each real hit emits one event PER CHORD TONE
+    (`_guitar_chord_tone_pitches`) instead of a single note -- the main
+    rhythm guitar's real per-hit pitch movement (vocab-weighted intervals,
+    pedal bias) is untouched, only how each already-chosen root gets
+    voiced when written out."""
+    if len(cells) != len(pitches):
+        raise ValueError("cells and pitches must be the same length")
+    events: list[tuple[int, int, int, int]] = []
+    t = start_beat
+    for cell, pitch in zip(cells, pitches):
+        duration = cell["duration"]
+        if not cell["is_rest"] and pitch is not None:
+            offset = cell.get("timing_offset", 0.0)
+            velocity = cell.get("velocity") or _DEFAULT_VELOCITY
+            on_tick = max(0, _beats_to_ticks(t + offset, ppq))
+            off_tick = max(on_tick + 1, _beats_to_ticks(t + offset + duration, ppq))
+            for tone in _guitar_chord_tone_pitches(fretboard, pitch):
+                events.append((on_tick, off_tick, tone, velocity))
+        t += duration
+    return events
+
+
+# X.23 -- roles whose main riff gets real power-chord thickening. Excludes
+# chill/interlude, matching the established real precedent (kick/snare/
+# hihat all already go quiet/sparse for those two atmospheric roles,
+# X.9/X.11/X.22) -- their already-real melodic/harmony character
+# (`riff.harmonize_line`) should stay single-note, not get chugged up.
+_CHORD_THICKENED_ROLES = frozenset({"intro", "breakdown", "build", "outro", "solo"})
 
 
 def _lead_events_for_section(section: dict, start_beat: float, ppq: int) -> list[tuple[int, int, int, int]]:
@@ -248,14 +324,23 @@ def song_to_midi(song: dict, path: str | Path, ppq: int = 480) -> None:
     drum_events: list[tuple[int, int, int, int]] = []
     lead_events: list[tuple[int, int, int, int]] = []
 
+    guitar_fb = song["guitar_fretboard"]
     start_beat = 0.0
     for section in song["sections"]:
-        guitar_a_events += _cell_events(
-            section["guitar_take_a"], section["pitches_per_cell"], start_beat, ppq
-        )
-        guitar_b_events += _cell_events(
-            section["guitar_take_b"], section["pitches_per_cell"], start_beat, ppq
-        )
+        if section["role"] in _CHORD_THICKENED_ROLES:
+            guitar_a_events += _chord_cell_events(
+                section["guitar_take_a"], section["pitches_per_cell"], start_beat, ppq, guitar_fb
+            )
+            guitar_b_events += _chord_cell_events(
+                section["guitar_take_b"], section["pitches_per_cell"], start_beat, ppq, guitar_fb
+            )
+        else:
+            guitar_a_events += _cell_events(
+                section["guitar_take_a"], section["pitches_per_cell"], start_beat, ppq
+            )
+            guitar_b_events += _cell_events(
+                section["guitar_take_b"], section["pitches_per_cell"], start_beat, ppq
+            )
         bass_events += _cell_events(
             section["bass"], [c["midi"] for c in section["bass"]], start_beat, ppq
         )

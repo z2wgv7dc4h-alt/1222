@@ -39,6 +39,7 @@ from pathlib import Path
 from midi_export import (
     _BASS_CHANNEL,
     _BASS_PROGRAM,
+    _CHORD_THICKENED_ROLES,
     _DRUM_CHANNEL,
     _GUITAR_A_CHANNEL,
     _GUITAR_B_CHANNEL,
@@ -47,6 +48,7 @@ from midi_export import (
     _LEAD_PROGRAM,
     _beats_to_ticks,
     _cell_events,
+    _chord_cell_events,
     _lead_events_for_section,
     _section_beats,
 )
@@ -235,6 +237,7 @@ def song_to_rpp(song: dict, path: str | Path) -> None:
     section_start_beats: list[float] = []
     section_start_seconds: list[float] = []
     tempo_points: list[tuple[float, float]] = []
+    guitar_fb = song["guitar_fretboard"]
     start_beat = 0.0
     start_seconds = 0.0
     for section, bpm in zip(song["sections"], song["tempo_map"]):
@@ -242,12 +245,20 @@ def song_to_rpp(song: dict, path: str | Path) -> None:
         section_start_seconds.append(start_seconds)
         tempo_points.append((start_seconds, bpm))
 
-        guitar_a_events += _cell_events(
-            section["guitar_take_a"], section["pitches_per_cell"], start_beat, _PPQ
-        )
-        guitar_b_events += _cell_events(
-            section["guitar_take_b"], section["pitches_per_cell"], start_beat, _PPQ
-        )
+        if section["role"] in _CHORD_THICKENED_ROLES:
+            guitar_a_events += _chord_cell_events(
+                section["guitar_take_a"], section["pitches_per_cell"], start_beat, _PPQ, guitar_fb
+            )
+            guitar_b_events += _chord_cell_events(
+                section["guitar_take_b"], section["pitches_per_cell"], start_beat, _PPQ, guitar_fb
+            )
+        else:
+            guitar_a_events += _cell_events(
+                section["guitar_take_a"], section["pitches_per_cell"], start_beat, _PPQ
+            )
+            guitar_b_events += _cell_events(
+                section["guitar_take_b"], section["pitches_per_cell"], start_beat, _PPQ
+            )
         bass_events += _cell_events(
             section["bass"], [c["midi"] for c in section["bass"]], start_beat, _PPQ
         )

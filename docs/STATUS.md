@@ -61,5 +61,6 @@ Update only after grep or pytest. No memory claims.
 | Editor -- P9.4 accept/reroll/undo (snapshot-stack undo, capped at 20) | WIRED+TESTED | verified live in browser |
 | Editor -- P9.5 Preview vs Render (`POST /api/export-rpp`, real `.rpp` download) | WIRED+TESTED | editor/backend/ 19 passed; verified live in browser |
 | Editor -- P9.2 Pro + Guided modes (`blend_presets` reused for a real blend slider, `blast_fill_chance` override, both modes same live params per CLAUDE.md's law) | WIRED+TESTED | engine/ 613 passed, 1 skipped; editor/backend/ 21 passed; verified live in browser |
+| Editor -- P9.6 VexFlow tab notation (real `(string, fret)` per cell via `Fretboard.pitch_to_fret`, `POST /api/section-tab`, `TabView.tsx`) | WIRED+TESTED | engine/ 613 passed, 1 skipped; editor/backend/ 25 passed; verified live in browser |
 
 Next: TASKS.md ## Next

@@ -1,7 +1,8 @@
 import json
 
-from app.serialize import summarize_preset, summarize_song
-from presets import load_all_presets
+from app.serialize import summarize_preset, summarize_song, summarize_tab
+from fretboard import Fretboard
+from presets import get_tuning, load_all_presets, load_tunings
 from song import compose_song
 
 
@@ -40,3 +41,43 @@ def test_summarize_song_includes_real_judge_result():
     song = compose_song("metalcore", seed=1, num_sections=4)
     summary = summarize_song(song, preset)
     assert summary["judge"] == song["judge"]
+
+
+def _guitar_fb(preset):
+    tunings = load_tunings()
+    tuning = get_tuning(preset.tuning_key, tunings)
+    return Fretboard(tuning.open)
+
+
+def test_summarize_tab_is_json_safe_and_cell_aligned():
+    presets = load_all_presets()
+    preset = presets["metalcore"]
+    song = compose_song("metalcore", seed=1, num_sections=4)
+    section = song["sections"][0]
+    guitar_fb = _guitar_fb(preset)
+
+    tab = summarize_tab(section, guitar_fb)
+    json.dumps(tab)
+    assert len(tab) == len(section["guitar_take_a"])
+    for cell, entry in zip(section["guitar_take_a"], tab):
+        assert entry["is_rest"] == cell["is_rest"]
+        assert entry["duration"] == cell["duration"]
+
+
+def test_summarize_tab_produces_real_playable_positions():
+    presets = load_all_presets()
+    preset = presets["metalcore"]
+    song = compose_song("metalcore", seed=1, num_sections=4)
+    guitar_fb = _guitar_fb(preset)
+
+    for section in song["sections"]:
+        tab = summarize_tab(section, guitar_fb)
+        for entry in tab:
+            if entry["is_rest"]:
+                assert entry["string"] is None
+                assert entry["fret"] is None
+                continue
+            # A real, reachable (string, fret) -- exactly what
+            # guitar_fb.fret_to_midi would produce for this position.
+            assert 0 <= entry["string"] < len(guitar_fb.tuning)
+            assert 0 <= entry["fret"] <= guitar_fb.max_fret

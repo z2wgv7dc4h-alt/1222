@@ -1,4 +1,4 @@
-import type { PresetSummary, RegenEdit, SongSummary } from './types'
+import type { PresetSummary, RegenEdit, SongSummary, TabCell } from './types'
 
 const BASE_URL = 'http://localhost:8000'
 
@@ -64,4 +64,14 @@ export function exportMidi(params: ComposeParams & { order: number[] }): Promise
 // preview export.
 export function exportRpp(params: ComposeParams & { order: number[] }): Promise<Blob> {
   return exportFile('/api/export-rpp', params)
+}
+
+// P9.6 -- real tab data for one section, same real arrange+edits
+// pipeline as compose/export (so a regenerated/reordered section's tab
+// reflects its actual current content, not a stale base one).
+export function fetchSectionTab(params: ComposeParams & { section_position: number }): Promise<TabCell[]> {
+  return requestJson('/api/section-tab', {
+    method: 'POST',
+    body: JSON.stringify(params),
+  })
 }

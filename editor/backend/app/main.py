@@ -28,14 +28,15 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
+from fretboard import Fretboard
 from midi_export import song_to_midi
-from presets import blend_presets, load_all_presets, resolve_preset_id
+from presets import blend_presets, get_tuning, load_all_presets, load_tunings, resolve_preset_id
 from reaper_project import song_to_rpp
 from song import compose_song, compose_song_from_preset
 
 from app.arrange import apply_order
 from app.edits import apply_edits
-from app.serialize import summarize_preset, summarize_song
+from app.serialize import summarize_preset, summarize_song, summarize_tab
 
 app = FastAPI(title="God Tier Metal Editor API")
 
@@ -77,6 +78,10 @@ class ComposeRequest(BaseModel):
 
 class ExportRequest(ComposeRequest):
     order: list[int]
+
+
+class TabRequest(ComposeRequest):
+    section_position: int
 
 
 def _resolve_preset(preset_id: str, presets: dict):
@@ -142,6 +147,22 @@ def export_midi(req: ExportRequest):
     (P9.1's Tone.js player)."""
     rearranged, _preset = _compose(req)
     return _write_and_stream(rearranged, song_to_midi, "arrangement.mid", "audio/midi")
+
+
+@app.post("/api/section-tab")
+def section_tab(req: TabRequest):
+    """P9.6 -- real tab data for one section, computed the exact same way
+    `song.py` itself resolves a fretboard (`presets.get_tuning` against
+    the real resolved preset's own `tuning_key`, never a UI-guessed
+    tuning), never a fabricated fingering."""
+    rearranged, preset = _compose(req)
+    if not (0 <= req.section_position < len(rearranged["sections"])):
+        raise HTTPException(status_code=400, detail=f"section_position out of range: {req.section_position}")
+    tunings = load_tunings()
+    tuning = get_tuning(preset.tuning_key, tunings)
+    guitar_fb = Fretboard(tuning.open)
+    section = rearranged["sections"][req.section_position]
+    return summarize_tab(section, guitar_fb)
 
 
 @app.post("/api/export-rpp")

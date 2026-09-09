@@ -64,6 +64,33 @@ def summarize_section(section: dict, bpm: float, bars: int) -> dict:
     }
 
 
+def summarize_tab(section: dict, guitar_fb) -> list[dict]:
+    """Real, JSON-safe tab data for one section's `guitar_take_a` -- one
+    entry per cell, `(string, fret)` computed via the real, already-used
+    `Fretboard.pitch_to_fret` against `pitches_per_cell` (index-aligned
+    with `guitar_take_a` since `performance.double_track` preserves the
+    input cell's rhythm shape exactly). `prev` is threaded across the
+    whole section so fret choice favors the nearest playable position to
+    the previous note -- the same real "minimize movement" rule
+    `pitch_to_fret` itself already implements, not a UI-invented one.
+    Every pitch here already passed `song._snap_to_playable_octave` at
+    generation time (checked against `guitar_fb.max_fret`, not the
+    smaller default `max_fret=12`), so this call uses the same real
+    `max_fret=guitar_fb.max_fret` to guarantee it never raises."""
+    cells = section["guitar_take_a"]
+    pitches = section["pitches_per_cell"]
+    out: list[dict] = []
+    prev: tuple[int, int] | None = None
+    for cell, pitch in zip(cells, pitches):
+        if cell["is_rest"] or pitch is None:
+            out.append({"string": None, "fret": None, "duration": cell["duration"], "is_rest": True})
+            continue
+        string, fret = guitar_fb.pitch_to_fret(pitch, max_fret=guitar_fb.max_fret, prev=prev)
+        prev = (string, fret)
+        out.append({"string": string, "fret": fret, "duration": cell["duration"], "is_rest": False})
+    return out
+
+
 def summarize_song(song: dict, preset) -> dict:
     """Real, JSON-safe summary of a full `compose_song` result: one entry
     per real section (in the real generated order) plus the song-level

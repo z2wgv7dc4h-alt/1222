@@ -3,6 +3,7 @@ import { composeSong, exportMidi, exportRpp, fetchPresets, type EditPayload } fr
 import { GuidedControls } from './components/GuidedControls'
 import { MidiPlayer } from './components/MidiPlayer'
 import { SectionDetailPanel } from './components/SectionDetailPanel'
+import { TabView } from './components/TabView'
 import { Timeline } from './components/Timeline'
 import { TopBar } from './components/TopBar'
 import type { PresetSummary, SongSummary, TimelineBlock } from './types'
@@ -215,6 +216,14 @@ export default function App() {
         ? (song.sections[selectedBlock.sourceIndex] ?? null)
         : null
 
+  // P9.6 -- tab data for the CURRENTLY-selected position, same real
+  // order+edits the timeline/detail panel already reflect.
+  const { order: tabOrder, edits: tabEdits } = toOrderAndEdits(blocks)
+  const tabParams =
+    song && selectedPosition >= 0 && tabOrder.length > 0
+      ? { preset_id: presetId, seed, num_sections: numSections, order: tabOrder, edits: tabEdits, section_position: selectedPosition, ...guidedParams() }
+      : null
+
   return (
     <div className="flex min-h-screen flex-col">
       <TopBar
@@ -290,18 +299,26 @@ export default function App() {
           </button>
         </div>
 
-        <div className="max-w-sm">
-          <SectionDetailPanel
-            section={selectedSection}
-            hasEdit={!!selectedBlock?.edit}
-            onFullReroll={() => selectedBlockId && handleRegen(selectedBlockId, 'full')}
-            onNewNotes={() => selectedBlockId && handleRegen(selectedBlockId, 'pitch')}
-            onNewHits={() => selectedBlockId && handleRegen(selectedBlockId, 'rhythm')}
-            onMakeRole={(role) => selectedBlockId && handleRegen(selectedBlockId, 'full', role)}
-            onTooBusy={() => selectedBlockId && handleDensityNudge(selectedBlockId, -0.15)}
-            onTooThin={() => selectedBlockId && handleDensityNudge(selectedBlockId, 0.15)}
-            onClearEdit={() => selectedBlockId && handleClearEdit(selectedBlockId)}
-          />
+        <div className="flex flex-wrap items-start gap-6">
+          <div className="max-w-sm">
+            <SectionDetailPanel
+              section={selectedSection}
+              hasEdit={!!selectedBlock?.edit}
+              onFullReroll={() => selectedBlockId && handleRegen(selectedBlockId, 'full')}
+              onNewNotes={() => selectedBlockId && handleRegen(selectedBlockId, 'pitch')}
+              onNewHits={() => selectedBlockId && handleRegen(selectedBlockId, 'rhythm')}
+              onMakeRole={(role) => selectedBlockId && handleRegen(selectedBlockId, 'full', role)}
+              onTooBusy={() => selectedBlockId && handleDensityNudge(selectedBlockId, -0.15)}
+              onTooThin={() => selectedBlockId && handleDensityNudge(selectedBlockId, 0.15)}
+              onClearEdit={() => selectedBlockId && handleClearEdit(selectedBlockId)}
+            />
+          </div>
+          <div className="min-w-0 flex-1">
+            <span className="mb-2 block text-[10px] uppercase tracking-widest text-text-faint">
+              Tab (real, per-cell fretboard positions)
+            </span>
+            <TabView params={tabParams} />
+          </div>
         </div>
       </main>
     </div>

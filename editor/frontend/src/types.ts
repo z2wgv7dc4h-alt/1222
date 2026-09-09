@@ -67,3 +67,13 @@ export interface TimelineBlock {
   soloed: boolean
   edit: RegenEdit | null
 }
+
+// P9.6 -- mirrors editor/backend/app/serialize.py's summarize_tab exactly:
+// one entry per real cell in a section's guitar_take_a, `string`/`fret`
+// null on a rest (never a fabricated fingering).
+export interface TabCell {
+  string: number | null
+  fret: number | null
+  duration: number
+  is_rest: boolean
+}

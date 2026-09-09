@@ -18,7 +18,8 @@
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "tailwindcss": "^4.3.3",
-    "tone": "^15.1.22"
+    "tone": "^15.1.22",
+    "vexflow": "^5.0.0"
   },
   "devDependencies": {
     "@types/node": "^24.13.3",

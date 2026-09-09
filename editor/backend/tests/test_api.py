@@ -74,3 +74,20 @@ def test_compose_with_blast_fill_chance_override():
         "preset_id": "deathcore", "seed": 1, "num_sections": 6, "blast_fill_chance": 1.0,
     })
     assert r.status_code == 200
+
+
+def test_section_tab_returns_real_cell_aligned_positions():
+    r = client.post("/api/section-tab", json={
+        "preset_id": "metalcore", "seed": 1, "num_sections": 6, "section_position": 0,
+    })
+    assert r.status_code == 200
+    tab = r.json()
+    assert len(tab) > 0
+    assert all("string" in entry and "fret" in entry and "duration" in entry for entry in tab)
+
+
+def test_section_tab_rejects_out_of_range_position():
+    r = client.post("/api/section-tab", json={
+        "preset_id": "metalcore", "seed": 1, "num_sections": 4, "section_position": 99,
+    })
+    assert r.status_code == 400

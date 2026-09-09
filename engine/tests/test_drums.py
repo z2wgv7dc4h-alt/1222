@@ -409,23 +409,65 @@ def test_double_kick_rejects_empty_cells():
         kick_pattern_for_style([], "double_kick")
 
 
-def test_kick_pattern_for_role_overrides_build_and_solo_with_double_kick_or_blast():
+def test_burst_style_shows_real_contrast_between_sparse_base_and_dense_burst():
+    """X.25: real evidence -- a real reference track's isolated drum stem
+    showed 32.5% of kick-to-kick gaps under 150ms, concentrated bursts
+    inside an otherwise moderate groove. 16 real 0.25-beat hit cells (a
+    4-beat/one real burst-cycle span) -- the exact real hit-index math is
+    hand-verifiable: base is _kick_sparse's real every-other-hit pattern
+    (hits 0,2,4,...,14), then the burst cycle (starts at beat 0.0, the
+    first index) forces cells [0,1,2,3] into real consecutive hits,
+    overriding the base's own gaps there."""
+    cells = [{"duration": 0.25, "is_rest": False} for _ in range(16)]  # 4 real beats
+    result = kick_pattern_for_style(cells, "burst")
+    assert len(result) == len(cells)
+    # The burst covers cell indices 0-3 -- all real, consecutive hits.
+    for i in range(4):
+        assert not result[i]["is_rest"], f"expected cell {i} inside the real burst to be a hit"
+        assert result[i]["role"] == "KICK"
+    # Past the burst, the real sparse base pattern resumes: every OTHER
+    # of the remaining guitar hits (indices 4-15, 0-indexed among ALL
+    # hits including 0-3) is a hit -- hit_index 4 is index 4 (kept, even),
+    # hit_index 5 is index 5 (dropped, odd), etc.
+    real_sparse_rest_of_pattern = [not result[i]["is_rest"] for i in range(4, 16)]
+    expected = [(hit_index % 2 == 0) for hit_index in range(4, 16)]
+    assert real_sparse_rest_of_pattern == expected, (
+        "expected the real _kick_sparse base pattern to resume exactly past the burst"
+    )
+
+
+def test_burst_style_repeats_every_real_cycle():
+    """A section long enough for two real burst cycles (8 beats) must show
+    two real bursts, not just one."""
+    cells = [{"duration": 0.25, "is_rest": False} for _ in range(32)]  # 8 real beats
+    result = kick_pattern_for_style(cells, "burst")
+    # Real burst at cells 0-3 AND cells 16-19 (beat 4.0's cycle).
+    for i in list(range(4)) + list(range(16, 20)):
+        assert not result[i]["is_rest"], f"expected cell {i} to be a real burst hit"
+
+
+def test_burst_rejects_empty_cells():
+    with pytest.raises(ValueError):
+        kick_pattern_for_style([], "burst")
+
+
+def test_kick_pattern_for_role_overrides_build_and_solo_with_double_kick_blast_or_burst():
     cells = _straight_quarter_cells(4)
     for role in ("build", "solo"):
         seen_styles = set()
         for seed in range(20):
             result = kick_pattern_for_role(cells, role, "bounce", rng=random.Random(seed))
-            # Every hit must come from either double_kick's dense grid or
-            # blast's every-cell pattern -- never bounce's guitar-lock
-            # (all cells here are real guitar hits, so this alone doesn't
-            # distinguish them; the real distinguishing check is below).
+            # Every hit must come from one of the three real overlay
+            # styles -- never bounce's guitar-lock (all cells here are
+            # real guitar hits, so this alone doesn't distinguish them;
+            # the real distinguishing check is below).
             assert len(result) == len(cells)
-        # Real variety: over enough seeds, both real overlay styles must
-        # actually get picked (not silently always the same one).
+        # Real variety: over enough seeds, all three real overlay styles
+        # must actually get picked (not silently always the same one).
         for seed in range(20):
-            style = random.Random(seed).choice(("double_kick", "blast"))
+            style = random.Random(seed).choice(("double_kick", "blast", "burst"))
             seen_styles.add(style)
-        assert seen_styles == {"double_kick", "blast"}
+        assert seen_styles == {"double_kick", "blast", "burst"}
 
 
 def test_kick_pattern_for_role_leaves_other_roles_on_the_preset_style():

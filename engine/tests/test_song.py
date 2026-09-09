@@ -177,9 +177,13 @@ def test_kick_style_field_changes_real_song_kick_output():
         euclid_kick_hits = [i for i, c in enumerate(euclid_sec["kick"]) if not c["is_rest"]]
         # "bounce" still locks exactly to the guitar for every role EXCEPT
         # build/solo (X.11: those always get a real double_kick/blast
-        # overlay regardless of the preset's own declared style).
-        if euclid_sec["role"] not in ("build", "solo"):
+        # overlay regardless of the preset's own declared style) and
+        # chill/interlude (X.22: kick goes silent there too, matching
+        # snare/hihat's own real atmospheric-breather rule).
+        if euclid_sec["role"] not in ("build", "solo", "chill", "interlude"):
             assert bounce_kick_hits == guitar_hits
+        elif euclid_sec["role"] in ("chill", "interlude"):
+            assert bounce_kick_hits == []
         if euclid_kick_hits != guitar_hits:
             differed = True
     assert differed, "expected djent's real 'euclid' kick style to differ from a guitar-locked kick in at least one section"
@@ -421,6 +425,27 @@ def test_every_preset_gets_a_real_hihat_layer_wired_for_every_role():
                     c["role"] in ("HIHAT_CLOSED", "HIHAT_OPEN", "CRASH_1", None) for c in hihat
                 )
         assert saw_hits, f"{preset_id}: expected at least one section with real hihat hits"
+
+
+def test_every_preset_gets_silent_kick_for_chill_and_interlude():
+    """X.22: a real, previously-missed inconsistency -- snare/hihat both
+    already went silent for chill/interlude (tested above), but kick had
+    no such rule and kept playing at the preset's own full declared
+    density regardless of role, undermining the entire point of a quiet
+    breather section. Fixed to match the same real rule, for every real
+    preset, not just metalcore."""
+    for preset_id in load_all_presets():
+        song = compose_song(preset_id, seed=4, num_sections=8)
+        saw_hits = False
+        for section in song["sections"]:
+            kick = section["kick"]
+            assert len(kick) == len(section["motif"].cell)
+            has_hits = any(not c["is_rest"] for c in kick)
+            if section["role"] in ("chill", "interlude"):
+                assert not has_hits, f"{preset_id}/{section['role']} kick must be silent"
+            elif has_hits:
+                saw_hits = True
+        assert saw_hits, f"{preset_id}: expected at least one section with real kick hits"
 
 
 def test_build_and_solo_sections_get_a_real_varied_kick_overlay():

@@ -42,6 +42,7 @@ Update only after grep or pytest. No memory claims.
 | Real IRVD phrase development, wired for the first time (X.19) | WIRED+TESTED | 525 passed, 1 skipped in 13.94s |
 | Fixed severe density bug: open_chance was misapplied as hit_chance (X.20) | WIRED+TESTED | 528 passed, 1 skipped in 16.45s |
 | Real open-string-vs-muted velocity articulation (X.21) | WIRED+TESTED | 533 passed, 1 skipped in 12.58s |
+| Fixed kick never going silent for chill/interlude (X.22) | WIRED+TESTED | 535 passed, 1 skipped in 11.44s |
 | Reaper | MISSING | |
 | Editor | MISSING | |
 

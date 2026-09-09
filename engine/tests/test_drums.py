@@ -429,10 +429,22 @@ def test_kick_pattern_for_role_overrides_build_and_solo_with_double_kick_or_blas
 
 def test_kick_pattern_for_role_leaves_other_roles_on_the_preset_style():
     cells = _straight_quarter_cells(2)
-    for role in ("intro", "breakdown", "outro", "chill", "interlude"):
+    for role in ("intro", "breakdown", "outro"):
         result = kick_pattern_for_role(cells, role, "bounce", rng=random.Random(1))
         expected = kick_pattern_for_style(cells, "bounce")
         assert result == expected
+
+
+def test_kick_pattern_for_role_is_silent_for_chill_and_interlude():
+    """X.22: a real, previously-missed inconsistency -- snare/hihat both
+    already went silent for chill/interlude (the atmospheric-breather
+    rule), but kick had no such check and kept the preset's full-density
+    style regardless of role. Fixed to match."""
+    cells = _straight_quarter_cells(2)
+    for role in ("chill", "interlude"):
+        result = kick_pattern_for_role(cells, role, "bounce", rng=random.Random(1))
+        assert all(c["is_rest"] for c in result)
+        assert all(c["role"] is None for c in result)
 
 
 def test_kick_pattern_for_role_requires_rng_for_overlay_roles():

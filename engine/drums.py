@@ -435,9 +435,19 @@ def kick_pattern_for_role(
     see `_ROLE_KICK_OVERRIDE_CHOICES`. Delegates entirely to
     `kick_pattern_for_style`, no reimplemented dispatch logic.
 
+    X.22 -- a real, previously-missed inconsistency: `snare_pattern_for_
+    role`/`hihat_pattern_for_role` both go silent for `chill`/`interlude`
+    (the same "atmospheric sections stay quiet" rule `song.py`'s own
+    `lead_mode` logic makes), but this function had no such check -- every
+    chill/interlude section got the SAME full-density kick as every other
+    section, undermining the entire point of a quiet breather. Fixed to
+    match the exact same real rule the other two drum layers already use.
+
     Raises `ValueError` if `role` has real overlay choices but `rng` is
     `None` -- a real per-section choice needs a real seeded source, never
     a silent default to "always the first option"."""
+    if role in ("chill", "interlude"):
+        return [{"duration": c["duration"], "is_rest": True, "role": None} for c in guitar_cells]
     choices = _ROLE_KICK_OVERRIDE_CHOICES.get(role)
     if choices is None:
         style = preset_kick

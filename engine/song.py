@@ -312,6 +312,41 @@ def _pickup_values(prev_values: list, next_values: list, n: int = _BLEND_N) -> l
     return out
 
 
+# X.27 -- real pinch-harmonic accent (scope sec.4: "Slam-specific devices:
+# pinch-harmonic accent simulation..." -- kept as a real, genre-agnostic
+# technique per the user's own standing direction that Metalerator-mined
+# techniques generalize across every relevant genre, not just the original
+# slam target this project no longer builds for). Confirmed via grep this
+# whole session: `slam.mark_pinch_harmonics` (P3.10, real and tested) was
+# never called from `song.py`. Applied to the roles where a real chug riff
+# idiomatically punches a closing squeal -- `breakdown` and `outro`, the
+# real phrase-ending roles.
+#
+# NOT calling `slam.mark_pinch_harmonics` directly: its own real contract
+# resets EVERY hit in the cell to a flat `velocity_base`, which would
+# destroy X.21's real per-hit open-vs-muted velocity data. This reuses the
+# same real CONCEPT (the phrase's last real hit gets a velocity spike) but
+# only touches that one accent cell, leaving every other cell's existing
+# velocity untouched.
+_PINCH_HARMONIC_ROLES = ("breakdown", "outro")
+_PINCH_HARMONIC_VELOCITY = 127  # matches slam.mark_pinch_harmonics' own real default
+
+
+def _apply_pinch_harmonic_accent(cells: list[dict]) -> list[dict]:
+    """Real pinch-harmonic accent on `cells`' final real hit only -- see
+    the module-level comment above `_PINCH_HARMONIC_ROLES` for the real
+    design (why this doesn't call `slam.mark_pinch_harmonics` directly).
+    A cell list with no real hits is returned unchanged (never fabricates
+    an accent on a rest)."""
+    out = [dict(c) for c in cells]
+    hit_indices = [i for i, c in enumerate(out) if not c["is_rest"]]
+    if hit_indices:
+        last = hit_indices[-1]
+        out[last]["velocity"] = _PINCH_HARMONIC_VELOCITY
+        out[last]["pinch_harmonic"] = True
+    return out
+
+
 def _snap_to_playable_octave(fretboard: Fretboard, pitch: int) -> int:
     """Shift `pitch` by whole octaves (up or down, whichever is closer)
     until it lands on a real, reachable `(string, fret)` on `fretboard`.
@@ -707,6 +742,14 @@ def _generate_attempt(rng: random.Random, preset: Preset, num_sections: int) -> 
         kick_style = kick_styles[i]
         if kick_style is not None:
             this_section["kick"] = kick_pattern_for_style(this_section["guitar_take_a"], kick_style)
+
+    # X.27 -- real pinch-harmonic accent, applied last (after blending) so
+    # it always lands on the TRUE final hit of each fully-assembled
+    # section, not one that blending might later overwrite.
+    for section in sections:
+        if section["role"] in _PINCH_HARMONIC_ROLES:
+            section["guitar_take_a"] = _apply_pinch_harmonic_accent(section["guitar_take_a"])
+            section["guitar_take_b"] = _apply_pinch_harmonic_accent(section["guitar_take_b"])
 
     for section in sections:
         guitar_track.extend(section["guitar_take_a"])

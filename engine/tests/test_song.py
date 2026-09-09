@@ -6,6 +6,8 @@ import pytest
 from presets import load_all_presets
 from song import (
     _BASE_HIT_CHANCE,
+    _PINCH_HARMONIC_ROLES,
+    _apply_pinch_harmonic_accent,
     _compute_tempo_map,
     _develop_theme,
     _generate_attempt,
@@ -830,7 +832,16 @@ def test_real_composed_song_shows_the_real_blend_signature_at_every_boundary():
     cells (and pitches) must exactly equal section i+1's first 2 -- the
     real, directly-checkable blend signature -- for every boundary except
     ones touching chill/interlude (excluded for a real, documented reason:
-    harmony-mode's lead pairing depends on the pre-blend guitar hit count)."""
+    harmony-mode's lead pairing depends on the pre-blend guitar hit count).
+
+    X.27 note: `breakdown`/`outro` sections get a real pinch-harmonic
+    velocity accent on their own final hit, applied AFTER blending (by
+    design -- it must land on the true final hit of the fully-assembled
+    section). That real, deliberate override can touch the same cell the
+    blend signature checks, so `velocity`/`pinch_harmonic` are excluded
+    from the tail/head comparison for those two roles specifically;
+    duration/is_rest/timing_offset (the real rhythmic blend shape) and the
+    real pitch blend are still checked exactly, for every eligible role."""
     metalcore = load_all_presets()["metalcore"]
     song = _generate_attempt(random.Random(6), metalcore, num_sections=6)
     sections = song["sections"]
@@ -841,10 +852,15 @@ def test_real_composed_song_shows_the_real_blend_signature_at_every_boundary():
         checked_any = True
         this_tail = sections[i]["guitar_take_a"][-2:]
         next_head = sections[i + 1]["guitar_take_a"][:2]
-        assert this_tail == next_head
+        if sections[i]["role"] in _PINCH_HARMONIC_ROLES:
+            keys = ("duration", "is_rest", "timing_offset")
+            assert [{k: c[k] for k in keys} for c in this_tail] == [{k: c[k] for k in keys} for c in next_head]
+        else:
+            assert this_tail == next_head
         this_pitch_tail = sections[i]["pitches_per_cell"][-2:]
         next_pitch_head = sections[i + 1]["pitches_per_cell"][:2]
         assert this_pitch_tail == next_pitch_head
+    assert checked_any, "expected at least one real non-chill/interlude boundary in this seed"
     assert checked_any, "expected at least one real non-chill/interlude boundary in this seed"
 
 
@@ -944,3 +960,50 @@ def test_kick_styles_independent_of_guitar_shape_are_unaffected_by_blending():
                 continue
             expected = kick_pattern_for_style(section["guitar_take_a"], style)
             assert section["kick"] == expected
+
+
+# --- X.27: real pinch-harmonic accent -----------------------------------------
+
+
+def test_apply_pinch_harmonic_accent_marks_only_the_last_real_hit():
+    cells = [
+        {"duration": 0.5, "is_rest": False, "velocity": 90, "timing_offset": 0.01},
+        {"duration": 0.5, "is_rest": True, "velocity": 0, "timing_offset": 0.0},
+        {"duration": 0.5, "is_rest": False, "velocity": 88, "timing_offset": -0.02},
+    ]
+    out = _apply_pinch_harmonic_accent(cells)
+    assert out[0]["velocity"] == 90  # untouched
+    assert out[0].get("pinch_harmonic") is None
+    assert out[1] == cells[1]  # rest untouched entirely
+    assert out[2]["velocity"] == 127
+    assert out[2]["pinch_harmonic"] is True
+    assert out[2]["duration"] == 0.5 and out[2]["timing_offset"] == -0.02  # only velocity/flag changed
+
+
+def test_apply_pinch_harmonic_accent_all_rests_is_a_no_op():
+    cells = [{"duration": 0.5, "is_rest": True, "velocity": 0, "timing_offset": 0.0}]
+    assert _apply_pinch_harmonic_accent(cells) == cells
+
+
+def test_breakdown_and_outro_sections_get_a_real_pinch_harmonic_accent():
+    """X.27 end-to-end: every real breakdown/outro section's guitar takes
+    must show a real pinch-harmonic accent on their own true final hit,
+    for every real preset -- not gated to one genre."""
+    for preset_id in load_all_presets():
+        song = _generate_attempt(random.Random(4), load_all_presets()[preset_id], num_sections=8)
+        saw_accent = False
+        for section in song["sections"]:
+            if section["role"] not in _PINCH_HARMONIC_ROLES:
+                # Real, negative check: no OTHER role gets this accent.
+                for take in (section["guitar_take_a"], section["guitar_take_b"]):
+                    assert not any(c.get("pinch_harmonic") for c in take)
+                continue
+            for take in (section["guitar_take_a"], section["guitar_take_b"]):
+                hit_indices = [i for i, c in enumerate(take) if not c["is_rest"]]
+                if not hit_indices:
+                    continue
+                last = hit_indices[-1]
+                assert take[last]["velocity"] == 127
+                assert take[last]["pinch_harmonic"] is True
+                saw_accent = True
+        assert saw_accent, f"{preset_id}: expected at least one real breakdown/outro pinch-harmonic accent"

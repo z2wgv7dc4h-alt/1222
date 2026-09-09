@@ -46,6 +46,7 @@ Update only after grep or pytest. No memory claims.
 | Real power chords on the main rhythm guitar (X.23) | WIRED+TESTED | 539 passed, 1 skipped in 11.62s |
 | Real cross-section blending -- guitar, bass, guitar-locking kick (X.24) | WIRED+TESTED | 550 passed, 1 skipped in 12.05s |
 | Real kick "burst" device (X.25) | WIRED+TESTED | 553 passed, 1 skipped in 11.96s |
+| Real pinch-harmonic accent, every preset (X.27; X.26 cancelled, see PORTS/TASKS) | WIRED+TESTED | 556 passed, 1 skipped in 12.14s |
 | Reaper | MISSING | |
 | Editor | MISSING | |
 

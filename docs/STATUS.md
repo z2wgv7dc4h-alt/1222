@@ -55,7 +55,8 @@ Update only after grep or pytest. No memory claims.
 | Real song-pacing rebalance -- occasional half-time, less atmospheric filler (X.33) | WIRED+TESTED | 581 passed, 1 skipped in 12.86s |
 | Real blast beats wired into the actual drum track (X.34) | WIRED+TESTED | 589 passed, 1 skipped in 13.77s |
 | Real riff-repetition bias correction (X.35) + real melodic sequence generator for solos (X.36) | WIRED+TESTED | 596 passed, 1 skipped |
-| Reaper | MISSING | |
+| Reaper full render pipeline (P8.2-P8.8: separate buses, FX-chain splice, sfizz drums, Surge/Supermassive, orchestra, adaptive mix) | MISSING | only P8.1 (.rpp project generation) is done -- see row above; P8.2-P8.8 all unchecked in TASKS.md |
+| Atmosphere/synth pad + octave-stab EXPORT (distinct from generation) | WIRED+TESTED | engine/ 620 passed, 1 skipped (up from 613); real "Pad"/"Accents" MIDI+`.rpp` tracks, `MidiPlayer.tsx` real synth voices; verified live -- see TASKS.md tracker, 2026-09-10 |
 | Editor -- P9.1 timeline scaffold (FastAPI + React/TS, real generate/mute/solo/duplicate/delete/reorder + Tone.js MIDI playback) | WIRED+TESTED | engine/ 596 passed, 1 skipped; editor/backend/ 8 passed; verified live in browser |
 | Editor -- P9.3 real single-section regeneration (`regenerate_section`: full/pitch/rhythm modes, role override, density nudge, neighbor re-blend) + edit-history replay | WIRED+TESTED | engine/ 610 passed; editor/backend/ 12 passed; verified live in browser |
 | Editor -- P9.4 accept/reroll/undo (snapshot-stack undo, capped at 20) | WIRED+TESTED | verified live in browser |

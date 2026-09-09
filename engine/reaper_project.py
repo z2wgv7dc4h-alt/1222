@@ -25,7 +25,8 @@ etc.) is REAPER's own real default, copied from that ground-truth file,
 not invented.
 
 Reuses `midi_export`'s already-real event-extraction functions
-(`_cell_events`/`_lead_events_for_section`/`_section_beats`) rather than
+(`_cell_events`/`_lead_events_for_section`/`_section_beats`/
+`_pad_events_for_section`/`_accent_events_for_section`) rather than
 re-deriving per-track note/timing data a second time -- one source of
 truth for "what notes are in this song," two serializers (Standard MIDI
 File, and this real Reaper project format) on top of it.
@@ -37,6 +38,7 @@ import uuid
 from pathlib import Path
 
 from midi_export import (
+    _ACCENT_CHANNEL,
     _BASS_CHANNEL,
     _BASS_PROGRAM,
     _CHORD_THICKENED_ROLES,
@@ -46,10 +48,13 @@ from midi_export import (
     _GUITAR_PROGRAM,
     _LEAD_CHANNEL,
     _LEAD_PROGRAM,
+    _PAD_CHANNEL,
+    _accent_events_for_section,
     _beats_to_ticks,
     _cell_events,
     _chord_cell_events,
     _lead_events_for_section,
+    _pad_events_for_section,
     _section_beats,
 )
 from drums import note_for_role
@@ -233,6 +238,8 @@ def song_to_rpp(song: dict, path: str | Path) -> None:
     bass_events: list[tuple[int, int, int, int]] = []
     drum_events: list[tuple[int, int, int, int]] = []
     lead_events: list[tuple[int, int, int, int]] = []
+    pad_events: list[tuple[int, int, int, int]] = []
+    accent_events: list[tuple[int, int, int, int]] = []
 
     section_start_beats: list[float] = []
     section_start_seconds: list[float] = []
@@ -271,6 +278,8 @@ def song_to_rpp(song: dict, path: str | Path) -> None:
         lead_events += _lead_events_for_section(section, start_beat, _PPQ)
 
         beats = _section_beats(section)
+        pad_events += _pad_events_for_section(section, start_beat, beats, _PPQ)
+        accent_events += _accent_events_for_section(section, start_beat, _PPQ)
         start_beat += beats
         # X.18: a section with a mid-section `tempo_drop` spends its real
         # elapsed time in two parts -- the portion before the trigger at
@@ -393,12 +402,19 @@ def song_to_rpp(song: dict, path: str | Path) -> None:
         "  >",
     ]
 
+    # Drums stays LAST -- tests/test_reaper_project.py locates the drum
+    # track's real <SOURCE MIDI> block via "the last one in the file"
+    # (`text.rindex`), same real convention as this list's own prior
+    # ordering; Pad/Accents are new real tracks inserted before it, not
+    # appended after.
     tracks = [
         ("Guitar (Take A)", _GUITAR_A_CHANNEL, guitar_a_events, 1),
         ("Guitar (Take B)", _GUITAR_B_CHANNEL, guitar_b_events, 2),
         ("Bass", _BASS_CHANNEL, bass_events, 3),
         ("Lead", _LEAD_CHANNEL, lead_events, 4),
-        ("Drums", _DRUM_CHANNEL, drum_events, 5),
+        ("Pad", _PAD_CHANNEL, pad_events, 5),
+        ("Accents", _ACCENT_CHANNEL, accent_events, 6),
+        ("Drums", _DRUM_CHANNEL, drum_events, 7),
     ]
     for name, channel, events, item_id in tracks:
         lines += _track_block(name, channel, events, total_seconds, item_id)

@@ -38,7 +38,21 @@ function buildRig() {
     harmonicity: 5.1,
     resonance: 4000,
   }).toDestination()
-  return { guitar, bass, lead, kick, snare, hihat, distortion }
+  // P7.1-P7.3 + the 2026-09-10 export-wiring pass: real "Pad"/"Accents"
+  // MIDI tracks now carry real data (see midi_export.py's own module
+  // docstring) -- undistorted, slow-attack sine pad and a short
+  // triangle-wave stab voice so they read as atmosphere/accent, not more
+  // distorted guitar (the routing fallback every other unrecognized
+  // track would otherwise hit).
+  const pad = new Tone.PolySynth(Tone.Synth, {
+    oscillator: { type: 'sine' },
+    envelope: { attack: 0.5, decay: 0.3, sustain: 0.7, release: 1.0 },
+  }).toDestination()
+  const accent = new Tone.PolySynth(Tone.Synth, {
+    oscillator: { type: 'triangle' },
+    envelope: { attack: 0.005, decay: 0.3, sustain: 0.1, release: 0.4 },
+  }).toDestination()
+  return { guitar, bass, lead, kick, snare, hihat, distortion, pad, accent }
 }
 
 type Rig = ReturnType<typeof buildRig>
@@ -82,6 +96,8 @@ export function MidiPlayer({ midiBlob, isLoading }: MidiPlayerProps) {
         const isDrums = /drum/i.test(track.name)
         const isBass = /bass/i.test(track.name)
         const isLead = /lead|harmony/i.test(track.name)
+        const isPad = /pad/i.test(track.name)
+        const isAccent = /accent/i.test(track.name)
 
         const events = track.notes.map((note) => ({
           time: note.time,
@@ -104,7 +120,7 @@ export function MidiPlayer({ midiBlob, isLoading }: MidiPlayerProps) {
             }
             return
           }
-          const synth = isBass ? rig.bass : isLead ? rig.lead : rig.guitar
+          const synth = isPad ? rig.pad : isAccent ? rig.accent : isBass ? rig.bass : isLead ? rig.lead : rig.guitar
           const freq = Tone.Frequency(event.pitch, 'midi').toFrequency()
           synth.triggerAttackRelease(freq, Math.max(event.duration, 0.03), time, vel)
         }, events).start(0)

@@ -2,7 +2,15 @@ import mido
 import pytest
 
 from fretboard import Fretboard
-from midi_export import _CHORD_THICKENED_ROLES, _guitar_chord_tone_pitches, song_to_midi
+from midi_export import (
+    _ACCENT_CHANNEL,
+    _CHORD_THICKENED_ROLES,
+    _PAD_CHANNEL,
+    _accent_events_for_section,
+    _guitar_chord_tone_pitches,
+    _pad_events_for_section,
+    song_to_midi,
+)
 from presets import load_all_presets
 from song import compose_song
 
@@ -40,8 +48,8 @@ def test_song_to_midi_writes_a_real_parseable_file_for_every_preset(preset_id, t
     assert out.exists() and out.stat().st_size > 0
     parsed = _read_back(out)
     assert parsed.type == 1
-    # Tempo track + guitar A/B + bass + lead + drums.
-    assert len(parsed.tracks) == 6
+    # Tempo track + guitar A/B + bass + lead + drums + pad + accents.
+    assert len(parsed.tracks) == 8
 
 
 def test_guitar_track_note_count_matches_real_guitar_hit_count():
@@ -297,3 +305,73 @@ def _track_by_name(parsed, name):
         if track.name == name:
             return track
     raise AssertionError(f"no track named {name!r} in {[t.name for t in parsed.tracks]}")
+
+
+def _note_events(track, channel):
+    """(pitch, velocity) pairs for every real note_on on `channel` in a
+    parsed mido track -- ignores the leading track_name/program_change
+    meta messages and any note_off events."""
+    return [(m.note, m.velocity) for m in track if m.type == "note_on" and m.channel == channel]
+
+
+def test_pad_events_for_section_spans_the_real_full_section_length():
+    song = compose_song("djent", seed=1, num_sections=1)
+    section = song["sections"][0]
+    section_beats = sum(c["duration"] for c in section["guitar_take_a"])
+
+    events = _pad_events_for_section(section, start_beat=2.0, section_beats=section_beats, ppq=480)
+
+    assert len(events) == len(section["pad"])
+    for on_tick, off_tick, pitch, _velocity in events:
+        assert on_tick == round(2.0 * 480)
+        assert off_tick == round((2.0 + section_beats) * 480)
+        assert pitch in section["pad"]
+
+
+def test_pad_events_for_section_empty_when_no_pad_data():
+    events = _pad_events_for_section({}, start_beat=0.0, section_beats=4.0, ppq=480)
+    assert events == []
+
+
+def test_accent_events_for_section_land_on_real_accented_cells():
+    song = compose_song("djent", seed=1, num_sections=4)
+    for section in song["sections"]:
+        if not section["accents"]:
+            continue
+        events = _accent_events_for_section(section, start_beat=0.0, ppq=480)
+        assert len(events) > 0
+        # Every event's pitch must be a real chord tone from that
+        # accent's own stab_voicing (or, for djent's real octave_stab,
+        # the real VoiceLeader leap zipped in alongside it) -- never a
+        # fabricated pitch.
+        real_pitches = {p for a in section["accents"] for p in a["voicing"]}
+        real_pitches |= set(section.get("octave_stabs") or [])
+        for _on, _off, pitch, _vel in events:
+            assert pitch in real_pitches
+        return
+    pytest.fail("no section with real accents found across 4 sections -- unexpected for djent")
+
+
+def test_accent_events_for_section_skips_an_out_of_range_cell_index():
+    """Fails closed: an accent whose cell_index doesn't fit the section's
+    current guitar_take_a (never produced by real compose_song/
+    regenerate_section output, but this module doesn't assume it) is
+    skipped, never a crash or a misplaced note."""
+    section = {
+        "guitar_take_a": [{"duration": 1.0, "is_rest": False}],
+        "accents": [{"cell_index": 99, "voicing": [40, 47]}],
+        "octave_stabs": [],
+    }
+    events = _accent_events_for_section(section, start_beat=0.0, ppq=480)
+    assert events == []
+
+
+def test_real_exported_midi_has_pad_and_accent_note_content():
+    song = compose_song("djent", seed=1, num_sections=6)  # djent: octave_stab=true
+    path = _write_tmp(song, "pad_accent")
+    parsed = _read_back(path)
+
+    pad_track = _track_by_name(parsed, "Pad")
+    accent_track = _track_by_name(parsed, "Accents")
+    assert len(_note_events(pad_track, _PAD_CHANNEL)) > 0
+    assert len(_note_events(accent_track, _ACCENT_CHANNEL)) > 0

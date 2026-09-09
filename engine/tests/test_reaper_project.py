@@ -10,7 +10,7 @@ from song import compose_song
 
 ALL_PRESET_IDS = sorted(load_all_presets().keys())
 
-_TRACK_NAMES = ["Guitar (Take A)", "Guitar (Take B)", "Bass", "Lead", "Drums"]
+_TRACK_NAMES = ["Guitar (Take A)", "Guitar (Take B)", "Bass", "Lead", "Pad", "Accents", "Drums"]
 
 
 def _write(song, tmp_path, name="song"):
@@ -34,7 +34,7 @@ def test_song_to_rpp_writes_a_structurally_balanced_project_for_every_preset(pre
 
     for name in _TRACK_NAMES:
         assert f'NAME "{name}"' in text
-    assert text.count("<TRACK") == 5
+    assert text.count("<TRACK") == 7
 
 
 def test_rpp_track_name_x_block_decodes_to_the_real_midi_meta_event(tmp_path):
@@ -89,6 +89,38 @@ def test_rpp_drum_events_use_real_gm_notes_on_channel_nine(tmp_path):
     # 0x31=49=CRASH_1 (X.9/X.11/X.13).
     assert all(h in ("24", "26", "2a", "30", "31") for h in hits)
     assert "2a" in hits, "expected real hihat hits (X.11)"
+
+
+def _source_midi_block_for_track(text, name):
+    """The `<SOURCE MIDI ...>` block belonging to the track whose real
+    `<X ...>` name-meta-event decodes to `name` -- located by name, not
+    position, so it's robust to the real track order in the file."""
+    x_marker = f'<X 0 0 0 0 3 "{name}"'
+    x_index = text.index(x_marker)
+    block_start = text.rindex("<SOURCE MIDI", 0, x_index)
+    next_block = text.find("<SOURCE MIDI", x_index)
+    block_end = next_block if next_block != -1 else len(text)
+    return text[block_start:block_end]
+
+
+def test_rpp_pad_track_has_real_sustained_chord_events(tmp_path):
+    song = compose_song("djent", seed=1, num_sections=6)  # djent: octave_stab=true
+    text = _write(song, tmp_path)
+
+    block = _source_midi_block_for_track(text, "Pad")
+    # Channel 4 (_PAD_CHANNEL) note-on status byte: 0x90 | 4 = 0x94.
+    note_ons = re.findall(r"^\s*E \d+ 94 ", block, flags=re.MULTILINE)
+    assert note_ons, "expected real pad-chord note-on events on channel 4"
+
+
+def test_rpp_accents_track_has_real_accent_hit_events(tmp_path):
+    song = compose_song("djent", seed=1, num_sections=6)  # djent: octave_stab=true
+    text = _write(song, tmp_path)
+
+    block = _source_midi_block_for_track(text, "Accents")
+    # Channel 5 (_ACCENT_CHANNEL) note-on status byte: 0x90 | 5 = 0x95.
+    note_ons = re.findall(r"^\s*E \d+ 95 ", block, flags=re.MULTILINE)
+    assert note_ons, "expected real accent-hit note-on events on channel 5"
 
 
 def test_rpp_tempo_envelope_matches_real_tempo_map(tmp_path):

@@ -40,6 +40,18 @@ exported here: `_generate_attempt` never actually blends it into the
 song's assembled drum data (`drum_track` is built from `kick_cells` alone)
 -- inventing a fill/kick blend in the exporter would be new arrangement
 logic this project's own generation code doesn't define, not a wiring job.
+
+Also written: a real sustained synth-pad track (`atmosphere.pad_voicing`,
+GM "Pad 2 (warm)") spanning each section's full length, and a real
+accent-hit track (`atmosphere.find_accents`' own per-accent
+`stab_voicing`, GM "Orchestra Hit", landing exactly on each structurally-
+accented cell -- scope sec.16.3's "a single orchestral hit landing
+exactly on a structural accent") layered with `preset.octave_stab`'s real
+`VoiceLeader.stab()` leap when a section has one (`section["octave_stabs"]`,
+positionally zipped 1:1 with `section["accents"]` by `song.py`). Both were
+real, computed, tested data since P7.1-P7.3 but were never wired into any
+exported output until now -- found via a 2026-09-10 full scope re-read
+(see TASKS.md's tracker).
 """
 from __future__ import annotations
 
@@ -53,6 +65,7 @@ except ImportError as exc:  # pragma: no cover - exercised only when mido is mis
         "engine/requirements.txt -- install with `pip install mido`."
     ) from exc
 
+from atmosphere import ORCH_HIT_PROGRAM, PAD_PROGRAM
 from chords import solve_chord
 from drums import note_for_role
 from fretboard import Fretboard
@@ -84,6 +97,8 @@ _GUITAR_A_CHANNEL = 0
 _GUITAR_B_CHANNEL = 1
 _BASS_CHANNEL = 2
 _LEAD_CHANNEL = 3
+_PAD_CHANNEL = 4
+_ACCENT_CHANNEL = 5
 _DEFAULT_VELOCITY = 100
 
 
@@ -242,6 +257,75 @@ def _lead_events_for_section(section: dict, start_beat: float, ppq: int) -> list
     raise ValueError(f"unknown lead_mode: {mode!r}")
 
 
+def _pad_events_for_section(
+    section: dict, start_beat: float, section_beats: float, ppq: int
+) -> list[tuple[int, int, int, int]]:
+    """Real sustained pad-chord events for one section: `section["pad"]`
+    (`atmosphere.pad_voicing`, a real 3-note chord) held for the section's
+    entire real length -- one note-on/off pair per chord tone, all
+    sharing the section's own start/end ticks. `section.get("pad")` is
+    never missing on a real `compose_song`/`regenerate_section` result
+    (every role gets one, chill/interlude included -- an ambient pad
+    suits them especially), but the empty-list fallback keeps this
+    honestly defensive against a malformed/hand-built section dict rather
+    than assuming."""
+    pad = section.get("pad") or []
+    on_tick = _beats_to_ticks(start_beat, ppq)
+    off_tick = max(on_tick + 1, _beats_to_ticks(start_beat + section_beats, ppq))
+    return [(on_tick, off_tick, pitch, _DEFAULT_VELOCITY) for pitch in pad]
+
+
+def _accent_events_for_section(section: dict, start_beat: float, ppq: int) -> list[tuple[int, int, int, int]]:
+    """Real accent-hit events for one section: one short chord per
+    structurally-accented cell (`section["accents"]`, `atmosphere.
+    find_accents`' own per-accent `stab_voicing` -- scope sec.16.3's "a
+    single orchestral hit landing exactly on a structural accent"),
+    landing at that accent's own real cell position/duration within
+    `guitar_take_a` (accent `cell_index` values are computed against the
+    pre-double-tracked cell list, which `performance.double_track`
+    preserves index-for-index -- same real alignment P9.6's tab export
+    already relies on). When `preset.octave_stab` was true for this
+    section, `section["octave_stabs"]` (real `theory.VoiceLeader.stab()`
+    leaps, positionally zipped 1:1 with `accents` by `song.py`) layers
+    that accent's own wide-leap note into the SAME event rather than a
+    separate track, since it's already generated one-per-accent, not an
+    independent stream.
+
+    Fails closed on an accent whose `cell_index` doesn't fit the current
+    `guitar_take_a` (never actually produced by real `compose_song`/
+    `regenerate_section` output -- accents/pad/octave_stabs are always
+    recomputed together with a fresh cell list whenever the rhythm
+    changes -- but this module doesn't assume a section dict it's handed
+    is necessarily one of those) rather than raising or misplacing a
+    note."""
+    accents = section.get("accents") or []
+    if not accents:
+        return []
+    cells = section["guitar_take_a"]
+    octave_stabs = section.get("octave_stabs") or []
+
+    offsets: list[float] = []
+    t = 0.0
+    for cell in cells:
+        offsets.append(t)
+        t += cell["duration"]
+
+    events: list[tuple[int, int, int, int]] = []
+    for i, accent in enumerate(accents):
+        idx = accent["cell_index"]
+        if not (0 <= idx < len(cells)):
+            continue
+        cell_start = start_beat + offsets[idx]
+        cell_duration = cells[idx]["duration"]
+        on_tick = _beats_to_ticks(cell_start, ppq)
+        off_tick = max(on_tick + 1, _beats_to_ticks(cell_start + cell_duration, ppq))
+        pitches = list(accent["voicing"])
+        if i < len(octave_stabs):
+            pitches.append(octave_stabs[i])
+        events += [(on_tick, off_tick, pitch, _DEFAULT_VELOCITY) for pitch in pitches]
+    return events
+
+
 def _events_to_track(
     events: list[tuple[int, int, int, int]],
     channel: int,
@@ -330,6 +414,8 @@ def song_to_midi(song: dict, path: str | Path, ppq: int = 480) -> None:
     bass_events: list[tuple[int, int, int, int]] = []
     drum_events: list[tuple[int, int, int, int]] = []
     lead_events: list[tuple[int, int, int, int]] = []
+    pad_events: list[tuple[int, int, int, int]] = []
+    accent_events: list[tuple[int, int, int, int]] = []
 
     guitar_fb = song["guitar_fretboard"]
     start_beat = 0.0
@@ -358,7 +444,10 @@ def song_to_midi(song: dict, path: str | Path, ppq: int = 480) -> None:
         hihat_pitches = [None if c["is_rest"] else note_for_role(c["role"]) for c in section["hihat"]]
         drum_events += _cell_events(section["hihat"], hihat_pitches, start_beat, ppq)
         lead_events += _lead_events_for_section(section, start_beat, ppq)
-        start_beat += _section_beats(section)
+        section_beats = _section_beats(section)
+        pad_events += _pad_events_for_section(section, start_beat, section_beats, ppq)
+        accent_events += _accent_events_for_section(section, start_beat, ppq)
+        start_beat += section_beats
 
     midi_file = mido.MidiFile(type=1, ticks_per_beat=ppq)
     midi_file.tracks.append(_tempo_track(song, ppq))
@@ -371,5 +460,7 @@ def song_to_midi(song: dict, path: str | Path, ppq: int = 480) -> None:
     midi_file.tracks.append(_events_to_track(bass_events, _BASS_CHANNEL, _BASS_PROGRAM, "Bass"))
     midi_file.tracks.append(_events_to_track(lead_events, _LEAD_CHANNEL, _LEAD_PROGRAM, "Lead"))
     midi_file.tracks.append(_events_to_track(drum_events, _DRUM_CHANNEL, None, "Drums"))
+    midi_file.tracks.append(_events_to_track(pad_events, _PAD_CHANNEL, PAD_PROGRAM, "Pad"))
+    midi_file.tracks.append(_events_to_track(accent_events, _ACCENT_CHANNEL, ORCH_HIT_PROGRAM, "Accents"))
 
     midi_file.save(str(path))

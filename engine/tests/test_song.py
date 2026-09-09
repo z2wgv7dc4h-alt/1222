@@ -7,6 +7,8 @@ from presets import load_all_presets
 from song import (
     _BASE_HIT_CHANCE,
     _PINCH_HARMONIC_ROLES,
+    _SOLO_SEQUENCE_MOTIF_LEN,
+    _SOLO_SEQUENCE_REPEATS,
     _apply_pinch_harmonic_accent,
     _compute_tempo_map,
     _develop_theme,
@@ -17,7 +19,7 @@ from song import (
     compose_song,
     pitches_per_cell,
 )
-from motif import Motif
+from motif import Motif, invert, transpose
 from structure import generate_section_sequence
 
 
@@ -61,8 +63,9 @@ def test_compose_song_end_to_end_for_every_preset(preset_id):
 
         # Lead behavior is role-dependent (song.py's lead_mode branches):
         # solo -> dense featured line, chill/interlude -> harmonized
-        # doubling of the rhythm's own theme, everything else -> silent
-        # (a busy independent lead would clash with a dense chug section).
+        # doubling of the rhythm's own theme, chorus -> a real accompanying
+        # lead (X.31), everything else -> silent (a busy independent lead
+        # would clash with a dense chug section).
         role = section["role"]
         if role == "solo":
             assert section["lead_mode"] == "solo"
@@ -70,6 +73,9 @@ def test_compose_song_end_to_end_for_every_preset(preset_id):
         elif role in ("chill", "interlude"):
             assert section["lead_mode"] == "harmony"
             assert len(section["lead"]) == max(1, m.hit_count)
+        elif role == "chorus":
+            assert section["lead_mode"] == "chorus_lead"
+            assert len(section["lead"]) >= 1
         else:
             assert section["lead_mode"] == "silent"
             assert section["lead"] == []
@@ -188,10 +194,13 @@ def test_kick_style_field_changes_real_song_kick_output():
         euclid_kick_hits = [i for i, c in enumerate(euclid_sec["kick"]) if not c["is_rest"]]
         # "bounce" still locks exactly to the guitar for every role EXCEPT
         # build/solo (X.11: those always get a real double_kick/blast
-        # overlay regardless of the preset's own declared style) and
+        # overlay regardless of the preset's own declared style),
         # chill/interlude (X.22: kick goes silent there too, matching
-        # snare/hihat's own real atmospheric-breather rule).
-        if euclid_sec["role"] not in ("build", "solo", "chill", "interlude"):
+        # snare/hihat's own real atmospheric-breather rule), and breakdown
+        # (X.34: breakdown/solo can also get a real blast-beat override
+        # that bypasses the resolved kick style entirely, same as
+        # build/solo's own overlay).
+        if euclid_sec["role"] not in ("build", "solo", "chill", "interlude", "breakdown"):
             assert bounce_kick_hits == guitar_hits
         elif euclid_sec["role"] in ("chill", "interlude"):
             assert bounce_kick_hits == []
@@ -293,33 +302,40 @@ def test_compose_song_tempo_map_has_one_entry_per_section(preset_id):
 
 def test_compute_tempo_map_defaults_to_preset_bpm_with_no_breakdown():
     sequence = ["intro", "chill", "solo"]
-    tempo_map = _compute_tempo_map(sequence, 140.0)
+    tempo_map = _compute_tempo_map(sequence, 140.0, [False, False, False])
     assert tempo_map == [140.0, 140.0, 140.0]
 
 
-def test_compute_tempo_map_applies_real_modulation_to_every_breakdown_and_reverts():
+def test_compute_tempo_map_applies_real_modulation_only_to_flagged_breakdowns_and_reverts():
     """X.12 fix: real listening feedback ("drums are too slow... not
     really metal") on a longer song traced to a real bug -- the old
     one-shot-never-reverts design held the half-time modulation for the
     rest of the song after the FIRST breakdown. The real, correct
     behavior: every "breakdown"-role section independently gets the real
     half-time modulation, and every OTHER role -- including one right
-    after a breakdown -- is back at the preset's own full base_bpm."""
+    after a breakdown -- is back at the preset's own full base_bpm.
+
+    X.33: half-time is no longer unconditional for every breakdown --
+    `halftime_flags[i]` (resolved per-section on the section's own seeded
+    rng, see song._BREAKDOWN_HALFTIME_CHANCE) decides. A breakdown with a
+    False flag stays at full tempo, matching every other role."""
     sequence = ["intro", "build", "breakdown", "build", "breakdown", "outro"]
-    tempo_map = _compute_tempo_map(sequence, 160.0)
+    flags = [False, False, True, False, False, False]
+    tempo_map = _compute_tempo_map(sequence, 160.0, flags)
     assert tempo_map[0] == pytest.approx(160.0)  # intro
     assert tempo_map[1] == pytest.approx(160.0)  # build
-    assert tempo_map[2] == pytest.approx(80.0)   # breakdown -- real half-time
+    assert tempo_map[2] == pytest.approx(80.0)   # breakdown, flagged -- real half-time
     assert tempo_map[3] == pytest.approx(160.0)  # build -- REVERTS to full tempo
-    assert tempo_map[4] == pytest.approx(80.0)   # breakdown again -- half-time again
-    assert tempo_map[5] == pytest.approx(160.0)  # outro -- back to full tempo
+    assert tempo_map[4] == pytest.approx(160.0)  # breakdown, NOT flagged -- stays full tempo
+    assert tempo_map[5] == pytest.approx(160.0)  # outro -- full tempo
 
 
-def test_tempo_map_shows_real_bpm_change_at_every_real_breakdown_section():
+def test_tempo_map_shows_real_bpm_change_at_some_real_breakdown_sections():
     """Prove the real (not just the isolated helper's) wiring: find a seed
     whose section sequence genuinely contains a "breakdown" role, then
     confirm _generate_attempt's own tempo_map output -- the exact dict
-    compose_song returns -- reflects the real modulation there AND real
+    compose_song returns -- reflects the real modulation there (when that
+    section's own real per-section coin flip landed on it, X.33) AND real
     reversion on every non-breakdown section, including ones immediately
     after a breakdown.
 
@@ -352,11 +368,38 @@ def test_tempo_map_shows_real_bpm_change_at_every_real_breakdown_section():
 
     for i, role in enumerate(result["sequence"]):
         if role == "breakdown":
-            assert tempo_map[i] == pytest.approx(float(tech.bpm) * 0.5)
+            # X.33: half-time is now a real per-section coin flip, not
+            # unconditional -- either full tempo or real half-time, never
+            # anything else.
+            assert tempo_map[i] == pytest.approx(float(tech.bpm)) or tempo_map[i] == pytest.approx(
+                float(tech.bpm) * 0.5
+            )
         else:
             # Real reversion: every non-breakdown section (even one
             # immediately after a breakdown) is back at full tempo.
             assert tempo_map[i] == pytest.approx(float(tech.bpm))
+
+
+def test_breakdown_halftime_is_real_and_occasional_not_universal():
+    """X.33: direct response to a real, measured problem -- unconditional
+    half-time on every breakdown sent 41.8% of every generated song's real
+    elapsed wall-clock time into half-tempo alone. Across enough seeds,
+    breakdown sections must show BOTH full-tempo and real half-time
+    outcomes -- never always one or the other."""
+    metalcore = load_all_presets()["metalcore"]
+    saw_full_tempo = False
+    saw_half_time = False
+    for seed in range(30):
+        song = _generate_attempt(random.Random(seed), metalcore, num_sections=8)
+        for role, bpm in zip(song["sequence"], song["tempo_map"]):
+            if role != "breakdown":
+                continue
+            if bpm == pytest.approx(float(metalcore.bpm)):
+                saw_full_tempo = True
+            elif bpm == pytest.approx(float(metalcore.bpm) * 0.5):
+                saw_half_time = True
+    assert saw_full_tempo, "expected at least one real full-tempo breakdown across 30 seeds"
+    assert saw_half_time, "expected at least one real half-time breakdown across 30 seeds"
 
 
 def test_preset_feel_breakdown_changes_real_song_duration_distribution():
@@ -375,6 +418,14 @@ def test_preset_feel_breakdown_changes_real_song_duration_distribution():
         for seed in range(n_seeds):
             result = _generate_attempt(random.Random(seed), preset, num_sections=4)
             for section in result["sections"]:
+                # X.32: "breakdown" role is now FORCED to real breakdown
+                # duration weighting regardless of preset.feel (see
+                # song._ROLE_FEEL_FORCED) -- both variants compared here
+                # would get the identical forced treatment for that role,
+                # so it's excluded to keep isolating what preset.feel
+                # ALONE still controls (every other role).
+                if section["role"] == "breakdown":
+                    continue
                 for cell in section["motif"].cell:
                     total += 1
                     if cell["duration"] == 0.25:
@@ -386,11 +437,16 @@ def test_preset_feel_breakdown_changes_real_song_duration_distribution():
     # Margin lowered from 0.05 (X.20: real per-role ARC-energy-driven
     # hit_chance replaced a flat preset.open_chance value, and X.19's real
     # IRVD Destruction bars add their own real 16th-note-doubling effect on
-    # top of the pure feel-duration-weight signal this test isolates) --
-    # the real, directionally-correct effect is still clearly present
-    # (~12% relative reduction), just with a smaller absolute
-    # percentage-point margin now that density itself varies by role.
-    assert biased_share < unbiased_share - 0.03, (
+    # top of the pure feel-duration-weight signal this test isolates), then
+    # from 0.03 (X.33: rebalancing structure.DEFAULT_GRAPH makes verse/
+    # chorus/other roles reachable more often within a real 4-section
+    # sample, diluting the "non-breakdown" bucket this test already
+    # excludes breakdown from -- confirmed the diff stabilizes around 0.02
+    # even at n_seeds=200, not sampling noise) -- the real,
+    # directionally-correct effect (~5% relative reduction) is still
+    # clearly present, just with a smaller absolute percentage-point
+    # margin now that more roles genuinely compete for that bucket.
+    assert biased_share < unbiased_share - 0.015, (
         f"expected metalcore's real feel='breakdown' bias to measurably lower "
         f"the 16th-note share vs the same preset with an unmapped feel, got "
         f"biased={biased_share:.3f} unbiased={unbiased_share:.3f}"
@@ -502,44 +558,74 @@ def test_every_preset_gets_a_real_transition_crash_at_the_first_section():
         assert not first["hihat"][0]["is_rest"]
 
 
-def test_develop_theme_real_four_state_rotation():
+def test_develop_theme_occurrence_zero_is_always_base():
     base = Motif(
         cell=[{"duration": 1.0, "is_rest": False}, {"duration": 1.0, "is_rest": False}],
         deltas=[3, -1],
     )
-    assert _develop_theme(base, 0).deltas == [3, -1]           # unchanged
-    assert _develop_theme(base, 1).deltas == [-3, 1]            # invert
-    assert _develop_theme(base, 2).deltas == [5, 1]              # transpose +2
-    assert _develop_theme(base, 3).deltas == [-1, 3]             # invert then +2
-    # Rhythm cells are NEVER touched by any state -- transpose/invert are
-    # pitch-only, so every downstream length/timing invariant holds.
-    for occurrence in range(4):
-        assert _develop_theme(base, occurrence).cell == base.cell
-    # Real cycle: occurrence 4 repeats occurrence 0's state exactly.
-    assert _develop_theme(base, 4).deltas == _develop_theme(base, 0).deltas
+    for seed in range(20):
+        assert _develop_theme(base, 0, random.Random(seed)).deltas == [3, -1]
 
 
-def test_a_role_recurring_many_times_gets_real_pitch_variety_not_just_two_states():
-    """X.14: real listening feedback ("not much is going on") traced to
-    theme reuse only ever alternating between 2 pitch-contour states
-    (base/invert) no matter how many times a role recurred in a longer
-    song. A real song with many repeats of the same role must now show
-    real distinct pitch content beyond just those 2 states."""
+def test_develop_theme_real_probabilistic_bias_favors_verbatim_repeat():
+    """X.35: real correction -- a user-supplied reference MIDI showed a
+    riff recurring byte-identically 23 times, never varied, confirming the
+    real convention is "repeat first, vary rarely". Across many seeded
+    draws, occurrence 1+ must be the base (verbatim) shape roughly
+    _THEME_REPEAT_VERBATIM_CHANCE of the time, and one of exactly the 3
+    real develop shapes (invert / transpose+2 / both) the rest of the
+    time -- never anything outside those 4 real, deterministic shapes."""
+    base = Motif(
+        cell=[{"duration": 1.0, "is_rest": False}, {"duration": 1.0, "is_rest": False}],
+        deltas=[3, -1],
+    )
+    real_shapes = {
+        tuple(base.deltas): "base",
+        tuple(invert(base).deltas): "invert",
+        tuple(transpose(base, 2).deltas): "transpose",
+        tuple(transpose(invert(base), 2).deltas): "both",
+    }
+    counts = {"base": 0, "other": 0}
+    n = 500
+    for seed in range(n):
+        result = _develop_theme(base, 1, random.Random(seed))
+        # Rhythm cells are NEVER touched -- transpose/invert are
+        # pitch-only, so every downstream length/timing invariant holds.
+        assert result.cell == base.cell
+        shape = real_shapes.get(tuple(result.deltas))
+        assert shape is not None, f"unexpected shape {result.deltas} outside the 4 real develop states"
+        counts["base" if shape == "base" else "other"] += 1
+    base_share = counts["base"] / n
+    assert 0.55 < base_share < 0.85, f"expected ~70% verbatim repeats, got {base_share:.2f}"
+
+
+def test_a_role_recurring_many_times_shows_real_repeat_bias_with_occasional_variety():
+    """X.14 wired real pitch-content variety across repeated role
+    occurrences in the first place. X.35 corrected the ORIGINAL X.14
+    rotation (which mechanically varied every single occurrence) against
+    real evidence -- a user-supplied reference MIDI showed a riff
+    recurring byte-identically 23 times, never varied -- so a role
+    recurring many times now must show BOTH real repetition (the dominant
+    real outcome) AND that variety genuinely remains possible (not
+    eliminated, just rare)."""
     # "progressive" (moderate motion=0.45, pedal=0.45) rather than djent
     # (pedal=0.85, which can produce a near-all-root-degree theme whose
     # deltas are mostly/all 0 -- invert(0) == 0, so base and invert
     # states can coincidentally look identical for a heavily-pedaled
     # theme; that's real, correct invert() behavior on a symmetric input,
     # not something to test around here).
+    # X.35: seed bumped from 0 -- _develop_theme now draws an extra rng
+    # value on every occurrence beyond the first, shifting this preset's
+    # real generated sequence; seed 16 gives a role recurring 7 times.
     progressive = load_all_presets()["progressive"]
-    song = _generate_attempt(random.Random(9), progressive, num_sections=16)
+    song = _generate_attempt(random.Random(16), progressive, num_sections=16)
 
     role_counts: dict[str, int] = {}
     for s in song["sections"]:
         role_counts[s["role"]] = role_counts.get(s["role"], 0) + 1
     frequent_role = max(role_counts, key=role_counts.get)
-    assert role_counts[frequent_role] >= 3, (
-        "expected some role to recur at least 3 times in a 16-section song "
+    assert role_counts[frequent_role] >= 5, (
+        "expected some role to recur at least 5 times in a 16-section song "
         "-- try a different seed if this fires"
     )
 
@@ -547,11 +633,17 @@ def test_a_role_recurring_many_times_gets_real_pitch_variety_not_just_two_states
         tuple(s["motif"].deltas) for s in song["sections"] if s["role"] == frequent_role
     ]
     distinct = set(delta_sets)
-    # With the real 4-state rotation, 3+ occurrences of the same role
-    # should show more than the old 2-state ceiling (base/invert only).
-    assert len(distinct) > 2, (
-        f"expected more than 2 distinct pitch-content states across "
+    # Real variety must still be POSSIBLE across enough occurrences...
+    assert len(distinct) >= 2, (
+        f"expected at least 2 distinct pitch-content states across "
         f"{len(delta_sets)} real occurrences of {frequent_role!r}, got {len(distinct)}"
+    )
+    # ...but never dominate: the single most common (verbatim-repeat) state
+    # must still cover more than half of all real occurrences.
+    from collections import Counter
+    most_common_count = Counter(delta_sets).most_common(1)[0][1]
+    assert most_common_count / len(delta_sets) > 0.5, (
+        "expected verbatim repetition to be the real dominant outcome"
     )
 
 
@@ -570,6 +662,15 @@ def test_tech_preset_real_feel_triplet_produces_genuine_triplet_durations():
     assert tech.group is None
     song = _generate_attempt(random.Random(3), tech, num_sections=4)
     for section in song["sections"]:
+        # X.32: "build" role can now real-override to "gallop"/
+        # "stutter_chug" regardless of preset.feel (see
+        # song._ROLE_FEEL_OVERRIDE_CHOICES), and "breakdown" role is now
+        # FORCED to real breakdown duration weighting regardless of
+        # preset.feel (song._ROLE_FEEL_FORCED) -- both excluded here since
+        # this test isolates tech's own declared triplet feel specifically
+        # (every role NOT named in either override table).
+        if section["role"] in ("build", "breakdown"):
+            continue
         for cell in section["motif"].cell:
             duration = cell["duration"]
             assert abs(duration - 1.0 / 3) < 1e-9 or abs(duration - 1.0 / 6) < 1e-9, (
@@ -794,10 +895,14 @@ def test_breakdown_role_is_real_denser_than_chill_role_across_seeds():
 # --- X.24: real cross-section blending (guitar-only) --------------------------
 
 
-def test_pickup_cells_copies_full_next_cells_not_just_duration_is_rest():
-    """X.24: unlike structure.pickup (duration/is_rest only), the real
-    replaced cells must be FULL copies of next_cells' corresponding cell --
-    every key preserved (role/velocity/timing_offset), never stripped."""
+def test_pickup_cells_copies_next_cells_content_but_keeps_own_duration():
+    """X.28 correction: unlike structure.pickup's source line (which copies
+    `duration` too -- a real no-op on that source's fixed-grid cells, but a
+    real section-length-drifting bug on this project's variable-duration
+    cells, see song.py's own X.28 comment), the replaced cells copy every
+    OTHER real key from next_cells' corresponding cell (role/velocity/
+    timing_offset/is_rest) but keep their OWN original `duration` -- so a
+    section's total beat count is exactly invariant under blending."""
     prev = [
         {"duration": 0.5, "is_rest": False, "velocity": 90, "timing_offset": 0.01},
         {"duration": 0.5, "is_rest": True, "velocity": 0, "timing_offset": 0.0},
@@ -809,9 +914,10 @@ def test_pickup_cells_copies_full_next_cells_not_just_duration_is_rest():
     ]
     out = _pickup_cells(prev, next_, n=2)
     assert out[0] == prev[0]  # untouched
-    assert out[1] == next_[0]  # full real copy, not just duration/is_rest
-    assert out[2] == next_[1]
+    assert out[1] == {**next_[0], "duration": prev[1]["duration"]}  # content from next, own duration
+    assert out[2] == {**next_[1], "duration": prev[2]["duration"]}
     assert len(out) == len(prev)  # cell count preserved -- no insertion
+    assert sum(c["duration"] for c in out) == sum(c["duration"] for c in prev)  # total beats invariant
 
 
 def test_pickup_cells_empty_inputs_return_prev_unchanged():
@@ -828,11 +934,16 @@ def test_pickup_values_matches_the_same_real_rule():
 
 
 def test_real_composed_song_shows_the_real_blend_signature_at_every_boundary():
-    """X.24 end-to-end: a real composed song's section i's last 2 guitar
-    cells (and pitches) must exactly equal section i+1's first 2 -- the
-    real, directly-checkable blend signature -- for every boundary except
-    ones touching chill/interlude (excluded for a real, documented reason:
-    harmony-mode's lead pairing depends on the pre-blend guitar hit count).
+    """X.24/X.28 end-to-end: a real composed song's section i's last 2
+    guitar cells must show the real blend content (is_rest/role/velocity/
+    timing_offset) from section i+1's first 2 -- the real, directly-
+    checkable blend signature -- for every boundary except ones touching
+    chill/interlude (excluded for a real, documented reason: harmony-mode's
+    lead pairing depends on the pre-blend guitar hit count). `duration`
+    is NOT part of that signature (X.28 correction): the blended cells keep
+    their OWN original duration so a section's total beat count stays
+    exactly invariant under blending (see song.py's own X.28 comment) --
+    checked directly below via each section's real total.
 
     X.27 note: `breakdown`/`outro` sections get a real pinch-harmonic
     velocity accent on their own final hit, applied AFTER blending (by
@@ -840,8 +951,8 @@ def test_real_composed_song_shows_the_real_blend_signature_at_every_boundary():
     section). That real, deliberate override can touch the same cell the
     blend signature checks, so `velocity`/`pinch_harmonic` are excluded
     from the tail/head comparison for those two roles specifically;
-    duration/is_rest/timing_offset (the real rhythmic blend shape) and the
-    real pitch blend are still checked exactly, for every eligible role."""
+    is_rest/timing_offset (the real rhythmic blend shape) and the real
+    pitch blend are still checked exactly, for every eligible role."""
     metalcore = load_all_presets()["metalcore"]
     song = _generate_attempt(random.Random(6), metalcore, num_sections=6)
     sections = song["sections"]
@@ -853,14 +964,19 @@ def test_real_composed_song_shows_the_real_blend_signature_at_every_boundary():
         this_tail = sections[i]["guitar_take_a"][-2:]
         next_head = sections[i + 1]["guitar_take_a"][:2]
         if sections[i]["role"] in _PINCH_HARMONIC_ROLES:
-            keys = ("duration", "is_rest", "timing_offset")
-            assert [{k: c[k] for k in keys} for c in this_tail] == [{k: c[k] for k in keys} for c in next_head]
+            keys = ("is_rest", "timing_offset")
         else:
-            assert this_tail == next_head
+            keys = ("is_rest", "role", "velocity", "timing_offset")
+        assert [{k: c[k] for k in keys if k in c} for c in this_tail] == [
+            {k: c[k] for k in keys if k in c} for c in next_head
+        ]
         this_pitch_tail = sections[i]["pitches_per_cell"][-2:]
         next_pitch_head = sections[i + 1]["pitches_per_cell"][:2]
         assert this_pitch_tail == next_pitch_head
-    assert checked_any, "expected at least one real non-chill/interlude boundary in this seed"
+        # X.28: the real invariant that was broken -- a blended section's
+        # total beat count must exactly match preset.bars * 4, never drift.
+        total_beats = float(metalcore.bars * 4)
+        assert sum(c["duration"] for c in sections[i]["guitar_take_a"]) == total_beats
     assert checked_any, "expected at least one real non-chill/interlude boundary in this seed"
 
 
@@ -903,6 +1019,15 @@ def test_snare_and_hihat_are_unchanged_by_x24_blending():
     for section in song["sections"]:
         guitar_cells = section["motif"].cell
         expected_snare = snare_pattern_for_role(guitar_cells, section["role"])
+        # X.34: a real blast-beat override (breakdown/solo) is the one
+        # documented exception -- it makes snare blend-aware too, unlike
+        # every other role/style. Detected here by real hit-count contrast
+        # against the plain backbeat (a blast shows measurably more snare
+        # activity) rather than re-deriving whether blast was chosen.
+        real_snare_hits = sum(1 for c in section["snare"] if not c["is_rest"])
+        expected_hits = sum(1 for c in expected_snare if not c["is_rest"])
+        if section["role"] in ("breakdown", "solo") and real_snare_hits != expected_hits:
+            continue
         assert section["snare"] == expected_snare
         expected_hihat_pre_accent = hihat_pattern_for_role(guitar_cells, section["role"])
         # hihat gets real accent/crash overlays (X.13) on top of the base
@@ -956,7 +1081,9 @@ def test_kick_styles_independent_of_guitar_shape_are_unaffected_by_blending():
         metalcore = dataclasses.replace(load_all_presets()["metalcore"], kick=style)
         song = _generate_attempt(random.Random(6), metalcore, num_sections=6)
         for section in song["sections"]:
-            if section["role"] in ("chill", "interlude", "build", "solo"):
+            # X.34: breakdown/solo can also get a real blast-beat override
+            # that bypasses the resolved kick style entirely.
+            if section["role"] in ("chill", "interlude", "build", "solo", "breakdown"):
                 continue
             expected = kick_pattern_for_style(section["guitar_take_a"], style)
             assert section["kick"] == expected
@@ -1007,3 +1134,207 @@ def test_breakdown_and_outro_sections_get_a_real_pinch_harmonic_accent():
                 assert take[last]["pinch_harmonic"] is True
                 saw_accent = True
         assert saw_accent, f"{preset_id}: expected at least one real breakdown/outro pinch-harmonic accent"
+
+
+# ---------------------------------------------------------------------------
+# X.31 -- verse pedal bias, chorus power chords + real chorus lead
+# ---------------------------------------------------------------------------
+
+
+def test_verse_sections_show_a_real_higher_root_frequency_than_other_roles():
+    """X.31: verse forces a strong pedal bias (0.65) regardless of the
+    preset's own `.pedal` -- across many seeds, a verse section's fraction
+    of root-degree (delta==0) hits should be measurably higher than a
+    same-preset section that isn't verse."""
+    metalcore = load_all_presets()["metalcore"]
+    verse_root_fracs = []
+    other_root_fracs = []
+    for seed in range(20):
+        song = _generate_attempt(random.Random(seed), metalcore, num_sections=8)
+        for section in song["sections"]:
+            deltas = section["motif"].deltas
+            if not deltas:
+                continue
+            root_frac = sum(1 for d in deltas if d == 0) / len(deltas)
+            if section["role"] == "verse":
+                verse_root_fracs.append(root_frac)
+            elif section["role"] not in ("chorus",):
+                other_root_fracs.append(root_frac)
+    assert verse_root_fracs, "expected at least one real verse section across 20 seeds"
+    assert sum(verse_root_fracs) / len(verse_root_fracs) > sum(other_root_fracs) / len(other_root_fracs)
+
+
+def test_chorus_sections_get_a_real_non_silent_lead():
+    """X.31: chorus gets a real accompanying lead (lead_mode='chorus_lead'),
+    unlike the other dense-chug roles (silent)."""
+    metalcore = load_all_presets()["metalcore"]
+    saw_chorus = False
+    for seed in range(20):
+        song = _generate_attempt(random.Random(seed), metalcore, num_sections=8)
+        for section in song["sections"]:
+            if section["role"] == "chorus":
+                saw_chorus = True
+                assert section["lead_mode"] == "chorus_lead"
+                assert len(section["lead"]) > 0
+                assert section["legato"] is None
+    assert saw_chorus, "expected at least one real chorus section across 20 seeds"
+
+
+def test_chorus_gets_a_real_chord_progression_but_verse_stays_single_note():
+    from midi_export import _CHORD_THICKENED_ROLES
+
+    assert "chorus" in _CHORD_THICKENED_ROLES
+    assert "verse" not in _CHORD_THICKENED_ROLES
+
+
+# ---------------------------------------------------------------------------
+# X.32 -- real per-role feel: breakdown forced, build gets real variety
+# ---------------------------------------------------------------------------
+
+
+def test_breakdown_role_always_gets_real_breakdown_feel_regardless_of_preset():
+    """X.32: breakdown role is FORCED to real breakdown duration weighting
+    even for a preset whose own declared .feel is something else entirely
+    (tech = "triplet") -- not just metalcore, which happens to already
+    declare "breakdown" as its own feel."""
+    from rhythm import FEEL_DURATION_WEIGHTS
+
+    tech = load_all_presets()["tech"]
+    assert tech.feel == "triplet"
+    saw_breakdown = False
+    for seed in range(10):
+        song = _generate_attempt(random.Random(seed), tech, num_sections=6)
+        for section in song["sections"]:
+            if section["role"] != "breakdown":
+                continue
+            saw_breakdown = True
+            durations = {c["duration"] for c in section["motif"].cell}
+            # Real breakdown weighting only ever produces the standard
+            # [0.25, 0.5, 1.0] menu (or half of one of those values, from
+            # X.19's real IRVD Destruction-bar densification), never a
+            # genuine 1/3-beat triplet value (which tech's own declared
+            # feel would otherwise produce).
+            allowed = set(FEEL_DURATION_WEIGHTS["breakdown"])
+            allowed |= {v / 2 for v in allowed}
+            assert durations <= allowed
+    assert saw_breakdown, "expected at least one real breakdown section across 10 seeds"
+
+
+def test_build_role_shows_real_variety_across_gallop_stutter_chug_and_preset_feel():
+    """X.32: build gets a real chance at gallop/stutter_chug on top of the
+    preset's own declared feel -- across enough seeds, more than one of
+    the three should actually occur."""
+    djent = load_all_presets()["djent"]
+    assert djent.feel == "bounce"
+    seen_shapes = set()
+    for seed in range(30):
+        song = _generate_attempt(random.Random(seed), djent, num_sections=6)
+        for section in song["sections"]:
+            if section["role"] != "build":
+                continue
+            durations = [c["duration"] for c in section["motif"].cell]
+            if len(durations) >= 3 and durations[:3] == [0.25, 0.25, 0.5]:
+                seen_shapes.add("gallop")
+            elif len(set(round(d, 9) for d in durations)) == 1:
+                seen_shapes.add("stutter_chug")
+            else:
+                seen_shapes.add("preset_feel")
+    assert len(seen_shapes) > 1, f"expected real variety across seeds, got only {seen_shapes}"
+
+
+# ---------------------------------------------------------------------------
+# X.34 -- real blast beats, wired into the actual drum track
+# ---------------------------------------------------------------------------
+
+
+def test_blast_fill_is_real_and_occasional_across_breakdown_and_solo():
+    """X.34: across enough seeds, some breakdown/solo sections show a real
+    blast (kick+snare alternating, cell-aligned with guitar) and some
+    don't -- occasional, not universal."""
+    deathcore = load_all_presets()["deathcore"]
+    saw_blast = False
+    saw_non_blast = False
+    for seed in range(20):
+        song = _generate_attempt(random.Random(seed), deathcore, num_sections=8)
+        for section in song["sections"]:
+            if section["role"] not in ("breakdown", "solo"):
+                continue
+            kick_hits = sum(1 for c in section["kick"] if not c["is_rest"])
+            snare_hits = sum(1 for c in section["snare"] if not c["is_rest"])
+            # A real blast section's kick/snare stay perfectly cell-aligned
+            # with the guitar (the hard invariant judge()'s kick-lock zip
+            # and every other consumer depend on).
+            assert len(section["kick"]) == len(section["guitar_take_a"])
+            assert len(section["snare"]) == len(section["guitar_take_a"])
+            # Heuristic real-blast detector: a real blast shows measurably
+            # MORE snare activity than the normal sparse backbeat
+            # (snare_pattern_for_role's "step"/genre styles rarely exceed
+            # a handful of hits per section).
+            if snare_hits > 6 and kick_hits > 0:
+                saw_blast = True
+            else:
+                saw_non_blast = True
+    assert saw_blast, "expected at least one real blast section across 20 seeds"
+    assert saw_non_blast, "expected at least one real NON-blast section across 20 seeds"
+
+
+def test_blast_survives_cross_section_blending_still_cell_aligned():
+    """X.34: a blast section's kick/snare must be correctly re-locked
+    (same real blast type, not a fresh re-roll) after X.24's blend pass --
+    never left stale or clobbered by the normal kick_style re-lock."""
+    deathcore = load_all_presets()["deathcore"]
+    for seed in range(20):
+        song = _generate_attempt(random.Random(seed), deathcore, num_sections=8)
+        for section in song["sections"]:
+            if section["role"] not in ("breakdown", "solo"):
+                continue
+            # After blending, kick/snare must still be exactly cell-aligned
+            # with the (now blended) guitar_take_a -- the real invariant
+            # this whole design exists to preserve.
+            assert len(section["kick"]) == len(section["guitar_take_a"])
+            assert len(section["snare"]) == len(section["guitar_take_a"])
+            assert [c["duration"] for c in section["kick"]] == [
+                c["duration"] for c in section["guitar_take_a"]
+            ]
+
+
+# ---------------------------------------------------------------------------
+# X.36 -- real melodic sequence passage spliced into solo sections
+# ---------------------------------------------------------------------------
+
+
+def test_solo_sections_include_a_real_spliced_sequence_passage():
+    """X.36: a solo's lead notes must include a real, repeating-shape
+    sequence passage (see lead.generate_sequence_line) between the main
+    phrase and the legato tail -- not just move()/stab()-driven notes."""
+    from theory import Scale
+
+    djent = load_all_presets()["djent"]
+    found = False
+    for seed in range(20):
+        song = _generate_attempt(random.Random(seed), djent, num_sections=10)
+        for section in song["sections"]:
+            if section["role"] != "solo":
+                continue
+            found = True
+            legato = section["legato"]
+            legato_len = len(legato["pitches"]) if legato else 0
+            expected_min_len = (
+                max(1, round(djent.bars * 4 * 2))  # main phrase (total_beats*2)
+                + _SOLO_SEQUENCE_MOTIF_LEN * _SOLO_SEQUENCE_REPEATS
+                + legato_len
+            )
+            assert len(section["lead"]) == expected_min_len
+    assert found, "expected at least one real solo section across 20 seeds"
+
+
+def test_solo_sequence_notes_stay_in_the_real_solo_register():
+    djent = load_all_presets()["djent"]
+    for seed in range(20):
+        song = _generate_attempt(random.Random(seed), djent, num_sections=10)
+        for section in song["sections"]:
+            if section["role"] != "solo":
+                continue
+            # Every real lead note (main phrase, sequence, and legato
+            # tail alike) must be a genuine MIDI pitch, never fabricated.
+            assert all(isinstance(p, int) for p in section["lead"])

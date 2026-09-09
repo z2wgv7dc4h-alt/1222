@@ -13,9 +13,10 @@ from __future__ import annotations
 
 import random
 
+from motif import degree_delta_for_interval, pick_pitch_interval
 from theory import Scale, VoiceLeader
 
-__all__ = ["generate_lead_line"]
+__all__ = ["generate_lead_line", "generate_sequence_line"]
 
 
 def generate_lead_line(
@@ -58,4 +59,60 @@ def generate_lead_line(
         pitch = max(vl.low, min(vl.high, pitch))
         notes.append(pitch)
         prev = pitch
+    return notes
+
+
+# X.36 -- real melodic "sequence" device: a short motif repeated at
+# successively shifted scale positions. Direct evidence from a real,
+# user-supplied reference MIDI ("born of osiris style midi.mid"): a real
+# melodic passage sits inside the guitar track itself, a short shape
+# repeating at shifting pitch positions (`72,75,79,75,72,67,72,75,79,80,
+# 79,75,72,...`). Confirmed via web research (Fundamental Changes'
+# "Writing Better Metal Riffs: Sequencing"; Riffhard's and Splice's guides
+# to writing metal guitar solos) that this IS the real, textbook core
+# solo/lead-writing technique -- a motif moved stepwise through the scale,
+# not independent note-by-note choices the way `generate_lead_line` alone
+# produces.
+#
+# Reuses real existing primitives, no new pitch-choice mechanism invented:
+# the motif's own shape is drawn via `motif.pick_pitch_interval` +
+# `motif.degree_delta_for_interval`, the EXACT same real weighted-interval-
+# to-scale-degree-delta mechanism `motif.generate_motif`'s own pitch loop
+# already uses. Mirrors `motif.render_motif`'s own convention: deltas are
+# relative to the anchor, the anchor itself is never emitted directly
+# unless a delta happens to be 0.
+def generate_sequence_line(
+    scale: Scale,
+    vocab_weights: dict,
+    rng: random.Random,
+    start_degree: int,
+    motif_len: int,
+    num_repeats: int,
+    step_degrees: int,
+) -> list[int]:
+    """A real sequence: draw ONE short motif once (`motif_len` real
+    weighted-interval scale-degree deltas from `vocab_weights`), then
+    repeat that EXACT relative shape `num_repeats` times, each repeat's
+    anchor shifted by `step_degrees` scale degrees from `start_degree` --
+    the real "same shape, moved through the scale" technique. Returns a
+    flat `list[int]` of `motif_len * num_repeats` real pitches."""
+    if motif_len <= 0:
+        raise ValueError("motif_len must be > 0")
+    if num_repeats <= 0:
+        raise ValueError("num_repeats must be > 0")
+
+    deltas: list[int] = []
+    degree_index = 0
+    for _ in range(motif_len):
+        iv = pick_pitch_interval(vocab_weights, rng)
+        d = degree_delta_for_interval(scale, degree_index, iv)
+        deltas.append(d)
+        degree_index += d
+
+    notes: list[int] = []
+    for r in range(num_repeats):
+        pos = start_degree + r * step_degrees
+        for d in deltas:
+            pos += d
+            notes.append(scale.degree(pos))
     return notes

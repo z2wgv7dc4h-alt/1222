@@ -138,7 +138,11 @@ def test_tempo_track_reflects_the_real_tempo_map():
     # build->breakdown transition (X.6c's real trigger) is likely, but the
     # test only asserts against song["tempo_map"] itself -- never a
     # hand-picked expected BPM -- so it's correct either way.
-    song = compose_song("djent", seed=11, num_sections=8)
+    # X.33: seed bumped from 11 -- half-time breakdown is now a real
+    # per-section coin flip (song._BREAKDOWN_HALFTIME_CHANCE), not
+    # unconditional, so seed 11 no longer guarantees a real tempo change;
+    # seed 0 does.
+    song = compose_song("djent", seed=0, num_sections=8)
     out_path = _write_tmp(song, "djent_tempo")
 
     parsed = _read_back(out_path)
@@ -168,7 +172,11 @@ def test_tempo_drop_event_lands_at_the_real_mid_section_tick():
     tempo_drop must land at the exact tick this section's own
     trigger_beat implies (start-of-section tick + trigger_beat*ppq),
     not just somewhere in the track."""
-    song = compose_song("djent", seed=11, num_sections=8)
+    # X.32: seed bumped from 11 -- real per-role feel resolution now draws
+    # an extra rng.choice() for every "build" role section, shifting this
+    # seed's later draws (including the tempo_drop chance roll) enough that
+    # seed 11 no longer lands a real tempo_drop; seed 0 does.
+    song = compose_song("djent", seed=0, num_sections=8)
     dropped = [(i, s) for i, s in enumerate(song["sections"]) if s.get("tempo_drop") is not None]
     assert dropped, "expected djent seed=11/8 sections to include a real tempo_drop (see test_tempo_track_reflects_the_real_tempo_map)"
 

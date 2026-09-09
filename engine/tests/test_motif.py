@@ -438,3 +438,53 @@ def test_generate_motif_irvd_bars_and_group_beats_together_raises():
             16.0, [0.25, 0.5, 1.0], 0.6, random.Random(1), scale, weights,
             group_beats=3.0, irvd_bars=4,
         )
+
+
+# ---------------------------------------------------------------------------
+# X.32 -- real feel="gallop"/feel="stutter_chug" dispatch
+# ---------------------------------------------------------------------------
+
+
+def test_feel_gallop_produces_the_real_short_short_long_pattern():
+    scale = Scale(52, "minor")
+    weights = {0: 10, 7: 5}
+    m = generate_motif(4.0, [0.25, 0.5, 1.0], 0.6, random.Random(1), scale, weights, feel="gallop")
+    durations = [c["duration"] for c in m.cell]
+    assert durations == [0.25, 0.25, 0.5] * (len(durations) // 3)
+    assert all(not c["is_rest"] for c in m.cell)  # gallop is always hits, never a rest
+    assert sum(c["duration"] for c in m.cell) == 4.0
+
+
+def test_feel_gallop_is_deterministic_regardless_of_rng():
+    scale = Scale(52, "minor")
+    weights = {0: 10, 7: 5}
+    a = generate_motif(4.0, [0.25, 0.5, 1.0], 0.6, random.Random(1), scale, weights, feel="gallop")
+    b = generate_motif(4.0, [0.25, 0.5, 1.0], 0.6, random.Random(99), scale, weights, feel="gallop")
+    assert a.cell == b.cell  # the gallop RHYTHM itself never varies by seed
+
+
+def test_feel_gallop_respects_group_beats_tiling():
+    scale = Scale(52, "minor")
+    weights = {0: 10, 7: 5}
+    m = generate_motif(
+        8.0, [0.25, 0.5, 1.0], 0.6, random.Random(1), scale, weights,
+        feel="gallop", group_beats=3.0,
+    )
+    assert sum(c["duration"] for c in m.cell) == 8.0
+
+
+def test_feel_stutter_chug_produces_real_equal_length_slots():
+    scale = Scale(52, "minor")
+    weights = {0: 10, 7: 5}
+    m = generate_motif(4.0, [0.25, 0.5, 1.0], 0.6, random.Random(2), scale, weights, feel="stutter_chug")
+    durations = {round(c["duration"], 9) for c in m.cell}
+    assert len(durations) == 1  # every slot the same length, unlike gallop's two-value pattern
+    assert sum(c["duration"] for c in m.cell) == 4.0
+
+
+def test_feel_stutter_chug_varies_by_rng_unlike_gallop():
+    scale = Scale(52, "minor")
+    weights = {0: 10, 7: 5}
+    a = generate_motif(4.0, [0.25, 0.5, 1.0], 0.6, random.Random(1), scale, weights, feel="stutter_chug")
+    b = generate_motif(4.0, [0.25, 0.5, 1.0], 0.6, random.Random(2), scale, weights, feel="stutter_chug")
+    assert [c["is_rest"] for c in a.cell] != [c["is_rest"] for c in b.cell]

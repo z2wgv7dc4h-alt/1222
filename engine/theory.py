@@ -240,6 +240,14 @@ ROLE_LETTER = {
     "outro": "O", "o": "O",
     "breakdown": "C", "c": "C",
     "chill": "K", "synth": "K", "k": "K",
+    # X.28 -- "A"/"B" were real, tested ARC rows with no role ever mapped to
+    # them (only reachable via arc(letter="A"/"B") directly). Verse/chorus
+    # are the real destination for them: "A" (energy 0.60) vs "B" (energy
+    # 0.70) is exactly the real verse-vs-chorus energy contrast Metalerator's
+    # own verse/chorus riff generators show (sparse pedal-tone verse, denser
+    # power-chord chorus) -- see PORTS.md/TASKS.md X.28.
+    "verse": "A", "v": "A",
+    "chorus": "B", "ch": "B",
 }
 
 

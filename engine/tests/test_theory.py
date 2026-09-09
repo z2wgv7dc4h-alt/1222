@@ -135,3 +135,21 @@ def test_arc_density_cannot_be_overridden_independently():
 def test_arc_unknown_letter_falls_back_to_default():
     row = arc("nonexistent-letter")
     assert row["letter"] == "A"
+
+
+# X.28 -- verse/chorus now resolve to the real, previously-unmapped "A"/"B"
+# ARC rows (real verse-vs-chorus energy contrast: 0.60 vs 0.70).
+def test_arc_verse_resolves_to_the_real_a_row():
+    row = arc(role="verse")
+    assert row["letter"] == "A"
+    assert row == arc("A")
+
+
+def test_arc_chorus_resolves_to_the_real_b_row():
+    row = arc(role="chorus")
+    assert row["letter"] == "B"
+    assert row == arc("B")
+
+
+def test_arc_chorus_has_higher_energy_than_verse():
+    assert arc(role="chorus")["energy"] > arc(role="verse")["energy"]

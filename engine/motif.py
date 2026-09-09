@@ -26,6 +26,7 @@ from __future__ import annotations
 import random
 from dataclasses import dataclass, field
 
+from groove import gallop_cell, stutter_chug_cell
 from rhythm import duration_bias_for_feel, generate_rhythm, generate_triplet_rhythm, phrase_plan, tile_cell
 from theory import Scale, shade
 
@@ -37,6 +38,7 @@ __all__ = [
     "invert",
     "fragment",
     "pick_pitch_interval",
+    "degree_delta_for_interval",
     "apply_pedal_bias",
     "generate_motif",
     "ThemeRegistry",
@@ -153,12 +155,19 @@ def pick_pitch_interval(weights: dict, rng: random.Random) -> int:
     return int(items[-1][0])
 
 
-def _degree_delta_for_interval(scale: Scale, base_degree_index: int, semitone_interval: int) -> int:
+def degree_delta_for_interval(scale: Scale, base_degree_index: int, semitone_interval: int) -> int:
     """Snap `base_degree_index`'s pitch + `semitone_interval` semitones into
     the scale, and express the result as a scale-degree DELTA from
     `base_degree_index` -- so chromatic bias (picked in semitone space, where
     `shade()` operates) still comes out as a scale-legal degree delta, never
-    a fabricated off-scale pitch."""
+    a fabricated off-scale pitch.
+
+    X.36 -- made public (was `_degree_delta_for_interval`): `lead.
+    generate_sequence_line` became a real second caller needing this exact
+    logic (the same real weighted-interval-to-scale-degree-delta mechanism
+    `generate_motif`'s own pitch loop uses), same established precedent as
+    X.24's `resolve_kick_style` extraction -- promote to public rather than
+    duplicate."""
     base_pitch = scale.degree(base_degree_index)
     target = scale.nearest(base_pitch + semitone_interval)
     return scale.index_of(target) - base_degree_index
@@ -170,7 +179,7 @@ def apply_pedal_bias(weights: dict, pedal: float) -> dict:
     project uses to make `preset.pedal` (documented in presets.py as "how
     often a phrase returns to the open low string") measurably change
     `generate_motif`'s output: picking semitone interval 0 always resolves
-    to scale-degree DELTA 0 (see `_degree_delta_for_interval` -- interval 0
+    to scale-degree DELTA 0 (see `degree_delta_for_interval` -- interval 0
     added to the current pitch snaps right back to that same degree), so
     biasing the interval-0 draw probability directly biases the fraction of
     root/pedal (`delta == 0`) hits a motif ends up with.
@@ -204,6 +213,12 @@ def apply_pedal_bias(weights: dict, pedal: float) -> dict:
     return out
 
 
+# X.32 -- real slot size for feel="stutter_chug" (groove.stutter_chug_cell),
+# matching this project's existing shortest allowed rhythm length (16th
+# note) rather than inventing a new duration value.
+_STUTTER_CHUG_HIT_LEN = 0.25
+
+
 def generate_motif(
     total_beats: float,
     allowed_lengths: list[float],
@@ -230,6 +245,13 @@ def generate_motif(
     mix, not just its label. `feel=None` or an unmapped name (the
     default) keeps rhythm generation exactly as before this parameter
     existed -- uniform duration selection, no forced pairing.
+
+    `feel="gallop"`/`feel="stutter_chug"` (X.32) dispatch to
+    `groove.gallop_cell`/`groove.stutter_chug_cell` instead -- real, named
+    rhythmic-cell DEVICES (a fixed short-short-long pattern / rapid
+    equal-length hits with random rests), not a duration-weight reshaping
+    of the standard menu, same real "different subdivision path entirely"
+    treatment `feel="triplet"` already gets.
 
     `chromatic=True` reshapes `vocab_weights` through `theory.shade()` at
     `dissonance` before picking, biasing draws toward the dissonant interval
@@ -276,7 +298,24 @@ def generate_motif(
             vocab_weights, chromatic=chromatic, dissonance=dissonance,
             base_degree=base_degree, pedal=pedal, feel=feel,
         )
-    if feel == "triplet":
+    if feel == "gallop":
+        # X.32 -- the classic short-short-long metal gallop (scope sec.4:
+        # "named rhythmic cells... 'gallop'"). `groove.gallop_cell` is
+        # deterministic (the gallop feel comes from the fixed duration
+        # pattern, not a random draw) and already tiles to fill `span`
+        # exactly -- same real "short cell then tile again under
+        # group_beats" structure as the "triplet" branch below.
+        span = float(group_beats) if group_beats is not None else total_beats
+        short_cell = gallop_cell(span)
+        cell = tile_cell(short_cell, total_beats) if group_beats is not None else short_cell
+    elif feel == "stutter_chug":
+        # X.32 -- rapid equal-length hits with rests punched in at random
+        # (scope sec.4: "'stutter-chug'") -- structurally distinct from
+        # gallop's fixed short-short-long pattern.
+        span = float(group_beats) if group_beats is not None else total_beats
+        short_cell = stutter_chug_cell(span, _STUTTER_CHUG_HIT_LEN, hit_chance, rng)
+        cell = tile_cell(short_cell, total_beats) if group_beats is not None else short_cell
+    elif feel == "triplet":
         # X.15: a real triplet feel is a genuinely different subdivision
         # device, not a duration-weight reshaping of the standard
         # [0.25, 0.5, 1.0] menu (see generate_triplet_rhythm's own
@@ -307,7 +346,7 @@ def generate_motif(
     degree_index = int(base_degree)
     for _ in range(hits):
         iv = pick_pitch_interval(weights, rng)
-        d = _degree_delta_for_interval(scale, degree_index, iv)
+        d = degree_delta_for_interval(scale, degree_index, iv)
         deltas.append(d)
         degree_index += d
 

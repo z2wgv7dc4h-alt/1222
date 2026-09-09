@@ -84,22 +84,25 @@ from atmosphere import find_accents, pad_voicing
 from bass import build_bass_fretboard, follow_guitar_rhythm
 from chord_vocab import quality_for_dissonance, voice_named_chord
 from drums import (
-    RhythmRegistry,
     add_transition_crash,
     apply_hihat_accents,
-    generate_vocabulary_informed_blast_fill,
+    blast_kick_cells,
+    blast_snare_cells,
     hihat_pattern_for_role,
     kick_pattern_for_style,
+    render_blast_beat,
+    render_blast_beat_for_type,
     resolve_kick_style,
     snare_pattern_for_role,
 )
 from fretboard import Fretboard
-from lead import generate_lead_line
+from lead import generate_lead_line, generate_sequence_line
 from legato import generate_legato_lick
 from metric_modulation import apply_metric_modulation, modulation_ratio
 from motif import Motif, ThemeRegistry, invert, render_motif, transpose
 from performance import double_track
 from presets import Preset, get_tuning, load_all_presets, load_tunings, resolve_preset_id
+from progression import CHORUS_PROGRESSIONS, VERSE_PROGRESSIONS, pitches_per_cell_with_progression
 from riff import harmonize_line
 from structure import generate_section_sequence, judge, tempo_at
 from theory import Scale, VoiceLeader, arc
@@ -148,6 +151,33 @@ _CHROMATIC_DISSONANCE_THRESHOLD = 0.5
 # yet.
 _BASE_HIT_CHANCE = 0.72
 
+# X.30 -- which real progression table (if any) a role draws from. Only
+# verse/chorus get real per-bar tonal-center movement (see progression.py's
+# module docstring); every other role keeps one fixed anchor for the whole
+# section, unchanged.
+_PROGRESSION_TABLES = {"verse": VERSE_PROGRESSIONS, "chorus": CHORUS_PROGRESSIONS}
+
+# X.31 -- real verse pedal-bias override. Matches Metalerator's own real
+# verse riff frequency (~65% root note, occasional colored note) -- see
+# song._generate_attempt's `theme-{role}` call site for where this is used.
+_VERSE_PEDAL_BIAS = 0.65
+
+# X.32 -- real per-role feel override, closing the architectural gap this
+# session's audit surfaced: `feel` was one value per whole PRESET, so a
+# metalcore song's intro/verse/build/chorus/outro all got the exact same
+# duration-weighting as the actual breakdown section -- zero rhythmic
+# contrast between "riffing toward the breakdown" and "the breakdown
+# itself" within one song. `breakdown` ALWAYS gets real breakdown duration
+# weighting (dense chug) regardless of what the preset otherwise declares --
+# the one section a "breakdown" role must always chug like a breakdown.
+# `build` gets a real chance at the classic gallop/stutter-chug riffing
+# devices (scope sec.4), picked per-section via the section's own seeded
+# rng alongside the preset's own declared feel as a real, always-available
+# choice (so build doesn't ALWAYS gallop -- genuine variety, same real
+# precedent as X.11's build/solo kick-style overlay).
+_ROLE_FEEL_FORCED = {"breakdown": "breakdown"}
+_ROLE_FEEL_OVERRIDE_CHOICES = {"build": ("gallop", "stutter_chug")}
+
 
 def _resolve_hit_chance(base: float, energy: float) -> float:
     """The real rest-vs-hit probability for one section: `base` (this
@@ -195,6 +225,40 @@ _TEMPO_DROP_MIN_BARS = 4
 _TEMPO_DROP_TAIL_BARS = 2
 _TEMPO_DROP_CHANCE = 0.5
 
+# X.33 -- real, direct measurement across every preset (10 seeds each, 80
+# real generated songs) found EVERY breakdown section unconditionally
+# halving tempo (the old _compute_tempo_map behavior below) sent 41.8% of
+# every song's real elapsed wall-clock time into half-tempo alone --
+# breakdown is already the single most common role, so "always half-time"
+# meant the default state of the most frequent section type, not a
+# dramatic occasional device. Same real precedent as `_TEMPO_DROP_CHANCE`
+# just above: rolled per-section on that section's own seeded rng.
+_BREAKDOWN_HALFTIME_CHANCE = 0.4
+
+# X.34 -- real, occasional blast beats. Direct response to a real, checked
+# gap: `drums.generate_vocabulary_informed_blast_fill` (P4.3/P4.4, real,
+# tested, three genuine alternating-KICK/SNARE blast-beat renderers) was
+# called here for every breakdown/solo section and its real output was
+# simply discarded -- `midi_export.py`'s own docstring admitted this
+# outright ("section['fill'] is intentionally NOT exported... _generate_
+# attempt never actually blends it into the song's assembled drum data").
+# Wired here instead via `drums.render_blast_beat` (rendered directly onto
+# this section's own guitar_cells, guaranteed cell-aligned with kick/snare
+# -- see that function's own docstring for why the OLD independent-skeleton
+# approach couldn't be used as-is). Occasional, not universal (same real
+# precedent as `_BREAKDOWN_HALFTIME_CHANCE` just above) -- not every
+# breakdown/solo should erupt into a blast, same reasoning X.33 already
+# established for half-time.
+_BLAST_FILL_ROLES = ("breakdown", "solo")
+_BLAST_FILL_CHANCE = 0.35
+_BLAST_WEIGHTS = {"traditional": 1.0, "gravity": 1.0, "hammer": 1.0}
+
+# X.36 -- real melodic sequence passage length for solo sections. See
+# lead.generate_sequence_line's own module docstring for the full real
+# reference-MIDI/research citation.
+_SOLO_SEQUENCE_MOTIF_LEN = 4
+_SOLO_SEQUENCE_REPEATS = 4
+
 
 def _resolve_tempo_drop(section_bpm: float, trigger_beat: float | None) -> dict | None:
     """The real, final `section["tempo_drop"]` value: `None` if this
@@ -211,19 +275,22 @@ def _resolve_tempo_drop(section_bpm: float, trigger_beat: float | None) -> dict 
     return {"trigger_beat": trigger_beat, "bpm": apply_metric_modulation(section_bpm, ratio)}
 
 
-def _compute_tempo_map(sequence: list[str], base_bpm: float) -> list[float]:
+def _compute_tempo_map(sequence: list[str], base_bpm: float, halftime_flags: list[bool]) -> list[float]:
     """Per-section effective BPM for every section in `sequence`: the
-    preset's own real `base_bpm` for every role, EXCEPT "breakdown",
-    which independently gets the real metric-modulation-scaled half-time
-    tempo (X.6c) every time it occurs -- computed via `structure.
-    tempo_at`'s `"metric_modulation"` curve for that one section (`at`
-    equal to the section's own index, so the curve's own "hold base_bpm
-    before `at`" branch never applies), never a separate parallel
-    calculation that skips that dispatch path.
+    preset's own real `base_bpm` for every role, EXCEPT a "breakdown"
+    section whose own `halftime_flags[i]` is `True` (X.33 -- resolved once
+    per section on that section's own seeded rng via
+    `_BREAKDOWN_HALFTIME_CHANCE`, real "occasional dramatic device" rather
+    than the old "every single breakdown, unconditionally" behavior),
+    which gets the real metric-modulation-scaled half-time tempo (X.6c) --
+    computed via `structure.tempo_at`'s `"metric_modulation"` curve for
+    that one section (`at` equal to the section's own index, so the
+    curve's own "hold base_bpm before `at`" branch never applies), never a
+    separate parallel calculation that skips that dispatch path.
     """
     tempos: list[float] = []
     for i, role in enumerate(sequence):
-        if role != "breakdown":
+        if role != "breakdown" or not halftime_flags[i]:
             tempos.append(float(base_bpm))
             continue
         curve = {
@@ -277,24 +344,55 @@ def pitches_per_cell(motif: Motif, scale: Scale, start_degree: int = 0) -> list[
 # deliberately deferred: inserting new cells changes a section's total
 # beat count, which would desync every other instrument's own beat count
 # too -- a real, coordinated multi-instrument redesign, not a quick add.
+#
+# X.28 CORRECTION -- real bug found via direct user listening feedback
+# ("it's the composition"), confirmed by measuring real per-track total
+# beat-durations on a composed song: `structure.pickup`'s source line
+# (`out[start+j] = {"duration": src["duration"], "is_rest": src["is_rest"]}`)
+# copies `duration` from the incoming cell. In the SOURCE project this is a
+# real no-op -- that project's cells are fixed-size grid slots, so every
+# cell's `duration` is already identical. This project's cells have
+# VARIABLE durations (0.25/0.5/1.0 beat cells), so copying `duration` is
+# NOT a no-op here: it silently changed a blended section's real total beat
+# count away from `preset.bars * 4` (measured drifts of 0.25-1.75 beats per
+# boundary on a real composed song). `bass`/`kick` get regenerated from the
+# blended guitar afterward so they follow the new (wrong) total, but
+# `snare`/`hihat` are generated once BEFORE blending and never touched
+# again -- so from the first blended boundary onward, guitar/bass/kick run
+# on a different absolute-time grid than snare/hihat, a real compounding
+# desync between instrument tracks for the rest of the song. Fixed by
+# preserving the OUTGOING cell's own `duration` at every blended position --
+# every other real key (is_rest/role/velocity/timing_offset/
+# pinch_harmonic) still comes from the incoming cell, so the real "lean
+# toward what's coming" blend effect is unchanged, but a section's total
+# beat count is now exactly invariant under blending, matching this
+# project's own law ("a section is `preset.bars` bars of 4/4") and keeping
+# every parallel per-section track on the same absolute-time grid.
 _BLEND_N = 2
 
 
 def _pickup_cells(prev_cells: list[dict], next_cells: list[dict], n: int = _BLEND_N) -> list[dict]:
-    """Key-preserving real reimplementation of `structure.pickup`'s rule:
-    the last `n` cells of `prev_cells` become full copies of `next_cells`'
-    first `n` cells (every key, not just duration/is_rest) -- so a newly
-    created hit always carries real role/velocity/timing_offset data, never
-    an orphaned one. `n` is capped to whatever both lists actually have,
-    matching the source's own bounds-safety; empty inputs return `prev_cells`
-    unchanged (nothing to pick up from/into), matching `structure.pickup`'s
-    own early-return contract."""
+    """Real reimplementation of `structure.pickup`'s rule, adapted for this
+    project's variable-duration cells (see the X.28 correction comment
+    above): the last `n` cells of `prev_cells` take on every real key from
+    `next_cells`' first `n` cells (role/velocity/timing_offset/is_rest/
+    pinch_harmonic -- real content, never stripped) EXCEPT `duration`,
+    which stays the outgoing cell's own original value -- so a section's
+    total beat count is exactly invariant under blending, never drifting
+    away from `preset.bars * 4`. `n` is capped to whatever both lists
+    actually have, matching the source's own bounds-safety; empty inputs
+    return `prev_cells` unchanged (nothing to pick up from/into), matching
+    `structure.pickup`'s own early-return contract."""
     if not prev_cells or not next_cells:
         return [dict(c) for c in prev_cells]
     out = [dict(c) for c in prev_cells]
     k = min(n, len(out), len(next_cells))
     for j in range(k):
-        out[len(out) - k + j] = dict(next_cells[j])
+        idx = len(out) - k + j
+        original_duration = out[idx]["duration"]
+        blended = dict(next_cells[j])
+        blended["duration"] = original_duration
+        out[idx] = blended
     return out
 
 
@@ -376,28 +474,46 @@ def _snap_to_playable_octave(fretboard: Fretboard, pitch: int) -> int:
 # same 2 states over and over, no matter how many times the role recurred.
 # `motif.transpose`/`motif.invert` already existed, fully real and tested,
 # but only `invert` was ever wired into this rotation.
-def _develop_theme(base_theme: Motif, occurrence: int) -> Motif:
-    """Real per-occurrence development for a reused role theme: a 4-state
-    rotation using ONLY safe, length-preserving develop ops (`transpose`/
-    `invert` touch pitch deltas alone, never rhythm cell count or
-    duration, so every downstream section-length/timing invariant this
-    file depends on stays untouched):
+#
+# X.35 CORRECTION -- real evidence from a user-supplied reference MIDI
+# ("born of osiris style midi.mid", a genuine transcription) found the
+# ORIGINAL fixed 4-state rotation below was itself wrong: the reference's
+# own opening riff recurs BYTE-IDENTICALLY 23 times across the song, never
+# varied anywhere -- confirmed by web research (Fundamental Changes'
+# "Writing Better Metal Riffs: Sequencing") that real riff practice is
+# "repeat first, vary rarely," not a mechanical vary-every-occurrence cycle.
+# The fixed `occurrence % 4` rotation guaranteed variation starting on the
+# very 2nd occurrence, every time -- the opposite of the real convention.
+# Replaced with a real, seeded probabilistic choice: the same three real
+# develop ops (invert/transpose/both) are kept as legitimate, occasional
+# devices, but verbatim repetition is now the real DEFAULT outcome.
+_THEME_REPEAT_VERBATIM_CHANCE = 0.7
 
-      0: base theme, unchanged
-      1: `invert(base)` -- contour mirrored around the anchor
-      2: `transpose(base, +2 degrees)` -- a real diatonic-third "repeat
-         and lift", a standard real songwriting development move
-      3: `transpose(invert(base), +2 degrees)` -- both combined
 
-    Quadruples real pitch-content variety per role compared to the
-    previous 2-state (base/invert-only) rotation.
+def _develop_theme(base_theme: Motif, occurrence: int, rng: random.Random) -> Motif:
+    """Real per-occurrence development for a reused role theme. Occurrence
+    0 always returns `base_theme` unchanged (establishes the theme). Every
+    later occurrence real-rolls `_THEME_REPEAT_VERBATIM_CHANCE` on the
+    section's own seeded `rng`: most of the time (70%) the theme repeats
+    VERBATIM (the real, dominant convention confirmed against a real
+    reference transcription -- see the correction comment above), and the
+    rest of the time one of three real, length-preserving develop ops
+    (`transpose`/`invert` touch pitch deltas alone, never rhythm cell count
+    or duration) is picked:
+
+      - `invert(base)` -- contour mirrored around the anchor
+      - `transpose(base, +2 degrees)` -- a real diatonic-third "repeat and
+        lift", a standard real songwriting development move
+      - `transpose(invert(base), +2 degrees)` -- both combined
     """
-    state = occurrence % 4
-    if state == 0:
+    if occurrence == 0:
         return base_theme
-    if state == 1:
+    if rng.random() < _THEME_REPEAT_VERBATIM_CHANCE:
+        return base_theme
+    variation = rng.choice(("invert", "transpose", "both"))
+    if variation == "invert":
         return invert(base_theme)
-    if state == 2:
+    if variation == "transpose":
         return transpose(base_theme, _THEME_DEVELOP_TRANSPOSE_DEGREES)
     return transpose(invert(base_theme), _THEME_DEVELOP_TRANSPOSE_DEGREES)
 
@@ -439,17 +555,29 @@ def _generate_attempt(rng: random.Random, preset: Preset, num_sections: int) -> 
     themes = ThemeRegistry()
     role_occurrences: dict[str, int] = {}
 
-    registry = RhythmRegistry()
     sections: list[dict] = []
     guitar_track: list[dict] = []
     drum_track: list[dict] = []
     kick_styles: list[str | None] = []
+    blast_types: list[str | None] = []
+    breakdown_halftime_flags: list[bool] = []
     previous_role: str | None = None
 
     for idx, role in enumerate(sequence):
         arc_row = arc(role=role)
         occurrence = role_occurrences.get(role, 0)
         role_occurrences[role] = occurrence + 1
+
+        # X.32 -- real per-role feel override (see the module-level
+        # _ROLE_FEEL_FORCED/_ROLE_FEEL_OVERRIDE_CHOICES comment for the
+        # real design). Every role not named in either table keeps today's
+        # exact behavior (preset.feel, unchanged).
+        if role in _ROLE_FEEL_FORCED:
+            section_feel = _ROLE_FEEL_FORCED[role]
+        elif role in _ROLE_FEEL_OVERRIDE_CHOICES:
+            section_feel = rng.choice(_ROLE_FEEL_OVERRIDE_CHOICES[role] + (preset.feel,))
+        else:
+            section_feel = preset.feel
 
         base_theme = themes.get_or_create(
             f"theme-{role}", total_beats, _ALLOWED_LENGTHS,
@@ -458,8 +586,16 @@ def _generate_attempt(rng: random.Random, preset: Preset, num_sections: int) -> 
             dissonance=arc_row["dissonance"],
             base_degree=arc_row["start_degree"],
             group_beats=(float(preset.group) if preset.group is not None else None),
-            pedal=preset.pedal,
-            feel=preset.feel,
+            # X.31 -- verse forces a real, strong pedal bias regardless of
+            # what the preset's own `.pedal` declares (same precedent as
+            # X.11's build/solo kick overlay overriding `preset.kick`):
+            # Metalerator's real verse riff (RGuitarPedalToneRiff) is ~65%
+            # root note, occasional colored upper-scale-degree note -- a
+            # distinct, sparser character than the preset's own general
+            # riffing, not just "verse again with whatever pedal happens to
+            # be set."
+            pedal=(_VERSE_PEDAL_BIAS if role == "verse" else preset.pedal),
+            feel=section_feel,
             # X.19 -- real IRVD phrase development (bar-by-bar
             # intro/repeat/vary/destroy shape) for every preset EXCEPT
             # djent/progressive, whose real `group_beats` polymeter tiling
@@ -468,11 +604,27 @@ def _generate_attempt(rng: random.Random, preset: Preset, num_sections: int) -> 
             # directly fight (see motif.generate_motif's docstring).
             irvd_bars=(preset.bars if preset.group is None else None),
         )
-        m: Motif = _develop_theme(base_theme, occurrence)
+        m: Motif = _develop_theme(base_theme, occurrence, rng)
         guitar_cells = m.cell
+
+        # X.30 -- real per-bar tonal-center progression (see progression.py's
+        # module docstring for the full real Metalerator citation). Only
+        # verse/chorus get one: this is a real, evidenced verse/chorus
+        # device, not applied everywhere by default -- every other role
+        # keeps a single fixed anchor for the whole section, unchanged.
+        progression_table = _PROGRESSION_TABLES.get(role)
+        chord_progression = (
+            rng.choice(list(progression_table.values())) if progression_table else None
+        )
+        if chord_progression is not None:
+            raw_pitches = pitches_per_cell_with_progression(
+                m, scale, chord_progression, _BEATS_PER_BAR, start_degree=arc_row["start_degree"],
+            )
+        else:
+            raw_pitches = pitches_per_cell(m, scale, start_degree=arc_row["start_degree"])
         cell_pitches = [
             (None if p is None else _snap_to_playable_octave(guitar_fb, p))
-            for p in pitches_per_cell(m, scale, start_degree=arc_row["start_degree"])
+            for p in raw_pitches
         ]
 
         seed_a, seed_b = _two_child_seeds(rng)
@@ -502,17 +654,21 @@ def _generate_attempt(rng: random.Random, preset: Preset, num_sections: int) -> 
         snare_cells = snare_pattern_for_role(guitar_cells, role)
         hihat_cells = hihat_pattern_for_role(guitar_cells, role)
 
-        fill = None
-        if role in ("breakdown", "solo"):
-            fill = generate_vocabulary_informed_blast_fill(
-                rhythm_id=f"section-{idx}-{role}",
-                registry=registry,
-                total_beats=total_beats,
-                allowed_lengths=_ALLOWED_LENGTHS,
-                bpm=preset.bpm,
-                blast_weights={"traditional": 1.0, "gravity": 1.0, "hammer": 1.0},
-                rng=rng,
-            )
+        # X.34 -- real, occasional blast beat (see module-level
+        # _BLAST_FILL_ROLES/_BLAST_FILL_CHANCE comment). Rendered directly
+        # onto this section's own guitar_cells (guaranteed cell-aligned
+        # with kick/snare, unlike the old, real-but-never-wired
+        # generate_vocabulary_informed_blast_fill's independent skeleton),
+        # so it REPLACES the kick/snare cells just resolved above -- a real
+        # KICK/SNARE-alternating blast, not the old guitar-locked-but-
+        # kick-only "blast" kick style.
+        blast_type: str | None = None
+        if role in _BLAST_FILL_ROLES and rng.random() < _BLAST_FILL_CHANCE:
+            blast = render_blast_beat(guitar_cells, _BLAST_WEIGHTS, rng)
+            blast_type = blast["blast_type"]
+            kick_cells = blast_kick_cells(blast["cells"])
+            snare_cells = blast_snare_cells(blast["cells"])
+        blast_types.append(blast_type)
 
         bass_cells = follow_guitar_rhythm(guitar_cells, cell_pitches, bass_fb)
 
@@ -584,6 +740,33 @@ def _generate_attempt(rng: random.Random, preset: Preset, num_sections: int) -> 
                 num_notes=max(1, round(total_beats * 2)),
                 stab_chance=0.35,
             )
+            # X.36 -- real melodic "sequence" passage (see lead.
+            # generate_sequence_line's own module-level comment for the
+            # full real reference-MIDI/research citation): a real solo
+            # reads as a phrase with a beginning, middle, and end -- the
+            # established main phrase above, a real sequence passage here
+            # (a short motif repeated at shifting scale positions, the
+            # real core solo-writing technique), then the existing legato
+            # close below. Picks up where the main phrase's last note
+            # landed (never a disconnected new register), and moves in a
+            # real seeded-random direction (ascending or descending --
+            # both real, valid forms of the device).
+            seq_start_degree = scale.index_of(lead_notes[-1]) if lead_notes else scale.index_of(lead_anchor + 12)
+            seq_step = rng.choice((-1, 1))
+            sequence_notes = generate_sequence_line(
+                scale, preset.vocab.weights, rng,
+                start_degree=seq_start_degree,
+                motif_len=_SOLO_SEQUENCE_MOTIF_LEN,
+                num_repeats=_SOLO_SEQUENCE_REPEATS,
+                step_degrees=seq_step,
+            )
+            # Same real register guarantee generate_lead_line's own clamp
+            # already gives the main phrase -- a sequence's own repeated
+            # shifting can otherwise drift outside the solo's real playable
+            # register.
+            seq_low, seq_high = lead_anchor - 12, lead_anchor + 24
+            sequence_notes = [max(seq_low, min(seq_high, p)) for p in sequence_notes]
+            lead_notes = list(lead_notes) + sequence_notes
             # X.6a: a real featured solo needs legato technique too, not
             # just VoiceLeader's leap-and-settle phrasing -- splice one
             # genuine contiguous legato run (engine/legato.py) onto the end
@@ -613,6 +796,26 @@ def _generate_attempt(rng: random.Random, preset: Preset, num_sections: int) -> 
                 legato = None
             else:
                 lead_notes = list(lead_notes) + legato["pitches"]
+        elif role == "chorus":
+            # X.31 -- real chorus lead, the second half of Metalerator's own
+            # RGuitarChorus device (a chorus riff generates an accompanying
+            # lead alongside it, `generate_lead`, not silent like the other
+            # dense-chug roles). Deliberately less extreme than "solo"'s
+            # fully-featured technical break: motion stays at the preset's
+            # own value (not solo's `+0.3` boost -- a chorus lead sits WITH
+            # the riff, not over it as a featured break), a narrower
+            # `stab_chance`, and register one octave above the riff (not
+            # solo's wider `-12..+24` span) -- "a lead sits over the
+            # chorus", not a second solo. No legato splice (that's a real,
+            # deliberately solo-only technical device).
+            lead_mode = "chorus_lead"
+            lead_notes = generate_lead_line(
+                scale, preset.vocab.weights, preset.vocab.motion, rng,
+                low=lead_anchor, high=lead_anchor + 24, anchor=lead_anchor + 12,
+                num_notes=max(1, round(total_beats * 2)),
+                stab_chance=0.15,
+            )
+            legato = None
         elif role in ("chill", "interlude"):
             # A melodic/atmospheric section: the second guitar harmonizes
             # the rhythm's own theme at a fixed interval (riff.
@@ -668,6 +871,10 @@ def _generate_attempt(rng: random.Random, preset: Preset, num_sections: int) -> 
         ):
             tempo_drop_trigger_beat = total_beats - _TEMPO_DROP_TAIL_BARS * _BEATS_PER_BAR
 
+        # X.33: real, occasional (not universal) half-time breakdown --
+        # see _BREAKDOWN_HALFTIME_CHANCE's own module-level comment.
+        breakdown_halftime_flags.append(role == "breakdown" and rng.random() < _BREAKDOWN_HALFTIME_CHANCE)
+
         sections.append({
             "role": role,
             "arc": arc_row,
@@ -681,17 +888,17 @@ def _generate_attempt(rng: random.Random, preset: Preset, num_sections: int) -> 
             "kick": kick_cells,
             "snare": snare_cells,
             "hihat": hihat_cells,
-            "fill": fill,
             "bass": bass_cells,
             "pad": pad,
             "accents": accents,
             "octave_stabs": octave_stabs,
             "chord_quality": chord_quality,
             "chord_voicing": chord_voicing,
+            "chord_progression": chord_progression,
             "_tempo_drop_trigger_beat": tempo_drop_trigger_beat,
         })
 
-    tempo_map = _compute_tempo_map(sequence, preset.bpm)
+    tempo_map = _compute_tempo_map(sequence, preset.bpm, breakdown_halftime_flags)
     for section, bpm in zip(sections, tempo_map):
         section["tempo_drop"] = _resolve_tempo_drop(bpm, section.pop("_tempo_drop_trigger_beat"))
 
@@ -739,6 +946,24 @@ def _generate_attempt(rng: random.Random, preset: Preset, num_sections: int) -> 
         this_section["bass"] = follow_guitar_rhythm(
             this_section["guitar_take_a"], this_section["pitches_per_cell"], bass_fb
         )
+
+        # X.34 -- a blast-fill section (see _BLAST_FILL_ROLES/_BLAST_FILL_
+        # CHANCE) is guitar-locked too, so it needs the exact same real
+        # re-lock treatment as a guitar-locking kick style -- reusing the
+        # SAME blast type already chosen for this section (render_blast_
+        # beat_for_type, no rng/re-roll), never a fresh random re-pick.
+        # This is the one place snare_cells becomes blend-aware -- a real,
+        # deliberate, documented exception to the "snare stays exactly as
+        # generated" rule above, scoped only to blast-fill sections. Skips
+        # the normal kick_style re-lock below entirely: blast owns both
+        # kick and snare for this section, not the resolved kick style.
+        blast_type = blast_types[i]
+        if blast_type is not None:
+            blast = render_blast_beat_for_type(this_section["guitar_take_a"], blast_type)
+            this_section["kick"] = blast_kick_cells(blast["cells"])
+            this_section["snare"] = blast_snare_cells(blast["cells"])
+            continue
+
         kick_style = kick_styles[i]
         if kick_style is not None:
             this_section["kick"] = kick_pattern_for_style(this_section["guitar_take_a"], kick_style)

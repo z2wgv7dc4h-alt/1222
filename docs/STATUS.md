@@ -47,6 +47,13 @@ Update only after grep or pytest. No memory claims.
 | Real cross-section blending -- guitar, bass, guitar-locking kick (X.24) | WIRED+TESTED | 550 passed, 1 skipped in 12.05s |
 | Real kick "burst" device (X.25) | WIRED+TESTED | 553 passed, 1 skipped in 11.96s |
 | Real pinch-harmonic accent, every preset (X.27; X.26 cancelled, see PORTS/TASKS) | WIRED+TESTED | 556 passed, 1 skipped in 12.14s |
+| Fixed real cross-section blend desync bug -- guitar/bass/kick vs snare/hihat (X.28) | WIRED+TESTED | 560 passed, 1 skipped |
+| Real verse/chorus structure-graph roles (X.29) | WIRED+TESTED | 562 passed, 1 skipped |
+| Real per-bar tonal-center progression, verse/chorus (X.30) | WIRED+TESTED | 569 passed, 1 skipped |
+| Real verse pedal bias, chorus power chords + chorus lead (X.31) | WIRED+TESTED | 572 passed, 1 skipped in 12.50s |
+| Real gallop/stutter-chug + per-role feel system (X.32) | WIRED+TESTED | 579 passed, 1 skipped in 12.58s |
+| Real song-pacing rebalance -- occasional half-time, less atmospheric filler (X.33) | WIRED+TESTED | 581 passed, 1 skipped in 12.86s |
+| Real blast beats wired into the actual drum track (X.34) | WIRED+TESTED | 589 passed, 1 skipped in 13.77s |
 | Reaper | MISSING | |
 | Editor | MISSING | |
 

@@ -861,6 +861,82 @@ def generate_blast_fill(
     return {"blast_type": blast_type, "cells": renderer(skeleton)}
 
 
+# --- X.34: real blast beats, guitar-cell-locked (wired into song.py) -------
+#
+# `generate_blast_fill`/`generate_vocabulary_informed_blast_fill` above draw
+# their own INDEPENDENT rhythm skeleton via `RhythmRegistry` -- real, tested,
+# but a different cell count/duration breakdown than `guitar_cells`. Every
+# real kick/snare style in this module (`_cells_from_hit_indices`,
+# `_kick_blast`, etc.) instead returns a cell list the EXACT SAME LENGTH as
+# `guitar_cells`, one entry per guitar cell -- a real, load-bearing
+# invariant `song.judge()`'s kick-lock scoring (`zip(guitar, drums)`) and
+# X.24's post-blend kick re-lock both depend on. These two functions reuse
+# the real, valuable part of the blast machinery above (the alternating-role
+# RENDERERS, `_BLAST_RENDERERS`/`pick_blast_type`) applied DIRECTLY onto a
+# section's own `guitar_cells` instead of an independent skeleton --
+# guaranteed cell-alignment by construction, same trick `_kick_blast`
+# already uses for its own guitar-locked density, but with real KICK/SNARE
+# alternation instead of a flat kick-only pulse.
+
+
+def render_blast_beat(cells: list[dict], blast_weights: dict[str, float], rng: random.Random) -> dict:
+    """Real blast-beat overlay rendered directly onto `cells`' own hit/rest
+    pattern: picks a blast type via `rhythm.pick_blast_type(blast_weights,
+    rng)`, then renders it with the same real `_BLAST_RENDERERS` used by
+    `generate_blast_fill` above. Returns `{"blast_type": str, "cells":
+    [{"duration", "is_rest", "roles"}]}` -- `cells` is the exact same
+    length as the input `cells`, never a different rhythm skeleton."""
+    blast_type = pick_blast_type(blast_weights, rng)
+    return render_blast_beat_for_type(cells, blast_type)
+
+
+def render_blast_beat_for_type(cells: list[dict], blast_type: str) -> dict:
+    """Same real rendering as `render_blast_beat`, but for a blast type
+    already chosen (no `rng`/re-roll) -- the real re-lock path X.24's
+    post-blend pass needs: reuse the SAME blast type already picked for a
+    section, never a fresh random re-roll, when regenerating from a
+    blended guitar rhythm (same rule that path already applies to kick
+    styles)."""
+    renderer = _BLAST_RENDERERS.get(blast_type)
+    if renderer is None:
+        raise ValueError(
+            f"unsupported blast type {blast_type!r} "
+            f"(no renderer wired for it in drums._BLAST_RENDERERS)"
+        )
+    return {"blast_type": blast_type, "cells": renderer(cells)}
+
+
+def blast_kick_cells(blast_cells: list[dict]) -> list[dict]:
+    """Real KICK half of a rendered blast (`render_blast_beat`'s own
+    `"cells"`), converted to the exact `{"duration", "is_rest", "role"}`
+    shape every other kick style already uses (e.g.
+    `_cells_from_hit_indices`)."""
+    return [
+        {
+            "duration": c["duration"],
+            "is_rest": "KICK" not in c["roles"],
+            "role": "KICK" if "KICK" in c["roles"] else None,
+        }
+        for c in blast_cells
+    ]
+
+
+def blast_snare_cells(blast_cells: list[dict]) -> list[dict]:
+    """Real SNARE half of a rendered blast, same real shape as
+    `blast_kick_cells` -- a "hammer" blast cell carries BOTH roles (kick
+    and snare struck together), so a hit position can be non-rest in both
+    `blast_kick_cells` and `blast_snare_cells` simultaneously, a real,
+    intentional device (see `_render_hammer`'s own docstring), not a bug."""
+    return [
+        {
+            "duration": c["duration"],
+            "is_rest": "SNARE" not in c["roles"],
+            "role": "SNARE" if "SNARE" in c["roles"] else None,
+        }
+        for c in blast_cells
+    ]
+
+
 # --- P4.4: reference-MIDI density vocabulary informs fill hit_chance --------
 
 

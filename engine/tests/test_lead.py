@@ -2,7 +2,7 @@ import random
 
 import pytest
 
-from lead import generate_lead_line
+from lead import generate_lead_line, generate_sequence_line
 from presets import load_all_presets
 from theory import Scale
 
@@ -56,3 +56,69 @@ def test_lead_line_rejects_bad_input():
         generate_lead_line(scale, preset.vocab.weights, preset.vocab.motion, rng, 50, 70, 56, num_notes=0)
     with pytest.raises(ValueError):
         generate_lead_line(scale, preset.vocab.weights, preset.vocab.motion, rng, 50, 70, 56, num_notes=5, stab_chance=1.5)
+
+
+# ---------------------------------------------------------------------------
+# X.36 -- real melodic "sequence" device
+# ---------------------------------------------------------------------------
+
+
+def test_sequence_line_repeats_the_exact_same_relative_shape():
+    preset = load_all_presets()["melodic"]
+    scale = Scale(56, preset.scale)
+    rng = random.Random(7)
+
+    notes = generate_sequence_line(
+        scale, preset.vocab.weights, rng,
+        start_degree=0, motif_len=4, num_repeats=3, step_degrees=1,
+    )
+    assert len(notes) == 12
+
+    # Real check: each repeat's own relative shape (degree deltas between
+    # consecutive notes within a repeat) must be identical -- the whole
+    # point of a "sequence" is the SAME shape, moved.
+    def repeat_deltas(chunk):
+        idx = [scale.index_of(p) for p in chunk]
+        return [b - a for a, b in zip(idx, idx[1:])]
+
+    repeats = [notes[i:i + 4] for i in range(0, 12, 4)]
+    shapes = [repeat_deltas(r) for r in repeats]
+    assert shapes[0] == shapes[1] == shapes[2]
+
+
+def test_sequence_line_shifts_anchor_by_step_degrees_each_repeat():
+    preset = load_all_presets()["melodic"]
+    scale = Scale(56, preset.scale)
+    rng = random.Random(7)
+
+    notes = generate_sequence_line(
+        scale, preset.vocab.weights, rng,
+        start_degree=0, motif_len=1, num_repeats=4, step_degrees=2,
+    )
+    # motif_len=1 means each "repeat" is just scale.degree(start_degree +
+    # r*step_degrees + delta) -- a single real, checkable pitch per repeat.
+    degrees = [scale.index_of(p) for p in notes]
+    assert degrees[1] - degrees[0] == degrees[2] - degrees[1] == degrees[3] - degrees[2]
+
+
+def test_sequence_line_rejects_bad_input():
+    preset = load_all_presets()["melodic"]
+    scale = Scale(56, preset.scale)
+    rng = random.Random(0)
+    with pytest.raises(ValueError):
+        generate_sequence_line(scale, preset.vocab.weights, rng, 0, motif_len=0, num_repeats=3, step_degrees=1)
+    with pytest.raises(ValueError):
+        generate_sequence_line(scale, preset.vocab.weights, rng, 0, motif_len=4, num_repeats=0, step_degrees=1)
+
+
+def test_sequence_line_negative_step_descends():
+    preset = load_all_presets()["melodic"]
+    scale = Scale(56, preset.scale)
+    rng = random.Random(7)
+
+    notes = generate_sequence_line(
+        scale, preset.vocab.weights, rng,
+        start_degree=10, motif_len=1, num_repeats=3, step_degrees=-1,
+    )
+    degrees = [scale.index_of(p) for p in notes]
+    assert degrees[0] > degrees[1] > degrees[2]

@@ -82,6 +82,37 @@ def test_generate_section_sequence_uses_default_graph():
     assert all(role in DEFAULT_GRAPH for role in seq)
 
 
+# X.28 -- verse/chorus are real, reachable nodes in the default graph now.
+def test_verse_and_chorus_are_reachable_from_intro():
+    seen = set()
+    for seed in range(50):
+        seq = walk_graph(DEFAULT_GRAPH, "intro", 16, random.Random(seed))
+        seen.update(seq)
+    assert "verse" in seen
+    assert "chorus" in seen
+
+
+def test_chorus_can_lead_straight_to_outro():
+    # A song CAN end on a chorus, not only on breakdown/solo/interlude.
+    for seed in range(200):
+        seq = walk_graph(DEFAULT_GRAPH, "chorus", 2, random.Random(seed))
+        if len(seq) == 2 and seq[1] == "outro":
+            return
+    pytest.fail("chorus never reached outro across 200 seeds")
+
+
+def test_verse_dominant_destination_is_chorus():
+    # verse -> chorus has the highest weight out of "verse" -- across many
+    # seeds, chorus should be verse's single most common next step.
+    from collections import Counter
+    counts = Counter()
+    for seed in range(300):
+        seq = walk_graph(DEFAULT_GRAPH, "verse", 2, random.Random(seed))
+        if len(seq) == 2:
+            counts[seq[1]] += 1
+    assert counts["chorus"] == max(counts.values())
+
+
 # ---------------------------------------------------------------------------
 # P6.2 -- pickup / bridge / flatten
 # ---------------------------------------------------------------------------
@@ -450,3 +481,28 @@ def test_tempo_at_still_rejects_unknown_curve_type_alongside_new_branch():
     # existing fail-closed default for a genuinely unknown curve type.
     with pytest.raises(ValueError):
         tempo_at(0, 140.0, {"type": "not-a-real-curve"})
+
+
+# ---------------------------------------------------------------------------
+# X.33 -- real rebalance: chill/interlude occur measurably less often
+# ---------------------------------------------------------------------------
+
+
+def test_rebalanced_graph_visits_chill_and_interlude_less_often():
+    """X.33: direct response to a real, measured problem -- the old graph
+    weights sent chill+interlude to ~21% of all sections combined. Across
+    many seeds, the real observed share must now be measurably lower."""
+    from collections import Counter
+
+    counts = Counter()
+    total = 0
+    for seed in range(300):
+        seq = generate_section_sequence(random.Random(seed), 8)
+        for role in seq:
+            counts[role] += 1
+            total += 1
+    atmospheric_share = (counts["chill"] + counts["interlude"]) / total
+    assert atmospheric_share < 0.15, (
+        f"expected chill+interlude to be a real minority of sections "
+        f"(< 15%), got {atmospheric_share:.3f}"
+    )

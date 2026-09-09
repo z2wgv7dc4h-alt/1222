@@ -7,6 +7,8 @@ from drums import (
     ROLE_TO_NOTE,
     add_transition_crash,
     apply_hihat_accents,
+    blast_kick_cells,
+    blast_snare_cells,
     generate_blast_fill,
     generate_hihat_pattern,
     generate_snare_backbeat,
@@ -15,6 +17,8 @@ from drums import (
     kick_pattern_for_role,
     kick_pattern_for_style,
     note_for_role,
+    render_blast_beat,
+    render_blast_beat_for_type,
     resolve_kick_style,
     snare_pattern_for_role,
 )
@@ -613,3 +617,67 @@ def test_add_transition_crash_no_op_when_not_firing():
 
 def test_add_transition_crash_handles_empty_cells():
     assert add_transition_crash([], fire=True) == []
+
+
+# ---------------------------------------------------------------------------
+# X.34 -- real blast beats, guitar-cell-locked (song.py's actual wiring)
+# ---------------------------------------------------------------------------
+
+
+def _guitar_like_cells(n=8):
+    return [{"duration": 0.25, "is_rest": (i % 3 == 2)} for i in range(n)]
+
+
+def test_render_blast_beat_matches_input_cell_count_and_durations():
+    cells = _guitar_like_cells()
+    result = render_blast_beat(cells, {"traditional": 1.0}, random.Random(0))
+    assert result["blast_type"] == "traditional"
+    assert len(result["cells"]) == len(cells)
+    assert [c["duration"] for c in result["cells"]] == [c["duration"] for c in cells]
+    assert [c["is_rest"] for c in result["cells"]] == [c["is_rest"] for c in cells]
+
+
+def test_render_blast_beat_for_type_is_deterministic_no_rng():
+    cells = _guitar_like_cells()
+    a = render_blast_beat_for_type(cells, "gravity")
+    b = render_blast_beat_for_type(cells, "gravity")
+    assert a == b
+
+
+def test_render_blast_beat_for_type_rejects_unknown_type():
+    with pytest.raises(ValueError):
+        render_blast_beat_for_type(_guitar_like_cells(), "not-a-real-blast-type")
+
+
+def test_blast_kick_cells_and_snare_cells_match_input_length():
+    cells = _guitar_like_cells()
+    blast = render_blast_beat_for_type(cells, "traditional")
+    kick = blast_kick_cells(blast["cells"])
+    snare = blast_snare_cells(blast["cells"])
+    assert len(kick) == len(cells)
+    assert len(snare) == len(cells)
+    for k, s, c in zip(kick, snare, blast["cells"]):
+        assert k["duration"] == c["duration"] == s["duration"]
+
+
+def test_blast_traditional_alternates_kick_and_snare():
+    cells = [{"duration": 0.25, "is_rest": False} for _ in range(6)]
+    blast = render_blast_beat_for_type(cells, "traditional")
+    kick = blast_kick_cells(blast["cells"])
+    snare = blast_snare_cells(blast["cells"])
+    # Real alternation: never both kick AND snare on at the same real hit
+    # for "traditional" (unlike "hammer", see below).
+    for k, s in zip(kick, snare):
+        assert not (not k["is_rest"] and not s["is_rest"])
+    assert any(not c["is_rest"] for c in kick)
+    assert any(not c["is_rest"] for c in snare)
+
+
+def test_blast_hammer_hits_kick_and_snare_together():
+    cells = [{"duration": 0.25, "is_rest": False} for _ in range(4)]
+    blast = render_blast_beat_for_type(cells, "hammer")
+    kick = blast_kick_cells(blast["cells"])
+    snare = blast_snare_cells(blast["cells"])
+    # Real "hammer" device: kick+snare struck together on every real hit.
+    for k, s in zip(kick, snare):
+        assert not k["is_rest"] and not s["is_rest"]

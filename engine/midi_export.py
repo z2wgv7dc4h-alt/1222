@@ -185,7 +185,10 @@ def _chord_cell_events(
 # hihat all already go quiet/sparse for those two atmospheric roles,
 # X.9/X.11/X.22) -- their already-real melodic/harmony character
 # (`riff.harmonize_line`) should stay single-note, not get chugged up.
-_CHORD_THICKENED_ROLES = frozenset({"intro", "breakdown", "build", "outro", "solo"})
+# X.31 -- "chorus" added: real power chords, same real device Metalerator's
+# own RGuitarChorus uses (root+5th+octave on quarter notes). Not "verse":
+# Metalerator's verse riff is real single-note pedal tone, not chorded.
+_CHORD_THICKENED_ROLES = frozenset({"intro", "breakdown", "build", "outro", "solo", "chorus"})
 
 
 def _lead_events_for_section(section: dict, start_beat: float, ppq: int) -> list[tuple[int, int, int, int]]:
@@ -205,7 +208,11 @@ def _lead_events_for_section(section: dict, start_beat: float, ppq: int) -> list
         per_cell = [None if c["is_rest"] else next(hit_pitches) for c in take_a]
         return _cell_events(take_a, per_cell, start_beat, ppq)
 
-    if mode == "solo":
+    if mode in ("solo", "chorus_lead"):
+        # X.31: chorus_lead reuses the exact same even-8th-note timing as
+        # solo's main phrase -- `legato` is always None for chorus_lead
+        # (song.py never splices one), which this branch already handles
+        # gracefully (empty legato_pitches/legato_cells).
         legato = section["legato"]
         legato_pitches = legato["pitches"] if legato else []
         legato_cells = legato["cells"] if legato else []

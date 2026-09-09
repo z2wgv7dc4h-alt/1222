@@ -92,7 +92,9 @@ def test_rpp_drum_events_use_real_gm_notes_on_channel_nine(tmp_path):
 
 
 def test_rpp_tempo_envelope_matches_real_tempo_map(tmp_path):
-    song = compose_song("djent", seed=11, num_sections=8)
+    # X.33: seed bumped from 11 -- see the equivalent test_midi_export.py
+    # test's own comment for why.
+    song = compose_song("djent", seed=0, num_sections=8)
     text = _write(song, tmp_path)
 
     tempo_block = text[text.index("<TEMPOENVEX"):text.index(">", text.index("<TEMPOENVEX"))]
@@ -116,7 +118,9 @@ def test_rpp_tempo_drop_point_lands_at_the_real_time_and_shifts_later_sections(t
     every later section's own point must reflect the slower real time the
     dropped portion actually took -- not just the flat `beats*60/bpm`
     every section used before this feature existed."""
-    song = compose_song("djent", seed=11, num_sections=8)
+    # X.32: seed bumped from 11 -- see the equivalent test_midi_export.py
+    # test's own comment for why.
+    song = compose_song("djent", seed=0, num_sections=8)
     dropped_indices = [i for i, s in enumerate(song["sections"]) if s.get("tempo_drop") is not None]
     assert dropped_indices, "expected djent seed=11/8 sections to include a real tempo_drop"
 

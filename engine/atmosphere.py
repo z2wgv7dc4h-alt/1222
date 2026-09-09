@@ -32,6 +32,7 @@ from theory import Scale
 __all__ = [
     "PAD_PROGRAM",
     "ORCH_HIT_PROGRAM",
+    "SYNTH_DOUBLE_PROGRAM",
     "pad_voicing",
     "stab_voicing",
     "synth_double",
@@ -44,6 +45,12 @@ __all__ = [
 PAD_PROGRAM = 90
 # General MIDI program 56: "Orchestra Hit".
 ORCH_HIT_PROGRAM = 56
+# General MIDI program 81: "Lead 2 (sawtooth)" -- a real, distinct
+# synth-lead timbre for `synth_double`'s own real doubled-riff voice
+# (song.py's dense-chug wiring), deliberately different from the pad/
+# orch-hit/guitar/bass programs so it reads as its own voice, not a
+# blend into one of the others.
+SYNTH_DOUBLE_PROGRAM = 81
 
 
 def _check_root(root: int) -> int:

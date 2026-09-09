@@ -52,7 +52,17 @@ function buildRig() {
     oscillator: { type: 'triangle' },
     envelope: { attack: 0.005, decay: 0.3, sustain: 0.1, release: 0.4 },
   }).toDestination()
-  return { guitar, bass, lead, kick, snare, hihat, distortion, pad, accent }
+  // Wired same day as the pad/accent fix above, found via direct user
+  // listening feedback ("no melody... no synth... nothing") -- a real
+  // "Synth" track now doubles the riff an octave up on every dense-chug
+  // section (song.py's synth_double wiring). Undistorted bright
+  // sawtooth, its own register/timbre so it reads as a synth doubling
+  // the riff, not a second rhythm guitar.
+  const synthDouble = new Tone.PolySynth(Tone.Synth, {
+    oscillator: { type: 'sawtooth' },
+    envelope: { attack: 0.02, decay: 0.1, sustain: 0.6, release: 0.2 },
+  }).toDestination()
+  return { guitar, bass, lead, kick, snare, hihat, distortion, pad, accent, synthDouble }
 }
 
 type Rig = ReturnType<typeof buildRig>
@@ -98,6 +108,7 @@ export function MidiPlayer({ midiBlob, isLoading }: MidiPlayerProps) {
         const isLead = /lead|harmony/i.test(track.name)
         const isPad = /pad/i.test(track.name)
         const isAccent = /accent/i.test(track.name)
+        const isSynthDouble = /^synth$/i.test(track.name)
 
         const events = track.notes.map((note) => ({
           time: note.time,
@@ -120,7 +131,17 @@ export function MidiPlayer({ midiBlob, isLoading }: MidiPlayerProps) {
             }
             return
           }
-          const synth = isPad ? rig.pad : isAccent ? rig.accent : isBass ? rig.bass : isLead ? rig.lead : rig.guitar
+          const synth = isPad
+            ? rig.pad
+            : isAccent
+              ? rig.accent
+              : isSynthDouble
+                ? rig.synthDouble
+                : isBass
+                  ? rig.bass
+                  : isLead
+                    ? rig.lead
+                    : rig.guitar
           const freq = Tone.Frequency(event.pitch, 'midi').toFrequency()
           synth.triggerAttackRelease(freq, Math.max(event.duration, 0.03), time, vel)
         }, events).start(0)

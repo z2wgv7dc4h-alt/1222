@@ -6,9 +6,11 @@ from midi_export import (
     _ACCENT_CHANNEL,
     _CHORD_THICKENED_ROLES,
     _PAD_CHANNEL,
+    _SYNTH_DOUBLE_CHANNEL,
     _accent_events_for_section,
     _guitar_chord_tone_pitches,
     _pad_events_for_section,
+    _synth_double_events_for_section,
     song_to_midi,
 )
 from presets import load_all_presets
@@ -48,8 +50,8 @@ def test_song_to_midi_writes_a_real_parseable_file_for_every_preset(preset_id, t
     assert out.exists() and out.stat().st_size > 0
     parsed = _read_back(out)
     assert parsed.type == 1
-    # Tempo track + guitar A/B + bass + lead + drums + pad + accents.
-    assert len(parsed.tracks) == 8
+    # Tempo track + guitar A/B + bass + lead + drums + pad + accents + synth.
+    assert len(parsed.tracks) == 9
 
 
 def test_guitar_track_note_count_matches_real_guitar_hit_count():
@@ -375,3 +377,30 @@ def test_real_exported_midi_has_pad_and_accent_note_content():
     accent_track = _track_by_name(parsed, "Accents")
     assert len(_note_events(pad_track, _PAD_CHANNEL)) > 0
     assert len(_note_events(accent_track, _ACCENT_CHANNEL)) > 0
+
+
+def test_synth_double_events_for_section_aligns_with_real_guitar_cells():
+    song = compose_song("metalcore", seed=3, num_sections=8)
+    for section in song["sections"]:
+        if section["lead_mode"] != "silent" or not section["synth_double"]:
+            continue
+        events = _synth_double_events_for_section(section, start_beat=0.0, ppq=480)
+        real_hits = sum(1 for c in section["guitar_take_a"] if not c["is_rest"])
+        assert len(events) == real_hits
+        assert real_hits > 0
+        return
+    pytest.fail("no real dense-chug section with a non-empty synth_double found across 8 sections")
+
+
+def test_synth_double_events_for_section_empty_when_no_data():
+    events = _synth_double_events_for_section({"guitar_take_a": []}, start_beat=0.0, ppq=480)
+    assert events == []
+
+
+def test_real_exported_midi_has_synth_double_note_content():
+    song = compose_song("metalcore", seed=3, num_sections=8)  # metalcore: octave_stab=true
+    path = _write_tmp(song, "synth_double")
+    parsed = _read_back(path)
+
+    synth_track = _track_by_name(parsed, "Synth")
+    assert len(_note_events(synth_track, _SYNTH_DOUBLE_CHANNEL)) > 0

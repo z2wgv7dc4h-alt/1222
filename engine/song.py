@@ -80,7 +80,7 @@ from __future__ import annotations
 
 import random
 
-from atmosphere import find_accents, pad_voicing
+from atmosphere import find_accents, pad_voicing, synth_double
 from bass import build_bass_fretboard, follow_guitar_rhythm
 from chord_vocab import quality_for_dissonance, voice_named_chord
 from drums import (
@@ -269,6 +269,11 @@ _BLAST_WEIGHTS = {"traditional": 1.0, "gravity": 1.0, "hammer": 1.0}
 # reference-MIDI/research citation.
 _SOLO_SEQUENCE_MOTIF_LEN = 4
 _SOLO_SEQUENCE_REPEATS = 4
+
+# Real "synth doubles the riff an octave up" device (scope sec.16.1's own
+# Born-of-Osiris research finding) -- see the dense-chug `else` branch of
+# `_generate_one_section` for the full real citation.
+_SYNTH_DOUBLE_TRANSPOSE = 12
 
 
 def _resolve_tempo_drop(section_bpm: float, trigger_beat: float | None) -> dict | None:
@@ -757,6 +762,12 @@ def _generate_one_section(
     # other role leaves them None -- not applicable, never fabricated.
     chord_quality: str | None = None
     chord_voicing: list[tuple[int, int]] | None = None
+    # Only dense-chug ("silent" lead_mode) sections ever populate this
+    # (see the `else` branch below) -- solo/chorus/chill already have
+    # their own real melodic voice and don't need a doubled riff on top.
+    # Per-cell shape (None on rest), same as `pitches_per_cell` -- see
+    # the `else` branch's own comment for why.
+    synth_double_pitches: list[int | None] = []
     if role == "solo":
         # A genuine featured lead: denser (roughly 8th-note-rate across
         # the section rather than one note per rhythm hit), more active
@@ -879,15 +890,43 @@ def _generate_one_section(
         except ValueError:
             chord_voicing = None
     else:
-        # Dense chug sections (intro/build/breakdown/outro): a busy
-        # independent lead would just clash with the rhythm here --
-        # real arrangements leave the second guitar out (or doubling
-        # the riff, already covered by the double-tracked pair) rather
-        # than noodling a melody over a breakdown. Silent, not a
-        # fabricated part filling space it doesn't belong in.
+        # Dense chug sections (intro/build/breakdown/outro/verse): a
+        # busy INDEPENDENTLY-COMPOSED lead would just clash with the
+        # rhythm here -- real arrangements leave the second guitar out
+        # rather than noodling a competing melody over a breakdown, so
+        # `lead_mode` stays "silent" and `lead` stays empty.
+        #
+        # But scope sec.16.1's own real Born-of-Osiris research finding
+        # is that the synth should DOUBLE/HARMONIZE the SAME riff
+        # essentially continuously -- "a genuine compositional voice
+        # under riffs and interludes, not just intro-only ambience" --
+        # not sit out for 70% of a song. `atmosphere.synth_double`
+        # (P7.2, real and tested since that session but never wired
+        # into generation until now) is exactly the right tool for
+        # this: it re-renders THIS section's own `m` motif via the same
+        # `render_motif` the guitar itself uses, so its rhythm/contour
+        # is GUARANTEED identical -- a doubling, never a second,
+        # competing musical idea -- shifted up `_SYNTH_DOUBLE_TRANSPOSE`
+        # semitones (an octave, the classic "synth doubles the riff an
+        # octave up" device).
         lead_mode = "silent"
         lead_notes = []
         legato = None
+        # Stored PER-CELL (None on rest), the exact same shape as
+        # `pitches_per_cell` -- not per-hit -- specifically so X.24's own
+        # cross-section blending pass (`_pickup_values`, below and in
+        # `regenerate_section`) can blend it the identical real way it
+        # already blends `pitches_per_cell`, keeping it index-aligned
+        # with `guitar_take_a` even after the tail gets overwritten by a
+        # neighbor. A per-HIT list (this function's first real attempt)
+        # broke exactly there: blending can change how many hits land in
+        # a section's tail without this list knowing, desyncing a
+        # naive hit-by-hit zip in the exporter -- the same real class of
+        # bug X.28 already fixed once for guitar/bass/kick.
+        synth_double_hits = iter(synth_double(
+            m, scale, start_degree=arc_row["start_degree"], transpose=_SYNTH_DOUBLE_TRANSPOSE,
+        ))
+        synth_double_pitches = [None if c["is_rest"] else next(synth_double_hits) for c in m.cell]
 
     # X.18: real mid-section half-time drop trigger -- see module-level
     # docstring above `_resolve_tempo_drop`. Only the TRIGGER BEAT is
@@ -920,6 +959,7 @@ def _generate_one_section(
         "pad": pad,
         "accents": accents,
         "octave_stabs": octave_stabs,
+        "synth_double": synth_double_pitches,
         "chord_quality": chord_quality,
         "chord_voicing": chord_voicing,
         "chord_progression": chord_progression,
@@ -1025,6 +1065,14 @@ def _generate_attempt(
         this_section["guitar_take_b"] = _pickup_cells(this_section["guitar_take_b"], next_section["guitar_take_b"])
         this_section["pitches_per_cell"] = _pickup_values(
             this_section["pitches_per_cell"], next_section["pitches_per_cell"]
+        )
+        # Same real per-cell blend, same reason: keeps synth_double
+        # index-aligned with the just-blended guitar_take_a. Safe to call
+        # unconditionally -- `_pickup_values` returns its input unchanged
+        # when either side is empty (solo/chorus/chill sections carry an
+        # empty synth_double, never populated).
+        this_section["synth_double"] = _pickup_values(
+            this_section["synth_double"], next_section["synth_double"]
         )
 
         # Real, "do it properly" extension: bass and (the guitar-locking
@@ -1282,6 +1330,9 @@ def regenerate_section(
         this_section["guitar_take_b"] = _pickup_cells(this_section["guitar_take_b"], next_section["guitar_take_b"])
         this_section["pitches_per_cell"] = _pickup_values(
             this_section["pitches_per_cell"], next_section["pitches_per_cell"]
+        )
+        this_section["synth_double"] = _pickup_values(
+            this_section["synth_double"], next_section["synth_double"]
         )
         this_section["bass"] = follow_guitar_rhythm(
             this_section["guitar_take_a"], this_section["pitches_per_cell"], bass_fb

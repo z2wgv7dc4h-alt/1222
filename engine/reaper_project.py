@@ -49,6 +49,7 @@ from midi_export import (
     _LEAD_CHANNEL,
     _LEAD_PROGRAM,
     _PAD_CHANNEL,
+    _SYNTH_DOUBLE_CHANNEL,
     _accent_events_for_section,
     _beats_to_ticks,
     _cell_events,
@@ -56,6 +57,7 @@ from midi_export import (
     _lead_events_for_section,
     _pad_events_for_section,
     _section_beats,
+    _synth_double_events_for_section,
 )
 from drums import note_for_role
 
@@ -240,6 +242,7 @@ def song_to_rpp(song: dict, path: str | Path) -> None:
     lead_events: list[tuple[int, int, int, int]] = []
     pad_events: list[tuple[int, int, int, int]] = []
     accent_events: list[tuple[int, int, int, int]] = []
+    synth_double_events: list[tuple[int, int, int, int]] = []
 
     section_start_beats: list[float] = []
     section_start_seconds: list[float] = []
@@ -276,6 +279,7 @@ def song_to_rpp(song: dict, path: str | Path) -> None:
         hihat_pitches = [None if c["is_rest"] else note_for_role(c["role"]) for c in section["hihat"]]
         drum_events += _cell_events(section["hihat"], hihat_pitches, start_beat, _PPQ)
         lead_events += _lead_events_for_section(section, start_beat, _PPQ)
+        synth_double_events += _synth_double_events_for_section(section, start_beat, _PPQ)
 
         beats = _section_beats(section)
         pad_events += _pad_events_for_section(section, start_beat, beats, _PPQ)
@@ -414,7 +418,8 @@ def song_to_rpp(song: dict, path: str | Path) -> None:
         ("Lead", _LEAD_CHANNEL, lead_events, 4),
         ("Pad", _PAD_CHANNEL, pad_events, 5),
         ("Accents", _ACCENT_CHANNEL, accent_events, 6),
-        ("Drums", _DRUM_CHANNEL, drum_events, 7),
+        ("Synth", _SYNTH_DOUBLE_CHANNEL, synth_double_events, 7),
+        ("Drums", _DRUM_CHANNEL, drum_events, 8),
     ]
     for name, channel, events, item_id in tracks:
         lines += _track_block(name, channel, events, total_seconds, item_id)

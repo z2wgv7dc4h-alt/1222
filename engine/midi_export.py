@@ -52,6 +52,16 @@ positionally zipped 1:1 with `section["accents"]` by `song.py`). Both were
 real, computed, tested data since P7.1-P7.3 but were never wired into any
 exported output until now -- found via a 2026-09-10 full scope re-read
 (see TASKS.md's tracker).
+
+Also written (same day, found via direct user listening feedback -- "no
+melody... no synth... nothing"): a real "Synth" track doubling the
+guitar's own riff an octave up (`atmosphere.synth_double`, GM "Lead 2
+(sawtooth)") for every dense-chug ("silent" lead_mode) section -- scope
+sec.16.1's own real Born-of-Osiris research finding that the synth
+should double/harmonize the riff nearly continuously, not just during
+solo/chorus/chill. `atmosphere.synth_double` itself has existed and been
+tested since P7.2, but `song.py` never actually called it in production
+generation until this fix -- `section["synth_double"]` is real, new data.
 """
 from __future__ import annotations
 
@@ -65,7 +75,7 @@ except ImportError as exc:  # pragma: no cover - exercised only when mido is mis
         "engine/requirements.txt -- install with `pip install mido`."
     ) from exc
 
-from atmosphere import ORCH_HIT_PROGRAM, PAD_PROGRAM
+from atmosphere import ORCH_HIT_PROGRAM, PAD_PROGRAM, SYNTH_DOUBLE_PROGRAM
 from chords import solve_chord
 from drums import note_for_role
 from fretboard import Fretboard
@@ -99,6 +109,7 @@ _BASS_CHANNEL = 2
 _LEAD_CHANNEL = 3
 _PAD_CHANNEL = 4
 _ACCENT_CHANNEL = 5
+_SYNTH_DOUBLE_CHANNEL = 6
 _DEFAULT_VELOCITY = 100
 
 
@@ -255,6 +266,26 @@ def _lead_events_for_section(section: dict, start_beat: float, ppq: int) -> list
         return events
 
     raise ValueError(f"unknown lead_mode: {mode!r}")
+
+
+def _synth_double_events_for_section(section: dict, start_beat: float, ppq: int) -> list[tuple[int, int, int, int]]:
+    """Real synth-doubles-the-riff events for one section:
+    `section["synth_double"]` (`atmosphere.synth_double`'s real octave-up
+    doubling of THIS section's own motif -- only ever populated for
+    dense-chug/"silent"-lead_mode sections, scope sec.16.1) is already
+    stored PER-CELL (`None` on rest), the exact same shape as
+    `pitches_per_cell` and already index-aligned with `guitar_take_a`
+    even across X.24's own cross-section blending (`song.py`'s
+    `_pickup_values` blends it the identical real way) -- so this is a
+    direct `_cell_events` call, no per-hit expansion needed. Reusing
+    `guitar_take_a`'s own cells means this voice inherits the SAME real
+    humanization (`timing_offset`/`velocity`) the guitar take already
+    carries -- it reads as locked to the riff, not a separately-timed
+    layer."""
+    pitches = section.get("synth_double") or []
+    if not pitches:
+        return []
+    return _cell_events(section["guitar_take_a"], pitches, start_beat, ppq)
 
 
 def _pad_events_for_section(
@@ -416,6 +447,7 @@ def song_to_midi(song: dict, path: str | Path, ppq: int = 480) -> None:
     lead_events: list[tuple[int, int, int, int]] = []
     pad_events: list[tuple[int, int, int, int]] = []
     accent_events: list[tuple[int, int, int, int]] = []
+    synth_double_events: list[tuple[int, int, int, int]] = []
 
     guitar_fb = song["guitar_fretboard"]
     start_beat = 0.0
@@ -444,6 +476,7 @@ def song_to_midi(song: dict, path: str | Path, ppq: int = 480) -> None:
         hihat_pitches = [None if c["is_rest"] else note_for_role(c["role"]) for c in section["hihat"]]
         drum_events += _cell_events(section["hihat"], hihat_pitches, start_beat, ppq)
         lead_events += _lead_events_for_section(section, start_beat, ppq)
+        synth_double_events += _synth_double_events_for_section(section, start_beat, ppq)
         section_beats = _section_beats(section)
         pad_events += _pad_events_for_section(section, start_beat, section_beats, ppq)
         accent_events += _accent_events_for_section(section, start_beat, ppq)
@@ -462,5 +495,8 @@ def song_to_midi(song: dict, path: str | Path, ppq: int = 480) -> None:
     midi_file.tracks.append(_events_to_track(drum_events, _DRUM_CHANNEL, None, "Drums"))
     midi_file.tracks.append(_events_to_track(pad_events, _PAD_CHANNEL, PAD_PROGRAM, "Pad"))
     midi_file.tracks.append(_events_to_track(accent_events, _ACCENT_CHANNEL, ORCH_HIT_PROGRAM, "Accents"))
+    midi_file.tracks.append(
+        _events_to_track(synth_double_events, _SYNTH_DOUBLE_CHANNEL, SYNTH_DOUBLE_PROGRAM, "Synth")
+    )
 
     midi_file.save(str(path))

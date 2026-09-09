@@ -10,7 +10,7 @@ from song import compose_song
 
 ALL_PRESET_IDS = sorted(load_all_presets().keys())
 
-_TRACK_NAMES = ["Guitar (Take A)", "Guitar (Take B)", "Bass", "Lead", "Pad", "Accents", "Drums"]
+_TRACK_NAMES = ["Guitar (Take A)", "Guitar (Take B)", "Bass", "Lead", "Pad", "Accents", "Synth", "Drums"]
 
 
 def _write(song, tmp_path, name="song"):
@@ -34,7 +34,7 @@ def test_song_to_rpp_writes_a_structurally_balanced_project_for_every_preset(pre
 
     for name in _TRACK_NAMES:
         assert f'NAME "{name}"' in text
-    assert text.count("<TRACK") == 7
+    assert text.count("<TRACK") == 8
 
 
 def test_rpp_track_name_x_block_decodes_to_the_real_midi_meta_event(tmp_path):
@@ -121,6 +121,16 @@ def test_rpp_accents_track_has_real_accent_hit_events(tmp_path):
     # Channel 5 (_ACCENT_CHANNEL) note-on status byte: 0x90 | 5 = 0x95.
     note_ons = re.findall(r"^\s*E \d+ 95 ", block, flags=re.MULTILINE)
     assert note_ons, "expected real accent-hit note-on events on channel 5"
+
+
+def test_rpp_synth_track_has_real_synth_double_events(tmp_path):
+    song = compose_song("metalcore", seed=3, num_sections=8)  # metalcore: octave_stab=true
+    text = _write(song, tmp_path)
+
+    block = _source_midi_block_for_track(text, "Synth")
+    # Channel 6 (_SYNTH_DOUBLE_CHANNEL) note-on status byte: 0x90 | 6 = 0x96.
+    note_ons = re.findall(r"^\s*E \d+ 96 ", block, flags=re.MULTILINE)
+    assert note_ons, "expected real synth-double note-on events on channel 6"
 
 
 def test_rpp_tempo_envelope_matches_real_tempo_map(tmp_path):

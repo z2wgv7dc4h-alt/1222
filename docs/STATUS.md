@@ -57,5 +57,9 @@ Update only after grep or pytest. No memory claims.
 | Real riff-repetition bias correction (X.35) + real melodic sequence generator for solos (X.36) | WIRED+TESTED | 596 passed, 1 skipped |
 | Reaper | MISSING | |
 | Editor -- P9.1 timeline scaffold (FastAPI + React/TS, real generate/mute/solo/duplicate/delete/reorder + Tone.js MIDI playback) | WIRED+TESTED | engine/ 596 passed, 1 skipped; editor/backend/ 8 passed; verified live in browser |
+| Editor -- P9.3 real single-section regeneration (`regenerate_section`: full/pitch/rhythm modes, role override, density nudge, neighbor re-blend) + edit-history replay | WIRED+TESTED | engine/ 610 passed; editor/backend/ 12 passed; verified live in browser |
+| Editor -- P9.4 accept/reroll/undo (snapshot-stack undo, capped at 20) | WIRED+TESTED | verified live in browser |
+| Editor -- P9.5 Preview vs Render (`POST /api/export-rpp`, real `.rpp` download) | WIRED+TESTED | editor/backend/ 19 passed; verified live in browser |
+| Editor -- P9.2 Pro + Guided modes (`blend_presets` reused for a real blend slider, `blast_fill_chance` override, both modes same live params per CLAUDE.md's law) | WIRED+TESTED | engine/ 613 passed, 1 skipped; editor/backend/ 21 passed; verified live in browser |
 
 Next: TASKS.md ## Next

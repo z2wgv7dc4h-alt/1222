@@ -118,7 +118,7 @@ from riff import harmonize_line
 from structure import generate_section_sequence, judge, tempo_at
 from theory import Scale, VoiceLeader, arc
 
-__all__ = ["compose_song", "pitches_per_cell"]
+__all__ = ["compose_song", "compose_song_from_preset", "regenerate_section", "pitches_per_cell"]
 
 # A section is `preset.bars` bars of 4/4; slots are sixteenth/eighth/quarter
 # notes -- a reasonable default vocabulary for chug-driven metal rhythm.
@@ -580,6 +580,7 @@ def _generate_one_section(
     theme_source,
     hit_chance_bias: float = 0.0,
     motif_override: Motif | None = None,
+    blast_fill_chance: float | None = None,
 ) -> tuple[dict, str | None, str | None]:
     """Real, standalone per-section generation. Returns `(section, kick_
     style, blast_type)` -- `section` has no `"tempo_drop"` key yet (whole-
@@ -695,7 +696,8 @@ def _generate_one_section(
     # KICK/SNARE-alternating blast, not the old guitar-locked-but-
     # kick-only "blast" kick style.
     blast_type: str | None = None
-    if role in _BLAST_FILL_ROLES and rng.random() < _BLAST_FILL_CHANCE:
+    effective_blast_chance = _BLAST_FILL_CHANCE if blast_fill_chance is None else blast_fill_chance
+    if role in _BLAST_FILL_ROLES and rng.random() < effective_blast_chance:
         blast = render_blast_beat(guitar_cells, _BLAST_WEIGHTS, rng)
         blast_type = blast["blast_type"]
         kick_cells = blast_kick_cells(blast["cells"])
@@ -926,10 +928,17 @@ def _generate_one_section(
     return section, kick_style, blast_type
 
 
-def _generate_attempt(rng: random.Random, preset: Preset, num_sections: int) -> dict:
+def _generate_attempt(
+    rng: random.Random, preset: Preset, num_sections: int, blast_fill_chance: float | None = None,
+) -> dict:
     """One full attempt at composing a song from `preset`. Called
     repeatedly (with fresh seeds) by `judge_and_retry` in `compose_song`
-    below until the result judges `ok`, or attempts run out."""
+    below until the result judges `ok`, or attempts run out.
+
+    `blast_fill_chance` (P9.2): real per-request override of the module
+    default `_BLAST_FILL_CHANCE`, threaded straight through to every
+    section -- Guided Mode's "blast-beat frequency" dial. `None` (the
+    default) reproduces the exact pre-P9.2 behavior."""
     tunings = load_tunings()
     tuning = get_tuning(preset.tuning_key, tunings)
     guitar_fb = Fretboard(tuning.open)
@@ -979,6 +988,7 @@ def _generate_attempt(rng: random.Random, preset: Preset, num_sections: int) -> 
         section, kick_style, blast_type = _generate_one_section(
             rng, preset, role, occurrence, scale, guitar_fb, bass_fb,
             total_beats, chromatic, previous_role, _shared_theme_source,
+            blast_fill_chance=blast_fill_chance,
         )
         kick_styles.append(kick_style)
         blast_types.append(blast_type)
@@ -1300,6 +1310,7 @@ def compose_song(
     seed: int,
     num_sections: int = 6,
     max_seeds: int = 6,
+    blast_fill_chance: float | None = None,
 ) -> dict:
     """Compose a full song from a real preset id (e.g. "djent", or a stale
     band-linked alias like "periphery" -- both resolve via
@@ -1339,12 +1350,29 @@ def compose_song(
     resolved = resolve_preset_id(preset_id)
     if resolved not in presets:
         raise KeyError(f"unknown preset id or alias: {preset_id!r}")
-    preset = presets[resolved]
+    return compose_song_from_preset(presets[resolved], seed, num_sections, max_seeds, blast_fill_chance)
 
+
+def compose_song_from_preset(
+    preset: Preset,
+    seed: int,
+    num_sections: int = 6,
+    max_seeds: int = 6,
+    blast_fill_chance: float | None = None,
+) -> dict:
+    """P9.2 -- the same real judge/retry loop `compose_song` uses, extracted
+    so a caller with a real `Preset` OBJECT already in hand -- e.g. Guided
+    Mode's `presets.blend_presets` output, which has no real preset id of
+    its own -- doesn't need one. `compose_song` itself now just resolves
+    `preset_id` and calls this.
+
+    `blast_fill_chance`: real per-request override of the "blast-beat
+    frequency" module default, threaded straight through to
+    `_generate_attempt`. `None` reproduces the exact original behavior."""
     result = None
     for attempt in range(max_seeds):
         rng = random.Random(seed + attempt)
-        result = _generate_attempt(rng, preset, num_sections)
+        result = _generate_attempt(rng, preset, num_sections, blast_fill_chance=blast_fill_chance)
         if result["judge"]["ok"]:
             break
     return result

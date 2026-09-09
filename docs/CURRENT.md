@@ -1,14 +1,14 @@
 # CURRENT
 
-task: P9.1
+task: P9.2
 phase: 9 (Editor)
 status: DONE
-last_pytest: engine/ 596 passed, 1 skipped; editor/backend/ 8 passed
-note: First real editor work -- "let's build the ui and other items." Opened SCOPE-INDEX.md's P9 heading (`## 10. Application / Editor`) per CLAUDE.md's own rule before designing anything: real architecture is a local Python backend (FastAPI) + local React/TS frontend over localhost (scope sec.10.5), section-timeline layout per sec.10.1. User explicitly scoped this build to the timeline scaffold (P9.1) only -- not the full 7-part editor -- and chose a local dev server + browser tab over Electron/Tauri.
+last_pytest: engine/ 613 passed, 1 skipped; editor/backend/ 21 passed
+note: "All of them" -- user authorized all remaining Phase 9 sub-parts in one go (P9.2-P9.7). P9.3 (real single-section regeneration) landed first as the real foundation every other sub-part builds on -- see its own TASKS.md entry. This entry covers P9.2 (Pro + Guided modes), built after P9.3.
 
-Built `editor/backend/` (FastAPI wrapping the real engine: `/api/presets`, `/api/compose`, `/api/export-midi`; `app/serialize.py` for real JSON-safe summaries, `app/arrange.py` for a real reorder/duplicate/mute/solo mechanism over an already-composed song) and `editor/frontend/` (Vite+React+TS+Tailwind v4, `@dnd-kit` drag-reorder timeline, Tone.js+`@tonejs/midi` real in-browser playback -- switched away from `html-midi-player` after `npm audit` found unpatched critical vulnerabilities in its Magenta.js dependency chain, ended at 0 vulnerabilities). Documented a real, honest scope boundary throughout: the engine can't yet regenerate a single section or blend a freshly-edited boundary (scope sec.10.3 is a real, separate, not-yet-built requirement), so this scaffold's CRUD rearranges already-generated sections rather than faking regeneration.
+Per CLAUDE.md's own law ("Guided = sliders on the same params as Pro"), Guided is NOT a separate data model -- both modes drive the exact same two real engine knobs: `blend_with`/`blend_t` (nudge toward a second real preset via `presets.blend_presets`'s real linear interpolation of continuous character knobs only) and `blast_fill_chance` (overrides the module-default blast-beat coin-flip). `engine/song.py` gained `compose_song_from_preset` (extracted from `compose_song`'s retry loop, accepts a real `Preset` object directly since a blended preset has no id of its own) and threaded `blast_fill_chance` as a real optional override through the full call chain, defaulting to the existing constant when omitted (zero behavior change for existing callers). `editor/backend/app/main.py`'s `_compose` branches on whether a blend was requested, both paths going through the same real order/edits pipeline. `editor/frontend/`'s new `GuidedControls.tsx` shows the SAME live blend/blast controls in both modes, just relabeled (Pro shows raw param names, Guided shows friendly ones) -- toggling never resets a value.
 
-Verified end-to-end in a real browser (mcp Browser tool, not just built): generated a real metalcore song, confirmed mute/duplicate/delete all correctly change the real section arrangement and re-trigger MIDI export (58.8s -> 52.6s on mute), and real Tone.js audio playback starts/stops cleanly with no console errors. `.claude/launch.json` added for both dev servers.
-updated: 2026-09-09
+Verified live in the browser: blending toward djent at t=0.5 measurably changed a real generated song (pm 0.55->0.56, kick-lock 0.77->0.78, preview 58.8s->55.7s); maxing blast_fill_chance changed it further (hits 295->300, kick-lock 0.78->0.69). `npx tsc --noEmit` clean.
+updated: 2026-09-10
 
-P9.2-P9.7 (Pro/Guided modes, real regen primitives, accept/reroll/undo, preview/render, VexFlow tab notation, section-level presets) remain real, separate, larger follow-up builds -- not attempted this pass, per the user's own explicit scoping choice.
+P9.6-P9.7 (VexFlow tab notation, section-level save/load presets) remain, per the same "All of them" authorization -- next up.

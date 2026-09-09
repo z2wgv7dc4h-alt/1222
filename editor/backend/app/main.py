@@ -29,9 +29,9 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from midi_export import song_to_midi
-from presets import load_all_presets, resolve_preset_id
+from presets import blend_presets, load_all_presets, resolve_preset_id
 from reaper_project import song_to_rpp
-from song import compose_song
+from song import compose_song, compose_song_from_preset
 
 from app.arrange import apply_order
 from app.edits import apply_edits
@@ -63,20 +63,46 @@ class ComposeRequest(BaseModel):
     num_sections: int = 8
     order: list[int] | None = None
     edits: list[RegenEdit] = []
+    # P9.2 -- Guided Mode's real knobs. `blend_with`/`blend_t` nudge
+    # between `preset_id` and a second real preset (presets.blend_presets)
+    # -- the same real mechanism covers "more djent"-style character
+    # nudges and Guided's own energy/technicality/atmosphere dials, all as
+    # "which preset am I leaning toward" rather than four separate
+    # invented knobs. `blast_fill_chance`, when given, overrides the real
+    # module default for the "blast-beat frequency" dial specifically.
+    blend_with: str | None = None
+    blend_t: float = 0.0
+    blast_fill_chance: float | None = None
 
 
 class ExportRequest(ComposeRequest):
     order: list[int]
 
 
+def _resolve_preset(preset_id: str, presets: dict):
+    resolved = resolve_preset_id(preset_id)
+    if resolved not in presets:
+        raise HTTPException(status_code=404, detail=f"unknown preset id: {preset_id!r}")
+    return presets[resolved]
+
+
 def _compose(req: ComposeRequest):
     presets = load_all_presets()
-    resolved = resolve_preset_id(req.preset_id)
-    if resolved not in presets:
-        raise HTTPException(status_code=404, detail=f"unknown preset id: {req.preset_id!r}")
-    preset = presets[resolved]
+    preset = _resolve_preset(req.preset_id, presets)
     try:
-        song = compose_song(req.preset_id, seed=req.seed, num_sections=req.num_sections)
+        if req.blend_with is not None:
+            other = _resolve_preset(req.blend_with, presets)
+            blended = blend_presets(preset, other, req.blend_t)
+            song = compose_song_from_preset(
+                blended, seed=req.seed, num_sections=req.num_sections,
+                blast_fill_chance=req.blast_fill_chance,
+            )
+            preset = blended
+        else:
+            song = compose_song(
+                req.preset_id, seed=req.seed, num_sections=req.num_sections,
+                blast_fill_chance=req.blast_fill_chance,
+            )
         if req.order is not None:
             song = apply_order(song, req.order)
         song = apply_edits(song, req.edits, preset)

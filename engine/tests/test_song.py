@@ -1449,3 +1449,61 @@ def test_regenerate_section_is_reproducible_with_same_regen_seed():
     b = regenerate_section(song, 2, random.Random(99), metalcore, mode="full")
     assert a["sections"][2]["motif"].deltas == b["sections"][2]["motif"].deltas
     assert a["sections"][2]["motif"].cell == b["sections"][2]["motif"].cell
+
+
+def test_compose_song_from_preset_works_with_a_real_blended_preset():
+    from song import compose_song_from_preset
+    from presets import blend_presets
+
+    presets = load_all_presets()
+    blended = blend_presets(presets["djent"], presets["deathcore"], 0.5)
+    song = compose_song_from_preset(blended, seed=3, num_sections=6)
+    assert song["sections"]
+    assert song["judge"]["hits"] > 0
+
+
+def test_compose_song_from_preset_reproducible_with_same_seed():
+    from song import compose_song_from_preset
+
+    preset = load_all_presets()["metalcore"]
+    a = compose_song_from_preset(preset, seed=5, num_sections=4)
+    b = compose_song_from_preset(preset, seed=5, num_sections=4)
+    assert a["sequence"] == b["sequence"]
+
+
+def test_compose_song_blast_fill_chance_override_is_real():
+    """P9.2: blast_fill_chance is a real per-section coin-flip threshold
+    (song._generate_one_section) -- 0.0 must never fire it, 1.0 must
+    always fire it for a real eligible role, checked directly against the
+    real per-section function rather than an indirect heuristic on the
+    resulting drum density (which varies by preset/style already)."""
+    from song import _generate_one_section
+    from presets import load_all_presets
+    from theory import Scale
+    from fretboard import Fretboard
+    from bass import build_bass_fretboard
+    from presets import get_tuning, load_tunings
+
+    preset = load_all_presets()["deathcore"]
+    tunings = load_tunings()
+    tuning = get_tuning(preset.tuning_key, tunings)
+    guitar_fb = Fretboard(tuning.open)
+    bass_fb = build_bass_fretboard(tuning.open)
+    scale = Scale(root=tuning.open[0], name=preset.scale)
+
+    def fresh_theme_source(key, *a, **kw):
+        from motif import generate_motif
+        return generate_motif(*a, **kw)
+
+    for seed in range(10):
+        _section, _kick, blast_type = _generate_one_section(
+            random.Random(seed), preset, "breakdown", 0, scale, guitar_fb, bass_fb,
+            16.0, False, None, fresh_theme_source, blast_fill_chance=0.0,
+        )
+        assert blast_type is None
+
+        _section, _kick, blast_type = _generate_one_section(
+            random.Random(seed), preset, "breakdown", 0, scale, guitar_fb, bass_fb,
+            16.0, False, None, fresh_theme_source, blast_fill_chance=1.0,
+        )
+        assert blast_type is not None

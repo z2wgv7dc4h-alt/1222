@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { composeSong, exportMidi, exportRpp, fetchPresets, type EditPayload } from './api'
+import { GuidedControls } from './components/GuidedControls'
 import { MidiPlayer } from './components/MidiPlayer'
 import { SectionDetailPanel } from './components/SectionDetailPanel'
 import { Timeline } from './components/Timeline'
@@ -32,6 +33,14 @@ export default function App() {
   const [presetId, setPresetId] = useState('metalcore')
   const [seed, setSeed] = useState(1)
   const [numSections, setNumSections] = useState(8)
+
+  // P9.2 -- Pro/Guided are the SAME real params (CLAUDE.md's own law:
+  // "Guided = sliders on the same params as Pro"), just shown or hidden.
+  // Nothing here is a separate data model from what /api/compose accepts.
+  const [guided, setGuided] = useState(false)
+  const [blendWith, setBlendWith] = useState<string | null>(null)
+  const [blendT, setBlendT] = useState(0.5)
+  const [blastFillChance, setBlastFillChance] = useState<number | null>(null)
 
   const [song, setSong] = useState<SongSummary | null>(null)
   const [arrangedSong, setArrangedSong] = useState<SongSummary | null>(null)
@@ -70,11 +79,15 @@ export default function App() {
       .catch((e) => setError(String(e)))
   }, [])
 
+  function guidedParams() {
+    return { blend_with: blendWith, blend_t: blendT, blast_fill_chance: blastFillChance }
+  }
+
   async function handleGenerate() {
     setGenerating(true)
     setError(null)
     try {
-      const summary = await composeSong({ preset_id: presetId, seed, num_sections: numSections })
+      const summary = await composeSong({ preset_id: presetId, seed, num_sections: numSections, ...guidedParams() })
       setSong(summary)
       const freshBlocks = summary.sections.map((_, i) => newBlock(i))
       undoStack.current = []
@@ -106,7 +119,7 @@ export default function App() {
     }
     let cancelled = false
     setExporting(true)
-    const params = { preset_id: presetId, seed, num_sections: numSections, order, edits }
+    const params = { preset_id: presetId, seed, num_sections: numSections, order, edits, ...guidedParams() }
     Promise.all([
       composeSong(params).then((summary) => !cancelled && setArrangedSong(summary)),
       exportMidi(params).then((blob) => !cancelled && setMidiBlob(blob)),
@@ -117,7 +130,7 @@ export default function App() {
       cancelled = true
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [song, blocks])
+  }, [song, blocks, blendWith, blendT, blastFillChance])
 
   function updateBlock(blockId: string, patch: Partial<TimelineBlock>) {
     setBlocks((prev) => prev.map((b) => (b.blockId === blockId ? { ...b, ...patch } : b)))
@@ -181,7 +194,7 @@ export default function App() {
     const { order, edits } = toOrderAndEdits(blocks)
     if (order.length === 0) return
     try {
-      const blob = await exportRpp({ preset_id: presetId, seed, num_sections: numSections, order, edits })
+      const blob = await exportRpp({ preset_id: presetId, seed, num_sections: numSections, order, edits, ...guidedParams() })
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
@@ -216,6 +229,18 @@ export default function App() {
         onRandomizeSeed={() => setSeed(Math.floor(Math.random() * 100000))}
         onGenerate={handleGenerate}
         onUndo={handleUndo}
+      />
+
+      <GuidedControls
+        guided={guided}
+        presets={presets.filter((p) => p.id !== presetId)}
+        blendWith={blendWith}
+        blendT={blendT}
+        blastFillChance={blastFillChance}
+        onToggleGuided={() => setGuided((g) => !g)}
+        onBlendWithChange={setBlendWith}
+        onBlendTChange={setBlendT}
+        onBlastFillChanceChange={setBlastFillChance}
       />
 
       <main className="flex flex-1 flex-col gap-6 p-6">

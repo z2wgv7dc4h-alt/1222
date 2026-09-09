@@ -28,6 +28,11 @@ export interface ComposeParams {
   num_sections: number
   order?: number[]
   edits?: EditPayload[]
+  // P9.2 -- Guided Mode's real knobs (see editor/backend/app/main.py's
+  // ComposeRequest for the full real citation).
+  blend_with?: string | null
+  blend_t?: number
+  blast_fill_chance?: number | null
 }
 
 export function composeSong(params: ComposeParams): Promise<SongSummary> {

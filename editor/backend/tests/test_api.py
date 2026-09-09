@@ -57,3 +57,20 @@ def test_compose_rejects_unknown_preset():
 def test_export_midi_rejects_out_of_range_order():
     r = client.post("/api/export-midi", json={"preset_id": "metalcore", "seed": 1, "num_sections": 4, "order": [0, 99]})
     assert r.status_code == 400
+
+
+def test_compose_with_real_preset_blend():
+    r = client.post("/api/compose", json={
+        "preset_id": "djent", "seed": 1, "num_sections": 6,
+        "blend_with": "deathcore", "blend_t": 0.5,
+    })
+    assert r.status_code == 200
+    body = r.json()
+    assert len(body["sections"]) == 6
+
+
+def test_compose_with_blast_fill_chance_override():
+    r = client.post("/api/compose", json={
+        "preset_id": "deathcore", "seed": 1, "num_sections": 6, "blast_fill_chance": 1.0,
+    })
+    assert r.status_code == 200

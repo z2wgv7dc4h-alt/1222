@@ -122,11 +122,6 @@ export function SectionDetailPanel({
           ))}
         </div>
       </div>
-
-      <p className="text-xs text-text-faint">
-        Full editable parameters (style intensity, Guided-mode dials) are a real, separate follow-up
-        (P9.2) -- these are the real Pro-mode regen primitives, wired directly to the engine.
-      </p>
     </div>
   )
 }

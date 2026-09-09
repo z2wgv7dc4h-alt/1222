@@ -1338,3 +1338,114 @@ def test_solo_sequence_notes_stay_in_the_real_solo_register():
             # Every real lead note (main phrase, sequence, and legato
             # tail alike) must be a genuine MIDI pitch, never fabricated.
             assert all(isinstance(p, int) for p in section["lead"])
+
+
+# ---------------------------------------------------------------------------
+# P9.3 -- real single-section regeneration
+# ---------------------------------------------------------------------------
+
+
+def test_regenerate_section_pitch_mode_keeps_rhythm_changes_pitch():
+    from song import regenerate_section
+
+    metalcore = load_all_presets()["metalcore"]
+    song = compose_song("metalcore", seed=1, num_sections=6)
+    original = song["sections"][2]
+
+    new_song = regenerate_section(song, 2, random.Random(42), metalcore, mode="pitch")
+    new_section = new_song["sections"][2]
+
+    assert new_section["motif"].cell == original["motif"].cell
+    assert new_section["role"] == original["role"]
+    assert len(new_section["kick"]) == len(new_section["guitar_take_a"])
+    assert len(new_section["bass"]) == len(new_section["guitar_take_a"])
+    # Real evidence the pitch layer actually changed (extremely unlikely
+    # to coincidentally match exactly across a real reroll).
+    assert new_section["motif"].deltas != original["motif"].deltas or new_section["pitches_per_cell"] != original["pitches_per_cell"]
+
+
+def test_regenerate_section_rhythm_mode_changes_rhythm_keeps_alignment():
+    from song import regenerate_section
+
+    metalcore = load_all_presets()["metalcore"]
+    song = compose_song("metalcore", seed=1, num_sections=6)
+
+    new_song = regenerate_section(song, 2, random.Random(42), metalcore, mode="rhythm")
+    new_section = new_song["sections"][2]
+
+    assert len(new_section["kick"]) == len(new_section["guitar_take_a"])
+    assert len(new_section["snare"]) == len(new_section["guitar_take_a"])
+    assert len(new_section["bass"]) == len(new_section["guitar_take_a"])
+    assert sum(c["duration"] for c in new_section["guitar_take_a"]) == pytest.approx(metalcore.bars * 4)
+
+
+def test_regenerate_section_full_mode_is_a_real_fresh_section():
+    from song import regenerate_section
+
+    metalcore = load_all_presets()["metalcore"]
+    song = compose_song("metalcore", seed=1, num_sections=6)
+
+    new_song = regenerate_section(song, 2, random.Random(42), metalcore, mode="full")
+    new_section = new_song["sections"][2]
+    assert len(new_section["kick"]) == len(new_section["guitar_take_a"])
+    assert sum(c["duration"] for c in new_section["guitar_take_a"]) == pytest.approx(metalcore.bars * 4)
+
+
+def test_regenerate_section_role_override_converts_section_type():
+    from song import regenerate_section
+
+    metalcore = load_all_presets()["metalcore"]
+    song = compose_song("metalcore", seed=1, num_sections=6)
+    assert song["sections"][2]["role"] != "breakdown"
+
+    new_song = regenerate_section(song, 2, random.Random(7), metalcore, mode="full", role="breakdown")
+    assert new_song["sections"][2]["role"] == "breakdown"
+    assert new_song["sequence"][2] == "breakdown"
+
+
+def test_regenerate_section_hit_chance_bias_measurably_changes_density():
+    from song import regenerate_section
+
+    metalcore = load_all_presets()["metalcore"]
+    song = compose_song("metalcore", seed=1, num_sections=6)
+    original_hits = sum(1 for c in song["sections"][2]["guitar_take_a"] if not c["is_rest"])
+
+    sparser = regenerate_section(song, 2, random.Random(7), metalcore, mode="rhythm", hit_chance_bias=-0.4)
+    sparser_hits = sum(1 for c in sparser["sections"][2]["guitar_take_a"] if not c["is_rest"])
+    assert sparser_hits < original_hits
+
+
+def test_regenerate_section_does_not_mutate_the_original_song():
+    from song import regenerate_section
+
+    metalcore = load_all_presets()["metalcore"]
+    song = compose_song("metalcore", seed=1, num_sections=6)
+    original_cell = list(song["sections"][2]["motif"].cell)
+    original_neighbor_kick = list(song["sections"][1]["kick"])
+
+    regenerate_section(song, 2, random.Random(42), metalcore, mode="full")
+
+    assert song["sections"][2]["motif"].cell == original_cell
+    assert song["sections"][1]["kick"] == original_neighbor_kick
+
+
+def test_regenerate_section_rejects_bad_input():
+    from song import regenerate_section
+
+    metalcore = load_all_presets()["metalcore"]
+    song = compose_song("metalcore", seed=1, num_sections=6)
+    with pytest.raises(ValueError):
+        regenerate_section(song, 99, random.Random(1), metalcore)
+    with pytest.raises(ValueError):
+        regenerate_section(song, 0, random.Random(1), metalcore, mode="not-a-real-mode")
+
+
+def test_regenerate_section_is_reproducible_with_same_regen_seed():
+    from song import regenerate_section
+
+    metalcore = load_all_presets()["metalcore"]
+    song = compose_song("metalcore", seed=1, num_sections=6)
+    a = regenerate_section(song, 2, random.Random(99), metalcore, mode="full")
+    b = regenerate_section(song, 2, random.Random(99), metalcore, mode="full")
+    assert a["sections"][2]["motif"].deltas == b["sections"][2]["motif"].deltas
+    assert a["sections"][2]["motif"].cell == b["sections"][2]["motif"].cell

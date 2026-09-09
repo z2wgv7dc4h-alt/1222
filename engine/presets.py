@@ -220,6 +220,56 @@ def load_preset(path: Path, tunings: dict[str, Tuning] | None = None) -> Preset:
     )
 
 
+def blend_presets(preset_a: Preset, preset_b: Preset, t: float) -> Preset:
+    """P9.2/P9.3 -- real linear interpolation of the CONTINUOUS character
+    knobs between two real presets, at `t` in `[0, 1]` (`t=0` is exactly
+    `preset_a`, `t=1` is exactly `preset_b`). Feeds Guided Mode's
+    preset-blend slider (scope sec.15.1: "let the user nudge between two
+    presets... e.g. a Born-of-Osiris <-> Infant-Annihilator slider") and
+    Pro/regen "more djent"-style character nudges.
+
+    Only real, continuous, genre-CHARACTER fields blend: `vocab.weights`
+    (the union of both presets' real interval keys -- a key only one side
+    declares is treated as weight 0 on the other side, not dropped),
+    `dissonance`, `vocab.motion`, and `pedal` (a preset that leaves `pedal`
+    `None` is treated as `0.0` for the blend, not skipped). Every
+    STRUCTURAL field (tuning_key, scale, bpm, bars, feel, kick, group,
+    octave_stab, open_chance, id, description) comes from `preset_a`
+    UNCHANGED -- blending two different tunings or scales isn't
+    well-defined, a deliberate, documented scope boundary, not an
+    oversight."""
+    if not (0.0 <= t <= 1.0):
+        raise ValueError("t must be within [0, 1]")
+
+    keys = set(preset_a.vocab.weights) | set(preset_b.vocab.weights)
+    weights = {
+        k: preset_a.vocab.weights.get(k, 0) * (1 - t) + preset_b.vocab.weights.get(k, 0) * t
+        for k in keys
+    }
+    motion = preset_a.vocab.motion * (1 - t) + preset_b.vocab.motion * t
+    dissonance = preset_a.dissonance * (1 - t) + preset_b.dissonance * t
+    pedal_a = preset_a.pedal if preset_a.pedal is not None else 0.0
+    pedal_b = preset_b.pedal if preset_b.pedal is not None else 0.0
+    pedal = pedal_a * (1 - t) + pedal_b * t
+
+    return Preset(
+        id=preset_a.id,
+        description=preset_a.description,
+        tuning_key=preset_a.tuning_key,
+        scale=preset_a.scale,
+        dissonance=dissonance,
+        bpm=preset_a.bpm,
+        bars=preset_a.bars,
+        feel=preset_a.feel,
+        open_chance=preset_a.open_chance,
+        octave_stab=preset_a.octave_stab,
+        kick=preset_a.kick,
+        vocab=Vocab(weights=weights, motion=motion),
+        group=preset_a.group,
+        pedal=pedal,
+    )
+
+
 def load_all_presets(presets_dir: Path | None = None) -> dict[str, Preset]:
     """Discover and load every preset JSON file in `presets_dir` via glob --
     never a hardcoded filename list, so a new or broken preset file can't

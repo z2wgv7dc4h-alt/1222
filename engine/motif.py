@@ -39,6 +39,7 @@ __all__ = [
     "fragment",
     "pick_pitch_interval",
     "degree_delta_for_interval",
+    "generate_pitch_deltas",
     "apply_pedal_bias",
     "generate_motif",
     "ThemeRegistry",
@@ -338,19 +339,47 @@ def generate_motif(
                 weights=duration_weights, no_singular_short=no_singular_short,
             )
     hits = _count_hits(cell)
+    deltas = generate_pitch_deltas(
+        hits, scale, vocab_weights, rng,
+        chromatic=chromatic, dissonance=dissonance, base_degree=base_degree, pedal=pedal,
+    )
+    return Motif(cell=cell, deltas=deltas)
+
+
+# P9.3 -- extracted from generate_motif's own tail (the real per-hit pitch
+# loop), made public since a second real caller (song.regenerate_section's
+# "new notes, same hits" primitive) needs the EXACT same real weighted-
+# interval-to-scale-degree-delta mechanism against an EXISTING rhythm cell
+# it isn't regenerating -- same established precedent as X.24's
+# resolve_kick_style / X.36's degree_delta_for_interval extractions
+# (promote to public when a genuine second caller needs it, never
+# duplicate). generate_motif itself now calls this, zero behavior change.
+def generate_pitch_deltas(
+    hit_count: int,
+    scale: Scale,
+    vocab_weights: dict,
+    rng: random.Random,
+    chromatic: bool = False,
+    dissonance: float = 0.85,
+    base_degree: int = 0,
+    pedal: float | None = None,
+) -> list[int]:
+    """Real per-hit scale-degree deltas for `hit_count` hits, walking from
+    `base_degree` -- the exact same real mechanism `generate_motif`'s own
+    pitch loop uses (`shade()` for chromatic bias, `apply_pedal_bias` for
+    `pedal`, then one real weighted `pick_pitch_interval` draw per hit)."""
     weights = shade(vocab_weights, dissonance) if chromatic else dict(vocab_weights)
     if pedal is not None:
         weights = apply_pedal_bias(weights, pedal)
 
     deltas: list[int] = []
     degree_index = int(base_degree)
-    for _ in range(hits):
+    for _ in range(hit_count):
         iv = pick_pitch_interval(weights, rng)
         d = degree_delta_for_interval(scale, degree_index, iv)
         deltas.append(d)
         degree_index += d
-
-    return Motif(cell=cell, deltas=deltas)
+    return deltas
 
 
 # X.19 -- real IRVD phrase development (Introduction/Repetition/Variation/

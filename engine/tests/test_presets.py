@@ -6,6 +6,7 @@ import pytest
 from presets import (
     PRESETS_DIR,
     TUNINGS_PATH,
+    blend_presets,
     get_tuning,
     load_all_presets,
     load_preset,
@@ -254,3 +255,72 @@ def test_tunings_file_discovered_by_glob_loads():
     tuning_files = [p for p in Path(PRESETS_DIR).glob("*.json") if p.name == "tunings.json"]
     assert tuning_files == [TUNINGS_PATH]
     assert load_tunings(tuning_files[0])
+
+
+# ---------------------------------------------------------------------------
+# P9.2/P9.3 -- real preset character blending
+# ---------------------------------------------------------------------------
+
+
+def test_blend_presets_t0_and_t1_are_exact_endpoints():
+    presets = load_all_presets()
+    a, b = presets["djent"], presets["deathcore"]
+    at_zero = blend_presets(a, b, 0.0)
+    assert at_zero.dissonance == pytest.approx(a.dissonance)
+    assert at_zero.vocab.motion == pytest.approx(a.vocab.motion)
+    at_one = blend_presets(a, b, 1.0)
+    assert at_one.dissonance == pytest.approx(b.dissonance)
+    assert at_one.vocab.motion == pytest.approx(b.vocab.motion)
+
+
+def test_blend_presets_midpoint_is_real_average():
+    presets = load_all_presets()
+    a, b = presets["djent"], presets["deathcore"]
+    mid = blend_presets(a, b, 0.5)
+    assert mid.dissonance == pytest.approx((a.dissonance + b.dissonance) / 2)
+    for key in set(a.vocab.weights) | set(b.vocab.weights):
+        expected = (a.vocab.weights.get(key, 0) + b.vocab.weights.get(key, 0)) / 2
+        assert mid.vocab.weights[key] == pytest.approx(expected)
+
+
+def test_blend_presets_structural_fields_come_from_preset_a():
+    presets = load_all_presets()
+    a, b = presets["djent"], presets["chill"]
+    blended = blend_presets(a, b, 0.7)
+    assert blended.tuning_key == a.tuning_key
+    assert blended.scale == a.scale
+    assert blended.bpm == a.bpm
+    assert blended.bars == a.bars
+    assert blended.feel == a.feel
+    assert blended.kick == a.kick
+    assert blended.group == a.group
+    assert blended.id == a.id
+
+
+def test_blend_presets_none_pedal_treated_as_zero():
+    presets = load_all_presets()
+    a = presets["djent"]  # real pedal declared
+    b = presets["metalcore"]  # pedal is None
+    assert a.pedal is not None and b.pedal is None
+    blended = blend_presets(a, b, 1.0)
+    assert blended.pedal == pytest.approx(0.0)
+
+
+def test_blend_presets_rejects_out_of_range_t():
+    presets = load_all_presets()
+    a, b = presets["djent"], presets["metalcore"]
+    with pytest.raises(ValueError):
+        blend_presets(a, b, -0.1)
+    with pytest.raises(ValueError):
+        blend_presets(a, b, 1.1)
+
+
+def test_blend_presets_output_is_usable_by_the_real_generation_pipeline():
+    from song import _generate_attempt
+    import random
+
+    presets = load_all_presets()
+    blended = blend_presets(presets["djent"], presets["deathcore"], 0.4)
+    song = _generate_attempt(random.Random(3), blended, num_sections=4)
+    assert song["sections"]
+    assert song["judge"]["hits"] > 0

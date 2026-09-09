@@ -54,7 +54,8 @@ Update only after grep or pytest. No memory claims.
 | Real gallop/stutter-chug + per-role feel system (X.32) | WIRED+TESTED | 579 passed, 1 skipped in 12.58s |
 | Real song-pacing rebalance -- occasional half-time, less atmospheric filler (X.33) | WIRED+TESTED | 581 passed, 1 skipped in 12.86s |
 | Real blast beats wired into the actual drum track (X.34) | WIRED+TESTED | 589 passed, 1 skipped in 13.77s |
+| Real riff-repetition bias correction (X.35) + real melodic sequence generator for solos (X.36) | WIRED+TESTED | 596 passed, 1 skipped |
 | Reaper | MISSING | |
-| Editor | MISSING | |
+| Editor -- P9.1 timeline scaffold (FastAPI + React/TS, real generate/mute/solo/duplicate/delete/reorder + Tone.js MIDI playback) | WIRED+TESTED | engine/ 596 passed, 1 skipped; editor/backend/ 8 passed; verified live in browser |
 
 Next: TASKS.md ## Next

@@ -1,0 +1,62 @@
+@import "tailwindcss";
+
+@theme {
+  --font-display: "Segoe UI", system-ui, sans-serif;
+  --font-mono: ui-monospace, "Cascadia Code", Consolas, monospace;
+
+  --color-ink: #08070a;
+  --color-surface: #100e14;
+  --color-surface-raised: #1a1720;
+  --color-surface-hover: #221e2c;
+  --color-border: #2c2733;
+  --color-border-bright: #3d3548;
+  --color-text: #e8e6ee;
+  --color-text-dim: #948da3;
+  --color-text-faint: #605a6b;
+
+  --color-ember: #ff3b3b;
+  --color-ember-dim: #7a1f1f;
+  --color-violet: #a855f7;
+  --color-violet-dim: #4c1d78;
+  --color-amber: #f5a623;
+
+  --color-role-intro: #4b7bec;
+  --color-role-build: #f5a623;
+  --color-role-breakdown: #ff3b3b;
+  --color-role-verse: #26c281;
+  --color-role-chorus: #a855f7;
+  --color-role-solo: #ff6ec7;
+  --color-role-chill: #4dd0c4;
+  --color-role-interlude: #7f8fa6;
+  --color-role-outro: #6b6580;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--color-ink);
+  color: var(--color-text);
+  font-family: var(--font-display);
+  -webkit-font-smoothing: antialiased;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+::-webkit-scrollbar {
+  height: 10px;
+  width: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-border-bright);
+  border-radius: 999px;
+}

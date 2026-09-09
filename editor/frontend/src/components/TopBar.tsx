@@ -11,6 +11,7 @@ interface TopBarProps {
   onNumSectionsChange: (n: number) => void
   onRandomizeSeed: () => void
   onGenerate: () => void
+  onUndo: () => void
 }
 
 export function TopBar({
@@ -24,6 +25,7 @@ export function TopBar({
   onNumSectionsChange,
   onRandomizeSeed,
   onGenerate,
+  onUndo,
 }: TopBarProps) {
   return (
     <header className="flex flex-wrap items-center gap-4 border-b border-border bg-surface px-6 py-4">
@@ -78,6 +80,14 @@ export function TopBar({
             className="w-20 rounded-md border border-border bg-ink px-2 py-1.5 font-mono text-sm text-text outline-none focus:border-violet"
           />
         </label>
+
+        <button
+          onClick={onUndo}
+          title="Undo the last timeline/regen edit"
+          className="mt-4 rounded-md border border-border px-3 py-2 text-sm text-text-dim transition hover:border-violet hover:text-violet"
+        >
+          ↶ Undo
+        </button>
 
         <button
           onClick={onGenerate}

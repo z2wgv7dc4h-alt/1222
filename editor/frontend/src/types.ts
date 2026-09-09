@@ -45,13 +45,25 @@ export interface SongSummary {
   judge: JudgeResult
 }
 
+// P9.3/P9.4: a real, reproducible description of a single-section
+// regeneration -- mirrors editor/backend/app/main.py's RegenEdit exactly.
+export interface RegenEdit {
+  mode: 'full' | 'pitch' | 'rhythm'
+  role: string | null
+  hit_chance_bias: number
+  regen_seed: number
+}
+
 // A timeline "block" is a client-side arrangement entry: it points back at
 // one real section from the last composed SongSummary by index, plus a
 // stable id so dnd-kit can track it independently of that index (the same
-// real section can appear more than once via duplicate).
+// real section can appear more than once via duplicate). `edit`, when
+// present, is a real regen edit applied to THIS block's position on the
+// server before compose/export.
 export interface TimelineBlock {
   blockId: string
   sourceIndex: number
   muted: boolean
   soloed: boolean
+  edit: RegenEdit | null
 }

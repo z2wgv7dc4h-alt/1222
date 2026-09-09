@@ -1,4 +1,4 @@
-import type { PresetSummary, SongSummary } from './types'
+import type { PresetSummary, RegenEdit, SongSummary } from './types'
 
 const BASE_URL = 'http://localhost:8000'
 
@@ -18,10 +18,16 @@ export function fetchPresets(): Promise<PresetSummary[]> {
   return requestJson('/api/presets')
 }
 
+export interface EditPayload extends RegenEdit {
+  section_position: number
+}
+
 export interface ComposeParams {
   preset_id: string
   seed: number
   num_sections: number
+  order?: number[]
+  edits?: EditPayload[]
 }
 
 export function composeSong(params: ComposeParams): Promise<SongSummary> {

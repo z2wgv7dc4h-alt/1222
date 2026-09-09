@@ -33,6 +33,7 @@ from presets import load_all_presets, resolve_preset_id
 from song import compose_song
 
 from app.arrange import apply_order
+from app.edits import apply_edits
 from app.serialize import summarize_preset, summarize_song
 
 app = FastAPI(title="God Tier Metal Editor API")
@@ -47,10 +48,20 @@ app.add_middleware(
 )
 
 
+class RegenEdit(BaseModel):
+    section_position: int
+    mode: str = "full"
+    role: str | None = None
+    hit_chance_bias: float = 0.0
+    regen_seed: int = 0
+
+
 class ComposeRequest(BaseModel):
     preset_id: str
     seed: int
     num_sections: int = 8
+    order: list[int] | None = None
+    edits: list[RegenEdit] = []
 
 
 class ExportRequest(ComposeRequest):
@@ -62,11 +73,15 @@ def _compose(req: ComposeRequest):
     resolved = resolve_preset_id(req.preset_id)
     if resolved not in presets:
         raise HTTPException(status_code=404, detail=f"unknown preset id: {req.preset_id!r}")
+    preset = presets[resolved]
     try:
         song = compose_song(req.preset_id, seed=req.seed, num_sections=req.num_sections)
+        if req.order is not None:
+            song = apply_order(song, req.order)
+        song = apply_edits(song, req.edits, preset)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    return song, presets[resolved]
+    return song, preset
 
 
 @app.get("/api/presets")
@@ -83,11 +98,7 @@ def compose(req: ComposeRequest):
 
 @app.post("/api/export-midi")
 def export_midi(req: ExportRequest):
-    song, _preset = _compose(req)
-    try:
-        rearranged = apply_order(song, req.order)
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    rearranged, _preset = _compose(req)
 
     # song_to_midi writes to a real path (mido's own file-write API, not a
     # stream) -- a real tempfile round-trip, not a workaround for anything

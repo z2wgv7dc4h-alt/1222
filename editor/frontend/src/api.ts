@@ -37,15 +37,26 @@ export function composeSong(params: ComposeParams): Promise<SongSummary> {
   })
 }
 
-export async function exportMidi(params: ComposeParams & { order: number[] }): Promise<Blob> {
-  const res = await fetch(`${BASE_URL}/api/export-midi`, {
+async function exportFile(path: string, params: ComposeParams & { order: number[] }): Promise<Blob> {
+  const res = await fetch(`${BASE_URL}${path}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(params),
   })
   if (!res.ok) {
     const detail = await res.text()
-    throw new Error(`export-midi failed (${res.status}): ${detail}`)
+    throw new Error(`${path} failed (${res.status}): ${detail}`)
   }
   return res.blob()
+}
+
+export function exportMidi(params: ComposeParams & { order: number[] }): Promise<Blob> {
+  return exportFile('/api/export-midi', params)
+}
+
+// P9.5 -- real Render (distinct from Preview): a real, DAW-importable
+// Reaper project file, same real arrange+edits pipeline as the MIDI
+// preview export.
+export function exportRpp(params: ComposeParams & { order: number[] }): Promise<Blob> {
+  return exportFile('/api/export-rpp', params)
 }

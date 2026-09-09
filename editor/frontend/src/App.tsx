@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { composeSong, exportMidi, fetchPresets, type EditPayload } from './api'
+import { composeSong, exportMidi, exportRpp, fetchPresets, type EditPayload } from './api'
 import { MidiPlayer } from './components/MidiPlayer'
 import { SectionDetailPanel } from './components/SectionDetailPanel'
 import { Timeline } from './components/Timeline'
@@ -173,6 +173,26 @@ export default function App() {
     updateBlock(blockId, { edit: null })
   }
 
+  // P9.5 -- real Render (distinct from Preview): downloads the actual
+  // .rpp Reaper project for the CURRENT real arrangement (same order +
+  // edits the MIDI preview and detail panel already reflect).
+  async function handleRenderRpp() {
+    if (!song) return
+    const { order, edits } = toOrderAndEdits(blocks)
+    if (order.length === 0) return
+    try {
+      const blob = await exportRpp({ preset_id: presetId, seed, num_sections: numSections, order, edits })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = 'arrangement.rpp'
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch (e) {
+      setError(String(e))
+    }
+  }
+
   const selectedBlock = blocks.find((b) => b.blockId === selectedBlockId) ?? null
   const selectedPosition = selectedBlock ? visibleBlocks(blocks).findIndex((b) => b.blockId === selectedBlockId) : -1
   const selectedSection =
@@ -233,7 +253,17 @@ export default function App() {
           onInsertAt={handleInsertAt}
         />
 
-        <MidiPlayer midiBlob={midiBlob} isLoading={exporting} />
+        <div className="flex items-center gap-3">
+          <MidiPlayer midiBlob={midiBlob} isLoading={exporting} />
+          <button
+            onClick={handleRenderRpp}
+            disabled={!song}
+            title="Render a real, DAW-importable Reaper project for the current arrangement"
+            className="rounded-md border border-border bg-surface px-4 py-2 text-sm font-semibold text-text-dim transition hover:border-violet hover:text-violet disabled:opacity-40"
+          >
+            ⬇ Render .rpp
+          </button>
+        </div>
 
         <div className="max-w-sm">
           <SectionDetailPanel

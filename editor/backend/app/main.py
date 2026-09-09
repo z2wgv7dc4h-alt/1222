@@ -30,6 +30,7 @@ from pydantic import BaseModel
 
 from midi_export import song_to_midi
 from presets import load_all_presets, resolve_preset_id
+from reaper_project import song_to_rpp
 from song import compose_song
 
 from app.arrange import apply_order
@@ -96,18 +97,33 @@ def compose(req: ComposeRequest):
     return summarize_song(song, preset)
 
 
+def _write_and_stream(rearranged: dict, writer, filename: str, media_type: str) -> StreamingResponse:
+    """Both `song_to_midi` and `song_to_rpp` write to a real path (not a
+    stream) -- a real tempfile round-trip, not a workaround for anything
+    wrong with either real, already-tested writer."""
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        tmp_path = Path(tmp_dir) / filename
+        writer(rearranged, str(tmp_path))
+        data = tmp_path.read_bytes()
+    return StreamingResponse(io.BytesIO(data), media_type=media_type, headers={
+        "Content-Disposition": f'attachment; filename="{filename}"',
+    })
+
+
 @app.post("/api/export-midi")
 def export_midi(req: ExportRequest):
+    """Preview export -- the real MIDI a browser can actually play back
+    (P9.1's Tone.js player)."""
     rearranged, _preset = _compose(req)
+    return _write_and_stream(rearranged, song_to_midi, "arrangement.mid", "audio/midi")
 
-    # song_to_midi writes to a real path (mido's own file-write API, not a
-    # stream) -- a real tempfile round-trip, not a workaround for anything
-    # wrong with song_to_midi itself.
-    with tempfile.TemporaryDirectory() as tmp_dir:
-        tmp_path = Path(tmp_dir) / "arrangement.mid"
-        song_to_midi(rearranged, str(tmp_path))
-        data = tmp_path.read_bytes()
 
-    return StreamingResponse(io.BytesIO(data), media_type="audio/midi", headers={
-        "Content-Disposition": 'attachment; filename="arrangement.mid"',
-    })
+@app.post("/api/export-rpp")
+def export_rpp(req: ExportRequest):
+    """P9.5 -- real Render (distinct from Preview): a real, already-tested
+    Reaper project file (`reaper_project.song_to_rpp`, verified opening in
+    the user's real installed Reaper earlier this session) over the exact
+    same real arrange+edits pipeline as the MIDI preview -- same real
+    arrangement, a different, DAW-importable real output format."""
+    rearranged, _preset = _compose(req)
+    return _write_and_stream(rearranged, song_to_rpp, "arrangement.rpp", "application/octet-stream")

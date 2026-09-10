@@ -80,7 +80,7 @@ from __future__ import annotations
 
 import random
 
-from atmosphere import find_accents, pad_voicing, synth_double
+from atmosphere import find_accents, pad_voicing
 from bass import build_bass_fretboard, follow_guitar_rhythm
 from chord_vocab import quality_for_dissonance, voice_named_chord
 from drums import (
@@ -269,11 +269,6 @@ _BLAST_WEIGHTS = {"traditional": 1.0, "gravity": 1.0, "hammer": 1.0}
 # reference-MIDI/research citation.
 _SOLO_SEQUENCE_MOTIF_LEN = 4
 _SOLO_SEQUENCE_REPEATS = 4
-
-# Real "synth doubles the riff an octave up" device (scope sec.16.1's own
-# Born-of-Osiris research finding) -- see the dense-chug `else` branch of
-# `_generate_one_section` for the full real citation.
-_SYNTH_DOUBLE_TRANSPOSE = 12
 
 # Real, second, genuinely-different rhythm-guitar part -- a near-
 # monophonic low pedal/chug doubler, distinct from the wide, melodic
@@ -495,6 +490,34 @@ def _snap_to_playable_octave(fretboard: Fretboard, pitch: int) -> int:
     raise ValueError(f"pitch {pitch} has no reachable octave on this fretboard")
 
 
+def _thin_pedal_cells(guitar_cells: list[dict]) -> list[dict]:
+    """Real rhythmic thinning for the pedal guitar (2026-09-11): keeps
+    every OTHER real hit among the main guitar's own non-rest cells,
+    converting the dropped ones into genuine rest cells of the identical
+    duration -- same overall cell COUNT/timing grid as `guitar_cells`
+    (cross-section blending operates on cell count, so this stays
+    unaffected), just real rhythmic CONTRAST instead of a note-for-note
+    copy of the main guitar's own rhythm.
+
+    Found necessary via direct user listening feedback ("I can't even
+    tell it apart, there's so much spam") plus a real, measured count: a
+    single verse section had SIX voices -- both guitar takes, the pedal
+    guitar, the (since-retired) synth double, bass, and kick -- all
+    firing on the identical 120 rhythmic hits simultaneously. Halving
+    just this one voice's density is a real, bounded first step toward
+    genuine interplay between parts rather than a full rhythm redesign."""
+    thinned: list[dict] = []
+    hit_index = 0
+    for cell in guitar_cells:
+        if cell["is_rest"]:
+            thinned.append(dict(cell))
+            continue
+        keep = hit_index % 2 == 0
+        hit_index += 1
+        thinned.append(dict(cell) if keep else {"duration": cell["duration"], "is_rest": True})
+    return thinned
+
+
 def _pedal_double_pitches(
     guitar_cells: list[dict], scale: Scale, guitar_fb: Fretboard, rng: random.Random,
 ) -> list[int | None]:
@@ -510,13 +533,14 @@ def _pedal_double_pitches(
     real `generate_pitch_deltas` mechanism the main guitar's own pitch
     layer uses, anchored at `start_degree=0` (no `arc_row["register"]`
     offset -- keeps this part in the section's own low, tight register,
-    matching the real reference), reusing the SAME rhythm cells as the
-    main guitar (`guitar_cells`, a deliberate simplification -- see
-    `_generate_one_section`'s own comment on the real production
-    precedent for a rhythmically-locked low doubler). Every resulting
-    pitch is snapped through the same real `_snap_to_playable_octave`
-    every other guitar pitch in this project already gets, for a real,
-    reachable `(string, fret)` -- never a fabricated note.
+    matching the real reference). `guitar_cells` here is a real, THINNED
+    copy of the main guitar's own rhythm cells (see `_thin_pedal_cells`),
+    not the raw cells directly -- the caller passes the already-thinned
+    version, so `hit_count` below naturally reflects the real, sparser
+    rhythm. Every resulting pitch is snapped through the same real
+    `_snap_to_playable_octave` every other guitar pitch in this project
+    already gets, for a real, reachable `(string, fret)` -- never a
+    fabricated note.
     """
     hit_count = sum(1 for c in guitar_cells if not c["is_rest"])
     deltas = generate_pitch_deltas(hit_count, scale, _PEDAL_DOUBLE_WEIGHTS, rng)
@@ -736,10 +760,15 @@ def _generate_one_section(
     # section-blending/kick-lock consideration for a single reference's
     # ambiguous density difference).
     if role not in ("chill", "interlude"):
-        pedal_pitches_per_cell = _pedal_double_pitches(guitar_cells, scale, guitar_fb, rng)
+        # 2026-09-11: real rhythmic thinning (see `_thin_pedal_cells`'s
+        # own docstring) -- every other real hit, not a note-for-note
+        # copy of the main guitar's own rhythm, cutting real redundant
+        # simultaneous density.
+        pedal_cells = _thin_pedal_cells(guitar_cells)
+        pedal_pitches_per_cell = _pedal_double_pitches(pedal_cells, scale, guitar_fb, rng)
         pedal_seed = rng.randrange(2**31)
         guitar_pedal = humanize_take(
-            guitar_cells, random.Random(pedal_seed), open_chance=preset.open_chance,
+            pedal_cells, random.Random(pedal_seed), open_chance=preset.open_chance,
         )
     else:
         pedal_pitches_per_cell = []
@@ -1011,33 +1040,23 @@ def _generate_one_section(
             markov=lead_vocab.markov,
         )
         legato = None
-        # The riff-doubling synth (scope sec.16.1's own real research
-        # finding -- the synth should double/harmonize the SAME riff
-        # essentially continuously, "a genuine compositional voice under
-        # riffs and interludes, not just intro-only ambience") stays,
-        # additive to the new ambient lead above, not replaced by it --
-        # two distinct real devices, not a swap. `atmosphere.
-        # synth_double` re-renders THIS section's own `m` motif via the
-        # same `render_motif` the guitar itself uses, so its rhythm/
-        # contour is GUARANTEED identical -- a doubling, never a second
-        # competing idea -- shifted up `_SYNTH_DOUBLE_TRANSPOSE`
-        # semitones (an octave).
-        #
-        # Stored PER-CELL (None on rest), the exact same shape as
-        # `pitches_per_cell` -- not per-hit -- specifically so X.24's own
-        # cross-section blending pass (`_pickup_values`, below and in
-        # `regenerate_section`) can blend it the identical real way it
-        # already blends `pitches_per_cell`, keeping it index-aligned
-        # with `guitar_take_a` even after the tail gets overwritten by a
-        # neighbor. A per-HIT list (this function's first real attempt)
-        # broke exactly there: blending can change how many hits land in
-        # a section's tail without this list knowing, desyncing a
-        # naive hit-by-hit zip in the exporter -- the same real class of
-        # bug X.28 already fixed once for guitar/bass/kick.
-        synth_double_hits = iter(synth_double(
-            m, scale, start_degree=arc_row["start_degree"], transpose=_SYNTH_DOUBLE_TRANSPOSE,
-        ))
-        synth_double_pitches = [None if c["is_rest"] else next(synth_double_hits) for c in m.cell]
+        # (2026-09-11) `atmosphere.synth_double` -- the riff-doubling
+        # synth (scope sec.16.1's own real research finding) -- USED to
+        # also play here, hit-for-hit locked to the exact same rhythm as
+        # `guitar_take_a`/`guitar_take_b`/`guitar_pedal`/`bass`/`kick`.
+        # Direct user listening feedback ("I can't even tell it apart,
+        # there's so much spam") plus a real, measured count (a single
+        # verse section: SIX voices, all firing on the identical 120
+        # rhythmic hits) confirmed this had become pure redundant
+        # stacking, not composition, now that the real ambient-lead line
+        # above already fills the "this section needs some upper-voice
+        # interest" role the synth double was originally built for --
+        # and does it with a genuinely independent melody instead of a
+        # locked-rhythm doubling. Retired here, not replaced -- `else`
+        # branch, not softened elsewhere; `synth_double_pitches` stays
+        # `[]` (its own declared default above), the same real "not
+        # applicable for this role" convention solo/chorus/chill already
+        # use.
 
     # X.18: real mid-section half-time drop trigger -- see module-level
     # docstring above `_resolve_tempo_drop`. Only the TRIGGER BEAT is

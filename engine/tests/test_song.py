@@ -67,34 +67,26 @@ def test_compose_song_end_to_end_for_every_preset(preset_id):
         # lead (X.31), everything else -> a real sparse/sustained ambient
         # lead (2026-09-11: dense-chug sections used to go fully silent
         # here, found via direct user listening feedback that most of a
-        # generated song had zero independent melodic content) PLUS a
-        # real synth-doubles-the-riff voice (scope sec.16.1) -- two
-        # distinct, additive real devices, not one or the other.
+        # generated song had zero independent melodic content). The
+        # riff-doubling synth (scope sec.16.1) is retired as of
+        # 2026-09-11 -- `section["synth_double"]` is unconditionally `[]`
+        # for every role now that ambient_lead fills its original role
+        # with a genuinely independent melody instead of a locked-rhythm
+        # copy (see the dedicated test near the bottom of this file).
         role = section["role"]
+        assert section["synth_double"] == []
         if role == "solo":
             assert section["lead_mode"] == "solo"
             assert len(section["lead"]) >= 1
-            assert section["synth_double"] == []
         elif role in ("chill", "interlude"):
             assert section["lead_mode"] == "harmony"
             assert len(section["lead"]) == max(1, m.hit_count)
-            assert section["synth_double"] == []
         elif role == "chorus":
             assert section["lead_mode"] == "chorus_lead"
             assert len(section["lead"]) >= 1
-            assert section["synth_double"] == []
         else:
             assert section["lead_mode"] == "ambient_lead"
             assert len(section["lead"]) >= 1
-            # Per-cell shape (None on rest), same as pitches_per_cell --
-            # not per-hit -- so cross-section blending can keep it
-            # index-aligned with guitar_take_a (see song.py's own
-            # comment). Real, LENGTH-invariant even after blending
-            # (blending only overwrites the last few cells' CONTENT,
-            # never the list length) -- so length always matches
-            # guitar_take_a, but the exact non-None count can shift by a
-            # cell or two at a blended boundary, same as pitches_per_cell.
-            assert len(section["synth_double"]) == len(section["guitar_take_a"])
 
 
 def test_compose_song_reproducible_with_same_seed():
@@ -741,9 +733,13 @@ def test_a_role_recurring_many_times_shows_real_repeat_bias_with_occasional_vari
     # not something to test around here).
     # X.35: seed bumped from 0 -- _develop_theme now draws an extra rng
     # value on every occurrence beyond the first, shifting this preset's
-    # real generated sequence; seed 16 gives a role recurring 7 times.
+    # real generated sequence. 2026-09-11: bumped again from 16 -- the
+    # pedal guitar's own real rhythmic thinning (`_thin_pedal_cells`)
+    # draws fewer real pitch deltas per section now (half the hits),
+    # shifting the shared rng stream again; seed 3 gives a role (build)
+    # recurring 5 times with the real dominant-repetition property intact.
     progressive = load_all_presets()["progressive"]
-    song = _generate_attempt(random.Random(16), progressive, num_sections=16)
+    song = _generate_attempt(random.Random(3), progressive, num_sections=16)
 
     role_counts: dict[str, int] = {}
     for s in song["sections"]:
@@ -1185,7 +1181,11 @@ def test_guitar_locked_kick_style_is_re_locked_after_blending():
     (so every section is eligible for blending)."""
     groovy = dataclasses.replace(load_all_presets()["groovy"], kick="bounce")
     assert groovy.group is None
-    song = _generate_attempt(random.Random(6), groovy, num_sections=6)
+    # 2026-09-11: seed bumped from 6 -- the pedal guitar's own real
+    # rhythmic thinning (`_thin_pedal_cells`) draws fewer real pitch
+    # deltas per section now, shifting the shared rng stream; seed 0
+    # gives real, non-blast-fired sections to check against.
+    song = _generate_attempt(random.Random(0), groovy, num_sections=6)
     for section in song["sections"]:
         if section["role"] in ("chill", "interlude", "build", "solo"):
             continue
@@ -1326,68 +1326,28 @@ def test_chorus_gets_a_real_chord_progression_but_verse_stays_single_note():
 # lead_mode) section -- found unwired during a 2026-09-10 user listening
 # session ("no melody... no synth... nothing"), traced to 7/10 sections of
 # a real generated song having zero melodic voice by design.
+#
+# RETIRED 2026-09-11: direct user listening feedback ("I can't even tell
+# it apart, there's so much spam") plus a real, measured count (a single
+# verse: SIX voices, including this one, all locked to the identical 120
+# rhythmic hits) confirmed this had become pure redundant stacking once
+# `lead_mode = "ambient_lead"` (above) started giving every dense-chug
+# section a genuinely independent melodic voice -- the exact role this
+# synth-doubling device was originally built to fill, now filled better
+# by something that isn't just a locked-rhythm copy of the riff. `atmosphere.
+# synth_double` itself is untouched (still real, still tested in
+# `test_atmosphere.py`) -- only the call site in `song.py`'s dense-chug
+# branch was removed. `section["synth_double"]` is now unconditionally
+# `[]` for every role, same real "not applicable" convention every other
+# field already uses when a device doesn't apply.
 # ---------------------------------------------------------------------------
 
 
-def test_dense_chug_sections_get_a_real_synth_double():
-    metalcore = load_all_presets()["metalcore"]
-    song = _generate_attempt(random.Random(3), metalcore, num_sections=8)
-    saw_ambient = False
-    for section in song["sections"]:
-        if section["lead_mode"] != "ambient_lead":
-            continue
-        saw_ambient = True
-        # Per-cell shape (None on rest) -- length always matches
-        # guitar_take_a, including across X.24's own cross-section
-        # blending (song.py's own comment explains why).
-        assert len(section["synth_double"]) == len(section["guitar_take_a"])
-        assert any(p is not None for p in section["synth_double"])
-    assert saw_ambient, "expected at least one real dense-chug section across 8 sections"
-
-
-def test_synth_double_pitches_are_the_real_octave_up_doubling_of_the_motif():
-    """Directly verifies the transpose relationship against a real,
-    independently-constructed reference call -- calls `_generate_one_
-    section` directly (bypassing the full song pipeline's own X.24
-    cross-section blending pass) so this unit check isn't entangled with
-    that separate, already-independently-tested behavior."""
-    from atmosphere import synth_double
-    from bass import build_bass_fretboard
-    from fretboard import Fretboard
-    from presets import get_tuning, load_tunings
-    from song import _SYNTH_DOUBLE_TRANSPOSE, _generate_one_section
-    from theory import Scale
-
-    preset = load_all_presets()["metalcore"]
-    tunings = load_tunings()
-    tuning = get_tuning(preset.tuning_key, tunings)
-    guitar_fb = Fretboard(tuning.open)
-    bass_fb = build_bass_fretboard(tuning.open)
-    scale = Scale(root=tuning.open[0], name=preset.scale)
-
-    def fresh_theme_source(key, *a, **kw):
-        from motif import generate_motif
-        return generate_motif(*a, **kw)
-
-    section, _kick, _blast = _generate_one_section(
-        random.Random(3), preset, "breakdown", 0, scale, guitar_fb, bass_fb,
-        16.0, False, None, fresh_theme_source,
-    )
-    assert section["lead_mode"] == "ambient_lead"
-    m: Motif = section["motif"]
-    start_degree = section["arc"]["start_degree"]
-    reference_hits = iter(synth_double(m, scale, start_degree=start_degree, transpose=_SYNTH_DOUBLE_TRANSPOSE))
-    expected_per_cell = [None if c["is_rest"] else next(reference_hits) for c in m.cell]
-    assert section["synth_double"] == expected_per_cell
-    assert any(p is not None for p in expected_per_cell), "expected at least one real hit in this section"
-
-
-def test_synth_double_is_empty_for_solo_chorus_and_harmony_roles():
+def test_synth_double_is_always_empty_now_that_ambient_lead_fills_its_role():
     metalcore = load_all_presets()["metalcore"]
     song = _generate_attempt(random.Random(3), metalcore, num_sections=8)
     for section in song["sections"]:
-        if section["lead_mode"] != "ambient_lead":
-            assert section["synth_double"] == []
+        assert section["synth_double"] == []
 
 
 # ---------------------------------------------------------------------------
@@ -1400,22 +1360,44 @@ def test_synth_double_is_empty_for_solo_chorus_and_harmony_roles():
 # ---------------------------------------------------------------------------
 
 
-def test_pedal_guitar_shares_rhythm_shape_with_main_guitar():
+def test_pedal_guitar_is_rhythmically_thinned_relative_to_the_main_guitar():
+    """2026-09-11: the pedal guitar used to copy the main guitar's rhythm
+    hit-for-hit (real, but confirmed via direct user listening feedback
+    -- "so much spam" -- plus a real measured count of six voices locked
+    to the identical rhythm in one section -- to be pure redundant
+    stacking). `_thin_pedal_cells` now keeps every OTHER real hit: same
+    overall cell grid (count/duration), but a real, genuinely SPARSER
+    rhythm than the main guitar, and never a hit where the main guitar
+    itself rests."""
     metalcore = load_all_presets()["metalcore"]
     song = _generate_attempt(random.Random(3), metalcore, num_sections=8)
+    saw_a_real_thinned_section = False
     for section in song["sections"]:
         if section["role"] in ("chill", "interlude"):
             continue
         take_a = section["guitar_take_a"]
         pedal = section["guitar_pedal"]
         assert len(pedal) == len(take_a)
-        # Duration is invariant under X.24 blending by construction
-        # (`_pickup_cells` never touches it), and both tracks originate
-        # from the exact same per-section `guitar_cells` rhythm, so this
-        # must hold cell-for-cell even at a blended boundary.
+        main_hits = 0
+        pedal_hits = 0
         for cell_a, cell_p in zip(take_a, pedal):
+            # Duration is invariant under both thinning and X.24 blending
+            # by construction -- the overall timing grid never changes.
             assert cell_a["duration"] == cell_p["duration"]
-            assert cell_a["is_rest"] == cell_p["is_rest"]
+            # The pedal guitar must never hit where the main guitar rests
+            # -- its own hits are strictly a subset of the main guitar's.
+            if not cell_p["is_rest"]:
+                assert not cell_a["is_rest"]
+                pedal_hits += 1
+            if not cell_a["is_rest"]:
+                main_hits += 1
+        if main_hits >= 8:
+            saw_a_real_thinned_section = True
+            assert pedal_hits < main_hits, (
+                f"expected the pedal guitar to be genuinely sparser than the main "
+                f"guitar, got {pedal_hits} pedal hits vs {main_hits} main hits"
+            )
+    assert saw_a_real_thinned_section, "expected at least one section with enough real hits to check thinning"
 
 
 def test_pedal_guitar_pitches_are_real_and_fretboard_reachable():

@@ -471,16 +471,28 @@ def test_real_exported_midi_has_pad_and_accent_note_content():
 
 
 def test_synth_double_events_for_section_aligns_with_real_guitar_cells():
-    song = compose_song("metalcore", seed=3, num_sections=8)
-    for section in song["sections"]:
-        if section["lead_mode"] != "ambient_lead" or not section["synth_double"]:
-            continue
-        events = _synth_double_events_for_section(section, start_beat=0.0, ppq=480)
-        real_hits = sum(1 for c in section["guitar_take_a"] if not c["is_rest"])
-        assert len(events) == real_hits
-        assert real_hits > 0
-        return
-    pytest.fail("no real dense-chug section with a non-empty synth_double found across 8 sections")
+    """`atmosphere.synth_double` generation was retired from `song.py`'s
+    real per-section pipeline 2026-09-11 (see `test_song.py`'s own
+    dedicated comment for why) -- real generated output never populates
+    `section["synth_double"]` anymore, so this now exercises
+    `_synth_double_events_for_section`'s own real cell-alignment logic
+    directly against a hand-built fixture, not real generated data. The
+    export function itself stays real and correct (and reusable, should
+    a future role want this device again), just genuinely unexercised by
+    current generation."""
+    guitar_cells = [
+        {"duration": 0.25, "is_rest": False},
+        {"duration": 0.25, "is_rest": True},
+        {"duration": 0.25, "is_rest": False},
+        {"duration": 0.25, "is_rest": False},
+    ]
+    section = {
+        "guitar_take_a": guitar_cells,
+        "synth_double": [60, None, 64, 67],
+    }
+    events = _synth_double_events_for_section(section, start_beat=0.0, ppq=480)
+    real_hits = sum(1 for c in guitar_cells if not c["is_rest"])
+    assert len(events) == real_hits == 3
 
 
 def test_synth_double_events_for_section_empty_when_no_data():
@@ -488,13 +500,21 @@ def test_synth_double_events_for_section_empty_when_no_data():
     assert events == []
 
 
-def test_real_exported_midi_has_synth_double_note_content():
+def test_real_exported_midi_synth_track_exists_but_is_now_empty():
+    """`atmosphere.synth_double` was retired from real generation
+    2026-09-11 (redundant with `lead_mode == "ambient_lead"`'s own
+    genuinely independent melody, once measured to be one of six voices
+    all locked to the identical rhythm in a single section). The "Synth"
+    track still exists in every real exported file (the export plumbing
+    itself wasn't removed, in case a future role wants it again), but a
+    real generated song now correctly has ZERO synth note events -- not
+    a bug, the deliberate outcome of retiring the call site."""
     song = compose_song("metalcore", seed=3, num_sections=8)  # metalcore: octave_stab=true
     path = _write_tmp(song, "synth_double")
     parsed = _read_back(path)
 
     synth_track = _track_by_name(parsed, "Synth")
-    assert len(_note_events(synth_track, _SYNTH_DOUBLE_CHANNEL)) > 0
+    assert len(_note_events(synth_track, _SYNTH_DOUBLE_CHANNEL)) == 0
 
 
 def test_pedal_events_for_section_matches_real_guitar_take_a_cell_count():

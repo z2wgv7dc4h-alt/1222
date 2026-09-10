@@ -165,14 +165,22 @@ def test_rpp_accents_track_has_real_accent_hit_events(tmp_path):
     assert note_ons, "expected real accent-hit note-on events on channel 5"
 
 
-def test_rpp_synth_track_has_real_synth_double_events(tmp_path):
+def test_rpp_synth_track_exists_but_is_now_empty(tmp_path):
+    """`atmosphere.synth_double` was retired from `song.py`'s real
+    per-section generation 2026-09-11 (redundant with `lead_mode ==
+    "ambient_lead"`'s own genuinely independent melody, once measured to
+    be one of six voices all locked to the identical rhythm in a single
+    section -- see `test_song.py`'s own dedicated comment). The "Synth"
+    track still exists in the real `.rpp` output (export plumbing kept,
+    in case a future role wants it again), but real generated output now
+    correctly has ZERO synth note events."""
     song = compose_song("metalcore", seed=3, num_sections=8)  # metalcore: octave_stab=true
     text = _write(song, tmp_path)
 
     block = _source_midi_block_for_track(text, "Synth")
     # Channel 6 (_SYNTH_DOUBLE_CHANNEL) note-on status byte: 0x90 | 6 = 0x96.
     note_ons = re.findall(r"^\s*E \d+ 96 ", block, flags=re.MULTILINE)
-    assert note_ons, "expected real synth-double note-on events on channel 6"
+    assert note_ons == [], "expected zero synth-double note-on events now that the call site is retired"
 
 
 def test_rpp_pedal_guitar_track_has_real_note_events(tmp_path):

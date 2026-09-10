@@ -64,9 +64,12 @@ def test_compose_song_end_to_end_for_every_preset(preset_id):
         # Lead behavior is role-dependent (song.py's lead_mode branches):
         # solo -> dense featured line, chill/interlude -> harmonized
         # doubling of the rhythm's own theme, chorus -> a real accompanying
-        # lead (X.31), everything else -> silent (a busy INDEPENDENTLY-
-        # COMPOSED lead would clash with a dense chug section) but with a
-        # real synth-doubles-the-riff voice instead (scope sec.16.1).
+        # lead (X.31), everything else -> a real sparse/sustained ambient
+        # lead (2026-09-11: dense-chug sections used to go fully silent
+        # here, found via direct user listening feedback that most of a
+        # generated song had zero independent melodic content) PLUS a
+        # real synth-doubles-the-riff voice (scope sec.16.1) -- two
+        # distinct, additive real devices, not one or the other.
         role = section["role"]
         if role == "solo":
             assert section["lead_mode"] == "solo"
@@ -81,8 +84,8 @@ def test_compose_song_end_to_end_for_every_preset(preset_id):
             assert len(section["lead"]) >= 1
             assert section["synth_double"] == []
         else:
-            assert section["lead_mode"] == "silent"
-            assert section["lead"] == []
+            assert section["lead_mode"] == "ambient_lead"
+            assert len(section["lead"]) >= 1
             # Per-cell shape (None on rest), same as pitches_per_cell --
             # not per-hit -- so cross-section blending can keep it
             # index-aligned with guitar_take_a (see song.py's own
@@ -1329,17 +1332,17 @@ def test_chorus_gets_a_real_chord_progression_but_verse_stays_single_note():
 def test_dense_chug_sections_get_a_real_synth_double():
     metalcore = load_all_presets()["metalcore"]
     song = _generate_attempt(random.Random(3), metalcore, num_sections=8)
-    saw_silent = False
+    saw_ambient = False
     for section in song["sections"]:
-        if section["lead_mode"] != "silent":
+        if section["lead_mode"] != "ambient_lead":
             continue
-        saw_silent = True
+        saw_ambient = True
         # Per-cell shape (None on rest) -- length always matches
         # guitar_take_a, including across X.24's own cross-section
         # blending (song.py's own comment explains why).
         assert len(section["synth_double"]) == len(section["guitar_take_a"])
         assert any(p is not None for p in section["synth_double"])
-    assert saw_silent, "expected at least one real dense-chug section across 8 sections"
+    assert saw_ambient, "expected at least one real dense-chug section across 8 sections"
 
 
 def test_synth_double_pitches_are_the_real_octave_up_doubling_of_the_motif():
@@ -1370,7 +1373,7 @@ def test_synth_double_pitches_are_the_real_octave_up_doubling_of_the_motif():
         random.Random(3), preset, "breakdown", 0, scale, guitar_fb, bass_fb,
         16.0, False, None, fresh_theme_source,
     )
-    assert section["lead_mode"] == "silent"
+    assert section["lead_mode"] == "ambient_lead"
     m: Motif = section["motif"]
     start_degree = section["arc"]["start_degree"]
     reference_hits = iter(synth_double(m, scale, start_degree=start_degree, transpose=_SYNTH_DOUBLE_TRANSPOSE))
@@ -1383,7 +1386,7 @@ def test_synth_double_is_empty_for_solo_chorus_and_harmony_roles():
     metalcore = load_all_presets()["metalcore"]
     song = _generate_attempt(random.Random(3), metalcore, num_sections=8)
     for section in song["sections"]:
-        if section["lead_mode"] != "silent":
+        if section["lead_mode"] != "ambient_lead":
             assert section["synth_double"] == []
 
 

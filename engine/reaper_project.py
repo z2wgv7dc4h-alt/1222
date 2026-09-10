@@ -49,8 +49,17 @@ from midi_export import (
     _LEAD_CHANNEL,
     _LEAD_PROGRAM,
     _PAD_CHANNEL,
+    _PAN_ACCENT,
+    _PAN_BASS,
+    _PAN_GUITAR_A,
+    _PAN_GUITAR_B,
+    _PAN_LEAD,
+    _PAN_PAD,
+    _PAN_PEDAL,
+    _PAN_SYNTH_DOUBLE,
     _PEDAL_CHANNEL,
     _SYNTH_DOUBLE_CHANNEL,
+    _pan_cc_to_reaper,
     _accent_events_for_section,
     _beats_to_ticks,
     _cell_events,
@@ -143,7 +152,16 @@ def _track_block(
     events: list[tuple[int, int, int, int]],
     length_seconds: float,
     item_id: int,
+    pan: float = 0.0,
 ) -> list[str]:
+    """`pan` is real stereo pan in Reaper's own `-1.0` (hard left) to
+    `1.0` (hard right) `VOLPAN` field -- previously always the fixed
+    template value `0` (dead center) for every track regardless of name,
+    the same real, previously-unchecked gap `midi_export.py`'s own
+    `_PAN_*` constants now fix on that export path (see their shared
+    comment for why this matters: 4 tracks sharing the identical
+    Distortion Guitar patch, all centered, collapsing into one mono
+    mass)."""
     track_guid = _new_guid()
     lines = [
         f"  <TRACK {track_guid}",
@@ -152,7 +170,7 @@ def _track_block(
         "    BEAT -1",
         "    AUTOMODE 0",
         "    PANLAWFLAGS 3",
-        "    VOLPAN 1 0 -1 -1 1",
+        f"    VOLPAN 1 {pan:g} -1 -1 1",
         "    MUTESOLO 0 0 0",
         "    IPHASE 0",
         "    PLAYOFFS 0 1",
@@ -416,18 +434,18 @@ def song_to_rpp(song: dict, path: str | Path) -> None:
     # ordering; Pad/Accents/Synth/Guitar (Pedal) are all real tracks
     # inserted before it, not appended after.
     tracks = [
-        ("Guitar (Take A)", _GUITAR_A_CHANNEL, guitar_a_events, 1),
-        ("Guitar (Take B)", _GUITAR_B_CHANNEL, guitar_b_events, 2),
-        ("Bass", _BASS_CHANNEL, bass_events, 3),
-        ("Lead", _LEAD_CHANNEL, lead_events, 4),
-        ("Pad", _PAD_CHANNEL, pad_events, 5),
-        ("Accents", _ACCENT_CHANNEL, accent_events, 6),
-        ("Synth", _SYNTH_DOUBLE_CHANNEL, synth_double_events, 7),
-        ("Guitar (Pedal)", _PEDAL_CHANNEL, pedal_events, 8),
-        ("Drums", _DRUM_CHANNEL, drum_events, 9),
+        ("Guitar (Take A)", _GUITAR_A_CHANNEL, guitar_a_events, 1, _PAN_GUITAR_A),
+        ("Guitar (Take B)", _GUITAR_B_CHANNEL, guitar_b_events, 2, _PAN_GUITAR_B),
+        ("Bass", _BASS_CHANNEL, bass_events, 3, _PAN_BASS),
+        ("Lead", _LEAD_CHANNEL, lead_events, 4, _PAN_LEAD),
+        ("Pad", _PAD_CHANNEL, pad_events, 5, _PAN_PAD),
+        ("Accents", _ACCENT_CHANNEL, accent_events, 6, _PAN_ACCENT),
+        ("Synth", _SYNTH_DOUBLE_CHANNEL, synth_double_events, 7, _PAN_SYNTH_DOUBLE),
+        ("Guitar (Pedal)", _PEDAL_CHANNEL, pedal_events, 8, _PAN_PEDAL),
+        ("Drums", _DRUM_CHANNEL, drum_events, 9, 64),
     ]
-    for name, channel, events, item_id in tracks:
-        lines += _track_block(name, channel, events, total_seconds, item_id)
+    for name, channel, events, item_id, pan_cc in tracks:
+        lines += _track_block(name, channel, events, total_seconds, item_id, pan=_pan_cc_to_reaper(pan_cc))
 
     lines.append(">")
 

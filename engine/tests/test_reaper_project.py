@@ -52,6 +52,48 @@ def test_rpp_track_name_x_block_decodes_to_the_real_midi_meta_event(tmp_path):
         assert decoded == b"\xff\x03" + name.encode("ascii")
 
 
+def _real_track_pan(text: str, track_name: str) -> float:
+    """Real `VOLPAN` pan field for the track named `track_name`, found by
+    locating its own `<TRACK ...>` block (never a bare regex across the
+    whole file, which could match a DIFFERENT track's VOLPAN line if one
+    happened to come first)."""
+    block_start = text.index(f'NAME "{track_name}"')
+    track_start = text.rindex("<TRACK", 0, block_start)
+    next_track = text.find("<TRACK", track_start + 1)
+    block = text[track_start:next_track if next_track != -1 else len(text)]
+    match = re.search(r"VOLPAN 1 (-?[\d.]+) ", block)
+    assert match, f"no VOLPAN line found in {track_name}'s own <TRACK> block"
+    return float(match.group(1))
+
+
+def test_rpp_pans_the_double_tracked_guitars_hard_left_and_right(tmp_path):
+    """Regression test for a real, previously-unchecked gap shared with
+    the MIDI export: every real `<TRACK>` block used the identical fixed
+    `VOLPAN 1 0 -1 -1 1` template regardless of name, so the real
+    double-tracked guitar pair (meant to be panned wide in an actual
+    mix) collapsed into one centered mass with zero stereo separation."""
+    song = compose_song("djent", seed=1, num_sections=6)
+    text = _write(song, tmp_path)
+
+    pan_a = _real_track_pan(text, "Guitar (Take A)")
+    pan_b = _real_track_pan(text, "Guitar (Take B)")
+    assert pan_a < 0.0 < pan_b, "expected Take A panned left of center and Take B right of center"
+    assert pan_a == pytest.approx(-pan_b), "expected a real, symmetric mirror-image pan spread"
+
+
+def test_rpp_and_midi_export_agree_on_which_side_each_guitar_take_sits(tmp_path):
+    """The two real export formats (`.rpp`/`.mid`) must not silently
+    disagree about which side Take A vs Take B is panned on -- both
+    ultimately read from the SAME real `_PAN_*` constants in
+    `midi_export.py`."""
+    from midi_export import _PAN_GUITAR_A, _PAN_GUITAR_B, _pan_cc_to_reaper
+
+    song = compose_song("djent", seed=1, num_sections=6)
+    text = _write(song, tmp_path)
+    assert _real_track_pan(text, "Guitar (Take A)") == pytest.approx(_pan_cc_to_reaper(_PAN_GUITAR_A))
+    assert _real_track_pan(text, "Guitar (Take B)") == pytest.approx(_pan_cc_to_reaper(_PAN_GUITAR_B))
+
+
 def test_rpp_guitar_note_count_matches_real_song_data(tmp_path):
     """X.23: chord-thickened roles emit multiple real note-on events per
     hit (one per chord tone) -- expected count must account for that."""

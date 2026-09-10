@@ -829,11 +829,11 @@ def _generate_one_section(
     # other role leaves them None -- not applicable, never fabricated.
     chord_quality: str | None = None
     chord_voicing: list[tuple[int, int]] | None = None
-    # Only dense-chug ("silent" lead_mode) sections ever populate this
-    # (see the `else` branch below) -- solo/chorus/chill already have
-    # their own real melodic voice and don't need a doubled riff on top.
-    # Per-cell shape (None on rest), same as `pitches_per_cell` -- see
-    # the `else` branch's own comment for why.
+    # Only dense-chug ("ambient_lead" lead_mode) sections ever populate
+    # this (see the `else` branch below) -- solo/chorus/chill already
+    # have their own real melodic voice and don't need a doubled riff on
+    # top. Per-cell shape (None on rest), same as `pitches_per_cell` --
+    # see the `else` branch's own comment for why.
     synth_double_pitches: list[int | None] = []
     if role == "solo":
         # A genuine featured lead: denser (roughly 8th-note-rate across
@@ -974,27 +974,55 @@ def _generate_one_section(
             chord_voicing = None
     else:
         # Dense chug sections (intro/build/breakdown/outro/verse): a
-        # busy INDEPENDENTLY-COMPOSED lead would just clash with the
-        # rhythm here -- real arrangements leave the second guitar out
-        # rather than noodling a competing melody over a breakdown, so
-        # `lead_mode` stays "silent" and `lead` stays empty.
+        # BUSY independently-composed lead (solo-density, wide leaps)
+        # would clash with the rhythm here -- real arrangements leave
+        # the second guitar out of a hard breakdown rather than
+        # noodling a competing technical line over it. But this engine
+        # has no vocals (a permanent, deliberate non-goal), and a real
+        # vocal-fronted song like this one's own reference corpus has a
+        # continuous melodic/rhythmic voice through EVERY section,
+        # verses included -- leaving 70-80% of a generated song with
+        # ZERO independent melodic content (confirmed directly via
+        # direct user listening feedback: real generated songs had
+        # `lead_mode="silent"` for 8 of 10 sections) is a real,
+        # structural gap the riff-doubling synth below doesn't close,
+        # since doubling the SAME riff an octave up is reinforcement,
+        # not a second musical idea.
         #
-        # But scope sec.16.1's own real Born-of-Osiris research finding
-        # is that the synth should DOUBLE/HARMONIZE the SAME riff
-        # essentially continuously -- "a genuine compositional voice
-        # under riffs and interludes, not just intro-only ambience" --
-        # not sit out for 70% of a song. `atmosphere.synth_double`
-        # (P7.2, real and tested since that session but never wired
-        # into generation until now) is exactly the right tool for
-        # this: it re-renders THIS section's own `m` motif via the same
-        # `render_motif` the guitar itself uses, so its rhythm/contour
-        # is GUARANTEED identical -- a doubling, never a second,
-        # competing musical idea -- shifted up `_SYNTH_DOUBLE_TRANSPOSE`
-        # semitones (an octave, the classic "synth doubles the riff an
-        # octave up" device).
-        lead_mode = "silent"
-        lead_notes = []
+        # `lead_mode = "ambient_lead"`: a real, genuinely INDEPENDENT
+        # melodic line, reusing the exact same `generate_lead_line`/
+        # `lead_vocab` machinery solo/chorus_lead already use (a preset
+        # calibrated with real corpus lead-register data, including its
+        # own Markov transitions, drives this too -- not a separate,
+        # invented mechanism), but deliberately SPARSE and SUSTAINED
+        # (one note every 2 beats -- half the rate of solo/chorus_lead's
+        # own dense 8th-note convention) so it reads as a real
+        # background melodic voice riding OVER the dense chug, never
+        # competing with it rhythmically. `stab_chance=0.0`: wide
+        # technical leaps are a featured-solo device, not appropriate
+        # for a background line sitting under a breakdown.
+        lead_mode = "ambient_lead"
+        lead_vocab = preset.lead_vocab if preset.lead_vocab is not None else preset.vocab
+        lead_notes = generate_lead_line(
+            scale, lead_vocab.weights, lead_vocab.motion, rng,
+            low=lead_anchor, high=lead_anchor + 24, anchor=lead_anchor + 12,
+            num_notes=max(1, round(total_beats / 2)),
+            stab_chance=0.0,
+            markov=lead_vocab.markov,
+        )
         legato = None
+        # The riff-doubling synth (scope sec.16.1's own real research
+        # finding -- the synth should double/harmonize the SAME riff
+        # essentially continuously, "a genuine compositional voice under
+        # riffs and interludes, not just intro-only ambience") stays,
+        # additive to the new ambient lead above, not replaced by it --
+        # two distinct real devices, not a swap. `atmosphere.
+        # synth_double` re-renders THIS section's own `m` motif via the
+        # same `render_motif` the guitar itself uses, so its rhythm/
+        # contour is GUARANTEED identical -- a doubling, never a second
+        # competing idea -- shifted up `_SYNTH_DOUBLE_TRANSPOSE`
+        # semitones (an octave).
+        #
         # Stored PER-CELL (None on rest), the exact same shape as
         # `pitches_per_cell` -- not per-hit -- specifically so X.24's own
         # cross-section blending pass (`_pickup_values`, below and in

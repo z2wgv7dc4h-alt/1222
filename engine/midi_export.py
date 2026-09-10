@@ -33,7 +33,15 @@ Lead-voice timing, and why it's exact (not fabricated):
     a solo (X.6a's `generate_legato_lick`) DOES carry real per-note
     `cells` durations (`legato_run_rhythm`), used directly, appended right
     after the main phrase.
-  - all other roles: `lead_mode == "silent"`, no lead events.
+  - dense-chug sections (`lead_mode == "ambient_lead"`, found via direct
+    2026-09-11 user listening feedback -- "the composition is weird",
+    traced to 8 of 10 generated sections having ZERO independent
+    melodic content): `song.py` requests `num_notes = round(total_beats
+    / 2)`, the same real "evenly-implied, no stored duration" shape as
+    solo, just HALF the rate (`total_beats / num_notes == 2.0` beats --
+    sparse, sustained notes riding over the riff rather than solo's
+    dense 8th-note figure). Each note held for the full interval minus
+    one tick, so it reads as a real sustained tone, not a short stab.
 
 `section["fill"]` (vocabulary-informed blast fills) is intentionally NOT
 exported here: `_generate_attempt` never actually blends it into the
@@ -123,6 +131,39 @@ _ACCENT_CHANNEL = 5
 _SYNTH_DOUBLE_CHANNEL = 6
 _PEDAL_CHANNEL = 7
 _DEFAULT_VELOCITY = 100
+
+# Real stereo panning (MIDI CC10, 0=hard left, 64=center, 127=hard right).
+# Previously entirely absent from this export -- every track defaulted to
+# dead center, meaning `Guitar (Take A)`/`(Take B)` (meant to represent a
+# real double-tracked pair, always panned hard L/R in an actual metal
+# mix for width) and `Guitar (Pedal)`/`Lead` (all four sharing the exact
+# same Distortion Guitar GM patch) collapsed into one centered, identical-
+# timbre mono mass with zero separation -- a real, concrete, previously
+# unchecked contributor to generated output reading as an undifferentiated
+# wall of noise rather than a mixed arrangement. Real double-track spread
+# is wide but not full-hard (a real mix rarely pans to the absolute
+# extreme); the pedal/chug layer sits centered, reinforcing the bass/kick's
+# low-end anchor rather than competing with the wide rhythm pair for
+# stereo space; lead sits just off-center so it doesn't collide with
+# either take while still reading as distinct from the pedal.
+_PAN_GUITAR_A = 22
+_PAN_GUITAR_B = 106
+_PAN_PEDAL = 64
+_PAN_LEAD = 80
+_PAN_BASS = 64
+_PAN_SYNTH_DOUBLE = 48
+_PAN_PAD = 64
+_PAN_ACCENT = 64
+
+
+def _pan_cc_to_reaper(cc: int) -> float:
+    """Real conversion from this module's own MIDI CC10 pan convention
+    (0-127, 64=center) to Reaper's own `VOLPAN` field convention (-1.0
+    hard left to 1.0 hard right, 0.0=center) -- `reaper_project.py`
+    reuses this so the real `_PAN_*` values above stay the one source of
+    truth for both export formats, never a second hand-copied set of
+    numbers to keep in sync."""
+    return round((cc - 64) / 64.0, 4)
 
 
 def _section_beats(section: dict) -> float:
@@ -233,8 +274,28 @@ def _lead_events_for_section(section: dict, start_beat: float, ppq: int) -> list
     """Real lead-voice events for one section -- see this module's
     docstring for exactly how each `lead_mode` maps to timing."""
     mode = section["lead_mode"]
-    if mode == "silent":
-        return []
+    if mode in ("ambient_lead", "silent"):
+        # "silent" (the pre-2026-09-11 mode name, before dense-chug
+        # sections got a real ambient lead line) is still accepted here
+        # for real backward compatibility with any section dict saved
+        # before this change (e.g. the editor's P9.7 section-preset
+        # save/load feature persists real section dicts to local JSON) --
+        # an old "silent" section's own `section["lead"]` is always `[]`,
+        # so this branch correctly degrades to zero events for it, same
+        # real outcome as before, rather than a hard `ValueError` on a
+        # perfectly valid saved file.
+        #
+        # See this module's own docstring above for the real 2.0-beat
+        # spacing convention shared with `song.py`'s `num_notes` request.
+        events: list[tuple[int, int, int, int]] = []
+        t = start_beat
+        spacing = 2.0
+        for pitch in section["lead"]:
+            on_tick = _beats_to_ticks(t, ppq)
+            off_tick = _beats_to_ticks(t + spacing, ppq)
+            events.append((on_tick, max(on_tick + 1, off_tick - 1), pitch, _DEFAULT_VELOCITY))
+            t += spacing
+        return events
 
     if mode == "harmony":
         # One lead note per guitar HIT, in order -- riff.harmonize_line's
@@ -393,17 +454,25 @@ def _events_to_track(
     channel: int,
     program: int | None,
     name: str,
+    pan: int | None = None,
 ) -> "mido.MidiTrack":
     """Real `mido.MidiTrack` from absolute-tick `(on, off, pitch,
     velocity)` events: a `track_name` meta message, an optional
-    `program_change`, then note on/off pairs converted to the delta-time
-    encoding a Standard MIDI File requires. Off-events are ordered before
-    on-events at the same tick so a note never appears to overlap itself.
+    `program_change`, an optional real stereo-pan `control_change` (CC10,
+    0-127 -- see the `_PAN_*` constants' own comment for why this matters
+    for a multi-guitar-layer arrangement), then note on/off pairs
+    converted to the delta-time encoding a Standard MIDI File requires.
+    `pan=None` (any channel not given a real `_PAN_*` value, e.g. Drums)
+    leaves the real GM default (dead center) untouched. Off-events are
+    ordered before on-events at the same tick so a note never appears to
+    overlap itself.
     """
     track = mido.MidiTrack()
     track.append(mido.MetaMessage("track_name", name=name, time=0))
     if program is not None:
         track.append(mido.Message("program_change", program=program, channel=channel, time=0))
+    if pan is not None:
+        track.append(mido.Message("control_change", control=10, value=pan, channel=channel, time=0))
 
     # (tick, is_off, pitch, velocity) -- is_off=0 sorts note_off (priority
     # 0) before note_on (priority 1) at an identical tick.
@@ -518,21 +587,31 @@ def song_to_midi(song: dict, path: str | Path, ppq: int = 480) -> None:
     midi_file = mido.MidiFile(type=1, ticks_per_beat=ppq)
     midi_file.tracks.append(_tempo_track(song, ppq))
     midi_file.tracks.append(
-        _events_to_track(guitar_a_events, _GUITAR_A_CHANNEL, _GUITAR_PROGRAM, "Guitar (Take A)")
+        _events_to_track(guitar_a_events, _GUITAR_A_CHANNEL, _GUITAR_PROGRAM, "Guitar (Take A)", pan=_PAN_GUITAR_A)
     )
     midi_file.tracks.append(
-        _events_to_track(guitar_b_events, _GUITAR_B_CHANNEL, _GUITAR_PROGRAM, "Guitar (Take B)")
+        _events_to_track(guitar_b_events, _GUITAR_B_CHANNEL, _GUITAR_PROGRAM, "Guitar (Take B)", pan=_PAN_GUITAR_B)
     )
-    midi_file.tracks.append(_events_to_track(bass_events, _BASS_CHANNEL, _BASS_PROGRAM, "Bass"))
-    midi_file.tracks.append(_events_to_track(lead_events, _LEAD_CHANNEL, _LEAD_PROGRAM, "Lead"))
+    midi_file.tracks.append(
+        _events_to_track(bass_events, _BASS_CHANNEL, _BASS_PROGRAM, "Bass", pan=_PAN_BASS)
+    )
+    midi_file.tracks.append(
+        _events_to_track(lead_events, _LEAD_CHANNEL, _LEAD_PROGRAM, "Lead", pan=_PAN_LEAD)
+    )
     midi_file.tracks.append(_events_to_track(drum_events, _DRUM_CHANNEL, None, "Drums"))
-    midi_file.tracks.append(_events_to_track(pad_events, _PAD_CHANNEL, PAD_PROGRAM, "Pad"))
-    midi_file.tracks.append(_events_to_track(accent_events, _ACCENT_CHANNEL, ORCH_HIT_PROGRAM, "Accents"))
     midi_file.tracks.append(
-        _events_to_track(synth_double_events, _SYNTH_DOUBLE_CHANNEL, SYNTH_DOUBLE_PROGRAM, "Synth")
+        _events_to_track(pad_events, _PAD_CHANNEL, PAD_PROGRAM, "Pad", pan=_PAN_PAD)
     )
     midi_file.tracks.append(
-        _events_to_track(pedal_events, _PEDAL_CHANNEL, _GUITAR_PROGRAM, "Guitar (Pedal)")
+        _events_to_track(accent_events, _ACCENT_CHANNEL, ORCH_HIT_PROGRAM, "Accents", pan=_PAN_ACCENT)
+    )
+    midi_file.tracks.append(
+        _events_to_track(
+            synth_double_events, _SYNTH_DOUBLE_CHANNEL, SYNTH_DOUBLE_PROGRAM, "Synth", pan=_PAN_SYNTH_DOUBLE
+        )
+    )
+    midi_file.tracks.append(
+        _events_to_track(pedal_events, _PEDAL_CHANNEL, _GUITAR_PROGRAM, "Guitar (Pedal)", pan=_PAN_PEDAL)
     )
 
     midi_file.save(str(path))

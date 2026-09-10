@@ -5,11 +5,15 @@ from fretboard import Fretboard
 from midi_export import (
     _ACCENT_CHANNEL,
     _CHORD_THICKENED_ROLES,
+    _DRUM_CHANNEL,
+    _GUITAR_A_CHANNEL,
+    _GUITAR_B_CHANNEL,
     _PAD_CHANNEL,
     _PEDAL_CHANNEL,
     _SYNTH_DOUBLE_CHANNEL,
     _accent_events_for_section,
     _guitar_chord_tone_pitches,
+    _lead_events_for_section,
     _pad_events_for_section,
     _pedal_events_for_section,
     _synth_double_events_for_section,
@@ -370,6 +374,91 @@ def test_accent_events_for_section_skips_an_out_of_range_cell_index():
     assert events == []
 
 
+def _pan_value(track, channel):
+    """The real CC10 pan value on `channel` in a parsed mido track, or
+    `None` if no pan control_change was emitted (the real GM default,
+    dead center)."""
+    for m in track:
+        if m.type == "control_change" and m.channel == channel and m.control == 10:
+            return m.value
+    return None
+
+
+def test_real_exported_midi_pans_the_double_tracked_guitars_hard_left_and_right():
+    """Regression test for a real, previously-unchecked gap: every track
+    defaulted to dead-center pan, so `Guitar (Take A)`/`(Take B)` -- meant
+    to represent a real double-tracked pair, always panned wide in an
+    actual metal mix -- collapsed into one centered mass with zero
+    stereo separation. `Take A` must be panned left of center, `Take B`
+    right of center, and they must be real mirror images of each other
+    (not just "both nonzero")."""
+    song = compose_song("djent", seed=1, num_sections=6)
+    path = _write_tmp(song, "panning")
+    parsed = _read_back(path)
+
+    take_a = _pan_value(_track_by_name(parsed, "Guitar (Take A)"), _GUITAR_A_CHANNEL)
+    take_b = _pan_value(_track_by_name(parsed, "Guitar (Take B)"), _GUITAR_B_CHANNEL)
+    assert take_a is not None and take_b is not None
+    assert take_a < 64 < take_b, "expected Take A panned left of center and Take B right of center"
+    assert (64 - take_a) == (take_b - 64), "expected a real, symmetric mirror-image pan spread"
+
+
+def test_real_exported_midi_drums_stay_at_the_real_gm_default_center():
+    # Drums intentionally get no explicit pan CC (per-drum panning within
+    # a kit is a real, separate, larger device -- out of scope here).
+    song = compose_song("djent", seed=1, num_sections=6)
+    path = _write_tmp(song, "panning_drums")
+    parsed = _read_back(path)
+    assert _pan_value(_track_by_name(parsed, "Drums"), _DRUM_CHANNEL) is None
+
+
+def test_pan_cc_to_reaper_matches_reaper_projects_own_real_values():
+    from midi_export import _PAN_GUITAR_A, _PAN_GUITAR_B, _pan_cc_to_reaper
+
+    assert _pan_cc_to_reaper(64) == 0.0
+    assert _pan_cc_to_reaper(0) == pytest.approx(-1.0)
+    assert _pan_cc_to_reaper(127) == pytest.approx(0.9844, abs=0.001)
+    # The two export formats must agree on WHICH side each real guitar
+    # take sits on, not just that panning exists in both.
+    assert _pan_cc_to_reaper(_PAN_GUITAR_A) < 0.0
+    assert _pan_cc_to_reaper(_PAN_GUITAR_B) > 0.0
+
+
+def test_ambient_lead_events_are_real_sustained_notes_at_the_2_beat_spacing():
+    """Real regression test for the 2026-09-11 fix: dense-chug sections
+    used to go fully silent (`lead_mode == "silent"`, `section["lead"]
+    == []`); now they get a real, sparse, SUSTAINED independent melodic
+    line (`lead_mode == "ambient_lead"`) at the documented 2.0-beat
+    spacing -- half the rate of solo's dense 0.5-beat convention, wide
+    enough to read as a real background voice, not a busy line."""
+    song = compose_song("labyrinth", seed=42, num_sections=10)
+    found = False
+    for section in song["sections"]:
+        if section["lead_mode"] != "ambient_lead" or not section["lead"]:
+            continue
+        found = True
+        events = _lead_events_for_section(section, start_beat=0.0, ppq=480)
+        assert len(events) == len(section["lead"])
+        on_ticks = [e[0] for e in events]
+        spacings_beats = [(b - a) / 480 for a, b in zip(on_ticks, on_ticks[1:])]
+        assert all(s == pytest.approx(2.0) for s in spacings_beats)
+        # A real sustained note (held close to the full 2.0-beat
+        # interval), not a short stab.
+        for on_tick, off_tick, _pitch, _vel in events:
+            assert (off_tick - on_tick) / 480 == pytest.approx(2.0, abs=0.01)
+        break
+    assert found, "expected at least one real ambient_lead section with content across 10 sections"
+
+
+def test_ambient_lead_backward_compat_with_a_saved_silent_section():
+    """An old section dict saved before this feature (e.g. via the
+    editor's P9.7 section-preset save/load) with `lead_mode == "silent"`
+    and `lead == []` must still export cleanly to zero events, not raise
+    `ValueError`."""
+    old_section = {"lead_mode": "silent", "lead": []}
+    assert _lead_events_for_section(old_section, start_beat=0.0, ppq=480) == []
+
+
 def test_real_exported_midi_has_pad_and_accent_note_content():
     song = compose_song("djent", seed=1, num_sections=6)  # djent: octave_stab=true
     path = _write_tmp(song, "pad_accent")
@@ -384,7 +473,7 @@ def test_real_exported_midi_has_pad_and_accent_note_content():
 def test_synth_double_events_for_section_aligns_with_real_guitar_cells():
     song = compose_song("metalcore", seed=3, num_sections=8)
     for section in song["sections"]:
-        if section["lead_mode"] != "silent" or not section["synth_double"]:
+        if section["lead_mode"] != "ambient_lead" or not section["synth_double"]:
             continue
         events = _synth_double_events_for_section(section, start_beat=0.0, ppq=480)
         real_hits = sum(1 for c in section["guitar_take_a"] if not c["is_rest"])

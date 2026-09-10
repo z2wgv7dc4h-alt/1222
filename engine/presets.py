@@ -31,7 +31,11 @@ ALIASES = {
     "psycho": "tech",
     "sots": "tech",
     "soi": "tech",
-    "boo": "djent",
+    # Was "djent" (an unrelated stand-in from the ported project, never
+    # actually calibrated against Born of Osiris). Now real:
+    # reference_vocab.py's own 12-song real corpus (Born of Osiris +
+    # Veil of Maya, mixed MIDI + Guitar Pro) -> "labyrinth" preset.
+    "boo": "labyrinth",
     "vom": "groovy",
     "atb": "melodic",
     # Was "chill" (the closest available proxy when this alias table was

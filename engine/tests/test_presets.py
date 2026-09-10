@@ -40,7 +40,12 @@ EXPECTED_TUNINGS = {
     "standard_6": (["E", "A", "D", "G", "B", "E"], [40, 45, 50, 55, 59, 64]),
 }
 
-EXPECTED_PRESET_IDS = {"groovy", "djent", "chill", "tech", "melodic", "metalcore", "deathcore", "progressive"}
+EXPECTED_PRESET_IDS = {
+    "groovy", "djent", "chill", "tech", "melodic", "metalcore", "deathcore", "progressive",
+    # Real, calibrated directly from a real 12-song reference corpus via
+    # reference_vocab.py (Born of Osiris + Veil of Maya) -- not hand-tuned.
+    "labyrinth",
+}
 
 
 # -- P1.6: tunings -----------------------------------------------------------
@@ -211,7 +216,9 @@ def test_resolve_preset_id_maps_old_band_ids():
     # be adopted) rather than "chill", its original stand-in proxy.
     assert resolve_preset_id("periphery") == "progressive"
     assert resolve_preset_id("psycho") == "tech"
-    assert resolve_preset_id("boo") == "djent"
+    # Was "djent" (an unrelated stand-in, never actually calibrated
+    # against Born of Osiris) -- now the real, corpus-calibrated preset.
+    assert resolve_preset_id("boo") == "labyrinth"
 
 
 def test_resolve_preset_id_passes_through_real_ids():

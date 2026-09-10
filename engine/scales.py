@@ -20,6 +20,19 @@ SCALES: dict[str, tuple[int, ...]] = {
     "lydian": (0, 2, 4, 6, 7, 9, 11),
     "mixolydian": (0, 2, 4, 5, 7, 9, 10),
     "harmonic_major": (0, 2, 4, 5, 7, 8, 11),
+    # A real, previously-flagged, never-fixed gap: theory.py's own module
+    # docstring has documented since this project's earliest sessions
+    # that the reference implementation's `phrygian_dominant` "has no
+    # equivalent scale here and is intentionally not carried over as a
+    # second table entry -- it would need to be added to scales.py
+    # first." Ported directly from the reference's own real interval
+    # tuple (`reference/ww-forge-prior-attempt/engine/theory.py`), not
+    # derived -- the 5th mode of harmonic minor, the real "Spanish
+    # Phrygian"/exotic scale genuinely common in this project's own
+    # genre bar (djent/deathcore/metalcore), distinct from the plain
+    # phrygian already in use by two shipped presets (major 3rd instead
+    # of minor 3rd is the whole real character difference).
+    "phrygian_dominant": (0, 1, 4, 5, 7, 8, 10),
 }
 
 # Aliases: same interval set as a canonical entry above, kept as a documented

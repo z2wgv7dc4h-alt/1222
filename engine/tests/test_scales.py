@@ -8,6 +8,20 @@ def test_cluster_and_power_present():
     assert SCALES["power"] == (0, 5, 7)
 
 
+def test_phrygian_dominant_present_and_matches_the_real_reference():
+    # Ported directly from reference/ww-forge-prior-attempt/engine/
+    # theory.py's own real interval tuple -- the 5th mode of harmonic
+    # minor (real music-theory identity, cross-checked, not just copied
+    # blind): harmonic_minor's degree index 4 (pitch 7) becomes the new
+    # root, and every other degree's real interval-from-7 comes out to
+    # this exact tuple.
+    assert SCALES["phrygian_dominant"] == (0, 1, 4, 5, 7, 8, 10)
+    harmonic_minor = SCALES["harmonic_minor"]
+    fifth_mode_root = harmonic_minor[4]
+    recomputed = tuple(sorted((iv - fifth_mode_root) % 12 for iv in harmonic_minor))
+    assert recomputed == SCALES["phrygian_dominant"]
+
+
 def test_no_duplicate_non_alias_scales():
     seen: dict[tuple[int, ...], str] = {}
     for name, intervals in SCALES.items():

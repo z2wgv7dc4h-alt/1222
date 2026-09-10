@@ -14,9 +14,10 @@ this project's `scales.py` is the single source of truth for interval sets
 (see .claude/rules/anti-patterns.md: "two scale names, one interval set:
 aliases only, documented"). `Scale` below resolves its intervals through
 `scales.get_scale`, so an unknown scale name fails the same way it does
-everywhere else in this codebase. The reference's `phrygian_dominant` has no
-equivalent scale here and is intentionally not carried over as a second
-table entry -- it would need to be added to scales.py first.
+everywhere else in this codebase. The reference's `phrygian_dominant` was
+missing here for several sessions (this note originally flagged it as a
+real, deliberately-deferred gap) -- now real, ported directly into
+`scales.py`'s own table (not invented).
 """
 from __future__ import annotations
 

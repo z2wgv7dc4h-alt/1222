@@ -1,7 +1,7 @@
 # CURRENT
 
-task: real reference-corpus analysis + preset calibration ("feed songs, learn")
-phase: cross-cutting (§17.6 preset-calibration workflow, now a real standalone tool)
+task: real audio-corpus extension -- 13 user-owned Born of Osiris tracks fed through demucs + reference_vocab
+phase: cross-cutting (§17.6 preset-calibration workflow, extended with real owned-audio input)
 status: DONE
 last_pytest: engine/ 654 passed, 1 skipped; editor/backend/ 34 passed
 note: Direct continuation of the same-day listening-feedback loop. After the real pedal-guitar architecture landed, user: "I think it needs me to be able to feed you songs and you learn from that." This formalizes the session's own ad hoc reference-MIDI analysis into a real, tested, standing capability, closing scope §17.6's own "not yet a standalone tool" gap.
@@ -22,3 +22,12 @@ Follow-up same day: user said the v6 render "still sounds a little off" and aske
 Also: the file-delivery mechanism apparently didn't show the v6 MP3 on the user's end ("I can't see it") -- re-sent via `SendUserFile` and additionally saved a plain copy to the user's Desktop as a fallback the user can open directly in their own player, bypassing whatever the chat UI's file-card issue was. Kept doing this for v7.
 
 Remaining: the GPX-format files this pyguitarpro version can't decompress (hit across all three bands now, a genuine library limitation, not a per-source issue), and the broader remaining gaps from the earlier scope re-read (P10.2 Song JSON, small unwired devices, §17.2 dense-passage flagging, Phase 8's real audio-render pipeline beyond `.rpp`).
+
+Same day, follow-up: user directly uploaded 15 real M4A files via Claude Code's own upload mechanism -- a near-complete Born of Osiris "The Discovery" album (13 unique tracks after deduplicating 2 repeats: Follow The Signs, Singularity, Ascension, Devastate, Two Worlds Of Design, Shaping The Masterpiece, Dissimulation, Automatic Motion, The Omniscient, Last Straw, Regenerate, XIV, Behold). This is the legitimate alternative offered above, now exercised: audio from an album the user already owns, handed over directly, going through the same `analyze_audio_reference`/demucs pipeline the reference-vocab feature always supported.
+
+Blocked initially on missing `ffmpeg` -- root-caused (neither `soundfile`/`librosa` nor `demucs`'s own internal `ffprobe`/`ffmpeg` subprocess calls can decode M4A/AAC without it) via direct Python REPL experimentation rather than guessing. Downloaded the official `ffmpeg-9.0.1-essentials_build.zip` from gyan.dev (ffmpeg.org's own linked Windows build source, 111,253,802 bytes) after stating filename/source/size and getting explicit confirmation. Ran all 13 tracks through real `demucs` 2-stem separation (`--two-stems=drums`) then `reference_vocab.add_reference` on each resulting `no_drums.wav` -- 13/13 succeeded, 0 failed, each contributing real `basic_pitch`-transcribed `riff`/`lead` tracks (not just structural stats). Corpus grew 18 -> 31 references.
+
+Rebuilt `labyrinth.json` from the full 31-song corpus: bpm shifted 151 -> 139, scale shifted phrygian -> minor, as the larger and now audio-heavy corpus average moved (both real, honest recalculations, not tuning). Full suite re-run clean: 654 passed, 1 skipped (unchanged count -- this exercised the already-tested pipeline against new real inputs, no new code needed). Regenerated the demo song (seed 6) on the rebuilt preset, rendered via the existing fluidsynth+GeneralUser-GS pipeline, sent to the user as v8 (and copied to Desktop per the established file-delivery fallback).
+
+Deleted the one-off `engine/_scratch_process_uploads.py` batch script after use (referenced user-local absolute upload paths, not meant to be permanent project code).
+updated: 2026-09-10

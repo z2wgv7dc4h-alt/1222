@@ -1,10 +1,10 @@
 {
   "id": "labyrinth",
-  "description": "Real technical/melodic minor-key djent, calibrated directly from a real 18-song reference corpus (Born of Osiris + Periphery + Veil of Maya, mixed MIDI + Guitar Pro transcriptions) via engine/reference_vocab.py -- not a genre guess. Interval vocabulary is the real averaged per-song riff track measurement (root/5th-dominant, real secondary color), not hand-tuned.",
+  "description": "Born of Osiris / Periphery / Veil of Maya calibrated preset -- corpus-averaged from 31 real references (13 real audio tracks + 18 MIDI/GP tabs)",
   "tuning_key": "drop_g_7",
-  "scale": "phrygian",
+  "scale": "minor",
   "dissonance": 0.3,
-  "bpm": 151,
+  "bpm": 139,
   "bars": 8,
   "feel": "bounce",
   "open_chance": 0.5,
@@ -13,18 +13,18 @@
   "pedal": 0.5,
   "vocab": {
     "weights": {
-      "0": 40.7,
-      "7": 17.9,
-      "3": 6.9,
-      "8": 7.0,
-      "2": 4.1,
-      "1": 4.6,
-      "5": 5.5,
-      "4": 4.6,
-      "11": 1.9,
-      "10": 3.9,
-      "9": 1.4,
-      "6": 1.5
+      "0": 34.6,
+      "7": 17.7,
+      "3": 8.2,
+      "8": 7.4,
+      "2": 5.6,
+      "1": 4.4,
+      "5": 5.4,
+      "4": 5.8,
+      "11": 2.9,
+      "10": 4.3,
+      "9": 1.9,
+      "6": 1.8
     },
     "motion": 0.45
   }

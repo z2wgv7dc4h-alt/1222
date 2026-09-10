@@ -372,6 +372,84 @@ def test_build_preset_from_corpus_markov_none_without_transition_data(tmp_path):
     assert preset.vocab.markov is None
 
 
+def test_build_preset_from_corpus_calibrates_triplet_feel_from_syncopated_corpus(tmp_path):
+    # Regression test for the "Fix rytyhm" finding: ALL 13/13 real Born
+    # of Osiris audio corpus entries measure rhythm_pattern="syncopated"
+    # (via audio_vocab.guitar_rhythm_pattern's real onset-timing
+    # classification), yet build_preset_from_corpus previously hardcoded
+    # feel="bounce" regardless -- never actually calibrated from real
+    # data. A corpus with a majority-"syncopated" real rhythm_pattern
+    # should now produce feel="triplet" (rhythm.generate_triplet_rhythm's
+    # real evenly-spaced 1/3-beat subdivision, the closest existing real
+    # device to Singularity's own measured ~0.31-beat median IOI).
+    corpus = {
+        "song_a": {
+            "tempo_bpm": 150.0,
+            "rhythm_pattern": "syncopated",
+            "tracks": [
+                {"role_guess": "riff", "key_mode": "minor", "interval_vocab_pct": {0: 50.0, 7: 30.0, 3: 20.0}},
+            ],
+        },
+        "song_b": {
+            "tempo_bpm": 150.0,
+            "rhythm_pattern": "syncopated",
+            "tracks": [
+                {"role_guess": "riff", "key_mode": "minor", "interval_vocab_pct": {0: 50.0, 7: 30.0, 3: 20.0}},
+            ],
+        },
+    }
+    preset = rv.build_preset_from_corpus(
+        preset_id="test_triplet_feel_calibration",
+        description="test",
+        tuning_key="drop_g_7",
+        output_dir=tmp_path,
+        corpus=corpus,
+    )
+    assert preset.feel == "triplet"
+
+
+def test_build_preset_from_corpus_calibrates_gallop_feel_from_gallop_corpus(tmp_path):
+    corpus = {
+        "song_a": {
+            "tempo_bpm": 150.0,
+            "rhythm_pattern": "gallop",
+            "tracks": [
+                {"role_guess": "riff", "key_mode": "minor", "interval_vocab_pct": {0: 50.0, 7: 30.0, 3: 20.0}},
+            ],
+        },
+    }
+    preset = rv.build_preset_from_corpus(
+        preset_id="test_gallop_feel_calibration",
+        description="test",
+        tuning_key="drop_g_7",
+        output_dir=tmp_path,
+        corpus=corpus,
+    )
+    assert preset.feel == "gallop"
+
+
+def test_build_preset_from_corpus_feel_defaults_to_bounce_without_rhythm_pattern_data(tmp_path):
+    # A corpus with no audio-analyzed entries (e.g. all MIDI/GP) carries
+    # no rhythm_pattern field at all -- must fall back to the original
+    # default rather than fabricating a mapping for absent data.
+    corpus = {
+        "song_a": {
+            "tempo_bpm": 150.0,
+            "tracks": [
+                {"role_guess": "riff", "key_mode": "minor", "interval_vocab_pct": {0: 50.0, 7: 30.0, 3: 20.0}},
+            ],
+        },
+    }
+    preset = rv.build_preset_from_corpus(
+        preset_id="test_feel_default_fallback",
+        description="test",
+        tuning_key="drop_g_7",
+        output_dir=tmp_path,
+        corpus=corpus,
+    )
+    assert preset.feel == "bounce"
+
+
 def test_build_preset_from_corpus_calibrates_a_real_separate_lead_vocab(tmp_path):
     # A "lead" track with a genuinely DIFFERENT interval color than the
     # "riff" track -- proves lead_vocab is really its own calibration,

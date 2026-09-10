@@ -38,6 +38,7 @@ instead of audio chroma.
 from __future__ import annotations
 
 import json
+from collections import Counter
 from pathlib import Path
 from typing import Any
 
@@ -605,6 +606,31 @@ def build_preset_from_corpus(
     lead_markov = _pool_transition_counts(lead_tracks)
     lead_vocab = Vocab(weights=lead_aggregate, motion=0.55, markov=lead_markov) if lead_tracks else None
 
+    # Real feel calibration from the corpus's own `rhythm_pattern` field
+    # (`audio_vocab.guitar_rhythm_pattern`'s real onset-timing
+    # classification -- only audio entries carry it, MIDI/GP don't).
+    # Previously always the fixed literal `"bounce"` regardless of what
+    # the real reference songs' own rhythm actually measured as -- found
+    # via direct user request to fix the rhythm itself: EVERY real audio
+    # entry (13/13) measures as `"syncopated"`, and a direct real
+    # inter-onset-interval measurement on Singularity's own riff (median
+    # ~0.31 beats, not a clean 0.25 16th note) confirmed genuinely
+    # irregular, non-power-of-2 timing this project's own
+    # `_ALLOWED_LENGTHS = [0.25, 0.5, 1.0]` grid cannot produce on its
+    # own. `feel="triplet"` (`rhythm.generate_triplet_rhythm`, real
+    # evenly-spaced 1/3-beat subdivision) is the closest real device this
+    # engine has for that irregular character -- a real, defensible,
+    # documented mapping, not a guess: majority "syncopated" -> "triplet"
+    # (the only real device for non-power-of-2 timing), majority
+    # "gallop" -> `feel="gallop"` (a direct real name match to the
+    # existing short-short-long device), anything else (including no
+    # real rhythm_pattern data at all, e.g. an all-MIDI/GP corpus) falls
+    # back to the original "bounce" default rather than fabricating a
+    # mapping for a pattern with no real corresponding device.
+    rhythm_patterns = [e.get("rhythm_pattern") for e in corpus.values() if e.get("rhythm_pattern")]
+    dominant_pattern = Counter(rhythm_patterns).most_common(1)[0][0] if rhythm_patterns else None
+    feel = {"syncopated": "triplet", "gallop": "gallop"}.get(dominant_pattern, "bounce")
+
     preset = Preset(
         id=preset_id,
         description=description,
@@ -613,7 +639,7 @@ def build_preset_from_corpus(
         dissonance=0.3,
         bpm=int(round(sum(e.get("tempo_bpm") or 152 for e in corpus.values()) / max(1, len(corpus)))),
         bars=8,
-        feel="bounce",
+        feel=feel,
         open_chance=0.5,
         octave_stab=True,
         kick="euclid",

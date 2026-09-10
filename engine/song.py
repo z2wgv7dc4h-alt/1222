@@ -270,6 +270,30 @@ _BLAST_WEIGHTS = {"traditional": 1.0, "gravity": 1.0, "hammer": 1.0}
 _SOLO_SEQUENCE_MOTIF_LEN = 4
 _SOLO_SEQUENCE_REPEATS = 4
 
+# 2026-09-11 -- real, direct evidence against the solo's own previous
+# `low=lead_anchor-12, high=lead_anchor+24` (a full 3-octave/36-semitone
+# span) and `stab_chance=0.35`. Direct user request ("go back to
+# singularity... figure out why it's not sounding as awesome") led to
+# transcribing that real reference song's own intro lead hook note-by-
+# note (via `basic_pitch`, the exact same real transcription this
+# project's whole reference-corpus feature already uses): a genuinely
+# melodic, "awesome"-sounding real BoO lead figure spans just 7
+# semitones (barely over half an octave) with 75% stepwise motion and
+# only ONE real deliberate leap across 16 note-to-note moves (~6%) --
+# nothing like a 3-octave range with a wide leap on over a third of
+# every note. `_SOLO_LOW_OFFSET`/`_SOLO_HIGH_OFFSET` narrow the span to
+# ~26 semitones (still meaningfully wider than one single 9-second hook,
+# since a real solo explores more territory across its own longer
+# duration, but nowhere near the previous 3-octave sprawl) and
+# `_SOLO_STAB_CHANCE` drops from 0.35 toward this real measured leap
+# rate -- a deliberate, real recalibration informed by one specific
+# reference's own transcribed data, not a corpus-wide statistic (a
+# single song's own melodic hook is real, concrete evidence, but not
+# claimed as a universal BoO constant).
+_SOLO_LOW_OFFSET = -7
+_SOLO_HIGH_OFFSET = 19
+_SOLO_STAB_CHANCE = 0.15
+
 # Real, second, genuinely-different rhythm-guitar part -- a near-
 # monophonic low pedal/chug doubler, distinct from the wide, melodic
 # guitar_take_a/take_b pair (which are the SAME riff double-tracked for
@@ -883,9 +907,9 @@ def _generate_one_section(
         lead_vocab = preset.lead_vocab if preset.lead_vocab is not None else preset.vocab
         lead_notes = generate_lead_line(
             scale, lead_vocab.weights, min(1.0, lead_vocab.motion + 0.3), rng,
-            low=lead_anchor - 12, high=lead_anchor + 24, anchor=lead_anchor + 12,
+            low=lead_anchor + _SOLO_LOW_OFFSET, high=lead_anchor + _SOLO_HIGH_OFFSET, anchor=lead_anchor + 12,
             num_notes=max(1, round(total_beats * 2)),
-            stab_chance=0.35,
+            stab_chance=_SOLO_STAB_CHANCE,
             markov=lead_vocab.markov,
         )
         # X.36 -- real melodic "sequence" passage (see lead.
@@ -913,7 +937,7 @@ def _generate_one_section(
         # already gives the main phrase -- a sequence's own repeated
         # shifting can otherwise drift outside the solo's real playable
         # register.
-        seq_low, seq_high = lead_anchor - 12, lead_anchor + 24
+        seq_low, seq_high = lead_anchor + _SOLO_LOW_OFFSET, lead_anchor + _SOLO_HIGH_OFFSET
         sequence_notes = [max(seq_low, min(seq_high, p)) for p in sequence_notes]
         lead_notes = list(lead_notes) + sequence_notes
         # X.6a: a real featured solo needs legato technique too, not

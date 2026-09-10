@@ -151,6 +151,35 @@ def test_solo_sections_get_a_denser_featured_lead():
         assert len(solo["lead"]) > max(len(s["lead"]) for s in non_solo_sections)
 
 
+def test_solo_main_phrase_stays_within_the_real_narrowed_register():
+    """2026-09-11: the solo's main phrase register was narrowed from a
+    full 3-octave span (`lead_anchor-12` to `+24`) to `_SOLO_LOW_OFFSET`/
+    `_SOLO_HIGH_OFFSET` (~26 semitones), directly evidenced by
+    transcribing a real Born of Osiris reference song's own intro lead
+    hook: it spans just 7 semitones with mostly stepwise motion. The
+    legato tail (a real, separate scalar-run technique) is deliberately
+    NOT bound by this same span -- a fast technical run legitimately
+    pushing higher for a real climactic moment is a different, real
+    device, not the main melodic phrase."""
+    from song import _SOLO_HIGH_OFFSET, _SOLO_LOW_OFFSET
+
+    djent = load_all_presets()["djent"]
+    song = None
+    for seed in range(11, 30):
+        candidate = _generate_attempt(random.Random(seed), djent, num_sections=10)
+        if any(s["role"] == "solo" for s in candidate["sections"]):
+            song = candidate
+            break
+    assert song is not None, "expected at least one seed in range(11, 30) to produce a real solo section"
+
+    solo = next(s for s in song["sections"] if s["role"] == "solo")
+    legato = solo["legato"]
+    legato_pitches = legato["pitches"] if legato else []
+    main_and_seq = solo["lead"][: len(solo["lead"]) - len(legato_pitches)]
+    assert main_and_seq, "expected real main-phrase/sequence content before any legato tail"
+    assert max(main_and_seq) - min(main_and_seq) <= _SOLO_HIGH_OFFSET - _SOLO_LOW_OFFSET
+
+
 def test_compose_song_judge_result_is_present_and_shaped():
     song = compose_song("groovy", seed=3, num_sections=4)
     j = song["judge"]

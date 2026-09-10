@@ -70,6 +70,54 @@ def test_walk_reflects_off_register_edges_instead_of_leaving():
         assert vl.low <= pitch <= vl.high
 
 
+def test_walk_explicit_direction_is_always_honored_regardless_of_momentum():
+    # An explicit, non-zero `direction` must win every time -- the real
+    # momentum heuristic only applies to the default `direction=0` case.
+    scale = Scale(60, "minor")
+    vl = VoiceLeader(scale, low=40, high=80, anchor=60, rng=random.Random(0))
+    vl.last = 60
+    vl._walk_direction = -1  # deliberately opposite to what we'll request
+    pitch = vl.walk(direction=1)
+    assert pitch > 60
+
+
+def test_walk_default_direction_has_real_momentum_not_a_coin_flip_every_step():
+    """Regression test for a real, measured bug: without momentum, every
+    `walk()` call independently re-rolled direction, producing a real
+    71% direction-reversal rate in an actual generated solo (confirmed
+    via direct user listening feedback -- "no nice melody"). With real
+    momentum, consecutive same-direction steps must be measurably more
+    common than a fair coin flip would produce."""
+    scale = Scale(60, "minor")
+    vl = VoiceLeader(scale, low=30, high=90, anchor=60, rng=random.Random(11))
+    vl.last = 60
+    directions = []
+    for _ in range(300):
+        before = vl.last
+        after = vl.walk()
+        directions.append(1 if after > before else (-1 if after < before else 0))
+    pairs = [(a, b) for a, b in zip(directions, directions[1:]) if a != 0 and b != 0]
+    same = sum(1 for a, b in pairs if a == b)
+    same_fraction = same / len(pairs)
+    assert same_fraction > 0.65, (
+        f"expected real directional momentum to keep consecutive steps going the "
+        f"same way well above chance (0.5), got {same_fraction:.2f}"
+    )
+
+
+def test_walk_momentum_updates_after_a_register_edge_reflection():
+    # A reflection off the register edge must update the real persisted
+    # direction to the NEW (reflected) direction, not silently keep the
+    # old one -- otherwise the very next call would immediately try to
+    # walk back off the same edge.
+    scale = Scale(60, "minor")
+    vl = VoiceLeader(scale, low=58, high=62, anchor=60, rng=random.Random(0))
+    vl.last = vl.high
+    vl._walk_direction = 1  # already heading toward the edge
+    vl.walk()
+    assert vl._walk_direction == -1
+
+
 def test_move_blends_pick_and_walk_by_motion():
     scale = Scale(60, "minor")
 

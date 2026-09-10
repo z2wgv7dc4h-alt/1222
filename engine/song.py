@@ -843,8 +843,16 @@ def _generate_one_section(
         # sweep-style interval leaps for technicality"), and a register
         # pushed up an extra octave (solos sit above the rhythm pedal).
         lead_mode = "solo"
+        # A genuinely separate lead-register vocab, when the preset has
+        # one (calibrated by reference_vocab.build_preset_from_corpus
+        # from real corpus songs' own transcribed LEAD-register content,
+        # distinct from the rhythm-guitar riff vocab). Falls back to the
+        # riff vocab for any preset that hasn't been calibrated against
+        # real lead-register data yet -- the same real fallback
+        # `presets.blend_presets` already uses, never a fabricated guess.
+        lead_vocab = preset.lead_vocab if preset.lead_vocab is not None else preset.vocab
         lead_notes = generate_lead_line(
-            scale, preset.vocab.weights, min(1.0, preset.vocab.motion + 0.3), rng,
+            scale, lead_vocab.weights, min(1.0, lead_vocab.motion + 0.3), rng,
             low=lead_anchor - 12, high=lead_anchor + 24, anchor=lead_anchor + 12,
             num_notes=max(1, round(total_beats * 2)),
             stab_chance=0.35,
@@ -863,7 +871,7 @@ def _generate_one_section(
         seq_start_degree = scale.index_of(lead_notes[-1]) if lead_notes else scale.index_of(lead_anchor + 12)
         seq_step = rng.choice((-1, 1))
         sequence_notes = generate_sequence_line(
-            scale, preset.vocab.weights, rng,
+            scale, lead_vocab.weights, rng,
             start_degree=seq_start_degree,
             motif_len=_SOLO_SEQUENCE_MOTIF_LEN,
             num_repeats=_SOLO_SEQUENCE_REPEATS,
@@ -918,8 +926,13 @@ def _generate_one_section(
         # chorus", not a second solo. No legato splice (that's a real,
         # deliberately solo-only technical device).
         lead_mode = "chorus_lead"
+        # Same real lead-register vocab fallback as the "solo" branch
+        # above -- a chorus lead is still a lead-guitar melodic voice,
+        # not the rhythm riff, so it draws from the same calibrated
+        # source when one exists.
+        lead_vocab = preset.lead_vocab if preset.lead_vocab is not None else preset.vocab
         lead_notes = generate_lead_line(
-            scale, preset.vocab.weights, preset.vocab.motion, rng,
+            scale, lead_vocab.weights, lead_vocab.motion, rng,
             low=lead_anchor, high=lead_anchor + 24, anchor=lead_anchor + 12,
             num_notes=max(1, round(total_beats * 2)),
             stab_chance=0.15,

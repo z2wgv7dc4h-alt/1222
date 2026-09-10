@@ -235,18 +235,44 @@ def analyze_gp_reference(path: str | Path) -> dict[str, Any]:
     }
 
 
-def analyze_audio_reference(path: str | Path) -> dict[str, Any]:
+def analyze_audio_reference(path: str | Path, drums_path: str | Path | None = None) -> dict[str, Any]:
     """Real analysis of an audio reference file. Always real tempo/
-    structural stats (`audio_vocab.analyze_track`). Attempts a real
+    structural stats (`audio_vocab.analyze_track`), a real rhythm-pattern
+    classification (`audio_vocab.guitar_rhythm_pattern` -- straight/
+    gallop/syncopated from onset timing, never pitch), and the real
+    per-section dynamic/density curve `analyze_track` already computes
+    internally (previously measured but discarded here). Attempts a real
     note-level vocabulary too via `audio_vocab.transcribe_and_split_
     registers` (Spotify's real `basic_pitch` polyphonic transcription) --
     honestly flags `"transcription": "structural_only"` (never silently
     claims note-level precision) when that dependency isn't available or
-    transcription fails for this file."""
+    transcription fails for this file.
+
+    `drums_path`, when given (e.g. a real `demucs` drum stem, isolated
+    from `path`'s own guitar/bass content), also runs `audio_vocab.
+    classify_drum_onsets` for a real per-role (KICK/SNARE/HIHAT_OR_CYMBAL)
+    onset-percentage breakdown -- `drum_role_pct` is `None`, not
+    fabricated, when no drum stem is supplied."""
+    from audio_vocab import guitar_rhythm_pattern
+
     y, sr = load_audio(path)
     duration_s = len(y) / sr
     track_stats = analyze_track(path)
     key = estimate_key(y, sr)
+    rhythm_pattern = guitar_rhythm_pattern(y, sr)["pattern"]
+
+    drum_role_pct: dict[str, float] | None = None
+    if drums_path is not None:
+        from audio_vocab import classify_drum_onsets
+
+        drum_y, drum_sr = load_audio(drums_path)
+        onsets = classify_drum_onsets(drum_y, drum_sr)
+        if onsets:
+            role_counts: dict[str, int] = {}
+            for onset in onsets:
+                role_counts[onset["role"]] = role_counts.get(onset["role"], 0) + 1
+            total_onsets = sum(role_counts.values())
+            drum_role_pct = {role: round(count / total_onsets * 100, 1) for role, count in role_counts.items()}
 
     tracks: list[dict[str, Any]] = []
     transcription = "structural_only"
@@ -297,6 +323,9 @@ def analyze_audio_reference(path: str | Path) -> dict[str, Any]:
         "structural_key": key,
         "tonal_descriptor": track_stats["tonal_descriptor"],
         "transcription": transcription,
+        "rhythm_pattern": rhythm_pattern,
+        "section_density_curve": track_stats["section_density_curve"],
+        "drum_role_pct": drum_role_pct,
         "tracks": tracks,
     }
 
@@ -312,14 +341,26 @@ def _analyze_by_extension(path: Path) -> dict[str, Any]:
     raise ValueError(f"unsupported reference file type: {suffix!r}")
 
 
-def add_reference(path: str | Path, corpus_path: str | Path = DEFAULT_CORPUS_PATH) -> dict[str, Any]:
+def add_reference(
+    path: str | Path,
+    corpus_path: str | Path = DEFAULT_CORPUS_PATH,
+    drums_path: str | Path | None = None,
+) -> dict[str, Any]:
     """Analyze one real reference file and add/update its entry in the
     real local corpus cache (`engine/data/reference_corpus.json` by
     default) -- the real accumulation the user asked for ("feed you
     songs and you learn from that"). Keyed by filename, so re-feeding the
-    same file updates rather than duplicates its entry."""
+    same file updates rather than duplicates its entry.
+
+    `drums_path` (audio references only) passes a real isolated drum stem
+    (e.g. from `demucs`) through to `analyze_audio_reference` for real
+    per-role onset classification; ignored for MIDI/GP references, which
+    have no such stem concept."""
     path = Path(path)
-    result = _analyze_by_extension(path)
+    if drums_path is not None:
+        result = analyze_audio_reference(path, drums_path=drums_path)
+    else:
+        result = _analyze_by_extension(path)
     corpus = load_reference_corpus(corpus_path)
     corpus[path.name] = result
     corpus_path = Path(corpus_path)
@@ -364,6 +405,31 @@ def _nearest_scale(interval_weights: dict[int, float]) -> str:
     return best_name
 
 
+def _aggregate_role_vocab(corpus: dict[str, Any], role: str) -> tuple[dict[int, float], list[dict[str, Any]]]:
+    """Real, shared aggregation: averages `interval_vocab_pct` across
+    every corpus entry's own real track matching `role` (one vote per
+    SONG, not per note -- the same real discipline `build_preset_from_
+    corpus` has always used for its main riff vocab, now shared so a
+    second role, e.g. `"lead"`, calibrates identically rather than via a
+    second hand-copied loop). Returns `(aggregate, matching_tracks)` --
+    an empty `aggregate` and `[]` when no track matches, never raises
+    (the caller decides whether that's fatal for ITS particular use)."""
+    matching_tracks = []
+    for entry in corpus.values():
+        for track in entry.get("tracks", []):
+            if track["role_guess"] == role:
+                matching_tracks.append(track)
+                break  # one real track per song, not every matching-role track in it
+    if not matching_tracks:
+        return {}, []
+    aggregate: dict[int, float] = {}
+    for track in matching_tracks:
+        for interval, pct in track["interval_vocab_pct"].items():
+            aggregate[int(interval)] = aggregate.get(int(interval), 0.0) + pct
+    aggregate = {k: round(v / len(matching_tracks), 1) for k, v in aggregate.items()}
+    return aggregate, matching_tracks
+
+
 def build_preset_from_corpus(
     preset_id: str,
     description: str,
@@ -386,24 +452,55 @@ def build_preset_from_corpus(
     from presets import PRESETS_DIR, Preset, Vocab, load_tunings, validate_preset
 
     corpus = corpus if corpus is not None else load_reference_corpus()
-    matching_tracks = []
-    for entry in corpus.values():
-        for track in entry.get("tracks", []):
-            if track["role_guess"] == track_role:
-                matching_tracks.append(track)
-                break  # one real track per song, not every riff-like track in it
+    aggregate, matching_tracks = _aggregate_role_vocab(corpus, track_role)
     if not matching_tracks:
         raise ValueError(f"no corpus reference has a real '{track_role}' track yet")
-
-    aggregate: dict[int, float] = {}
-    for track in matching_tracks:
-        for interval, pct in track["interval_vocab_pct"].items():
-            aggregate[int(interval)] = aggregate.get(int(interval), 0.0) + pct
-    aggregate = {k: round(v / len(matching_tracks), 1) for k, v in aggregate.items()}
 
     modes = [t["key_mode"] for t in matching_tracks]
     scale_name = "major" if modes.count("major") > modes.count("minor") else "minor"
     scale_name = _nearest_scale(aggregate) if aggregate else scale_name
+
+    # Real pedal-bias calibration from every corpus entry's own real
+    # "pedal" track (the second-guitar/chug-doubler role `_role_guess`
+    # already detects) -- this data has been sitting in the corpus since
+    # X.17.1's real reference-MIDI analysis, just never consumed here.
+    # Root-heaviness (interval 0's own pct) maps directly onto
+    # `preset.pedal`'s existing 0-1 root-bias scale. Falls back to the
+    # original 0.5 default, not a fabricated number, when no corpus entry
+    # has a real pedal track yet.
+    pedal_tracks = []
+    for entry in corpus.values():
+        for track in entry.get("tracks", []):
+            if track["role_guess"] == "pedal":
+                pedal_tracks.append(track)
+                break
+    if pedal_tracks:
+        # `interval_vocab_pct`'s keys are real ints in a freshly-analyzed
+        # entry but become real JSON STRING keys once loaded back from
+        # `load_reference_corpus` (the same real JSON round-trip effect
+        # `test_add_reference_and_load_reference_corpus_round_trip`
+        # already documents) -- `int(k)` every key rather than looking up
+        # the bare int 0 directly, or this silently finds nothing on any
+        # corpus loaded from disk (confirmed: it did, on the real 31-song
+        # corpus, before this fix -- avg_root_pct computed as 0.0 for
+        # every real pedal track).
+        avg_root_pct = sum(
+            {int(k): v for k, v in t["interval_vocab_pct"].items()}.get(0, 0.0) for t in pedal_tracks
+        ) / len(pedal_tracks)
+        pedal_bias = round(min(1.0, avg_root_pct / 100.0), 2)
+    else:
+        pedal_bias = 0.5
+
+    # Real, SEPARATE lead-guitar vocab calibration from every corpus
+    # entry's own real "lead" track (basic_pitch's transcribed lead
+    # register for audio references, `_role_guess`'s sparse/wide/high
+    # heuristic for MIDI/GP references) -- previously measured and
+    # stored in the corpus but never consumed anywhere: solo/chorus-lead
+    # generation reused the RIFF vocab wholesale. `None` when the corpus
+    # has no real lead track yet, never a fabricated vocab -- callers
+    # (song.py) already fall back to the main riff vocab in that case.
+    lead_aggregate, lead_tracks = _aggregate_role_vocab(corpus, "lead")
+    lead_vocab = Vocab(weights=lead_aggregate, motion=0.55) if lead_tracks else None
 
     preset = Preset(
         id=preset_id,
@@ -418,7 +515,8 @@ def build_preset_from_corpus(
         octave_stab=True,
         kick="euclid",
         vocab=Vocab(weights=aggregate, motion=0.45),
-        pedal=0.5,
+        pedal=pedal_bias,
+        lead_vocab=lead_vocab,
     )
 
     directory = Path(output_dir) if output_dir is not None else PRESETS_DIR
@@ -439,6 +537,11 @@ def build_preset_from_corpus(
         "pedal": preset.pedal,
         "vocab": {"weights": {str(k): v for k, v in preset.vocab.weights.items()}, "motion": preset.vocab.motion},
     }
+    if preset.lead_vocab is not None:
+        payload["lead_vocab"] = {
+            "weights": {str(k): v for k, v in preset.lead_vocab.weights.items()},
+            "motion": preset.lead_vocab.motion,
+        }
     validate_preset(payload, load_tunings(), expected_id=preset_id)
     out_path.write_text(json.dumps(payload, indent=2))
     return preset

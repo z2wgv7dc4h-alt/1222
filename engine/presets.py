@@ -82,6 +82,12 @@ class Preset:
     vocab: Vocab
     group: int | None = None
     pedal: float | None = None
+    # A separately-calibrated interval vocab for solo/lead-guitar
+    # generation, distinct from `vocab` (which drives the rhythm-guitar
+    # riff). `None` for any preset that hasn't been calibrated against
+    # real lead-register reference data -- solo generation falls back to
+    # reusing `vocab` itself in that case, never a fabricated guess.
+    lead_vocab: Vocab | None = None
 
 
 def load_tunings(path: Path | None = None) -> dict[str, Tuning]:
@@ -108,6 +114,29 @@ def get_tuning(key: str, tunings: dict[str, Tuning] | None = None) -> Tuning:
     if key not in table:
         raise ValueError(f"unknown tuning: {key!r}")
     return table[key]
+
+
+def _validate_vocab_shape(vocab: object, preset_id: str, field_name: str) -> None:
+    """Real shape validation shared by `vocab` (required) and
+    `lead_vocab` (optional) -- both are the same real `{weights, motion}`
+    shape, so this is one real check, not two copies to keep in sync."""
+    if not isinstance(vocab, dict) or "weights" not in vocab or "motion" not in vocab:
+        raise ValueError(f"preset '{preset_id}': '{field_name}' must have 'weights' and 'motion'")
+    weights = vocab["weights"]
+    if not isinstance(weights, dict) or not weights:
+        raise ValueError(f"preset '{preset_id}': '{field_name}.weights' must be a non-empty object")
+    for interval_str, weight in weights.items():
+        try:
+            interval = int(interval_str)
+        except (TypeError, ValueError):
+            raise ValueError(f"preset '{preset_id}': {field_name} interval key '{interval_str}' is not an int") from None
+        if not (0 <= interval <= 11):
+            raise ValueError(f"preset '{preset_id}': {field_name} interval {interval} out of 0-11 range")
+        if isinstance(weight, bool) or not isinstance(weight, (int, float)) or weight < 0:
+            raise ValueError(f"preset '{preset_id}': {field_name} weight for interval {interval} must be >= 0")
+    motion = vocab["motion"]
+    if isinstance(motion, bool) or not isinstance(motion, (int, float)) or not (0.0 <= float(motion) <= 1.0):
+        raise ValueError(f"preset '{preset_id}': '{field_name}.motion' must be within [0, 1]")
 
 
 def validate_preset(
@@ -168,24 +197,10 @@ def validate_preset(
     if not isinstance(data["kick"], str) or not data["kick"]:
         raise ValueError(f"preset '{preset_id}': 'kick' must be a non-empty string")
 
-    vocab = data["vocab"]
-    if not isinstance(vocab, dict) or "weights" not in vocab or "motion" not in vocab:
-        raise ValueError(f"preset '{preset_id}': 'vocab' must have 'weights' and 'motion'")
-    weights = vocab["weights"]
-    if not isinstance(weights, dict) or not weights:
-        raise ValueError(f"preset '{preset_id}': 'vocab.weights' must be a non-empty object")
-    for interval_str, weight in weights.items():
-        try:
-            interval = int(interval_str)
-        except (TypeError, ValueError):
-            raise ValueError(f"preset '{preset_id}': vocab interval key '{interval_str}' is not an int") from None
-        if not (0 <= interval <= 11):
-            raise ValueError(f"preset '{preset_id}': vocab interval {interval} out of 0-11 range")
-        if isinstance(weight, bool) or not isinstance(weight, (int, float)) or weight < 0:
-            raise ValueError(f"preset '{preset_id}': vocab weight for interval {interval} must be >= 0")
-    motion = vocab["motion"]
-    if isinstance(motion, bool) or not isinstance(motion, (int, float)) or not (0.0 <= float(motion) <= 1.0):
-        raise ValueError(f"preset '{preset_id}': 'vocab.motion' must be within [0, 1]")
+    _validate_vocab_shape(data["vocab"], preset_id, field_name="vocab")
+
+    if "lead_vocab" in data and data["lead_vocab"] is not None:
+        _validate_vocab_shape(data["lead_vocab"], preset_id, field_name="lead_vocab")
 
     if "group" in data and data["group"] is not None:
         if not isinstance(data["group"], int) or isinstance(data["group"], bool) or data["group"] <= 0:
@@ -221,6 +236,14 @@ def load_preset(path: Path, tunings: dict[str, Tuning] | None = None) -> Preset:
         ),
         group=data.get("group"),
         pedal=(float(data["pedal"]) if data.get("pedal") is not None else None),
+        lead_vocab=(
+            Vocab(
+                weights={int(k): v for k, v in data["lead_vocab"]["weights"].items()},
+                motion=float(data["lead_vocab"]["motion"]),
+            )
+            if data.get("lead_vocab") is not None
+            else None
+        ),
     )
 
 
@@ -235,13 +258,16 @@ def blend_presets(preset_a: Preset, preset_b: Preset, t: float) -> Preset:
     Only real, continuous, genre-CHARACTER fields blend: `vocab.weights`
     (the union of both presets' real interval keys -- a key only one side
     declares is treated as weight 0 on the other side, not dropped),
-    `dissonance`, `vocab.motion`, and `pedal` (a preset that leaves `pedal`
-    `None` is treated as `0.0` for the blend, not skipped). Every
-    STRUCTURAL field (tuning_key, scale, bpm, bars, feel, kick, group,
-    octave_stab, open_chance, id, description) comes from `preset_a`
-    UNCHANGED -- blending two different tunings or scales isn't
-    well-defined, a deliberate, documented scope boundary, not an
-    oversight."""
+    `dissonance`, `vocab.motion`, `pedal` (a preset that leaves `pedal`
+    `None` is treated as `0.0` for the blend, not skipped), and
+    `lead_vocab` (a preset that leaves `lead_vocab` `None` falls back to
+    its OWN `vocab` for the blend -- the same real fallback solo
+    generation itself uses -- so the blended result always carries a
+    real, non-`None` `lead_vocab`). Every STRUCTURAL field (tuning_key,
+    scale, bpm, bars, feel, kick, group, octave_stab, open_chance, id,
+    description) comes from `preset_a` UNCHANGED -- blending two
+    different tunings or scales isn't well-defined, a deliberate,
+    documented scope boundary, not an oversight."""
     if not (0.0 <= t <= 1.0):
         raise ValueError("t must be within [0, 1]")
 
@@ -255,6 +281,15 @@ def blend_presets(preset_a: Preset, preset_b: Preset, t: float) -> Preset:
     pedal_a = preset_a.pedal if preset_a.pedal is not None else 0.0
     pedal_b = preset_b.pedal if preset_b.pedal is not None else 0.0
     pedal = pedal_a * (1 - t) + pedal_b * t
+
+    lead_a = preset_a.lead_vocab if preset_a.lead_vocab is not None else preset_a.vocab
+    lead_b = preset_b.lead_vocab if preset_b.lead_vocab is not None else preset_b.vocab
+    lead_keys = set(lead_a.weights) | set(lead_b.weights)
+    lead_weights = {
+        k: lead_a.weights.get(k, 0) * (1 - t) + lead_b.weights.get(k, 0) * t
+        for k in lead_keys
+    }
+    lead_motion = lead_a.motion * (1 - t) + lead_b.motion * t
 
     return Preset(
         id=preset_a.id,
@@ -271,6 +306,7 @@ def blend_presets(preset_a: Preset, preset_b: Preset, t: float) -> Preset:
         vocab=Vocab(weights=weights, motion=motion),
         group=preset_a.group,
         pedal=pedal,
+        lead_vocab=Vocab(weights=lead_weights, motion=lead_motion),
     )
 
 

@@ -206,6 +206,35 @@ def test_load_preset_accepts_valid_full_preset(tmp_path):
     assert preset.vocab.weights == {0: 10, 7: 4}
     assert preset.group is None
     assert preset.pedal is None
+    assert preset.lead_vocab is None
+
+
+def test_load_preset_accepts_a_real_optional_lead_vocab(tmp_path):
+    tunings = load_tunings()
+    with_lead = dict(BASE_VALID_PRESET, lead_vocab={"weights": {"0": 20, "9": 30}, "motion": 0.6})
+    path = tmp_path / "bogus.json"
+    path.write_text(json.dumps(with_lead))
+    preset = load_preset(path, tunings)
+    assert preset.lead_vocab is not None
+    assert preset.lead_vocab.weights == {0: 20, 9: 30}
+    assert preset.lead_vocab.motion == pytest.approx(0.6)
+    # The main riff vocab stays independent -- lead_vocab is a genuinely
+    # separate field, not a copy/override of `vocab`.
+    assert preset.vocab.weights == {0: 10, 7: 4}
+
+
+def test_validate_preset_rejects_malformed_lead_vocab():
+    tunings = load_tunings()
+    bad = dict(BASE_VALID_PRESET, lead_vocab={"weights": {"0": 20}})  # missing "motion"
+    with pytest.raises(ValueError):
+        validate_preset(bad, tunings, expected_id="bogus")
+
+
+def test_validate_preset_rejects_lead_vocab_weight_out_of_range():
+    tunings = load_tunings()
+    bad = dict(BASE_VALID_PRESET, lead_vocab={"weights": {"15": 20}, "motion": 0.5})
+    with pytest.raises(ValueError):
+        validate_preset(bad, tunings, expected_id="bogus")
 
 
 # -- preset id aliases: old band-linked ids resolve, never a second preset --
@@ -311,6 +340,34 @@ def test_blend_presets_none_pedal_treated_as_zero():
     assert a.pedal is not None and b.pedal is None
     blended = blend_presets(a, b, 1.0)
     assert blended.pedal == pytest.approx(0.0)
+
+
+def test_blend_presets_lead_vocab_falls_back_to_own_vocab_when_none():
+    presets = load_all_presets()
+    a = presets["labyrinth"]  # real, corpus-calibrated lead_vocab
+    b = presets["metalcore"]  # lead_vocab is None
+    assert a.lead_vocab is not None and b.lead_vocab is None
+    # t=1.0 (fully b's side): b has no real lead_vocab, so the blend
+    # must fall back to b's own riff vocab for that side -- never crash
+    # on a None, and never silently drop the field.
+    blended = blend_presets(a, b, 1.0)
+    assert blended.lead_vocab is not None
+    for key in set(b.vocab.weights):
+        assert blended.lead_vocab.weights[key] == pytest.approx(b.vocab.weights[key])
+
+
+def test_blend_presets_lead_vocab_midpoint_is_real_average():
+    presets = load_all_presets()
+    a = presets["labyrinth"]
+    b_lead_vocab = {0: 40, 7: 60}
+    from dataclasses import replace
+    from presets import Vocab
+
+    b = replace(presets["metalcore"], lead_vocab=Vocab(weights=b_lead_vocab, motion=0.3))
+    mid = blend_presets(a, b, 0.5)
+    for key in set(a.lead_vocab.weights) | set(b.lead_vocab.weights):
+        expected = (a.lead_vocab.weights.get(key, 0) + b.lead_vocab.weights.get(key, 0)) / 2
+        assert mid.lead_vocab.weights[key] == pytest.approx(expected)
 
 
 def test_blend_presets_rejects_out_of_range_t():

@@ -259,6 +259,49 @@ def test_pedal_field_raises_root_degree_fraction_in_real_song_output():
     )
 
 
+def test_lead_vocab_field_changes_real_solo_pitch_content():
+    """A preset's real, separately-calibrated `lead_vocab` (reference_
+    vocab.build_preset_from_corpus's own real corpus-derived lead-register
+    calibration) must actually change solo/chorus-lead pitch content, not
+    just sit validated and unused -- the same class of gap X.2's kick/
+    group/pedal/octave_stab wiring already closed once for other fields."""
+    from presets import Vocab
+
+    # A deliberately extreme, unmistakably different lead vocab (all
+    # weight on interval 6, the tritone -- DJENT's own real vocab has
+    # essentially none) so any real effect is unmissable, not a
+    # statistical coin flip.
+    exotic_lead = dataclasses.replace(DJENT, lead_vocab=Vocab(weights={6: 100.0}, motion=0.9))
+
+    default_song = None
+    exotic_song = None
+    for seed in range(11, 40):
+        default_candidate = _generate_attempt(random.Random(seed), DJENT, num_sections=10)
+        if any(s["role"] == "solo" for s in default_candidate["sections"]):
+            default_song = default_candidate
+            exotic_song = _generate_attempt(random.Random(seed), exotic_lead, num_sections=10)
+            break
+    assert default_song is not None, "expected at least one seed in range(11, 40) to produce a real solo section"
+
+    default_solo = next(s for s in default_song["sections"] if s["role"] == "solo")
+    exotic_solo = next(s for s in exotic_song["sections"] if s["role"] == "solo")
+    assert exotic_solo["lead"] != default_solo["lead"], (
+        "expected a real, distinct lead_vocab to change actual solo pitch "
+        "content vs. the same preset falling back to its riff vocab"
+    )
+
+
+def test_lead_vocab_none_falls_back_to_riff_vocab_for_solo_generation():
+    """No behavior change for any preset that hasn't been calibrated with
+    a real lead_vocab yet (every preset shipped before this feature) --
+    `preset.lead_vocab is None` (DJENT's real, unmodified state) must
+    produce byte-identical output to before this fallback existed."""
+    assert DJENT.lead_vocab is None
+    song_a = _generate_attempt(random.Random(7), DJENT, num_sections=6)
+    song_b = _generate_attempt(random.Random(7), DJENT, num_sections=6)
+    assert [s["lead"] for s in song_a["sections"]] == [s["lead"] for s in song_b["sections"]]
+
+
 def test_octave_stab_field_changes_real_song_output():
     no_stab_variant = dataclasses.replace(DJENT, octave_stab=False)
 

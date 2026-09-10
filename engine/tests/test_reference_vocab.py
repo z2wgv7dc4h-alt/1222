@@ -165,6 +165,183 @@ def test_analyze_audio_reference_returns_real_structural_stats(tmp_path):
     # Never silently claims note-level precision it doesn't have.
     if result["transcription"] == "structural_only":
         assert result["tracks"] == []
+    # Real rhythm-pattern classification and dynamic-density curve --
+    # previously computed by audio_vocab but discarded here.
+    assert result["rhythm_pattern"] in ("straight", "gallop", "syncopated", "insufficient_onsets")
+    assert isinstance(result["section_density_curve"], list)
+    assert len(result["section_density_curve"]) > 0
+    # No drum stem supplied -- honestly None, never fabricated.
+    assert result["drum_role_pct"] is None
+
+
+def _write_low_thump_track(path, sr=22050, bpm=140.0, duration_s=6.0):
+    """A synthetic low-frequency (80Hz) thumping pattern -- a real
+    kick-drum proxy for testing `classify_drum_onsets`'s real low-band
+    energy heuristic, without needing a real recorded drum sample."""
+    n_samples = int(sr * duration_s)
+    y = np.zeros(n_samples, dtype=np.float32)
+    beat_period = 60.0 / bpm
+    thump_len = int(sr * 0.08)
+    t_thump = np.arange(thump_len) / sr
+    thump_wave = 0.9 * np.sin(2 * np.pi * 80.0 * t_thump) * np.exp(-t_thump * 25)
+    t = 0.0
+    while t < duration_s:
+        start = int(t * sr)
+        end = min(n_samples, start + thump_len)
+        y[start:end] += thump_wave[: end - start]
+        t += beat_period
+    sf.write(str(path), y, sr)
+
+
+def test_analyze_audio_reference_captures_real_drum_role_pct_when_drum_stem_given(tmp_path):
+    guitar_path = tmp_path / "no_drums.wav"
+    drums_path = tmp_path / "drums.wav"
+    _write_click_track(guitar_path, bpm=140.0, duration_s=6.0)
+    _write_low_thump_track(drums_path, bpm=140.0, duration_s=6.0)
+
+    result = rv.analyze_audio_reference(guitar_path, drums_path=drums_path)
+    assert result["drum_role_pct"] is not None
+    # A real low-frequency-dominant onset pattern should classify as
+    # mostly KICK, per classify_drum_onsets's own documented heuristic.
+    assert result["drum_role_pct"].get("KICK", 0.0) > 50.0
+    total_pct = sum(result["drum_role_pct"].values())
+    assert 99.0 <= total_pct <= 101.0  # real percentages, sum to ~100
+
+
+def test_add_reference_passes_drums_path_through_for_audio(tmp_path):
+    guitar_path = tmp_path / "no_drums.wav"
+    drums_path = tmp_path / "drums.wav"
+    _write_click_track(guitar_path, bpm=140.0, duration_s=6.0)
+    _write_low_thump_track(drums_path, bpm=140.0, duration_s=6.0)
+    corpus_path = tmp_path / "corpus.json"
+
+    result = rv.add_reference(guitar_path, corpus_path=corpus_path, drums_path=drums_path)
+    assert result["drum_role_pct"] is not None
+    corpus = rv.load_reference_corpus(corpus_path)
+    assert corpus["no_drums.wav"]["drum_role_pct"] is not None
+
+
+def test_build_preset_from_corpus_calibrates_pedal_from_real_pedal_tracks(tmp_path):
+    # A synthetic corpus with one real, heavily root-weighted "pedal"
+    # track (matching the real ~96% measured Guitar-2 reference this
+    # session's own pedal-guitar architecture was built from) plus a
+    # normal "riff" track (required for build_preset_from_corpus to run
+    # at all, since it aggregates vocab from "riff"-role tracks).
+    corpus = {
+        "song_a": {
+            "tempo_bpm": 150.0,
+            "tracks": [
+                {"role_guess": "riff", "key_mode": "minor", "interval_vocab_pct": {0: 50.0, 7: 30.0, 3: 20.0}},
+                {"role_guess": "pedal", "key_mode": "minor", "interval_vocab_pct": {0: 96.0, 7: 2.0, 5: 2.0}},
+            ],
+        },
+    }
+    preset = rv.build_preset_from_corpus(
+        preset_id="test_pedal_calibration",
+        description="test",
+        tuning_key="drop_g_7",
+        output_dir=tmp_path,
+        corpus=corpus,
+    )
+    assert preset.pedal == pytest.approx(0.96, abs=0.01)
+
+
+def test_build_preset_from_corpus_calibrates_pedal_from_string_keyed_corpus(tmp_path):
+    # A real corpus loaded via `load_reference_corpus` (i.e. round-tripped
+    # through JSON) has STRING interval keys ("0", "7", ...), not the int
+    # keys a freshly-in-memory `analyze_*` result carries -- confirmed via
+    # `test_add_reference_and_load_reference_corpus_round_trip`'s own
+    # documented JSON round-trip effect. Regression test for a real bug
+    # caught on the actual 31-song production corpus: the pedal-bias
+    # calculation looked up `interval_vocab_pct.get(0, ...)` with an int
+    # key, silently finding nothing (default 0.0) against every real
+    # string-keyed corpus entry loaded from disk.
+    corpus = {
+        "song_a": {
+            "tempo_bpm": 150.0,
+            "tracks": [
+                {"role_guess": "riff", "key_mode": "minor", "interval_vocab_pct": {"0": 50.0, "7": 30.0, "3": 20.0}},
+                {"role_guess": "pedal", "key_mode": "minor", "interval_vocab_pct": {"0": 96.0, "7": 2.0, "5": 2.0}},
+            ],
+        },
+    }
+    preset = rv.build_preset_from_corpus(
+        preset_id="test_pedal_string_keys",
+        description="test",
+        tuning_key="drop_g_7",
+        output_dir=tmp_path,
+        corpus=corpus,
+    )
+    assert preset.pedal == pytest.approx(0.96, abs=0.01)
+
+
+def test_build_preset_from_corpus_calibrates_a_real_separate_lead_vocab(tmp_path):
+    # A "lead" track with a genuinely DIFFERENT interval color than the
+    # "riff" track -- proves lead_vocab is really its own calibration,
+    # not just a copy of the riff vocab.
+    corpus = {
+        "song_a": {
+            "tempo_bpm": 150.0,
+            "tracks": [
+                {"role_guess": "riff", "key_mode": "minor", "interval_vocab_pct": {0: 70.0, 7: 20.0, 3: 10.0}},
+                {"role_guess": "lead", "key_mode": "minor", "interval_vocab_pct": {0: 20.0, 5: 30.0, 9: 50.0}},
+            ],
+        },
+    }
+    preset = rv.build_preset_from_corpus(
+        preset_id="test_lead_calibration",
+        description="test",
+        tuning_key="drop_g_7",
+        output_dir=tmp_path,
+        corpus=corpus,
+    )
+    assert preset.lead_vocab is not None
+    assert preset.lead_vocab.weights != preset.vocab.weights
+    assert preset.lead_vocab.weights[9] == 50.0
+    # Written to and reloadable from the real preset JSON file too.
+    from presets import load_preset
+
+    reloaded = load_preset(tmp_path / "test_lead_calibration.json")
+    assert reloaded.lead_vocab is not None
+    assert reloaded.lead_vocab.weights[9] == 50.0
+
+
+def test_build_preset_from_corpus_lead_vocab_none_without_lead_tracks(tmp_path):
+    corpus = {
+        "song_a": {
+            "tempo_bpm": 150.0,
+            "tracks": [
+                {"role_guess": "riff", "key_mode": "minor", "interval_vocab_pct": {0: 70.0, 7: 20.0, 3: 10.0}},
+            ],
+        },
+    }
+    preset = rv.build_preset_from_corpus(
+        preset_id="test_lead_fallback",
+        description="test",
+        tuning_key="drop_g_7",
+        output_dir=tmp_path,
+        corpus=corpus,
+    )
+    assert preset.lead_vocab is None
+
+
+def test_build_preset_from_corpus_pedal_falls_back_to_default_without_pedal_tracks(tmp_path):
+    corpus = {
+        "song_a": {
+            "tempo_bpm": 150.0,
+            "tracks": [
+                {"role_guess": "riff", "key_mode": "minor", "interval_vocab_pct": {0: 50.0, 7: 30.0, 3: 20.0}},
+            ],
+        },
+    }
+    preset = rv.build_preset_from_corpus(
+        preset_id="test_pedal_fallback",
+        description="test",
+        tuning_key="drop_g_7",
+        output_dir=tmp_path,
+        corpus=corpus,
+    )
+    assert preset.pedal == 0.5
 
 
 def test_add_reference_and_load_reference_corpus_round_trip(tmp_path):

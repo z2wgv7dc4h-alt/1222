@@ -1,6 +1,6 @@
 {
   "id": "labyrinth",
-  "description": "Born of Osiris / Periphery / Veil of Maya calibrated preset -- corpus-averaged from 31 real references (13 real audio tracks + 18 MIDI/GP tabs)",
+  "description": "x",
   "tuning_key": "drop_g_7",
   "scale": "minor",
   "dissonance": 0.3,
@@ -10,7 +10,7 @@
   "open_chance": 0.5,
   "octave_stab": true,
   "kick": "euclid",
-  "pedal": 0.5,
+  "pedal": 0.95,
   "vocab": {
     "weights": {
       "0": 34.6,
@@ -27,5 +27,22 @@
       "6": 1.8
     },
     "motion": 0.45
+  },
+  "lead_vocab": {
+    "weights": {
+      "0": 26.4,
+      "4": 5.8,
+      "7": 17.9,
+      "9": 4.5,
+      "5": 8.8,
+      "2": 6.9,
+      "11": 3.4,
+      "3": 11.3,
+      "6": 2.0,
+      "8": 5.3,
+      "10": 5.3,
+      "1": 2.4
+    },
+    "motion": 0.55
   }
 }

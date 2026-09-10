@@ -2204,6 +2204,22 @@
     },
     "tonal_descriptor": "balanced",
     "transcription": "full",
+    "rhythm_pattern": "syncopated",
+    "section_density_curve": [
+      0.7197,
+      1.218,
+      0.895,
+      0.9504,
+      1.0704,
+      0.9135,
+      0.9135,
+      1.3195
+    ],
+    "drum_role_pct": {
+      "HIHAT_OR_CYMBAL": 83.1,
+      "KICK": 15.3,
+      "SNARE": 1.7
+    },
     "tracks": [
       {
         "name": "rhythm",
@@ -2262,6 +2278,22 @@
     },
     "tonal_descriptor": "balanced",
     "transcription": "full",
+    "rhythm_pattern": "syncopated",
+    "section_density_curve": [
+      1.3807,
+      0.8934,
+      0.9475,
+      0.5279,
+      0.8663,
+      1.1912,
+      1.1641,
+      1.0288
+    ],
+    "drum_role_pct": {
+      "HIHAT_OR_CYMBAL": 69.5,
+      "KICK": 28.4,
+      "SNARE": 2.1
+    },
     "tracks": [
       {
         "name": "rhythm",
@@ -2317,6 +2349,22 @@
     },
     "tonal_descriptor": "balanced",
     "transcription": "full",
+    "rhythm_pattern": "syncopated",
+    "section_density_curve": [
+      1.1692,
+      0.8769,
+      0.8462,
+      1.1538,
+      1.1231,
+      0.8769,
+      1.0154,
+      0.9385
+    ],
+    "drum_role_pct": {
+      "KICK": 31.3,
+      "SNARE": 2.8,
+      "HIHAT_OR_CYMBAL": 66.0
+    },
     "tracks": [
       {
         "name": "rhythm",
@@ -2368,6 +2416,22 @@
     },
     "tonal_descriptor": "balanced",
     "transcription": "full",
+    "rhythm_pattern": "syncopated",
+    "section_density_curve": [
+      1.0868,
+      0.7783,
+      0.8624,
+      1.0447,
+      1.1218,
+      1.1429,
+      0.8063,
+      1.1569
+    ],
+    "drum_role_pct": {
+      "HIHAT_OR_CYMBAL": 88.8,
+      "KICK": 9.7,
+      "SNARE": 1.5
+    },
     "tracks": [
       {
         "name": "rhythm",
@@ -2426,6 +2490,22 @@
     },
     "tonal_descriptor": "balanced",
     "transcription": "full",
+    "rhythm_pattern": "syncopated",
+    "section_density_curve": [
+      1.2193,
+      1.0409,
+      0.7584,
+      0.8625,
+      1.1004,
+      1.2639,
+      1.3086,
+      0.4461
+    ],
+    "drum_role_pct": {
+      "HIHAT_OR_CYMBAL": 85.5,
+      "KICK": 14.1,
+      "SNARE": 0.4
+    },
     "tracks": [
       {
         "name": "rhythm",
@@ -2483,6 +2563,22 @@
     },
     "tonal_descriptor": "balanced",
     "transcription": "full",
+    "rhythm_pattern": "syncopated",
+    "section_density_curve": [
+      1.0676,
+      0.8474,
+      1.0542,
+      0.9341,
+      0.8674,
+      0.8941,
+      1.3545,
+      0.9808
+    ],
+    "drum_role_pct": {
+      "HIHAT_OR_CYMBAL": 83.7,
+      "KICK": 12.3,
+      "SNARE": 4.0
+    },
     "tracks": [
       {
         "name": "rhythm",
@@ -2541,6 +2637,22 @@
     },
     "tonal_descriptor": "balanced",
     "transcription": "full",
+    "rhythm_pattern": "syncopated",
+    "section_density_curve": [
+      0.8738,
+      0.8624,
+      1.0553,
+      0.9078,
+      0.8965,
+      1.5546,
+      1.0326,
+      0.817
+    ],
+    "drum_role_pct": {
+      "HIHAT_OR_CYMBAL": 88.4,
+      "KICK": 10.6,
+      "SNARE": 1.0
+    },
     "tracks": [
       {
         "name": "rhythm",
@@ -2597,6 +2709,22 @@
     },
     "tonal_descriptor": "balanced",
     "transcription": "full",
+    "rhythm_pattern": "syncopated",
+    "section_density_curve": [
+      0.5035,
+      1.2867,
+      1.1189,
+      1.0629,
+      1.1469,
+      1.3007,
+      0.6434,
+      0.9371
+    ],
+    "drum_role_pct": {
+      "KICK": 20.6,
+      "HIHAT_OR_CYMBAL": 78.6,
+      "SNARE": 0.8
+    },
     "tracks": [
       {
         "name": "rhythm",
@@ -2653,6 +2781,22 @@
     },
     "tonal_descriptor": "dark/scooped",
     "transcription": "full",
+    "rhythm_pattern": "syncopated",
+    "section_density_curve": [
+      1.1832,
+      1.0366,
+      1.0366,
+      1.2251,
+      1.0157,
+      1.0052,
+      0.8901,
+      0.6073
+    ],
+    "drum_role_pct": {
+      "KICK": 13.1,
+      "HIHAT_OR_CYMBAL": 86.5,
+      "SNARE": 0.4
+    },
     "tracks": [
       {
         "name": "rhythm",
@@ -2703,6 +2847,22 @@
     },
     "tonal_descriptor": "balanced",
     "transcription": "full",
+    "rhythm_pattern": "syncopated",
+    "section_density_curve": [
+      1.0017,
+      0.7861,
+      1.1548,
+      0.8835,
+      1.1548,
+      1.1548,
+      0.9391,
+      0.9252
+    ],
+    "drum_role_pct": {
+      "HIHAT_OR_CYMBAL": 75.8,
+      "SNARE": 2.1,
+      "KICK": 22.1
+    },
     "tracks": [
       {
         "name": "rhythm",
@@ -2761,6 +2921,22 @@
     },
     "tonal_descriptor": "balanced",
     "transcription": "full",
+    "rhythm_pattern": "syncopated",
+    "section_density_curve": [
+      1.1675,
+      0.8962,
+      0.7153,
+      0.7153,
+      0.9949,
+      1.11,
+      1.1182,
+      1.2826
+    ],
+    "drum_role_pct": {
+      "KICK": 16.7,
+      "HIHAT_OR_CYMBAL": 78.9,
+      "SNARE": 4.4
+    },
     "tracks": [
       {
         "name": "rhythm",
@@ -2818,6 +2994,22 @@
     },
     "tonal_descriptor": "balanced",
     "transcription": "full",
+    "rhythm_pattern": "syncopated",
+    "section_density_curve": [
+      0.7989,
+      0.7989,
+      0.8101,
+      0.8551,
+      1.2489,
+      1.384,
+      0.9451,
+      1.1589
+    ],
+    "drum_role_pct": {
+      "HIHAT_OR_CYMBAL": 74.0,
+      "SNARE": 22.6,
+      "KICK": 3.4
+    },
     "tracks": [
       {
         "name": "rhythm",
@@ -2875,6 +3067,22 @@
     },
     "tonal_descriptor": "balanced",
     "transcription": "full",
+    "rhythm_pattern": "syncopated",
+    "section_density_curve": [
+      0.7176,
+      0.5708,
+      0.5545,
+      1.1662,
+      1.3537,
+      0.7503,
+      1.4353,
+      1.4516
+    ],
+    "drum_role_pct": {
+      "HIHAT_OR_CYMBAL": 88.3,
+      "SNARE": 1.2,
+      "KICK": 10.5
+    },
     "tracks": [
       {
         "name": "rhythm",

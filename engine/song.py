@@ -685,6 +685,7 @@ def _generate_one_section(
             # section" device that IRVD's verbatim-repeat structure would
             # directly fight (see motif.generate_motif's docstring).
             irvd_bars=(preset.bars if preset.group is None else None),
+            markov=preset.vocab.markov,
         )
         m = _develop_theme(base_theme, occurrence, rng)
     guitar_cells = m.cell
@@ -856,6 +857,7 @@ def _generate_one_section(
             low=lead_anchor - 12, high=lead_anchor + 24, anchor=lead_anchor + 12,
             num_notes=max(1, round(total_beats * 2)),
             stab_chance=0.35,
+            markov=lead_vocab.markov,
         )
         # X.36 -- real melodic "sequence" passage (see lead.
         # generate_sequence_line's own module-level comment for the
@@ -876,6 +878,7 @@ def _generate_one_section(
             motif_len=_SOLO_SEQUENCE_MOTIF_LEN,
             num_repeats=_SOLO_SEQUENCE_REPEATS,
             step_degrees=seq_step,
+            markov=lead_vocab.markov,
         )
         # Same real register guarantee generate_lead_line's own clamp
         # already gives the main phrase -- a sequence's own repeated
@@ -936,6 +939,7 @@ def _generate_one_section(
             low=lead_anchor, high=lead_anchor + 24, anchor=lead_anchor + 12,
             num_notes=max(1, round(total_beats * 2)),
             stab_chance=0.15,
+            markov=lead_vocab.markov,
         )
         legato = None
     elif role in ("chill", "interlude"):
@@ -1275,6 +1279,7 @@ def _regenerate_pitch_only(
         chromatic=chromatic, dissonance=arc_row["dissonance"],
         base_degree=arc_row["start_degree"],
         pedal=(_VERSE_PEDAL_BIAS if role == "verse" else preset.pedal),
+        markov=preset.vocab.markov,
     )
     new_motif = Motif(cell=[dict(c) for c in old_motif.cell], deltas=new_deltas)
 

@@ -44,4 +44,6 @@ def test_transcribe_and_split_registers_returns_expected_shape(tmp_path):
     result = transcribe_and_split_registers(path, rhythm_cutoff_midi=52)
     assert set(result.keys()) == {"rhythm", "lead"}
     for layer in result.values():
-        assert set(layer.keys()) == {"n_notes", "density_per_s", "avg_duration_s", "pitch_class_counts"}
+        assert set(layer.keys()) == {
+            "n_notes", "density_per_s", "avg_duration_s", "pitch_class_counts", "pitch_class_sequence",
+        }

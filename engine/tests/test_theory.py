@@ -2,7 +2,7 @@ import random
 
 import pytest
 
-from theory import ARC, DISSONANT, Scale, VoiceLeader, arc, shade
+from theory import ARC, DISSONANT, Scale, VoiceLeader, _weighted_choice, arc, pick_pitch_interval_markov, shade
 
 
 # -- Scale --------------------------------------------------------------------
@@ -103,6 +103,86 @@ def test_voiceleader_ignores_non_positive_weights():
     vl = VoiceLeader(scale, weights={0: 1, 7: 0, 3: -1})
     assert 7 not in vl.weights
     assert 3 not in vl.weights
+
+
+# -- real, corpus-derived markov sequence-awareness --------------------------
+
+
+def test_weighted_choice_matches_original_inline_behavior():
+    # Regression: `_weighted_choice` replaced two independent inline
+    # accumulate-and-compare loops (VoiceLeader._weighted_interval's own,
+    # and motif.pick_pitch_interval's own) -- same seed must still pick
+    # the same real interval as the original inline math.
+    items = [(0, 5.0), (7, 3.0), (3, 2.0)]
+    rng = random.Random(7)
+    r = rng.random() * sum(w for _iv, w in items)
+    acc = 0.0
+    expected = items[-1][0]
+    for iv, w in items:
+        acc += w
+        if r <= acc:
+            expected = iv
+            break
+    assert _weighted_choice(items, random.Random(7)) == expected
+
+
+def test_weighted_choice_rejects_empty_or_non_positive_total():
+    with pytest.raises(ValueError):
+        _weighted_choice([], random.Random(0))
+    with pytest.raises(ValueError):
+        _weighted_choice([(0, 0.0), (7, 0.0)], random.Random(0))
+
+
+def test_pick_pitch_interval_markov_falls_back_without_markov():
+    weights = {0: 5.0, 7: 3.0}
+    assert pick_pitch_interval_markov(weights, random.Random(1), None, None) in weights
+    assert pick_pitch_interval_markov(weights, random.Random(1), {0: {7: 100.0}}, None) in weights
+
+
+def test_pick_pitch_interval_markov_falls_back_on_unseen_context():
+    weights = {0: 5.0, 7: 3.0}
+    markov = {0: {7: 100.0}}  # no real data for prev_interval=3
+    # Deterministic RNG check: with markov=None the pick would be drawn
+    # from `weights`; an unseen prev_interval (3) must fall through to
+    # the exact same real draw.
+    expected = _weighted_choice(list(weights.items()), random.Random(9))
+    assert pick_pitch_interval_markov(weights, random.Random(9), markov, 3) == expected
+
+
+def test_pick_pitch_interval_markov_uses_real_context_when_available():
+    weights = {0: 1.0, 7: 1.0, 3: 1.0}
+    markov = {0: {7: 100.0}}  # after interval 0, ALWAYS interval 7
+    rng = random.Random(123)
+    picks = [pick_pitch_interval_markov(weights, rng, markov, 0) for _ in range(50)]
+    assert all(p == 7 for p in picks)
+
+
+def test_voiceleader_markov_none_is_byte_identical_to_before():
+    scale = Scale(60, "minor")
+    weights = {0: 5, 7: 3, 3: 2}
+    vl_a = VoiceLeader(scale, weights=weights, rng=random.Random(42))
+    vl_b = VoiceLeader(scale, weights=weights, rng=random.Random(42), markov=None)
+    picks_a = [vl_a.pick() for _ in range(30)]
+    picks_b = [vl_b.pick() for _ in range(30)]
+    assert picks_a == picks_b
+
+
+def test_voiceleader_markov_measurably_changes_real_picks():
+    scale = Scale(60, "minor")
+    weights = {0: 1.0, 7: 1.0, 3: 1.0}
+    # After interval 0 (from anchor), ALWAYS interval 7 -- a real,
+    # extreme, unmistakable synthetic transition table.
+    markov = {0: {7: 100.0}}
+    vl = VoiceLeader(scale, weights=weights, rng=random.Random(5), anchor=60, low=48, high=84, markov=markov)
+    # Force a real interval-0 context (as if the previous pick had been
+    # interval 0), then confirm the real internal weighted-interval
+    # mechanism reflects the markov row: every draw comes out as 7, not
+    # the marginal 1/3-1/3-1/3 split `weights` alone would produce.
+    picks = []
+    for _ in range(30):
+        vl.last_interval = 0  # re-force the same real context every draw
+        picks.append(vl._weighted_interval())
+    assert all(p == 7 for p in picks)
 
 
 # -- ARC ------------------------------------------------------------------------

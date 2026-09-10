@@ -237,6 +237,80 @@ def test_validate_preset_rejects_lead_vocab_weight_out_of_range():
         validate_preset(bad, tunings, expected_id="bogus")
 
 
+# -- real, corpus-derived vocab.markov / lead_vocab.markov -------------------
+
+
+def test_load_preset_accepts_a_real_optional_markov_table(tmp_path):
+    tunings = load_tunings()
+    with_markov = dict(
+        BASE_VALID_PRESET,
+        vocab={"weights": {"0": 10, "7": 4}, "motion": 0.2, "markov": {"0": {"7": 80, "0": 20}}},
+    )
+    path = tmp_path / "bogus.json"
+    path.write_text(json.dumps(with_markov))
+    preset = load_preset(path, tunings)
+    assert preset.vocab.markov == {0: {7: 80, 0: 20}}
+
+
+def test_load_preset_markov_absent_is_none(tmp_path):
+    tunings = load_tunings()
+    path = tmp_path / "bogus.json"
+    path.write_text(json.dumps(BASE_VALID_PRESET))
+    preset = load_preset(path, tunings)
+    assert preset.vocab.markov is None
+
+
+def test_validate_preset_rejects_markov_row_out_of_range():
+    tunings = load_tunings()
+    bad = dict(
+        BASE_VALID_PRESET,
+        vocab={"weights": {"0": 10, "7": 4}, "motion": 0.2, "markov": {"15": {"0": 100}}},
+    )
+    with pytest.raises(ValueError):
+        validate_preset(bad, tunings, expected_id="bogus")
+
+
+def test_validate_preset_rejects_markov_inner_weight_out_of_range():
+    tunings = load_tunings()
+    bad = dict(
+        BASE_VALID_PRESET,
+        vocab={"weights": {"0": 10, "7": 4}, "motion": 0.2, "markov": {"0": {"15": 100}}},
+    )
+    with pytest.raises(ValueError):
+        validate_preset(bad, tunings, expected_id="bogus")
+
+
+def test_validate_preset_rejects_negative_markov_weight():
+    tunings = load_tunings()
+    bad = dict(
+        BASE_VALID_PRESET,
+        vocab={"weights": {"0": 10, "7": 4}, "motion": 0.2, "markov": {"0": {"7": -5}}},
+    )
+    with pytest.raises(ValueError):
+        validate_preset(bad, tunings, expected_id="bogus")
+
+
+def test_blend_presets_markov_cell_union_when_both_sides_have_data():
+    from dataclasses import replace
+
+    from presets import Vocab, blend_presets as _blend
+
+    presets = load_all_presets()
+    a = replace(presets["djent"], vocab=replace(presets["djent"].vocab, markov={0: {7: 100}}))
+    b = replace(presets["metalcore"], vocab=replace(presets["metalcore"].vocab, markov={0: {3: 100}}))
+    mid = _blend(a, b, 0.5)
+    assert mid.vocab.markov[0][7] == pytest.approx(50.0)
+    assert mid.vocab.markov[0][3] == pytest.approx(50.0)
+
+
+def test_blend_presets_markov_none_when_neither_side_has_data():
+    presets = load_all_presets()
+    a, b = presets["djent"], presets["metalcore"]
+    assert a.vocab.markov is None and b.vocab.markov is None
+    blended = blend_presets(a, b, 0.5)
+    assert blended.vocab.markov is None
+
+
 # -- preset id aliases: old band-linked ids resolve, never a second preset --
 
 def test_resolve_preset_id_maps_old_band_ids():

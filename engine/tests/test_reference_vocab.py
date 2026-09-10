@@ -101,6 +101,27 @@ def test_analyze_midi_reference_finds_the_real_root_heavy_vocab(tmp_path):
     assert track["register_high"] == _ROOT + 7
 
 
+def test_analyze_midi_reference_captures_a_real_alternating_transition(tmp_path):
+    # A deliberately ALTERNATING pattern (root, P5, root, P5, ...) -- the
+    # marginal `interval_vocab_pct` would report a boring, uninformative
+    # 50/50 root-vs-P5 split for this data (order-independent), but the
+    # real sequence has a strong, deterministic structure: interval 0 is
+    # ALWAYS followed by interval 7, and vice versa. Proves
+    # `interval_transition_counts` captures that real structure the
+    # marginal histogram cannot.
+    alternating = [_ROOT, _ROOT + 7] * 10
+    path = tmp_path / "ref.mid"
+    _write_midi_reference(path, alternating)
+
+    result = rv.analyze_midi_reference(path)
+    track = result["tracks"][0]
+    transitions = track["interval_transition_counts"]
+    # After a root (0), the next interval is ALWAYS 7 -- a real, strong
+    # signal a marginal histogram would never show.
+    assert transitions[0] == {7: 10}
+    assert transitions[7] == {0: 9}
+
+
 def test_analyze_midi_reference_skips_drum_and_sparse_tracks(tmp_path):
     path = tmp_path / "ref.mid"
     pm = pretty_midi.PrettyMIDI(initial_tempo=120.0)
@@ -273,6 +294,82 @@ def test_build_preset_from_corpus_calibrates_pedal_from_string_keyed_corpus(tmp_
         corpus=corpus,
     )
     assert preset.pedal == pytest.approx(0.96, abs=0.01)
+
+
+def test_pool_transition_counts_sums_raw_counts_across_tracks():
+    tracks = [
+        {"interval_transition_counts": {0: {7: 3}, 7: {0: 2}}},
+        {"interval_transition_counts": {0: {7: 1, 3: 1}}},
+    ]
+    pooled = rv._pool_transition_counts(tracks)
+    # Row for prev=0: 7 appears 3+1=4 times, 3 appears 1 time -> total 5.
+    assert pooled[0][7] == pytest.approx(80.0)
+    assert pooled[0][3] == pytest.approx(20.0)
+    # Row for prev=7: only ever followed by 0, in one track -> 100%.
+    assert pooled[7] == {0: 100.0}
+
+
+def test_pool_transition_counts_handles_real_json_string_keys():
+    # Regression coverage for the exact class of bug caught in the real
+    # pedal-bias calibration (a corpus loaded from disk has STRING keys,
+    # not the int keys a freshly-in-memory analysis result carries).
+    tracks = [{"interval_transition_counts": {"0": {"7": 3}, "7": {"0": 2}}}]
+    pooled = rv._pool_transition_counts(tracks)
+    assert pooled[0][7] == pytest.approx(100.0)
+    assert pooled[7][0] == pytest.approx(100.0)
+
+
+def test_pool_transition_counts_none_when_no_track_has_real_data():
+    tracks = [{"interval_vocab_pct": {0: 100.0}}]  # no interval_transition_counts key
+    assert rv._pool_transition_counts(tracks) is None
+
+
+def test_build_preset_from_corpus_calibrates_a_real_markov_table(tmp_path):
+    corpus = {
+        "song_a": {
+            "tempo_bpm": 150.0,
+            "tracks": [
+                {
+                    "role_guess": "riff", "key_mode": "minor",
+                    "interval_vocab_pct": {0: 50.0, 7: 30.0, 3: 20.0},
+                    "interval_transition_counts": {0: {7: 10}, 7: {0: 9}},
+                },
+            ],
+        },
+    }
+    preset = rv.build_preset_from_corpus(
+        preset_id="test_markov_calibration",
+        description="test",
+        tuning_key="drop_g_7",
+        output_dir=tmp_path,
+        corpus=corpus,
+    )
+    assert preset.vocab.markov is not None
+    assert preset.vocab.markov[0][7] == pytest.approx(100.0)
+    # Written to and reloadable from the real preset JSON file too.
+    from presets import load_preset
+
+    reloaded = load_preset(tmp_path / "test_markov_calibration.json")
+    assert reloaded.vocab.markov[0][7] == pytest.approx(100.0)
+
+
+def test_build_preset_from_corpus_markov_none_without_transition_data(tmp_path):
+    corpus = {
+        "song_a": {
+            "tempo_bpm": 150.0,
+            "tracks": [
+                {"role_guess": "riff", "key_mode": "minor", "interval_vocab_pct": {0: 50.0, 7: 30.0, 3: 20.0}},
+            ],
+        },
+    }
+    preset = rv.build_preset_from_corpus(
+        preset_id="test_markov_fallback",
+        description="test",
+        tuning_key="drop_g_7",
+        output_dir=tmp_path,
+        corpus=corpus,
+    )
+    assert preset.vocab.markov is None
 
 
 def test_build_preset_from_corpus_calibrates_a_real_separate_lead_vocab(tmp_path):

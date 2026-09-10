@@ -29,6 +29,53 @@ from scales import get_scale
 DISSONANT = (1, 2, 6, 11)
 
 
+def _weighted_choice(items: list[tuple[int, float]], rng: random.Random) -> int:
+    """The one real accumulate-and-compare weighted pick, shared by
+    `VoiceLeader._weighted_interval` and `motif.pick_pitch_interval` --
+    previously two independent, duplicate implementations of the exact
+    same algorithm (confirmed by reading both). `items` is a real,
+    non-empty list of `(key, weight)` pairs; raises on an empty or
+    non-positive-total list rather than fabricating a pick."""
+    if not items:
+        raise ValueError("items must be non-empty")
+    total = sum(w for _key, w in items)
+    if total <= 0:
+        raise ValueError("weights must sum to a positive total")
+    r = rng.random() * total
+    acc = 0.0
+    for key, w in items:
+        acc += w
+        if r <= acc:
+            return int(key)
+    return int(items[-1][0])
+
+
+def pick_pitch_interval_markov(
+    weights: dict,
+    rng: random.Random,
+    markov: dict[int, dict[int, float]] | None,
+    prev_interval: int | None,
+) -> int:
+    """Real, corpus-informed sequence-aware interval pick: when `markov`
+    (a real, corpus-derived first-order transition table -- see
+    `reference_vocab.build_preset_from_corpus`) has a real, non-empty row
+    for `prev_interval`, draws the NEXT interval from THAT context-
+    dependent distribution instead of the static marginal `weights`.
+    Falls back to `weights` when `markov` is `None`, `prev_interval` is
+    `None` (the first pick of a phrase -- no context yet), or the corpus
+    never actually observed a transition FROM this specific interval --
+    never fabricates a distribution for an unseen context. Used by both
+    `VoiceLeader._weighted_interval` and `motif.generate_pitch_deltas`/
+    `lead.generate_sequence_line`, so a preset's real corpus-observed
+    note-to-note tendencies reach every real pitch-selection surface, not
+    just one."""
+    if markov is not None and prev_interval is not None:
+        row = markov.get(prev_interval)
+        if row:
+            return _weighted_choice(list(row.items()), rng)
+    return _weighted_choice(list((weights or {}).items()), rng)
+
+
 class Scale:
     """A root MIDI note plus a named interval set (resolved via scales.py)."""
 
@@ -129,6 +176,7 @@ class VoiceLeader:
         high: int | None = None,
         anchor: int | None = None,
         motion: float = 0.3,
+        markov: dict[int, dict[int, float]] | None = None,
     ):
         self.scale = scale
         self.weights = {
@@ -142,20 +190,33 @@ class VoiceLeader:
             self.low, self.high = self.high, self.low
         self.motion = max(0.0, min(1.0, float(motion)))
         self.last = None
+        # Real, corpus-derived first-order transition table (see
+        # `reference_vocab.build_preset_from_corpus`) -- `None` for any
+        # preset not calibrated with real sequence data, matching the
+        # rest of this project's optional-field-with-real-fallback
+        # discipline. `last_interval` tracks the PREVIOUS interval-from-
+        # anchor pick (distinct from `self.last`, which tracks the actual
+        # PITCH) -- the real context `pick_pitch_interval_markov` needs.
+        self.markov = markov
+        self.last_interval: int | None = None
 
     # -- internals ---------------------------------------------------------
     def _weighted_interval(self, exclude_root: bool = False) -> int:
-        items = [(iv, w) for iv, w in self.weights.items() if not (exclude_root and iv % 12 == 0)]
-        if not items:
-            items = list(self.weights.items()) or [(0, 1.0)]
-        total = sum(w for _iv, w in items)
-        r = self.rng.random() * total
-        acc = 0.0
-        for iv, w in items:
-            acc += w
-            if r <= acc:
-                return iv
-        return items[-1][0]
+        weights = self.weights
+        markov = self.markov
+        if exclude_root:
+            filtered = {iv: w for iv, w in weights.items() if iv % 12 != 0}
+            weights = filtered or weights
+            if markov is not None:
+                markov = {
+                    prev: ({iv: w for iv, w in row.items() if iv % 12 != 0} or row)
+                    for prev, row in markov.items()
+                }
+        if not weights:
+            weights = {0: 1.0}
+        iv = pick_pitch_interval_markov(weights, self.rng, markov, self.last_interval)
+        self.last_interval = iv
+        return iv
 
     def _place(self, pitch: int, prev: int | None) -> int:
         """Nearest register of `pitch`'s pitch class to `prev`, inside span."""

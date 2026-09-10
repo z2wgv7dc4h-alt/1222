@@ -353,7 +353,13 @@ def transcribe_and_split_registers(
     from a missing transitive dependency.
 
     Returns `{"rhythm": {"n_notes", "density_per_s", "avg_duration_s",
-    "pitch_class_counts"}, "lead": {same shape}}`.
+    "pitch_class_counts", "pitch_class_sequence"}, "lead": {same shape}}`.
+    `pitch_class_sequence` is a real, chronologically-ordered list of
+    mod-12 pitch classes ONLY (no absolute pitch, no timing) -- a compact
+    statistical intermediate for a caller to derive a real note-to-note
+    interval-TRANSITION table from (see `reference_vocab.
+    analyze_audio_reference`), distinct from `pitch_class_counts`' own
+    order-independent marginal tally.
     """
     try:
         from basic_pitch import ICASSP_2022_MODEL_PATH
@@ -375,10 +381,19 @@ def transcribe_and_split_registers(
 
     def _summarize(notes: list) -> dict[str, Any]:
         if not notes:
-            return {"n_notes": 0, "density_per_s": 0.0, "avg_duration_s": 0.0, "pitch_class_counts": {}}
+            return {
+                "n_notes": 0, "density_per_s": 0.0, "avg_duration_s": 0.0,
+                "pitch_class_counts": {}, "pitch_class_sequence": [],
+            }
+        # Real chronological order (sorted by onset time, `e[0]`) --
+        # `basic_pitch.inference.predict`'s own `note_events` return
+        # order isn't a documented guarantee, and a real interval-
+        # TRANSITION sequence (unlike a marginal pitch-class count) needs
+        # a real, honest chronological order to mean anything.
+        ordered = sorted(notes, key=lambda e: e[0])
         span = max(1e-9, (end_s if end_s is not None else max(e[1] for e in notes)) - start_s)
         pc_counts: dict[int, int] = {}
-        for e in notes:
+        for e in ordered:
             pc = int(e[2]) % 12
             pc_counts[pc] = pc_counts.get(pc, 0) + 1
         return {
@@ -386,6 +401,14 @@ def transcribe_and_split_registers(
             "density_per_s": round(len(notes) / span, 4),
             "avg_duration_s": round(sum(e[1] - e[0] for e in notes) / len(notes), 4),
             "pitch_class_counts": dict(sorted(pc_counts.items(), key=lambda kv: -kv[1])),
+            # Real, ordered mod-12 pitch classes ONLY -- never absolute
+            # pitch or timing. A compact statistical intermediate for the
+            # caller to derive a real interval-transition table from
+            # (see `reference_vocab.analyze_audio_reference`); never
+            # itself persisted to the corpus, and lossy enough (pitch
+            # CLASS only, octave/timing discarded) that it cannot
+            # reconstruct the original melody.
+            "pitch_class_sequence": [int(e[2]) % 12 for e in ordered],
         }
 
     rhythm_notes = [e for e in window if int(e[2]) < rhythm_cutoff_midi]

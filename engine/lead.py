@@ -13,8 +13,8 @@ from __future__ import annotations
 
 import random
 
-from motif import degree_delta_for_interval, pick_pitch_interval
-from theory import Scale, VoiceLeader
+from motif import degree_delta_for_interval
+from theory import Scale, VoiceLeader, pick_pitch_interval_markov
 
 __all__ = ["generate_lead_line", "generate_sequence_line"]
 
@@ -30,6 +30,7 @@ def generate_lead_line(
     num_notes: int,
     stab_chance: float = 0.15,
     stab_interval: int = 12,
+    markov: dict[int, dict[int, float]] | None = None,
 ) -> list[int]:
     """A phrase of `num_notes` pitches: `VoiceLeader.move()` (blends
     chord-tone `pick()` and stepwise `walk()` by `motion`, exactly the way
@@ -42,13 +43,23 @@ def generate_lead_line(
     `move`/`stab` produced it, so a lead line's register span is a hard
     guarantee callers (and tests) can rely on, not just true "most of the
     time."
+
+    `markov`, when given (a real, corpus-derived first-order transition
+    table -- see `reference_vocab.build_preset_from_corpus`), threads
+    straight through to the `VoiceLeader` this builds internally, making
+    every `pick()`-driven note (via `move()`) real corpus-sequence-aware
+    instead of an independent marginal draw. `markov=None` (every preset
+    that predates this feature) is byte-identical to before.
     """
     if num_notes <= 0:
         raise ValueError("num_notes must be > 0")
     if not (0.0 <= stab_chance <= 1.0):
         raise ValueError("stab_chance must be within [0, 1]")
 
-    vl = VoiceLeader(scale, weights=vocab_weights, rng=rng, low=low, high=high, anchor=anchor, motion=motion)
+    vl = VoiceLeader(
+        scale, weights=vocab_weights, rng=rng, low=low, high=high, anchor=anchor,
+        motion=motion, markov=markov,
+    )
     notes: list[int] = []
     prev = None
     for i in range(num_notes):
@@ -89,13 +100,21 @@ def generate_sequence_line(
     motif_len: int,
     num_repeats: int,
     step_degrees: int,
+    markov: dict[int, dict[int, float]] | None = None,
 ) -> list[int]:
     """A real sequence: draw ONE short motif once (`motif_len` real
     weighted-interval scale-degree deltas from `vocab_weights`), then
     repeat that EXACT relative shape `num_repeats` times, each repeat's
     anchor shifted by `step_degrees` scale degrees from `start_degree` --
     the real "same shape, moved through the scale" technique. Returns a
-    flat `list[int]` of `motif_len * num_repeats` real pitches."""
+    flat `list[int]` of `motif_len * num_repeats` real pitches.
+
+    `markov`, when given (a real, corpus-derived first-order transition
+    table), makes each pick AFTER the first depend on the PREVIOUS
+    interval actually chosen, via `theory.pick_pitch_interval_markov` --
+    the motif's own shape then reflects real corpus-observed note-to-note
+    tendencies, not just independent marginal picks. `markov=None` is
+    byte-identical to before."""
     if motif_len <= 0:
         raise ValueError("motif_len must be > 0")
     if num_repeats <= 0:
@@ -103,11 +122,13 @@ def generate_sequence_line(
 
     deltas: list[int] = []
     degree_index = 0
+    prev_interval: int | None = None
     for _ in range(motif_len):
-        iv = pick_pitch_interval(vocab_weights, rng)
+        iv = pick_pitch_interval_markov(vocab_weights, rng, markov, prev_interval)
         d = degree_delta_for_interval(scale, degree_index, iv)
         deltas.append(d)
         degree_index += d
+        prev_interval = iv
 
     notes: list[int] = []
     for r in range(num_repeats):

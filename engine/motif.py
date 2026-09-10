@@ -28,7 +28,7 @@ from dataclasses import dataclass, field
 
 from groove import gallop_cell, stutter_chug_cell
 from rhythm import duration_bias_for_feel, generate_rhythm, generate_triplet_rhythm, phrase_plan, tile_cell
-from theory import Scale, shade
+from theory import Scale, _weighted_choice, pick_pitch_interval_markov, shade
 
 __all__ = [
     "Motif",
@@ -136,24 +136,17 @@ def fragment(motif: Motif, start: int, end: int) -> Motif:
 
 
 def pick_pitch_interval(weights: dict, rng: random.Random) -> int:
-    """Weighted pick of one semitone interval (a key of `weights`), by the
-    same accumulate-and-compare scheme as `VoiceLeader._weighted_interval`,
-    but standalone so it can be reused (and its distribution tested) without
-    a full VoiceLeader/Scale context.
+    """Weighted pick of one semitone interval (a key of `weights`). A real
+    thin wrapper around `theory._weighted_choice` -- previously an
+    independent copy of the same accumulate-and-compare loop
+    `VoiceLeader._weighted_interval` also implemented; now the one real
+    shared primitive, same public signature/behavior as before (verified
+    byte-identical by this module's own distribution tests).
     """
     items = list((weights or {}).items())
     if not items:
         raise ValueError("weights must be non-empty")
-    total = sum(w for _iv, w in items)
-    if total <= 0:
-        raise ValueError("weights must sum to a positive total")
-    r = rng.random() * total
-    acc = 0.0
-    for iv, w in items:
-        acc += w
-        if r <= acc:
-            return int(iv)
-    return int(items[-1][0])
+    return _weighted_choice(items, rng)
 
 
 def degree_delta_for_interval(scale: Scale, base_degree_index: int, semitone_interval: int) -> int:
@@ -234,6 +227,7 @@ def generate_motif(
     pedal: float | None = None,
     feel: str | None = None,
     irvd_bars: int | None = None,
+    markov: dict[int, dict[int, float]] | None = None,
 ) -> Motif:
     """Generate a fresh Motif: a rhythm cell (via `rhythm.generate_rhythm`)
     plus a scale-degree contour drawn from `vocab_weights` (a preset's
@@ -290,6 +284,12 @@ def generate_motif(
     device (the tile length deliberately NOT dividing evenly into the
     section) would directly fight IRVD's verbatim-repeat-then-vary bar
     structure -- a preset uses one real device or the other, never both.
+
+    `markov`, when given (a real, corpus-derived first-order transition
+    table -- see `reference_vocab.build_preset_from_corpus`), threads
+    straight through to `generate_pitch_deltas`' own real sequence-aware
+    picking. `markov=None` (every preset that predates this feature) is
+    byte-identical to before.
     """
     if irvd_bars is not None and group_beats is not None:
         raise ValueError("irvd_bars and group_beats are mutually exclusive")
@@ -297,7 +297,7 @@ def generate_motif(
         return _generate_irvd_motif(
             irvd_bars, total_beats, allowed_lengths, hit_chance, rng, scale,
             vocab_weights, chromatic=chromatic, dissonance=dissonance,
-            base_degree=base_degree, pedal=pedal, feel=feel,
+            base_degree=base_degree, pedal=pedal, feel=feel, markov=markov,
         )
     if feel == "gallop":
         # X.32 -- the classic short-short-long metal gallop (scope sec.4:
@@ -342,6 +342,7 @@ def generate_motif(
     deltas = generate_pitch_deltas(
         hits, scale, vocab_weights, rng,
         chromatic=chromatic, dissonance=dissonance, base_degree=base_degree, pedal=pedal,
+        markov=markov,
     )
     return Motif(cell=cell, deltas=deltas)
 
@@ -363,22 +364,34 @@ def generate_pitch_deltas(
     dissonance: float = 0.85,
     base_degree: int = 0,
     pedal: float | None = None,
+    markov: dict[int, dict[int, float]] | None = None,
 ) -> list[int]:
     """Real per-hit scale-degree deltas for `hit_count` hits, walking from
     `base_degree` -- the exact same real mechanism `generate_motif`'s own
     pitch loop uses (`shade()` for chromatic bias, `apply_pedal_bias` for
-    `pedal`, then one real weighted `pick_pitch_interval` draw per hit)."""
+    `pedal`, then one real weighted interval draw per hit).
+
+    `markov`, when given (a real, corpus-derived first-order transition
+    table over interval classes -- see `reference_vocab.
+    build_preset_from_corpus`), makes each pick AFTER the first depend on
+    the PREVIOUS interval actually chosen, via `theory.
+    pick_pitch_interval_markov` -- real corpus-observed note-to-note
+    tendencies instead of an independent marginal draw every hit.
+    `markov=None` (every call site/preset that predates this feature) is
+    byte-identical to before."""
     weights = shade(vocab_weights, dissonance) if chromatic else dict(vocab_weights)
     if pedal is not None:
         weights = apply_pedal_bias(weights, pedal)
 
     deltas: list[int] = []
     degree_index = int(base_degree)
+    prev_interval: int | None = None
     for _ in range(hit_count):
-        iv = pick_pitch_interval(weights, rng)
+        iv = pick_pitch_interval_markov(weights, rng, markov, prev_interval)
         d = degree_delta_for_interval(scale, degree_index, iv)
         deltas.append(d)
         degree_index += d
+        prev_interval = iv
     return deltas
 
 
@@ -405,6 +418,7 @@ def _generate_irvd_motif(
     base_degree: int,
     pedal: float | None,
     feel: str | None,
+    markov: dict[int, dict[int, float]] | None = None,
 ) -> Motif:
     """Real bar-by-bar IRVD construction (see `generate_motif`'s docstring
     for why this exists and when it's used). `rhythm.phrase_plan(irvd_bars)`
@@ -441,7 +455,7 @@ def _generate_irvd_motif(
             bar = generate_motif(
                 bar_beats, allowed_lengths, hit_chance, rng, scale, vocab_weights,
                 chromatic=chromatic, dissonance=dissonance, base_degree=base_degree,
-                group_beats=None, pedal=pedal, feel=feel,
+                group_beats=None, pedal=pedal, feel=feel, markov=markov,
             )
             base_bar = bar
         elif label == "R":
@@ -492,6 +506,7 @@ class ThemeRegistry:
         pedal: float | None = None,
         feel: str | None = None,
         irvd_bars: int | None = None,
+        markov: dict[int, dict[int, float]] | None = None,
     ) -> Motif:
         if theme_id not in self._cache:
             self._cache[theme_id] = generate_motif(
@@ -508,6 +523,7 @@ class ThemeRegistry:
                 pedal=pedal,
                 feel=feel,
                 irvd_bars=irvd_bars,
+                markov=markov,
             )
         return self._cache[theme_id]
 

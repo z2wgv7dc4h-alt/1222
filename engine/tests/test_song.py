@@ -302,6 +302,72 @@ def test_lead_vocab_none_falls_back_to_riff_vocab_for_solo_generation():
     assert [s["lead"] for s in song_a["sections"]] == [s["lead"] for s in song_b["sections"]]
 
 
+def test_vocab_markov_field_changes_real_riff_pitch_content():
+    """A preset's real, corpus-derived `vocab.markov` (reference_vocab.
+    build_preset_from_corpus's real pooled transition table) must
+    actually change real generated rhythm-guitar riff pitch content, not
+    just sit validated and unused."""
+    exotic_markov = dataclasses.replace(
+        DJENT, vocab=dataclasses.replace(DJENT.vocab, markov={0: {6: 100.0}}),
+    )
+    default_song = _generate_attempt(random.Random(4), DJENT, num_sections=6)
+    exotic_song = _generate_attempt(random.Random(4), exotic_markov, num_sections=6)
+    default_deltas = [s["motif"].deltas for s in default_song["sections"]]
+    exotic_deltas = [s["motif"].deltas for s in exotic_song["sections"]]
+    assert default_deltas != exotic_deltas
+
+
+def test_vocab_markov_none_falls_back_to_byte_identical_riff_output():
+    """No behavior change for any preset that hasn't been calibrated with
+    a real markov table yet (every preset shipped before this feature)."""
+    assert DJENT.vocab.markov is None
+    song_a = _generate_attempt(random.Random(4), DJENT, num_sections=6)
+    song_b = _generate_attempt(random.Random(4), DJENT, num_sections=6)
+    assert [s["motif"].deltas for s in song_a["sections"]] == [s["motif"].deltas for s in song_b["sections"]]
+
+
+def test_lead_vocab_markov_field_changes_real_solo_pitch_content():
+    """Same real markov-awareness proof as the riff vocab, but for the
+    SEPARATE lead vocab reaching solo/chorus-lead generation."""
+    from presets import Vocab
+
+    exotic_lead = dataclasses.replace(
+        DJENT, lead_vocab=Vocab(weights={0: 1.0, 7: 1.0, 3: 1.0}, motion=0.7, markov={0: {6: 100.0}}),
+    )
+    default_song = None
+    exotic_song = None
+    for seed in range(11, 40):
+        candidate = _generate_attempt(random.Random(seed), DJENT, num_sections=10)
+        if any(s["role"] == "solo" for s in candidate["sections"]):
+            default_song = candidate
+            exotic_song = _generate_attempt(random.Random(seed), exotic_lead, num_sections=10)
+            break
+    assert default_song is not None, "expected at least one seed in range(11, 40) to produce a real solo section"
+    default_solo = next(s for s in default_song["sections"] if s["role"] == "solo")
+    exotic_solo = next(s for s in exotic_song["sections"] if s["role"] == "solo")
+    assert exotic_solo["lead"] != default_solo["lead"]
+
+
+def test_markov_none_stays_fully_deterministic_across_every_shipped_preset():
+    """Every preset shipped before this feature has `vocab.markov` (and
+    `lead_vocab.markov`, where `lead_vocab` exists at all) as `None` --
+    the markov plumbing added throughout `theory`/`motif`/`lead`/`song`
+    must not introduce any new source of nondeterminism into that
+    fallback path for ANY shipped preset, not just DJENT (the full
+    existing suite's own untouched assertions are the real proof this
+    matches pre-feature BEHAVIOR; this confirms it matches pre-feature
+    REPRODUCIBILITY too, seed for seed)."""
+    for preset_id, preset in load_all_presets().items():
+        song_a = _generate_attempt(random.Random(5), preset, num_sections=4)
+        song_b = _generate_attempt(random.Random(5), preset, num_sections=4)
+        assert [s["motif"].deltas for s in song_a["sections"]] == [
+            s["motif"].deltas for s in song_b["sections"]
+        ], f"preset '{preset_id}' produced non-deterministic riff output"
+        assert [s["lead"] for s in song_a["sections"]] == [
+            s["lead"] for s in song_b["sections"]
+        ], f"preset '{preset_id}' produced non-deterministic lead output"
+
+
 def test_octave_stab_field_changes_real_song_output():
     no_stab_variant = dataclasses.replace(DJENT, octave_stab=False)
 

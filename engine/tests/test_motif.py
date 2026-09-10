@@ -9,6 +9,7 @@ from motif import (
     augment,
     fragment,
     generate_motif,
+    generate_pitch_deltas,
     invert,
     pick_pitch_interval,
     render_motif,
@@ -158,6 +159,44 @@ def test_pick_pitch_interval_rejects_bad_weights():
         pick_pitch_interval({}, rng)
     with pytest.raises(ValueError):
         pick_pitch_interval({0: 0, 7: 0}, rng)
+
+
+# -- real, corpus-derived markov sequence-awareness (generate_pitch_deltas) --
+
+
+def test_generate_pitch_deltas_markov_none_is_byte_identical_to_before():
+    scale = Scale(60, "minor")
+    weights = {0: 5, 7: 3, 3: 2}
+    a = generate_pitch_deltas(12, scale, weights, random.Random(42))
+    b = generate_pitch_deltas(12, scale, weights, random.Random(42), markov=None)
+    assert a == b
+
+
+def test_generate_pitch_deltas_markov_measurably_reflects_real_transitions():
+    scale = Scale(60, "minor")
+    weights = {0: 1.0, 7: 1.0, 3: 1.0}
+    # After interval 0, ALWAYS interval 7 -- an extreme, unmistakable
+    # synthetic transition table (real corpus tables are softer, but the
+    # mechanism being tested is the same real fallback-chain logic).
+    markov = {0: {7: 100.0}}
+    with_markov = generate_pitch_deltas(30, scale, weights, random.Random(3), markov=markov)
+    without_markov = generate_pitch_deltas(30, scale, weights, random.Random(3), markov=None)
+    assert with_markov != without_markov
+
+
+def test_generate_motif_markov_pass_through_changes_real_output():
+    cell_len = 4.0
+    weights = {0: 1.0, 7: 1.0, 3: 1.0}
+    markov = {0: {7: 100.0}}
+    with_markov = generate_motif(
+        cell_len, [0.25, 0.5, 1.0], 0.9, random.Random(11), Scale(60, "minor"), weights, markov=markov,
+    )
+    without_markov = generate_motif(
+        cell_len, [0.25, 0.5, 1.0], 0.9, random.Random(11), Scale(60, "minor"), weights, markov=None,
+    )
+    assert with_markov.deltas != without_markov.deltas
+    # Same rhythm cell either way -- markov only touches pitch content.
+    assert with_markov.cell == without_markov.cell
 
 
 def test_chromatic_flag_shifts_distribution_toward_dissonant_intervals():

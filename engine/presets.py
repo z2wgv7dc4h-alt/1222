@@ -64,6 +64,15 @@ class Tuning:
 class Vocab:
     weights: dict[int, int]
     motion: float
+    # A real, corpus-derived first-order Markov transition table over
+    # interval classes (`{prev_interval: {next_interval: pct}}`), from
+    # `reference_vocab.build_preset_from_corpus`'s real corpus-observed
+    # note-to-note sequences -- `None` for any preset/vocab not
+    # calibrated against real sequence data. See `theory.
+    # pick_pitch_interval_markov` for the real fallback-to-marginal-
+    # weights behavior when this is `None` or lacks data for a given
+    # context.
+    markov: dict[int, dict[int, float]] | None = None
 
 
 @dataclass(frozen=True)
@@ -116,27 +125,51 @@ def get_tuning(key: str, tunings: dict[str, Tuning] | None = None) -> Tuning:
     return table[key]
 
 
-def _validate_vocab_shape(vocab: object, preset_id: str, field_name: str) -> None:
-    """Real shape validation shared by `vocab` (required) and
-    `lead_vocab` (optional) -- both are the same real `{weights, motion}`
-    shape, so this is one real check, not two copies to keep in sync."""
-    if not isinstance(vocab, dict) or "weights" not in vocab or "motion" not in vocab:
-        raise ValueError(f"preset '{preset_id}': '{field_name}' must have 'weights' and 'motion'")
-    weights = vocab["weights"]
-    if not isinstance(weights, dict) or not weights:
-        raise ValueError(f"preset '{preset_id}': '{field_name}.weights' must be a non-empty object")
-    for interval_str, weight in weights.items():
+def _validate_interval_weight_map(weight_map: object, preset_id: str, context: str) -> None:
+    """Real, shared 0-11-interval-key + non-negative-weight bounds check --
+    used for `vocab.weights`/`lead_vocab.weights` AND every real row of a
+    `markov` transition table, so this rule lives in exactly one place,
+    not three hand-copied checks."""
+    if not isinstance(weight_map, dict) or not weight_map:
+        raise ValueError(f"preset '{preset_id}': '{context}' must be a non-empty object")
+    for interval_str, weight in weight_map.items():
         try:
             interval = int(interval_str)
         except (TypeError, ValueError):
-            raise ValueError(f"preset '{preset_id}': {field_name} interval key '{interval_str}' is not an int") from None
+            raise ValueError(f"preset '{preset_id}': {context} interval key '{interval_str}' is not an int") from None
         if not (0 <= interval <= 11):
-            raise ValueError(f"preset '{preset_id}': {field_name} interval {interval} out of 0-11 range")
+            raise ValueError(f"preset '{preset_id}': {context} interval {interval} out of 0-11 range")
         if isinstance(weight, bool) or not isinstance(weight, (int, float)) or weight < 0:
-            raise ValueError(f"preset '{preset_id}': {field_name} weight for interval {interval} must be >= 0")
+            raise ValueError(f"preset '{preset_id}': {context} weight for interval {interval} must be >= 0")
+
+
+def _validate_vocab_shape(vocab: object, preset_id: str, field_name: str) -> None:
+    """Real shape validation shared by `vocab` (required) and
+    `lead_vocab` (optional) -- both are the same real
+    `{weights, motion, markov?}` shape, so this is one real check, not
+    two copies to keep in sync. `markov`, when present, is a real,
+    corpus-derived first-order transition table (see `theory.
+    pick_pitch_interval_markov`) -- optional, since not every preset is
+    calibrated against real sequence data yet."""
+    if not isinstance(vocab, dict) or "weights" not in vocab or "motion" not in vocab:
+        raise ValueError(f"preset '{preset_id}': '{field_name}' must have 'weights' and 'motion'")
+    _validate_interval_weight_map(vocab["weights"], preset_id, f"{field_name}.weights")
     motion = vocab["motion"]
     if isinstance(motion, bool) or not isinstance(motion, (int, float)) or not (0.0 <= float(motion) <= 1.0):
         raise ValueError(f"preset '{preset_id}': '{field_name}.motion' must be within [0, 1]")
+
+    if "markov" in vocab and vocab["markov"] is not None:
+        markov = vocab["markov"]
+        if not isinstance(markov, dict) or not markov:
+            raise ValueError(f"preset '{preset_id}': '{field_name}.markov' must be a non-empty object when present")
+        for prev_str, row in markov.items():
+            try:
+                prev = int(prev_str)
+            except (TypeError, ValueError):
+                raise ValueError(f"preset '{preset_id}': {field_name}.markov key '{prev_str}' is not an int") from None
+            if not (0 <= prev <= 11):
+                raise ValueError(f"preset '{preset_id}': {field_name}.markov interval {prev} out of 0-11 range")
+            _validate_interval_weight_map(row, preset_id, f"{field_name}.markov[{prev}]")
 
 
 def validate_preset(
@@ -211,13 +244,30 @@ def validate_preset(
             raise ValueError(f"preset '{preset_id}': 'pedal' must be within [0, 1] when present")
 
 
+def _parse_vocab(vocab_data: dict) -> Vocab:
+    """Real, shared JSON-dict-to-`Vocab` parsing (int-keyed `weights`,
+    real `motion`, optional real int-keyed-nested `markov`) -- used for
+    both the main `vocab` and the optional `lead_vocab`, one place, not
+    two hand-copied constructions."""
+    markov_data = vocab_data.get("markov")
+    markov = (
+        {int(prev): {int(nxt): w for nxt, w in row.items()} for prev, row in markov_data.items()}
+        if markov_data is not None
+        else None
+    )
+    return Vocab(
+        weights={int(k): v for k, v in vocab_data["weights"].items()},
+        motion=float(vocab_data["motion"]),
+        markov=markov,
+    )
+
+
 def load_preset(path: Path, tunings: dict[str, Tuning] | None = None) -> Preset:
     """Load and validate one preset JSON file. The validator runs here, on
     the real load path -- not just available for tests to call directly."""
     table = tunings if tunings is not None else load_tunings()
     data = json.loads(path.read_text())
     validate_preset(data, table, expected_id=path.stem)
-    vocab_data = data["vocab"]
     return Preset(
         id=data["id"],
         description=data["description"],
@@ -230,20 +280,10 @@ def load_preset(path: Path, tunings: dict[str, Tuning] | None = None) -> Preset:
         open_chance=float(data["open_chance"]),
         octave_stab=data["octave_stab"],
         kick=data["kick"],
-        vocab=Vocab(
-            weights={int(k): v for k, v in vocab_data["weights"].items()},
-            motion=float(vocab_data["motion"]),
-        ),
+        vocab=_parse_vocab(data["vocab"]),
         group=data.get("group"),
         pedal=(float(data["pedal"]) if data.get("pedal") is not None else None),
-        lead_vocab=(
-            Vocab(
-                weights={int(k): v for k, v in data["lead_vocab"]["weights"].items()},
-                motion=float(data["lead_vocab"]["motion"]),
-            )
-            if data.get("lead_vocab") is not None
-            else None
-        ),
+        lead_vocab=(_parse_vocab(data["lead_vocab"]) if data.get("lead_vocab") is not None else None),
     )
 
 
@@ -259,15 +299,21 @@ def blend_presets(preset_a: Preset, preset_b: Preset, t: float) -> Preset:
     (the union of both presets' real interval keys -- a key only one side
     declares is treated as weight 0 on the other side, not dropped),
     `dissonance`, `vocab.motion`, `pedal` (a preset that leaves `pedal`
-    `None` is treated as `0.0` for the blend, not skipped), and
-    `lead_vocab` (a preset that leaves `lead_vocab` `None` falls back to
-    its OWN `vocab` for the blend -- the same real fallback solo
-    generation itself uses -- so the blended result always carries a
-    real, non-`None` `lead_vocab`). Every STRUCTURAL field (tuning_key,
-    scale, bpm, bars, feel, kick, group, octave_stab, open_chance, id,
-    description) comes from `preset_a` UNCHANGED -- blending two
-    different tunings or scales isn't well-defined, a deliberate,
-    documented scope boundary, not an oversight."""
+    `None` is treated as `0.0` for the blend, not skipped), `lead_vocab`
+    (a preset that leaves `lead_vocab` `None` falls back to its OWN
+    `vocab` for the blend -- the same real fallback solo generation
+    itself uses -- so the blended result always carries a real,
+    non-`None` `lead_vocab`), and `vocab.markov`/`lead_vocab.markov` (a
+    real, corpus-derived transition table -- a side missing real markov
+    data is treated as an entirely empty table for the blend, same
+    "missing treated as 0" convention as `weights`' own blend; the
+    blended result's `markov` is `None` only when NEITHER side has any
+    real transition data at all, never a fabricated table). Every
+    STRUCTURAL field (tuning_key, scale, bpm, bars, feel, kick, group,
+    octave_stab, open_chance, id, description) comes from `preset_a`
+    UNCHANGED -- blending two different tunings or scales isn't
+    well-defined, a deliberate, documented scope boundary, not an
+    oversight."""
     if not (0.0 <= t <= 1.0):
         raise ValueError("t must be within [0, 1]")
 
@@ -277,6 +323,7 @@ def blend_presets(preset_a: Preset, preset_b: Preset, t: float) -> Preset:
         for k in keys
     }
     motion = preset_a.vocab.motion * (1 - t) + preset_b.vocab.motion * t
+    markov = _blend_markov(preset_a.vocab.markov, preset_b.vocab.markov, t)
     dissonance = preset_a.dissonance * (1 - t) + preset_b.dissonance * t
     pedal_a = preset_a.pedal if preset_a.pedal is not None else 0.0
     pedal_b = preset_b.pedal if preset_b.pedal is not None else 0.0
@@ -290,6 +337,7 @@ def blend_presets(preset_a: Preset, preset_b: Preset, t: float) -> Preset:
         for k in lead_keys
     }
     lead_motion = lead_a.motion * (1 - t) + lead_b.motion * t
+    lead_markov = _blend_markov(lead_a.markov, lead_b.markov, t)
 
     return Preset(
         id=preset_a.id,
@@ -303,11 +351,39 @@ def blend_presets(preset_a: Preset, preset_b: Preset, t: float) -> Preset:
         open_chance=preset_a.open_chance,
         octave_stab=preset_a.octave_stab,
         kick=preset_a.kick,
-        vocab=Vocab(weights=weights, motion=motion),
+        vocab=Vocab(weights=weights, motion=motion, markov=markov),
         group=preset_a.group,
         pedal=pedal,
-        lead_vocab=Vocab(weights=lead_weights, motion=lead_motion),
+        lead_vocab=Vocab(weights=lead_weights, motion=lead_motion, markov=lead_markov),
     )
+
+
+def _blend_markov(
+    markov_a: dict[int, dict[int, float]] | None,
+    markov_b: dict[int, dict[int, float]] | None,
+    t: float,
+) -> dict[int, dict[int, float]] | None:
+    """Real cell-by-cell blend of two `Vocab.markov` transition tables --
+    union of every `(prev, next)` pair across both, missing treated as 0
+    on whichever side lacks it (same convention `blend_presets` already
+    uses for `vocab.weights`). Returns `None`, never an empty `{}`, when
+    NEITHER side has any real transition data -- a blend of nothing
+    stays honestly nothing, not a fabricated table."""
+    a = markov_a or {}
+    b = markov_b or {}
+    if not a and not b:
+        return None
+    blended: dict[int, dict[int, float]] = {}
+    for prev in set(a) | set(b):
+        row_a = a.get(prev, {})
+        row_b = b.get(prev, {})
+        row = {
+            nxt: row_a.get(nxt, 0) * (1 - t) + row_b.get(nxt, 0) * t
+            for nxt in set(row_a) | set(row_b)
+        }
+        if row:
+            blended[prev] = row
+    return blended or None
 
 
 def load_all_presets(presets_dir: Path | None = None) -> dict[str, Preset]:

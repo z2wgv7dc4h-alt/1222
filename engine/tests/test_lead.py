@@ -122,3 +122,50 @@ def test_sequence_line_negative_step_descends():
     )
     degrees = [scale.index_of(p) for p in notes]
     assert degrees[0] > degrees[1] > degrees[2]
+
+
+# -- real, corpus-derived markov sequence-awareness --------------------------
+
+
+def test_lead_line_markov_none_is_byte_identical_to_before():
+    scale = Scale(56, "minor")
+    weights = {0: 5.0, 7: 3.0, 3: 2.0}
+    a = generate_lead_line(scale, weights, 0.4, random.Random(9), 50, 70, 56, num_notes=20)
+    b = generate_lead_line(scale, weights, 0.4, random.Random(9), 50, 70, 56, num_notes=20, markov=None)
+    assert a == b
+
+
+def test_lead_line_markov_measurably_changes_real_output():
+    scale = Scale(56, "minor")
+    weights = {0: 1.0, 7: 1.0, 3: 1.0}
+    markov = {0: {7: 100.0}}
+    with_markov = generate_lead_line(
+        scale, weights, 0.0, random.Random(4), 40, 80, 56, num_notes=30, stab_chance=0.0, markov=markov,
+    )
+    without_markov = generate_lead_line(
+        scale, weights, 0.0, random.Random(4), 40, 80, 56, num_notes=30, stab_chance=0.0, markov=None,
+    )
+    assert with_markov != without_markov
+
+
+def test_sequence_line_markov_none_is_byte_identical_to_before():
+    scale = Scale(56, "minor")
+    weights = {0: 5.0, 7: 3.0, 3: 2.0}
+    a = generate_sequence_line(scale, weights, random.Random(6), 0, motif_len=5, num_repeats=3, step_degrees=1)
+    b = generate_sequence_line(
+        scale, weights, random.Random(6), 0, motif_len=5, num_repeats=3, step_degrees=1, markov=None,
+    )
+    assert a == b
+
+
+def test_sequence_line_markov_measurably_changes_real_output():
+    scale = Scale(56, "minor")
+    weights = {0: 1.0, 7: 1.0, 3: 1.0}
+    markov = {0: {7: 100.0}}
+    with_markov = generate_sequence_line(
+        scale, weights, random.Random(2), 0, motif_len=6, num_repeats=2, step_degrees=1, markov=markov,
+    )
+    without_markov = generate_sequence_line(
+        scale, weights, random.Random(2), 0, motif_len=6, num_repeats=2, step_degrees=1, markov=None,
+    )
+    assert with_markov != without_markov

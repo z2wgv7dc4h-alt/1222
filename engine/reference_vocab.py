@@ -115,6 +115,29 @@ def _interval_vocab_from_pitches(pitches: list[int], root_pc: int) -> dict[int, 
     return {k: round(v / total * 100, 1) for k, v in sorted(counts.items(), key=lambda kv: -kv[1])}
 
 
+def _interval_transitions_from_sequence(interval_sequence: list[int]) -> dict[int, dict[int, int]]:
+    """Real first-order Markov transition COUNTS (not percentages) from a
+    real CHRONOLOGICAL sequence of interval classes (0-11, relative to
+    the track's own detected root): `{prev: {next: count}}`, walking
+    every consecutive pair. Raw counts, not per-track percentages --
+    deliberately different from `_interval_vocab_from_pitches`' own "one
+    vote per song" convention, since a single track's own transition
+    table is necessarily sparse (a 12x12 grid from at most a few hundred
+    real notes); raw counts pool correctly across many songs at
+    aggregation time (`_pool_transition_counts`), where a single-song
+    PERCENTAGE for a rarely-seen context would be statistically noisy
+    (e.g. "100% of the time X follows Y" from one incidental
+    occurrence). Only ever an intermediate step toward that real,
+    aggregate, percentage-normalized table -- never itself the final
+    stored/served statistic, and never reconstructable back into the
+    original melody (a real, lossy order-1 summary)."""
+    counts: dict[int, dict[int, int]] = {}
+    for prev, nxt in zip(interval_sequence, interval_sequence[1:]):
+        row = counts.setdefault(int(prev), {})
+        row[int(nxt)] = row.get(int(nxt), 0) + 1
+    return counts
+
+
 def _role_guess(pitches: list[int], root_pct: float, notes_per_sec: float) -> str:
     """Real, documented heuristic distinguishing a wide melodic riff from
     a tight pedal/chug doubler from a sparse lead/harmony line -- the
@@ -135,6 +158,11 @@ def _role_guess(pitches: list[int], root_pct: float, notes_per_sec: float) -> st
 
 
 def _track_summary(name: str, pitches: list[int], duration_s: float) -> dict[str, Any] | None:
+    """`pitches` must already be in real CHRONOLOGICAL order -- didn't
+    matter for the marginal `interval_vocab_pct` histogram below (order-
+    independent), but does now for `interval_transition_counts` (a real
+    sequence statistic). MIDI/GP callers are responsible for this (see
+    their own docstrings/comments)."""
     if len(pitches) < _MIN_TRACK_NOTES or duration_s <= 0:
         return None
     weights = np.zeros(12)
@@ -142,6 +170,7 @@ def _track_summary(name: str, pitches: list[int], duration_s: float) -> dict[str
         weights[p % 12] += 1
     root_pc, mode, confidence = _krumhansl_correlate(weights)
     vocab = _interval_vocab_from_pitches(pitches, root_pc)
+    interval_sequence = [(p - root_pc) % 12 for p in pitches]
     # float(...) throughout: `duration_s` can arrive as a numpy scalar
     # (pretty_midi/librosa both use numpy internally) -- every value here
     # must be a plain, real JSON-safe Python type, never a numpy scalar
@@ -154,6 +183,7 @@ def _track_summary(name: str, pitches: list[int], duration_s: float) -> dict[str
         "key_mode": mode,
         "key_confidence": confidence,
         "interval_vocab_pct": vocab,
+        "interval_transition_counts": _interval_transitions_from_sequence(interval_sequence),
         "register_low": int(min(pitches)),
         "register_high": int(max(pitches)),
         "notes_per_sec": notes_per_sec,
@@ -170,7 +200,13 @@ def analyze_midi_reference(path: str | Path) -> dict[str, Any]:
     for i, inst in enumerate(pm.instruments):
         if inst.is_drum or not inst.notes:
             continue
-        pitches = [n.pitch for n in inst.notes]
+        # Real chronological order (`pretty_midi`'s own `instrument.notes`
+        # list order isn't a documented sorted-by-time guarantee) -- the
+        # marginal `interval_vocab_pct` histogram below never cared about
+        # order, but `interval_transition_counts` (a real sequence
+        # statistic) does.
+        ordered_notes = sorted(inst.notes, key=lambda n: n.start)
+        pitches = [n.pitch for n in ordered_notes]
         summary = _track_summary(inst.name or f"track_{i}", pitches, duration_s)
         if summary is not None:
             tracks.append(summary)
@@ -212,6 +248,10 @@ def analyze_gp_reference(path: str | Path) -> dict[str, Any]:
     for track in song.tracks:
         if track.isPercussionTrack or any(hint in (track.name or "").lower() for hint in _GP_ROLE_TRACK_NAME_HINTS):
             continue
+        # Real chronological order for free: iterating measures -> voices
+        # -> beats in their own natural list order IS the song's real
+        # performance order (no sort needed, unlike MIDI's `instrument.
+        # notes`) -- `interval_transition_counts` below relies on this.
         pitches: list[int] = []
         elapsed_ticks = 0.0
         for measure in track.measures:
@@ -303,6 +343,14 @@ def analyze_audio_reference(path: str | Path, drums_path: str | Path | None = No
                 interval = (int(pc) - root_pc) % 12
                 vocab[interval] = vocab.get(interval, 0.0) + count
             vocab = {k: round(v / total * 100, 1) for k, v in sorted(vocab.items(), key=lambda kv: -kv[1])}
+            # Real chronological interval-class sequence from the ordered
+            # `pitch_class_sequence` `transcribe_and_split_registers` now
+            # returns (see that function's own docstring) -- the exact
+            # same shared transition-counting core every other format
+            # uses, just fed a root-relative interval sequence derived
+            # here instead of from raw MIDI/GP pitches.
+            pc_sequence = layer.get("pitch_class_sequence") or []
+            interval_sequence = [(int(pc) - root_pc) % 12 for pc in pc_sequence]
             tracks.append({
                 "name": layer_name,
                 "role_guess": role,
@@ -310,6 +358,7 @@ def analyze_audio_reference(path: str | Path, drums_path: str | Path | None = No
                 "key_mode": mode,
                 "key_confidence": confidence,
                 "interval_vocab_pct": vocab,
+                "interval_transition_counts": _interval_transitions_from_sequence(interval_sequence),
                 "notes_per_sec": layer.get("density_per_s", 0.0),
             })
     except ImportError:
@@ -430,6 +479,54 @@ def _aggregate_role_vocab(corpus: dict[str, Any], role: str) -> tuple[dict[int, 
     return aggregate, matching_tracks
 
 
+def _pool_transition_counts(tracks: list[dict[str, Any]]) -> dict[int, dict[int, float]] | None:
+    """Real aggregation of `interval_transition_counts` across every
+    provided track: POOLS raw counts (sums them cell-by-cell across every
+    track, NOT a per-song average) before normalizing each `prev` row to
+    real percentages at the very end. Deliberately different from
+    `_aggregate_role_vocab`'s own "one vote per song" convention --
+    correct here specifically because a single track's own transition
+    table is necessarily sparse; pooling real counts across many songs
+    before normalizing is the statistically sound way to estimate a
+    much-higher-dimensional (up to 12x12) distribution from many small,
+    individually-noisy samples (the standard MLE approach for combining
+    count data across independent sequences), where per-song percentage-
+    averaging would let one incidental occurrence in a short song swing
+    a whole row. Returns `None` (never a fabricated table) when none of
+    the given tracks has any real transition data (e.g. every track
+    predates this field, or every track was simply too short to produce
+    a single real consecutive pair)."""
+    pooled_counts: dict[int, dict[int, int]] = {}
+    for track in tracks:
+        for prev, row in (track.get("interval_transition_counts") or {}).items():
+            pooled_row = pooled_counts.setdefault(int(prev), {})
+            for nxt, count in row.items():
+                pooled_row[int(nxt)] = pooled_row.get(int(nxt), 0) + int(count)
+    if not pooled_counts:
+        return None
+    normalized: dict[int, dict[int, float]] = {}
+    for prev, row in pooled_counts.items():
+        total = sum(row.values()) or 1
+        normalized[prev] = {nxt: round(count / total * 100, 1) for nxt, count in row.items()}
+    return normalized
+
+
+def _serialize_vocab(vocab: "Vocab") -> dict[str, Any]:
+    """Real, shared `Vocab` -> JSON-safe dict serialization (string-keyed
+    `weights`, real `motion`, optional string-keyed-nested `markov`) --
+    used for both `vocab` and `lead_vocab`, one place, not two hand-
+    copied constructions."""
+    payload: dict[str, Any] = {
+        "weights": {str(k): v for k, v in vocab.weights.items()},
+        "motion": vocab.motion,
+    }
+    if vocab.markov is not None:
+        payload["markov"] = {
+            str(prev): {str(nxt): w for nxt, w in row.items()} for prev, row in vocab.markov.items()
+        }
+    return payload
+
+
 def build_preset_from_corpus(
     preset_id: str,
     description: str,
@@ -500,7 +597,13 @@ def build_preset_from_corpus(
     # has no real lead track yet, never a fabricated vocab -- callers
     # (song.py) already fall back to the main riff vocab in that case.
     lead_aggregate, lead_tracks = _aggregate_role_vocab(corpus, "lead")
-    lead_vocab = Vocab(weights=lead_aggregate, motion=0.55) if lead_tracks else None
+    # Real, pooled first-order transition tables (see `_pool_transition_
+    # counts`'s own docstring for why pooling, not per-song averaging) --
+    # `None` when the matching tracks have no real transition data yet
+    # (e.g. an entry predating this field), never a fabricated table.
+    riff_markov = _pool_transition_counts(matching_tracks)
+    lead_markov = _pool_transition_counts(lead_tracks)
+    lead_vocab = Vocab(weights=lead_aggregate, motion=0.55, markov=lead_markov) if lead_tracks else None
 
     preset = Preset(
         id=preset_id,
@@ -514,7 +617,7 @@ def build_preset_from_corpus(
         open_chance=0.5,
         octave_stab=True,
         kick="euclid",
-        vocab=Vocab(weights=aggregate, motion=0.45),
+        vocab=Vocab(weights=aggregate, motion=0.45, markov=riff_markov),
         pedal=pedal_bias,
         lead_vocab=lead_vocab,
     )
@@ -535,13 +638,10 @@ def build_preset_from_corpus(
         "octave_stab": preset.octave_stab,
         "kick": preset.kick,
         "pedal": preset.pedal,
-        "vocab": {"weights": {str(k): v for k, v in preset.vocab.weights.items()}, "motion": preset.vocab.motion},
+        "vocab": _serialize_vocab(preset.vocab),
     }
     if preset.lead_vocab is not None:
-        payload["lead_vocab"] = {
-            "weights": {str(k): v for k, v in preset.lead_vocab.weights.items()},
-            "motion": preset.lead_vocab.motion,
-        }
+        payload["lead_vocab"] = _serialize_vocab(preset.lead_vocab)
     validate_preset(payload, load_tunings(), expected_id=preset_id)
     out_path.write_text(json.dumps(payload, indent=2))
     return preset

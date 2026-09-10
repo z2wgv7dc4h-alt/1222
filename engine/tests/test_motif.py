@@ -453,6 +453,40 @@ def test_generate_motif_irvd_bars_produces_real_irvd_shape():
     assert d_deltas == v_deltas + v_deltas
 
 
+def test_generate_motif_irvd_consecutive_d_bars_do_not_compound():
+    """Regression test for a real, measured bug: `phrase_plan(8) ==
+    ["I","R","R","V","V","V","D","D"]` -- TWO consecutive "D" bars for
+    any real preset with `bars >= 8`. Halving an already-halved bar a
+    SECOND time compounds durations down to a real 64th-note subdivision
+    (0.25 -> 0.125 -> 0.0625 beats), which measurably read as chaotic
+    "random drum spam" in real generated output once other layers of
+    clutter were cut (direct user listening feedback, 2026-09-11) -- kick/
+    snare lock to the guitar's own cell durations, so this compounding
+    reached the drums too. The second "D" must now repeat the FIRST "D"
+    bar's own already-fragmented result verbatim, never halve again."""
+    from rhythm import phrase_plan
+
+    assert phrase_plan(8) == ["I", "R", "R", "V", "V", "V", "D", "D"]
+
+    scale = Scale(52, "minor")
+    weights = {0: 10, 3: 5, 7: 5}
+    rng = random.Random(9)
+    m = generate_motif(32.0, [0.25, 0.5, 1.0], 0.6, rng, scale, weights, irvd_bars=8)
+
+    bars = _bar_slices(m.cell, m.deltas, 4.0, 8)
+    (d1_cells, d1_deltas), (d2_cells, d2_deltas) = bars[6], bars[7]
+
+    # The second D bar is a real, exact repeat of the first D bar --
+    # never a further-halved version of it.
+    assert d2_cells == d1_cells
+    assert d2_deltas == d1_deltas
+    # And the first D bar's own durations must stay at a real, single
+    # halving of the preceding V bar -- never below that floor.
+    v_cells = bars[5][0]
+    assert [c["duration"] for c in d1_cells] == [c["duration"] / 2 for c in v_cells] * 2
+    assert min(c["duration"] for c in d1_cells) >= 0.125 - 1e-9
+
+
 def test_generate_motif_irvd_bars_single_bar_matches_plain_generation():
     """phrase_plan(1) == ["I"] only -- IRVD with a single bar must reduce
     to exactly the same construction (and rng consumption) as not using

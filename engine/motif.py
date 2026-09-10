@@ -436,7 +436,20 @@ def _generate_irvd_motif(
          fast, refilling the bar exactly (0.5 + 0.5 == 1.0 of the bar) --
          real "fragment and densify", derived from whatever bar came
          immediately before it (real forward momentum into the next
-         section), not always reaching back to "I".
+         section), not always reaching back to "I". Only the FIRST "D" in
+         a real consecutive run halves -- `phrase_plan`'s own real formula
+         (`d = bars // 4`) produces MULTIPLE consecutive "D" labels for
+         any `bars >= 8` (confirmed: `phrase_plan(8) == [..., "D", "D"]`),
+         and halving a bar that's already been halved compounds --
+         0.25 -> 0.125 -> 0.0625 beats, a real 64th-note subdivision that
+         measurably read as chaotic "random drum spam" once every other
+         layer of clutter was cut (direct user listening feedback,
+         2026-09-11). A second (or third...) consecutive "D" instead
+         repeats the FIRST "D" bar's own already-fragmented result
+         verbatim -- same real principle "R" already uses for "I", just
+         applied to "D"'s own output -- keeping the real "faster,
+         fragmenting" character of a D-run audible without unbounded
+         compounding.
 
     Every bar's cell/deltas are concatenated in label order into one Motif
     spanning the full `total_beats` -- exactly what a non-IRVD
@@ -448,6 +461,8 @@ def _generate_irvd_motif(
 
     base_bar: Motif | None = None
     previous_bar: Motif | None = None
+    first_d_bar: Motif | None = None
+    prev_label: str | None = None
     cells: list[dict] = []
     deltas: list[int] = []
     for label in labels:
@@ -462,15 +477,24 @@ def _generate_irvd_motif(
             bar = Motif(cell=[dict(c) for c in base_bar.cell], deltas=list(base_bar.deltas))
         elif label == "V":
             bar = transpose(base_bar, _IRVD_VARIATION_DEGREES)
-        else:  # "D"
+        elif prev_label == "D":
+            # A real, CONSECUTIVE "D" -- reuse the first D bar's own
+            # already-fragmented result verbatim (real "R"-for-"D"),
+            # never a second halving of an already-halved bar. See this
+            # function's own docstring for the real, measured evidence
+            # this compounding caused.
+            bar = Motif(cell=[dict(c) for c in first_d_bar.cell], deltas=list(first_d_bar.deltas))
+        else:  # the FIRST "D" in a real run
             half = augment(previous_bar, 0.5)
             bar = Motif(
                 cell=half.cell + [dict(c) for c in half.cell],
                 deltas=half.deltas + list(half.deltas),
             )
+            first_d_bar = bar
         cells.extend(bar.cell)
         deltas.extend(bar.deltas)
         previous_bar = bar
+        prev_label = label
 
     return Motif(cell=cells, deltas=deltas)
 

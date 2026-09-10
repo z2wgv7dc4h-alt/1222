@@ -111,7 +111,7 @@ from motif import (
     transpose,
 )
 from rhythm import duration_bias_for_feel, generate_rhythm
-from performance import double_track
+from performance import double_track, humanize_take
 from presets import Preset, get_tuning, load_all_presets, load_tunings, resolve_preset_id
 from progression import CHORUS_PROGRESSIONS, VERSE_PROGRESSIONS, pitches_per_cell_with_progression
 from riff import harmonize_line
@@ -274,6 +274,19 @@ _SOLO_SEQUENCE_REPEATS = 4
 # Born-of-Osiris research finding) -- see the dense-chug `else` branch of
 # `_generate_one_section` for the full real citation.
 _SYNTH_DOUBLE_TRANSPOSE = 12
+
+# Real, second, genuinely-different rhythm-guitar part -- a near-
+# monophonic low pedal/chug doubler, distinct from the wide, melodic
+# guitar_take_a/take_b pair (which are the SAME riff double-tracked for
+# stereo width, per scope sec.17.1). Found via direct measurement of a
+# real user-supplied Born-of-Osiris-style reference MIDI (2026-09-10):
+# its own "Guitar 2" track was 95.9% root-note, in a tight 1-octave-low
+# register, a genuinely separate musical idea from "Guitar 1"'s wider,
+# more melodic riff -- not another humanized copy of it. Weights below
+# are the real measured interval percentages from that track (root/P4/
+# M3/m6/P5), converted to engine weight units; see `_pedal_double_
+# pitches`'s own docstring for the full real citation.
+_PEDAL_DOUBLE_WEIGHTS = {0: 96.0, 5: 2.0, 4: 1.0, 8: 0.5, 7: 0.5}
 
 
 def _resolve_tempo_drop(section_bpm: float, trigger_beat: float | None) -> dict | None:
@@ -482,6 +495,36 @@ def _snap_to_playable_octave(fretboard: Fretboard, pitch: int) -> int:
     raise ValueError(f"pitch {pitch} has no reachable octave on this fretboard")
 
 
+def _pedal_double_pitches(
+    guitar_cells: list[dict], scale: Scale, guitar_fb: Fretboard, rng: random.Random,
+) -> list[int | None]:
+    """Real per-cell pitches for the pedal/chug doubler guitar
+    (`section["guitar_pedal"]`) -- a genuinely separate second rhythm-
+    guitar part, not another double-tracked copy of the main riff. See
+    `_PEDAL_DOUBLE_WEIGHTS`' own module comment for the full real
+    measured-reference citation (a real user-supplied Born-of-Osiris-
+    style MIDI's own "Guitar 2" track: 95.9% root, tight low register,
+    genuinely distinct from "Guitar 1"'s wider melodic riff).
+
+    Draws deltas from that heavily root-biased vocab via the exact same
+    real `generate_pitch_deltas` mechanism the main guitar's own pitch
+    layer uses, anchored at `start_degree=0` (no `arc_row["register"]`
+    offset -- keeps this part in the section's own low, tight register,
+    matching the real reference), reusing the SAME rhythm cells as the
+    main guitar (`guitar_cells`, a deliberate simplification -- see
+    `_generate_one_section`'s own comment on the real production
+    precedent for a rhythmically-locked low doubler). Every resulting
+    pitch is snapped through the same real `_snap_to_playable_octave`
+    every other guitar pitch in this project already gets, for a real,
+    reachable `(string, fret)` -- never a fabricated note.
+    """
+    hit_count = sum(1 for c in guitar_cells if not c["is_rest"])
+    deltas = generate_pitch_deltas(hit_count, scale, _PEDAL_DOUBLE_WEIGHTS, rng)
+    pedal_motif = Motif(cell=guitar_cells, deltas=deltas)
+    raw_pitches = pitches_per_cell(pedal_motif, scale, start_degree=0)
+    return [None if p is None else _snap_to_playable_octave(guitar_fb, p) for p in raw_pitches]
+
+
 # X.14 -- real listening feedback ("not much is going on") traced to a
 # real architectural limitation: ThemeRegistry keys a base theme by ROLE
 # ALONE, so every occurrence of that role for the WHOLE SONG reused just
@@ -677,6 +720,29 @@ def _generate_one_section(
         guitar_cells, random.Random(seed_a), random.Random(seed_b),
         open_chance=preset.open_chance,
     )
+
+    # Real, second, genuinely-different rhythm-guitar part -- see
+    # `_PEDAL_DOUBLE_WEIGHTS`' own module comment for the full real
+    # measured-reference citation. Skipped for chill/interlude, which
+    # stay deliberately quiet/atmospheric (X.9/X.11/X.22 already keep
+    # kick/snare/hihat silent there); a heavy root chug would contradict
+    # that same silence contract. A single take (not double-tracked --
+    # this is a tight, discrete low layer, not part of the wide-stereo
+    # pair), reusing `guitar_cells`' own rhythm (locked timing, a real
+    # production precedent -- a "low string doubler" commonly follows
+    # the main riff's picking rhythm exactly, and this avoids an
+    # independently-generated rhythm stream needing its own cross-
+    # section-blending/kick-lock consideration for a single reference's
+    # ambiguous density difference).
+    if role not in ("chill", "interlude"):
+        pedal_pitches_per_cell = _pedal_double_pitches(guitar_cells, scale, guitar_fb, rng)
+        pedal_seed = rng.randrange(2**31)
+        guitar_pedal = humanize_take(
+            guitar_cells, random.Random(pedal_seed), open_chance=preset.open_chance,
+        )
+    else:
+        pedal_pitches_per_cell = []
+        guitar_pedal = []
 
     # X.24 -- resolve the STYLE explicitly (rather than calling
     # drums.kick_pattern_for_role directly) so it can be stored and
@@ -949,6 +1015,8 @@ def _generate_one_section(
         "pitches_per_cell": cell_pitches,
         "guitar_take_a": take_a,
         "guitar_take_b": take_b,
+        "guitar_pedal": guitar_pedal,
+        "pedal_pitches_per_cell": pedal_pitches_per_cell,
         "lead_mode": lead_mode,
         "lead": lead_notes,
         "legato": legato,
@@ -1073,6 +1141,16 @@ def _generate_attempt(
         # empty synth_double, never populated).
         this_section["synth_double"] = _pickup_values(
             this_section["synth_double"], next_section["synth_double"]
+        )
+        # Same real per-cell blend for the new pedal/chug doubler guitar
+        # -- keeps it index-aligned with guitar_take_a/take_b, same
+        # unconditional-safety reasoning as synth_double above (empty on
+        # chill/interlude, never populated there).
+        this_section["guitar_pedal"] = _pickup_cells(
+            this_section["guitar_pedal"], next_section["guitar_pedal"]
+        )
+        this_section["pedal_pitches_per_cell"] = _pickup_values(
+            this_section["pedal_pitches_per_cell"], next_section["pedal_pitches_per_cell"]
         )
 
         # Real, "do it properly" extension: bass and (the guitar-locking
@@ -1333,6 +1411,12 @@ def regenerate_section(
         )
         this_section["synth_double"] = _pickup_values(
             this_section["synth_double"], next_section["synth_double"]
+        )
+        this_section["guitar_pedal"] = _pickup_cells(
+            this_section["guitar_pedal"], next_section["guitar_pedal"]
+        )
+        this_section["pedal_pitches_per_cell"] = _pickup_values(
+            this_section["pedal_pitches_per_cell"], next_section["pedal_pitches_per_cell"]
         )
         this_section["bass"] = follow_guitar_rhythm(
             this_section["guitar_take_a"], this_section["pitches_per_cell"], bass_fb

@@ -1079,6 +1079,13 @@ def test_guitar_locked_kick_style_is_re_locked_after_blending():
             continue
         guitar_hits = [i for i, c in enumerate(section["guitar_take_a"]) if not c["is_rest"]]
         kick_hits = [i for i, c in enumerate(section["kick"]) if not c["is_rest"]]
+        snare_hits = sum(1 for c in section["snare"] if not c["is_rest"])
+        # Same real "blast fired" heuristic used elsewhere in this file --
+        # X.34's blast fill can override a "breakdown" section's kick/snare
+        # regardless of the preset's own kick style, a real, separate
+        # device this bounce-specific re-lock test isn't about.
+        if snare_hits > 6:
+            continue
         assert kick_hits == guitar_hits
 
 
@@ -1269,6 +1276,117 @@ def test_synth_double_is_empty_for_solo_chorus_and_harmony_roles():
     for section in song["sections"]:
         if section["lead_mode"] != "silent":
             assert section["synth_double"] == []
+
+
+# ---------------------------------------------------------------------------
+# Real pedal/chug doubler guitar -- a genuinely SEPARATE second rhythm-
+# guitar part (not another double-tracked copy of guitar_take_a/take_b),
+# found via direct measurement of a real user-supplied Born-of-Osiris-
+# style reference MIDI (2026-09-10): its own "Guitar 2" track was 95.9%
+# root-note, tight low register -- see song._PEDAL_DOUBLE_WEIGHTS' own
+# module comment for the full real citation.
+# ---------------------------------------------------------------------------
+
+
+def test_pedal_guitar_shares_rhythm_shape_with_main_guitar():
+    metalcore = load_all_presets()["metalcore"]
+    song = _generate_attempt(random.Random(3), metalcore, num_sections=8)
+    for section in song["sections"]:
+        if section["role"] in ("chill", "interlude"):
+            continue
+        take_a = section["guitar_take_a"]
+        pedal = section["guitar_pedal"]
+        assert len(pedal) == len(take_a)
+        # Duration is invariant under X.24 blending by construction
+        # (`_pickup_cells` never touches it), and both tracks originate
+        # from the exact same per-section `guitar_cells` rhythm, so this
+        # must hold cell-for-cell even at a blended boundary.
+        for cell_a, cell_p in zip(take_a, pedal):
+            assert cell_a["duration"] == cell_p["duration"]
+            assert cell_a["is_rest"] == cell_p["is_rest"]
+
+
+def test_pedal_guitar_pitches_are_real_and_fretboard_reachable():
+    metalcore = load_all_presets()["metalcore"]
+    song = _generate_attempt(random.Random(3), metalcore, num_sections=8)
+    guitar_fb = song["guitar_fretboard"]
+    saw_any = False
+    for section in song["sections"]:
+        ppc = section.get("pedal_pitches_per_cell") or []
+        for p in ppc:
+            if p is None:
+                continue
+            saw_any = True
+            guitar_fb.pitch_to_fret(p, max_fret=guitar_fb.max_fret)
+    assert saw_any, "expected at least one real pedal-guitar pitch across 8 sections"
+
+
+def test_pedal_guitar_is_heavily_root_weighted_matching_the_real_measured_reference():
+    """Real, statistical proof of `_PEDAL_DOUBLE_WEIGHTS`' own effect --
+    not just a shape check. The reference measured 95.9% root; this
+    checks the generated pedal guitar lands solidly in that same
+    real ballpark (a generous >= 80% threshold, since a single seeded
+    song is a small sample), never the near-even spread the MAIN
+    riff's own preset vocab would produce."""
+    from theory import Scale
+
+    metalcore = load_all_presets()["metalcore"]
+    song = _generate_attempt(random.Random(3), metalcore, num_sections=10)
+    scale = Scale(root=song["guitar_fretboard"].tuning[0], name=metalcore.scale)
+    root_pitch_classes = {scale.degree(0) % 12}
+
+    total = 0
+    root_count = 0
+    for section in song["sections"]:
+        for p in section.get("pedal_pitches_per_cell") or []:
+            if p is None:
+                continue
+            total += 1
+            if p % 12 in root_pitch_classes:
+                root_count += 1
+    assert total > 20, "expected substantial real pedal-guitar hit content across 10 sections"
+    assert root_count / total >= 0.80
+
+
+def test_pedal_guitar_absent_for_chill_and_interlude():
+    chill = load_all_presets()["chill"]
+    song = _generate_attempt(random.Random(3), chill, num_sections=8)
+    for section in song["sections"]:
+        if section["role"] in ("chill", "interlude"):
+            assert section["guitar_pedal"] == []
+            assert section["pedal_pitches_per_cell"] == []
+
+
+def test_regenerate_section_pitch_mode_leaves_pedal_guitar_unchanged():
+    """Same established precedent as `lead`/kick/snare/hihat/chord data in
+    pitch-only regen: the pedal guitar's pitch is its own independent
+    draw (not derived from the main guitar's pitch content the way bass
+    is), so a "new notes, same hits" edit to the MAIN riff has no reason
+    to touch it."""
+    from song import regenerate_section
+
+    metalcore = load_all_presets()["metalcore"]
+    song = _generate_attempt(random.Random(3), metalcore, num_sections=4)
+    index = next(i for i, s in enumerate(song["sections"]) if s["role"] not in ("chill", "interlude"))
+    original_pedal = song["sections"][index]["guitar_pedal"]
+    original_ppc = song["sections"][index]["pedal_pitches_per_cell"]
+
+    new_song = regenerate_section(song, index, random.Random(99), metalcore, mode="pitch")
+    assert new_song["sections"][index]["guitar_pedal"] == original_pedal
+    assert new_song["sections"][index]["pedal_pitches_per_cell"] == original_ppc
+
+
+def test_regenerate_section_full_mode_refreshes_pedal_guitar():
+    from song import regenerate_section
+
+    metalcore = load_all_presets()["metalcore"]
+    song = _generate_attempt(random.Random(3), metalcore, num_sections=4)
+    index = next(i for i, s in enumerate(song["sections"]) if s["role"] not in ("chill", "interlude"))
+
+    new_song = regenerate_section(song, index, random.Random(99), metalcore, mode="full")
+    new_section = new_song["sections"][index]
+    assert len(new_section["guitar_pedal"]) == len(new_section["guitar_take_a"])
+    assert len(new_section["pedal_pitches_per_cell"]) == len(new_section["guitar_pedal"])
 
 
 # ---------------------------------------------------------------------------

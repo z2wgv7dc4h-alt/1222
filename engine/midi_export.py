@@ -62,6 +62,17 @@ should double/harmonize the riff nearly continuously, not just during
 solo/chorus/chill. `atmosphere.synth_double` itself has existed and been
 tested since P7.2, but `song.py` never actually called it in production
 generation until this fix -- `section["synth_double"]` is real, new data.
+
+Also written (same day, found by directly parsing a real user-supplied
+Born-of-Osiris-style reference MIDI rather than guessing at genre
+convention): a real "Guitar (Pedal)" track -- `section["guitar_pedal"]`/
+`section["pedal_pitches_per_cell"]`, a genuinely SEPARATE, near-
+monophonic low pedal/chug rhythm-guitar part, not another double-tracked
+copy of `guitar_take_a`/`take_b`. The reference's own "Guitar 2" track
+measured 95.9% root-note content in a tight low register -- a real,
+distinct second musical idea, not the same riff panned wide. See
+`song._PEDAL_DOUBLE_WEIGHTS`'s own module comment for the full real
+measured citation.
 """
 from __future__ import annotations
 
@@ -110,6 +121,7 @@ _LEAD_CHANNEL = 3
 _PAD_CHANNEL = 4
 _ACCENT_CHANNEL = 5
 _SYNTH_DOUBLE_CHANNEL = 6
+_PEDAL_CHANNEL = 7
 _DEFAULT_VELOCITY = 100
 
 
@@ -288,6 +300,25 @@ def _synth_double_events_for_section(section: dict, start_beat: float, ppq: int)
     return _cell_events(section["guitar_take_a"], pitches, start_beat, ppq)
 
 
+def _pedal_events_for_section(section: dict, start_beat: float, ppq: int) -> list[tuple[int, int, int, int]]:
+    """Real events for the pedal/chug doubler guitar
+    (`section["guitar_pedal"]`/`section["pedal_pitches_per_cell"]`) -- a
+    genuinely separate second rhythm-guitar part, not another double-
+    tracked copy of `guitar_take_a`/`take_b` (see `song._PEDAL_DOUBLE_
+    WEIGHTS`' own module comment for the full real measured-reference
+    citation). Already stored PER-CELL (`None` on rest) and index-
+    aligned with its own `guitar_pedal` cells (`song.py`'s `_pickup_
+    cells`/`_pickup_values` blend the pair together the identical real
+    way `guitar_take_a`/`pitches_per_cell` are blended), so this is a
+    direct `_cell_events` call -- empty for chill/interlude sections,
+    which never populate it."""
+    cells = section.get("guitar_pedal") or []
+    pitches = section.get("pedal_pitches_per_cell") or []
+    if not cells or not pitches:
+        return []
+    return _cell_events(cells, pitches, start_beat, ppq)
+
+
 def _pad_events_for_section(
     section: dict, start_beat: float, section_beats: float, ppq: int
 ) -> list[tuple[int, int, int, int]]:
@@ -448,6 +479,7 @@ def song_to_midi(song: dict, path: str | Path, ppq: int = 480) -> None:
     pad_events: list[tuple[int, int, int, int]] = []
     accent_events: list[tuple[int, int, int, int]] = []
     synth_double_events: list[tuple[int, int, int, int]] = []
+    pedal_events: list[tuple[int, int, int, int]] = []
 
     guitar_fb = song["guitar_fretboard"]
     start_beat = 0.0
@@ -477,6 +509,7 @@ def song_to_midi(song: dict, path: str | Path, ppq: int = 480) -> None:
         drum_events += _cell_events(section["hihat"], hihat_pitches, start_beat, ppq)
         lead_events += _lead_events_for_section(section, start_beat, ppq)
         synth_double_events += _synth_double_events_for_section(section, start_beat, ppq)
+        pedal_events += _pedal_events_for_section(section, start_beat, ppq)
         section_beats = _section_beats(section)
         pad_events += _pad_events_for_section(section, start_beat, section_beats, ppq)
         accent_events += _accent_events_for_section(section, start_beat, ppq)
@@ -497,6 +530,9 @@ def song_to_midi(song: dict, path: str | Path, ppq: int = 480) -> None:
     midi_file.tracks.append(_events_to_track(accent_events, _ACCENT_CHANNEL, ORCH_HIT_PROGRAM, "Accents"))
     midi_file.tracks.append(
         _events_to_track(synth_double_events, _SYNTH_DOUBLE_CHANNEL, SYNTH_DOUBLE_PROGRAM, "Synth")
+    )
+    midi_file.tracks.append(
+        _events_to_track(pedal_events, _PEDAL_CHANNEL, _GUITAR_PROGRAM, "Guitar (Pedal)")
     )
 
     midi_file.save(str(path))

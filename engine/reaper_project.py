@@ -49,6 +49,7 @@ from midi_export import (
     _LEAD_CHANNEL,
     _LEAD_PROGRAM,
     _PAD_CHANNEL,
+    _PEDAL_CHANNEL,
     _SYNTH_DOUBLE_CHANNEL,
     _accent_events_for_section,
     _beats_to_ticks,
@@ -56,6 +57,7 @@ from midi_export import (
     _chord_cell_events,
     _lead_events_for_section,
     _pad_events_for_section,
+    _pedal_events_for_section,
     _section_beats,
     _synth_double_events_for_section,
 )
@@ -243,6 +245,7 @@ def song_to_rpp(song: dict, path: str | Path) -> None:
     pad_events: list[tuple[int, int, int, int]] = []
     accent_events: list[tuple[int, int, int, int]] = []
     synth_double_events: list[tuple[int, int, int, int]] = []
+    pedal_events: list[tuple[int, int, int, int]] = []
 
     section_start_beats: list[float] = []
     section_start_seconds: list[float] = []
@@ -280,6 +283,7 @@ def song_to_rpp(song: dict, path: str | Path) -> None:
         drum_events += _cell_events(section["hihat"], hihat_pitches, start_beat, _PPQ)
         lead_events += _lead_events_for_section(section, start_beat, _PPQ)
         synth_double_events += _synth_double_events_for_section(section, start_beat, _PPQ)
+        pedal_events += _pedal_events_for_section(section, start_beat, _PPQ)
 
         beats = _section_beats(section)
         pad_events += _pad_events_for_section(section, start_beat, beats, _PPQ)
@@ -409,8 +413,8 @@ def song_to_rpp(song: dict, path: str | Path) -> None:
     # Drums stays LAST -- tests/test_reaper_project.py locates the drum
     # track's real <SOURCE MIDI> block via "the last one in the file"
     # (`text.rindex`), same real convention as this list's own prior
-    # ordering; Pad/Accents are new real tracks inserted before it, not
-    # appended after.
+    # ordering; Pad/Accents/Synth/Guitar (Pedal) are all real tracks
+    # inserted before it, not appended after.
     tracks = [
         ("Guitar (Take A)", _GUITAR_A_CHANNEL, guitar_a_events, 1),
         ("Guitar (Take B)", _GUITAR_B_CHANNEL, guitar_b_events, 2),
@@ -419,7 +423,8 @@ def song_to_rpp(song: dict, path: str | Path) -> None:
         ("Pad", _PAD_CHANNEL, pad_events, 5),
         ("Accents", _ACCENT_CHANNEL, accent_events, 6),
         ("Synth", _SYNTH_DOUBLE_CHANNEL, synth_double_events, 7),
-        ("Drums", _DRUM_CHANNEL, drum_events, 8),
+        ("Guitar (Pedal)", _PEDAL_CHANNEL, pedal_events, 8),
+        ("Drums", _DRUM_CHANNEL, drum_events, 9),
     ]
     for name, channel, events, item_id in tracks:
         lines += _track_block(name, channel, events, total_seconds, item_id)

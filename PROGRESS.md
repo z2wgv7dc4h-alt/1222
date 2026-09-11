@@ -1,3 +1,10 @@
+# PROGRESS (archive)
+
+Do not treat this file as the queue. State: `docs/CURRENT.md`. Next box: `TASKS.md`. Decisions: `docs/DECISIONS.md`.
+This log is kept so session detail is not lost. New work does not append X.* novels here.
+
+---
+
 # PROGRESS
 
 ## 2026-09-08 — knowledge-chat close

@@ -29,3 +29,10 @@ engine/data/ml_corpus/
 engine/models/
 *.pt
 *.pth
+
+# Real, per-fragment semitone-delta/duration/role data extracted verbatim
+# from real Guitar Pro tabs (riff_bank.py) -- more directly the source
+# songs' own melodic content than even ml_corpus/ above, so it gets at
+# least the same local-only posture. The raw source tab files themselves
+# already fall under the blanket reference/ ignore above.
+engine/data/riff_bank.json

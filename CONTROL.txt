@@ -1,96 +1,27 @@
-GOD TIER METAL — how you drive FCC
+GOD TIER METAL — FCC
+
 Folder: Desktop\god-tier-metal
 Remote: https://github.com/z2wgv7dc4h-alt/1222
+Lab: tools\boo-lab   (START.bat)   also https://github.com/z2wgv7dc4h-alt/boo-lab
 
-==================================================
-EVERY WORK SESSION (almost all you type)
-==================================================
-  /next
+Do NOT type /next as a habit. It used to walk a novel and invent X devices.
 
-That is the main command. It:
-  - reads CURRENT.md + first unchecked TASKS box
-  - if the box is P1+: reads SCOPE-INDEX.md and only those scope headings
-  - enters plan-then-do for THAT box only
+SESSION
+  1. Read docs\CURRENT.md
+  2. Read TASKS.md ## Now
+  3. Do that box only
+  4. pytest
+  5. Stop. /clear if starting another box
 
-When it finishes a turn, Stop hook should:
-  - update CURRENT.md TASKS.md PROGRESS.md
-  - git add / commit
-  - git push if origin exists
+Labelling CDs is tools\boo-lab\START.bat — not an engine ticket.
 
-You then type:
-
-  /clear
-
-and again:
-
-  /next
-
-Two commands per box. That is the intended hands-off loop.
-
-==================================================
 COMMANDS
-==================================================
-/next     Do the next TASKS checkbox. Use this every time.
-/scope    Open the right scope headings only. Use if /next skipped them.
-/port     Port one symbol from reference\ using PORTS.md. Use when
-          the task says "Port VoiceLeader" etc.
-/close    Force doc+git bookkeeping if Stop did not.
-/clear    New empty chat. You must type this. Hooks cannot.
-/plan     Plan mode (or Shift+Tab). Use if it starts coding blind.
-/compact  Only if the window is huge AND you are mid-box.
-          Prefer /clear after a finished box.
+  /plan     look first
+  /close    docs if you were asked to bookkeep
+  /clear    new chat
+  /port     only when the ticket says Port …
 
-Shift+Tab  Cycle permission mode.
-           Leave Auto OFF when you walk away.
-           Plan = look, don't edit.
+Auto OFF when you walk away. No overnight Auto.
 
-==================================================
-WHAT IS AUTOMATIC
-==================================================
-- SessionStart injects CURRENT.md + Next list + "scope file present?"
-- P1+ /next is told to open scope headings
-- Writes outside this repo / into Ww or 123 are blocked
-- Every tool call is logged under .claude\logs\
-- Chat is copied before compact
-- Stop tries to run the close skill (docs + commit + push)
-
-==================================================
-WHAT IS NOT AUTOMATIC (you still do)
-==================================================
-- /next to start a box
-- /clear after a box (or the same chat will start the next box)
-- Shift+Tab off Auto if you leave the machine
-- First git identity + first push (once)
-- Unpacking assets/reference/scope file (once)
-- Saying "no" if it tries to rewrite Ww or rebuild 123
-- Checking pytest paste before you believe DONE
-
-==================================================
-IF IT GOES SIDEWAYS
-==================================================
-It ignores scope
-  Type /scope then "continue the same box only"
-
-It starts Phase 8 during Phase 0
-  "Stop. Only the first unchecked box in TASKS.md ## Next."
-
-It cannot find assets
-  Unpack the reference bundle. P0.2 is supposed to halt.
-
-Git push asks for login
-  GitHub account z2wgv7dc4h-alt, PAT as password if needed.
-
-CURRENT.md stale after a turn
-  Type /close
-
-Waiting for API / retry
-  FCC server must be running. Same folder.
-
-==================================================
-DO NOT
-==================================================
-- Open Claude Code in 123 or Ww
-- Type "read the whole scope doc"
-- Leave Auto on overnight
-- Expect /clear to happen by itself
-- Commit assets\ or reference\
+LAW: docs\DECISIONS.md and CLAUDE.md
+ARCHIVE: PROGRESS.md and git ac047fd

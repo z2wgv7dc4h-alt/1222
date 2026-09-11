@@ -1,32 +1,16 @@
 # PLAN
 
-## Architecture
-```
-preset JSON → Fretboard + Scale + RNG(seed)
-     → Rhythm layer (cells / tile-polymeter / polyrhythm / blasts)
-     → Pitch layer (VoiceLeader + motif contour)
-     → Structure (sections, flatten+pickup, judge)
-     → MIDI / preview
-     → Reaper buses (gtr/bass/drums separate) + NAM/sfizz
-     → Editor talks to engine over localhost
-```
+preset JSON → fretboard + scale + seed
+  → rhythm cells (tile / IRVD / feels)
+  → pitch: labyrinth bank tile | other presets theory/Markov
+  → structure + ThemeRegistry
+  → MIDI / GM preview
+  → .rpp (P8.1). NAM/buses later
+  → editor localhost
 
-## Built vs intended
-- Built: Phase 0 (repo); Phase 1 (tonal+presets); Phase 2 (rhythm: two-layer gen, polymeter, polyrhythm, tuplets, blasts, shared rhythm id, IRVD); Phase 3 (motif, incl. theme development); Phase 4 (drums: roles, kick/snare/hihat styles, fills, blasts); Phase 5 (bass); Phase 6 (structure); Phase 7 (atmosphere); Phase 8 partial (real `.rpp` export, P8.1 -- pivoted from the originally-planned live reapy bridge, see PORTS.md/TASKS.md; FX-chain presets, P8.3, still open); Phase 10 partial (real MIDI export, P10.1; song JSON and further calibration, P10.2/P10.3, still open). Real 8-preset lineup (djent/tech/metalcore/deathcore/melodic/chill/groovy/progressive, no slam), each cross-checked against real reference material (an original MIDI, an original tab file, an original sheet-music transcription, all user-confirmed non-commercial). 515+ tests passing on `main` (see docs/STATUS.md for the current exact count). Reference code exists under `/reference`. Assets exist under `/assets`.
-- Intended: engine complete through Phase 7 before editor or mix polish. Phase 7 is now done; remaining engine work is Phase 8/10 cleanup plus Phase 9 (editor UI), not started.
+Done as engineering: Phases 0–7 devices, P8.1, P9 editor surface, P10.1 MIDI, labyrinth bank wire.
 
-## Phases (exit test)
-0. Repo + pytest hello — `pytest` collects ≥1 pass; assets present. **DONE.**
-1. Tonal+presets — unplayable note rejected; invalid JSON rejected; glob loads every preset; scales unique; VoiceLeader/shade/ARC ported and density derived not settable; chord-shape solver returns real fingerings only. **DONE (159 passed).**
-2. Rhythm — seed-identical; 7-into-16 tile drifts; polyrhythm ≠ tile fn; tuplets real grids; zero-weight blast type never picked; IRVD matches the real `phrase_plan` source exactly. **DONE (159 passed).**
-3. Motif — same contour at two roots; develop keeps rhythm/pitch length equal; cross-section theme id reused; call-and-response references another part's hits; chord solver actually called from the riff path.
-4. Drums — roles map + fallback (no China sample -> falls back to a configured substitute); kick locks guitar accents on breakdown fixture; fills/blasts reuse a shared rhythm id.
-5. Bass — own fretboard (not a copy of guitar's); follows guitar's rhythm exactly; own playability via its own `pitch_to_fret`, falls back to nearest reachable octave rather than raising or fabricating.
-6. Structure — weighted form incl. an atmospheric-interlude section type; flatten+pickup; wired modulation; judge fails a bad fixture; tempo curve exists as internal song data even though Reaper export stays one constant tempo (§17.5).
-7. Atmosphere — GM pad/hit first; synth copies motif contour.
-8. Reaper — separate buses; one FX chain applies; no premix; reapy-boost (not unmaintained reapy); Surge XT + Supermassive per §14.1.
-9. Editor — timeline + guided sliders + preview; section-level save/load presets distinct from song-level style presets.
-10. Export — MIDI stems + song JSON + full export matrix (tab/notation PDF, .rpp) per §14.2 items 10-11.
+Not done as music: one BoO riff that repeats.
+Not done as studio: P8.2–P8.8.
 
-## Non-goals
-Vocals. Audio-model-as-writer. Visible Reaper as the editor. Mix heroics before Phase 3 data is real.
+Non-goals: vocals, audio-as-writer, Reaper as the editor, mix heroics before a riff exists.

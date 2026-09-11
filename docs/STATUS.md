@@ -1,5 +1,14 @@
 # STATUS
 
+Listen is not a row you may tick from pytest.
+
+- labyrinth seed-1 demo: user rejected (medley / GM). 2026-09-12
+- bank wired + ThemeRegistry.seed: WIRED+TESTED (803 engine)
+- P8.2-P8.8: MISSING
+
+Wiring table below is historical pytest evidence. Counts differ by day. Do not treat a higher count as a better song.
+
+
 Legend: MISSING | SCAFFOLD | WIRED+TESTED
 
 Update only after grep or pytest. No memory claims.

@@ -18,3 +18,14 @@ reference/
 *.nam
 *.zip
 editor/backend/data/
+
+# Real, per-song ordered token sequences used to train the riff model --
+# close enough to the source songs' actual melodic content (a real
+# transcription, not just aggregate statistics) that it must stay
+# local-only, same posture as reference/ and the raw audio itself.
+engine/data/ml_corpus/
+# Trained model weights -- derived from the same real, non-redistributable
+# transcribed data above, kept local-only for the same reason.
+engine/models/
+*.pt
+*.pth

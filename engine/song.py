@@ -115,10 +115,70 @@ from performance import double_track, humanize_take
 from presets import Preset, get_tuning, load_all_presets, load_tunings, resolve_preset_id
 from progression import CHORUS_PROGRESSIONS, VERSE_PROGRESSIONS, pitches_per_cell_with_progression
 from riff import harmonize_line
+import riff_model
 from structure import generate_section_sequence, judge, tempo_at
 from theory import Scale, VoiceLeader, arc
 
 __all__ = ["compose_song", "compose_song_from_preset", "regenerate_section", "pitches_per_cell"]
+
+# Genuinely, deliberately scoped to ONE preset -- see the approved plan
+# ("Real, local, trained riff-generation model for Born of Osiris ONLY").
+# Every other preset keeps its existing Markov/statistical riff generation
+# completely untouched.
+_RIFF_MODEL_PRESET_ID = "labyrinth"
+
+
+def _try_riff_model_motif(
+    preset: Preset, role: str, arc_row: dict, scale: Scale, base_degree: int,
+    total_beats: float, rng: random.Random,
+) -> Motif | None:
+    """Real, corpus-trained riff generation for `labyrinth` ONLY, when a
+    trained checkpoint is actually present locally -- `None` (falling back
+    to the existing `theme_source`/Markov path unchanged) for every other
+    preset, and for `labyrinth` itself on any checkout without a trained
+    model file (the checkpoint is gitignored/local-only, see riff_model.py's
+    own docstring on why).
+
+    v2 -- real section-role awareness, added after direct listening
+    feedback that v1's model output had zero awareness of which role it
+    was writing for, making every section sound undifferentiated:
+      - `arc_row["energy"]` (the SAME real value already driving this
+        section's `hit_chance`) is threaded through as `arc_energy`,
+        conditioning the model's own sampling on real section intensity
+        (see `riff_model.generate_riff_motif`/`energy_bucket_from_arc_
+        energy`).
+      - `role == "verse"` gets the SAME real pedal-bias character
+        `_VERSE_PEDAL_BIAS` already gives the OLD Markov path, restored
+        via a real post-hoc pull (`riff_model.apply_pedal_bias_to_motif`)
+        since the model has no `weights` dict to bias before generation.
+
+    Draws real values from `rng` to seed the model's own separate
+    deterministic generator (and, for verse, the pedal-pull draws) -- but
+    ONLY inside this branch, so a checkout with no trained checkpoint
+    (every automated test, and any fresh clone) consumes the exact same
+    rng stream as before this function existed; zero behavior change for
+    anyone not opted in.
+
+    A real `RuntimeError` (the memorization-threshold safeguard) or
+    `FileNotFoundError` here falls back to `None` rather than crashing
+    song generation -- an untrained/over-memorizing model degrades to the
+    existing real generation path, never a hard failure.
+    """
+    if preset.id != _RIFF_MODEL_PRESET_ID:
+        return None
+    if not riff_model.DEFAULT_CHECKPOINT_PATH.exists():
+        return None
+    seed = rng.randrange(2**31)
+    try:
+        motif = riff_model.generate_riff_motif(
+            seed=seed, scale=scale, base_degree=base_degree, total_beats=total_beats,
+            arc_energy=arc_row["energy"],
+        )
+    except (FileNotFoundError, RuntimeError):
+        return None
+    if role == "verse":
+        motif = riff_model.apply_pedal_bias_to_motif(motif, _VERSE_PEDAL_BIAS, rng)
+    return motif
 
 # A section is `preset.bars` bars of 4/4; slots are sixteenth/eighth/quarter
 # notes -- a reasonable default vocabulary for chug-driven metal rhythm.
@@ -709,32 +769,38 @@ def _generate_one_section(
     if motif_override is not None:
         m: Motif = motif_override
     else:
-        base_theme = theme_source(
-            f"theme-{role}", total_beats, _ALLOWED_LENGTHS,
-            hit_chance,
-            rng, scale, preset.vocab.weights, chromatic=chromatic,
-            dissonance=arc_row["dissonance"],
-            base_degree=arc_row["start_degree"],
-            group_beats=(float(preset.group) if preset.group is not None else None),
-            # X.31 -- verse forces a real, strong pedal bias regardless of
-            # what the preset's own `.pedal` declares (same precedent as
-            # X.11's build/solo kick overlay overriding `preset.kick`):
-            # Metalerator's real verse riff (RGuitarPedalToneRiff) is ~65%
-            # root note, occasional colored upper-scale-degree note -- a
-            # distinct, sparser character than the preset's own general
-            # riffing, not just "verse again with whatever pedal happens to
-            # be set."
-            pedal=(_VERSE_PEDAL_BIAS if role == "verse" else preset.pedal),
-            feel=section_feel,
-            # X.19 -- real IRVD phrase development (bar-by-bar
-            # intro/repeat/vary/destroy shape) for every preset EXCEPT
-            # djent/progressive, whose real `group_beats` polymeter tiling
-            # is a different, already-real "something happens across the
-            # section" device that IRVD's verbatim-repeat structure would
-            # directly fight (see motif.generate_motif's docstring).
-            irvd_bars=(preset.bars if preset.group is None else None),
-            markov=preset.vocab.markov,
+        riff_model_theme = _try_riff_model_motif(
+            preset, role, arc_row, scale, arc_row["start_degree"], total_beats, rng,
         )
+        if riff_model_theme is not None:
+            base_theme = riff_model_theme
+        else:
+            base_theme = theme_source(
+                f"theme-{role}", total_beats, _ALLOWED_LENGTHS,
+                hit_chance,
+                rng, scale, preset.vocab.weights, chromatic=chromatic,
+                dissonance=arc_row["dissonance"],
+                base_degree=arc_row["start_degree"],
+                group_beats=(float(preset.group) if preset.group is not None else None),
+                # X.31 -- verse forces a real, strong pedal bias regardless of
+                # what the preset's own `.pedal` declares (same precedent as
+                # X.11's build/solo kick overlay overriding `preset.kick`):
+                # Metalerator's real verse riff (RGuitarPedalToneRiff) is ~65%
+                # root note, occasional colored upper-scale-degree note -- a
+                # distinct, sparser character than the preset's own general
+                # riffing, not just "verse again with whatever pedal happens to
+                # be set."
+                pedal=(_VERSE_PEDAL_BIAS if role == "verse" else preset.pedal),
+                feel=section_feel,
+                # X.19 -- real IRVD phrase development (bar-by-bar
+                # intro/repeat/vary/destroy shape) for every preset EXCEPT
+                # djent/progressive, whose real `group_beats` polymeter tiling
+                # is a different, already-real "something happens across the
+                # section" device that IRVD's verbatim-repeat structure would
+                # directly fight (see motif.generate_motif's docstring).
+                irvd_bars=(preset.bars if preset.group is None else None),
+                markov=preset.vocab.markov,
+            )
         m = _develop_theme(base_theme, occurrence, rng)
     guitar_cells = m.cell
 

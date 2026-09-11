@@ -31,7 +31,7 @@ from __future__ import annotations
 
 import math
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 import numpy as np
 
@@ -173,6 +173,30 @@ def energy_curve(y: np.ndarray, sr: int, n_sections: int = 8) -> list[float]:
         window_mean = float(np.mean(window)) if len(window) else 0.0
         curve.append(round(window_mean / overall, 4))
     return curve
+
+
+def energy_at_time(curve: list[float], duration_s: float) -> Callable[[float], float]:
+    """Real `onset_s -> relative_energy` lookup from an `energy_curve`
+    result -- the bridge `riff_corpus.notes_to_tokens`'s own `energy_at`
+    parameter needs to turn a coarse per-section curve into a real,
+    callable per-timestamp value. Each section spans `duration_s /
+    len(curve)` real seconds; an onset past the track's own real
+    duration clamps to the last section rather than raising or
+    extrapolating past real data.
+
+    Raises `ValueError` for an empty `curve` or non-positive
+    `duration_s` -- never divides by a fabricated span."""
+    if not curve:
+        raise ValueError("curve must be non-empty")
+    if duration_s <= 0:
+        raise ValueError("duration_s must be > 0")
+    n = len(curve)
+
+    def _lookup(onset_s: float) -> float:
+        idx = min(n - 1, max(0, int(onset_s / duration_s * n)))
+        return curve[idx]
+
+    return _lookup
 
 
 def tempo_stability(y: np.ndarray, sr: int, n_windows: int = 6) -> dict[str, Any]:
@@ -414,6 +438,55 @@ def transcribe_and_split_registers(
     rhythm_notes = [e for e in window if int(e[2]) < rhythm_cutoff_midi]
     lead_notes = [e for e in window if int(e[2]) >= rhythm_cutoff_midi]
     return {"rhythm": _summarize(rhythm_notes), "lead": _summarize(lead_notes)}
+
+
+def transcribe_full_note_sequence(
+    path: str | Path,
+    start_s: float = 0.0,
+    end_s: float | None = None,
+    rhythm_cutoff_midi: int = 52,
+) -> dict[str, list[tuple[float, float, int]]]:
+    """Real, chronologically-ordered `(onset_s, duration_s, pitch_midi)`
+    per note, split into the same rhythm/lead registers as
+    `transcribe_and_split_registers` -- reuses the exact same underlying
+    `basic_pitch.inference.predict` call, never a second re-transcription.
+
+    Unlike `transcribe_and_split_registers`'s own `pitch_class_sequence`
+    (pitch class only, no timing -- a compact statistical intermediate),
+    this keeps real onset time and duration too. That is a genuine,
+    deliberate departure from this module's own established "derived
+    statistics only, never enough to reconstruct the source" discipline:
+    a full timed note sequence IS close to a real transcription of the
+    melody's shape. Callers of this function must keep its output
+    LOCAL-ONLY (never committed to git, never redistributed) -- it exists
+    specifically to build real training data for a local ML model, not to
+    extend the corpus's own committed JSON caches.
+
+    Returns `{"rhythm": [(onset_s, duration_s, pitch_midi), ...], "lead":
+    [...]}`.
+    """
+    try:
+        from basic_pitch.inference import predict
+    except ImportError as exc:
+        raise ImportError(
+            "transcribe_full_note_sequence requires 'basic_pitch' -- see "
+            "transcribe_and_split_registers's own docstring for install "
+            "instructions."
+        ) from exc
+
+    _, _, note_events = predict(str(path))
+    window = [e for e in note_events if start_s <= e[0] and (end_s is None or e[0] <= end_s)]
+    ordered = sorted(window, key=lambda e: e[0])
+
+    rhythm = [
+        (round(e[0] - start_s, 4), round(e[1] - e[0], 4), int(e[2]))
+        for e in ordered if int(e[2]) < rhythm_cutoff_midi
+    ]
+    lead = [
+        (round(e[0] - start_s, 4), round(e[1] - e[0], 4), int(e[2]))
+        for e in ordered if int(e[2]) >= rhythm_cutoff_midi
+    ]
+    return {"rhythm": rhythm, "lead": lead}
 
 
 def analyze_track(path: str | Path, n_sections: int = 8) -> dict[str, Any]:

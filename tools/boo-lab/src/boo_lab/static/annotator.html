@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>boo-lab</title>
+  <style>
+    :root {
+      --bg: #0c0c0d;
+      --panel: #161618;
+      --line: #2a2a2e;
+      --text: #e8e6e3;
+      --mute: #8a8680;
+      --riff: #c4a35a;
+      --hook: #6ea8d6;
+      --break: #c45c4a;
+      --solo: #7dba7a;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
+      font: 15px/1.4 "Segoe UI", system-ui, sans-serif; }
+    .app { display: grid; grid-template-columns: 260px 1fr; height: 100%; }
+    aside { background: var(--panel); border-right: 1px solid var(--line); display: flex; flex-direction: column; }
+    aside h1 { margin: 0; padding: 18px 16px 8px; font-size: 15px; letter-spacing: .12em; text-transform: uppercase; color: var(--mute); }
+    aside p { margin: 0 16px 12px; color: var(--mute); font-size: 12px; }
+    #list { flex: 1; overflow: auto; }
+    .t { padding: 10px 16px; cursor: pointer; border-left: 3px solid transparent; }
+    .t:hover { background: #1d1d20; }
+    .t.on { background: #1d1d20; border-left-color: var(--break); }
+    .t .name { display: block; }
+    .t .meta { display: block; font-size: 11px; color: var(--mute); }
+    .dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; margin-right: 4px; background: #3a3a3e; }
+    .dot.ok { background: #7dba7a; }
+    main { display: flex; flex-direction: column; min-width: 0; padding: 20px 28px 16px; }
+    header.now { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; }
+    header.now h2 { margin: 0; font-size: 22px; font-weight: 600; }
+    header.now span { color: var(--mute); font-size: 13px; }
+    canvas { width: 100%; height: 88px; display: block; background: #101012; border: 1px solid var(--line); cursor: pointer; margin: 18px 0 8px; }
+    #hint { color: var(--mute); font-size: 12px; min-height: 16px; }
+    .transport { display: flex; align-items: center; gap: 10px; margin: 8px 0 16px; flex-wrap: wrap; }
+    .transport button, .pins button {
+      background: #222226; color: var(--text); border: 1px solid var(--line);
+      padding: 8px 14px; font: inherit; cursor: pointer;
+    }
+    .transport button:hover, .pins button:hover { border-color: #555; }
+    .time { font-variant-numeric: tabular-nums; color: var(--mute); min-width: 7em; }
+    .pins { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+    .pins button { min-width: 7.5em; }
+    .pins button.riff { border-color: var(--riff); color: var(--riff); }
+    .pins button.hook { border-color: var(--hook); color: var(--hook); }
+    .pins button.break { border-color: var(--break); color: var(--break); }
+    .pins button.solo { border-color: var(--solo); color: var(--solo); }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--line); font-size: 14px; }
+    th { color: var(--mute); font-weight: 500; }
+    input { background: #111; color: var(--text); border: 1px solid var(--line); padding: 4px 6px; font: inherit; }
+    .foot { margin-top: auto; padding-top: 16px; color: var(--mute); font-size: 12px; }
+    .err { color: var(--break); font-size: 13px; min-height: 18px; }
+  </style>
+</head>
+<body>
+<div class="app">
+  <aside>
+    <h1>boo-lab</h1>
+    <p>Four pins. Play. Save. Next.</p>
+    <div id="list"></div>
+  </aside>
+  <main>
+    <header class="now">
+      <h2 id="title">Load a map.csv</h2>
+      <span id="sub"></span>
+    </header>
+    <canvas id="wave" height="88"></canvas>
+    <div id="hint"></div>
+    <div class="transport">
+      <button type="button" id="btnPlay">Play</button>
+      <span class="time" id="clock">0:00 / 0:00</span>
+      <button type="button" id="btnEst">Guess sections</button>
+      <button type="button" id="btnSave">Save</button>
+      <button type="button" id="btnNext">Next track</button>
+    </div>
+    <div class="pins">
+      <button type="button" class="riff" data-role="verse">Riff 1</button>
+      <button type="button" class="hook" data-role="chorus">Hook</button>
+      <button type="button" class="break" data-role="breakdown">Breakdown</button>
+      <button type="button" class="solo" data-role="solo">Solo</button>
+    </div>
+    <div class="err" id="err"></div>
+    <table>
+      <thead><tr><th>pin</th><th>start</th><th></th></tr></thead>
+      <tbody id="rows"></tbody>
+    </table>
+    <p class="foot">Space play · 1 riff · 2 hook · 3 breakdown · 4 solo · G guess · S save · N next · click wave to seek</p>
+    <audio id="audio"></audio>
+  </main>
+</div>
+<script>
+const audio = document.getElementById("audio");
+const canvas = document.getElementById("wave");
+const ctx = canvas.getContext("2d");
+const PIN_ROLES = [
+  { role: "verse", label: "Riff 1" },
+  { role: "chorus", label: "Hook" },
+  { role: "breakdown", label: "Breakdown" },
+  { role: "solo", label: "Solo" }
+];
+const COLOR = { verse: "#c4a35a", chorus: "#6ea8d6", breakdown: "#c45c4a", solo: "#7dba7a",
+  intro: "#555", outro: "#555", build: "#8a6", chill: "#446", interlude: "#446" };
+
+let tracks = [], trackId = 0, peaks = [], duration = 1, pins = [];
+
+function fmt(t) {
+  if (!isFinite(t) || t < 0) t = 0;
+  const m = Math.floor(t / 60);
+  const s = Math.floor(t % 60);
+  return m + ":" + String(s).padStart(2, "0");
+}
+function showErr(m) { document.getElementById("err").textContent = m || ""; }
+
+fetch("/api/tracks").then(r => r.json()).then(data => {
+  tracks = data.tracks || [];
+  renderList();
+  if (tracks.length) select(0);
+  else document.getElementById("title").textContent = "No tracks — run boo-lab scan";
+}).catch(() => showErr("Start with: boo-lab studio"));
+
+function renderList() {
+  const box = document.getElementById("list");
+  box.innerHTML = "";
+  tracks.forEach((t, i) => {
+    const d = document.createElement("div");
+    d.className = "t" + (i === trackId ? " on" : "");
+    d.innerHTML = "<span class=\"name\">" + (t.track || "untitled") + "</span>" +
+      "<span class=\"meta\"><span class=\"dot " + (t.has_flac ? "ok" : "") + "\"></span>flac " +
+      "<span class=\"dot " + (t.has_gp ? "ok" : "") + "\"></span>tab · " + (t.album || "") + "</span>";
+    d.onclick = () => select(i);
+    box.appendChild(d);
+  });
+}
+
+function select(i) {
+  trackId = i;
+  const t = tracks[i];
+  document.getElementById("title").textContent = t.track || "untitled";
+  document.getElementById("sub").textContent = (t.album || "") + (t.tuning ? " · " + t.tuning : "");
+  renderList();
+  showErr("");
+  pins = [];
+  peaks = [];
+  audio.src = "/api/audio/" + t.id;
+  audio.load();
+  fetch("/api/sections/" + t.id).then(r => r.json()).then(secs => {
+    const human = secs.filter(s => s.source === "human");
+    const use = human.length ? human : secs;
+    pins = use.map(s => ({ role: s.role, start: +s.start })).sort((a,b) => a.start - b.start);
+    draw(); renderPins();
+    if (!use.length && t.has_flac) estimate();
+  });
+}
+
+audio.onloadedmetadata = () => { duration = audio.duration || 1; buildPeaks(); draw(); };
+audio.ontimeupdate = () => {
+  document.getElementById("clock").textContent = fmt(audio.currentTime) + " / " + fmt(audio.duration || 0);
+  draw();
+};
+document.getElementById("btnPlay").onclick = toggle;
+function toggle() {
+  if (audio.paused) audio.play().catch(() => showErr("Need a FLAC path in map.csv"));
+  else audio.pause();
+}
+audio.onplay = () => document.getElementById("btnPlay").textContent = "Pause";
+audio.onpause = () => document.getElementById("btnPlay").textContent = "Play";
+
+canvas.onclick = (ev) => {
+  const r = canvas.getBoundingClientRect();
+  audio.currentTime = ((ev.clientX - r.left) / r.width) * duration;
+};
+
+function drop(role) {
+  const start = audio.currentTime || 0;
+  pins = pins.filter(p => p.role !== role);
+  pins.push({ role, start });
+  pins.sort((a,b) => a.start - b.start);
+  renderPins(); draw();
+}
+document.querySelectorAll(".pins button").forEach(b => b.onclick = () => drop(b.dataset.role));
+
+function renderPins() {
+  const tb = document.getElementById("rows");
+  tb.innerHTML = "";
+  pins.forEach((p, i) => {
+    const label = (PIN_ROLES.find(x => x.role === p.role) || { label: p.role }).label;
+    const tr = document.createElement("tr");
+    tr.innerHTML = "<td style=\"color:" + (COLOR[p.role]||"#aaa") + "\">" + label + "</td>" +
+      "<td><input type=\"number\" step=\"0.01\" value=\"" + p.start.toFixed(2) + "\"></td>";
+    const td = document.createElement("td");
+    const x = document.createElement("button");
+    x.textContent = "remove";
+    x.onclick = () => { pins.splice(i, 1); renderPins(); draw(); };
+    td.appendChild(x); tr.appendChild(td);
+    tr.querySelector("input").onchange = (e) => {
+      pins[i].start = parseFloat(e.target.value);
+      pins.sort((a,b) => a.start - b.start);
+      renderPins(); draw();
+    };
+    tb.appendChild(tr);
+  });
+}
+
+function pinsToSections() {
+  const dur = audio.duration || duration;
+  const ordered = pins.slice().sort((a,b) => a.start - b.start);
+  return ordered.map((p, i) => ({
+    role: p.role,
+    start: p.start,
+    end: i + 1 < ordered.length ? ordered[i + 1].start : dur
+  }));
+}
+
+function estimate() {
+  showErr("Guessing…");
+  fetch("/api/estimate/" + tracks[trackId].id).then(r => {
+    if (!r.ok) return r.text().then(t => Promise.reject(t));
+    return r.json();
+  }).then(data => {
+    showErr("");
+    pins = (data.sections || []).map(s => ({ role: s.role, start: +s.start }));
+    renderPins(); draw();
+    document.getElementById("hint").textContent = data.bpm ? ("guess bpm " + Math.round(data.bpm)) : "";
+  }).catch(err => showErr(String(err).slice(0, 180)));
+}
+
+function save() {
+  fetch("/api/sections/" + tracks[trackId].id, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ sections: pinsToSections() })
+  }).then(r => r.json()).then(x => {
+    document.getElementById("hint").textContent = "saved " + x.saved + " sections";
+  }).catch(() => showErr("save failed"));
+}
+
+function next() {
+  if (trackId < tracks.length - 1) select(trackId + 1);
+}
+
+document.getElementById("btnEst").onclick = estimate;
+document.getElementById("btnSave").onclick = save;
+document.getElementById("btnNext").onclick = next;
+
+document.body.addEventListener("keydown", (e) => {
+  if (e.target.tagName === "INPUT") return;
+  if (e.code === "Space") { e.preventDefault(); toggle(); }
+  if (e.key === "1") drop("verse");
+  if (e.key === "2") drop("chorus");
+  if (e.key === "3") drop("breakdown");
+  if (e.key === "4") drop("solo");
+  if (e.key === "g" || e.key === "G") estimate();
+  if (e.key === "s" || e.key === "S") save();
+  if (e.key === "n" || e.key === "N") next();
+});
+
+function buildPeaks() {
+  const AC = window.AudioContext || window.webkitAudioContext;
+  const ac = new AC();
+  fetch(audio.src).then(r => r.arrayBuffer()).then(buf => ac.decodeAudioData(buf)).then(buf => {
+    const ch = buf.getChannelData(0);
+    const buckets = 800;
+    const step = Math.floor(ch.length / buckets) || 1;
+    peaks = [];
+    for (let i = 0; i < buckets; i++) {
+      let m = 0;
+      for (let j = 0; j < step; j++) m = Math.max(m, Math.abs(ch[i * step + j] || 0));
+      peaks.push(m);
+    }
+    draw();
+  }).catch(() => { peaks = []; draw(); });
+}
+
+function draw() {
+  const w = canvas.width = canvas.clientWidth * devicePixelRatio;
+  const h = canvas.height = 88 * devicePixelRatio;
+  ctx.clearRect(0, 0, w, h);
+  ctx.fillStyle = "#101012";
+  ctx.fillRect(0, 0, w, h);
+  pinsToSections().forEach(s => {
+    ctx.fillStyle = (COLOR[s.role] || "#444") + "55";
+    const x = (s.start / duration) * w;
+    const ww = ((s.end - s.start) / duration) * w;
+    ctx.fillRect(x, 0, ww, h);
+  });
+  if (peaks.length) {
+    ctx.fillStyle = "#6a6864";
+    const bw = w / peaks.length;
+    peaks.forEach((p, i) => {
+      const ph = p * h * 0.9;
+      ctx.fillRect(i * bw, (h - ph) / 2, Math.max(1, bw - 1), ph);
+    });
+  }
+  ctx.fillStyle = "#f2f0ec";
+  ctx.fillRect((audio.currentTime / duration) * w, 0, 2 * devicePixelRatio, h);
+}
+</script>
+</body>
+</html>

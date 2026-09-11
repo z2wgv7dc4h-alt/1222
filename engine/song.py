@@ -1277,7 +1277,17 @@ def _generate_attempt(
             continue
 
         kick_style = kick_styles[i]
-        if kick_style is not None:
+        # "corpus" is deliberately excluded from this re-lock: unlike
+        # every other real style, it's genuinely RANDOMIZED (a Markov
+        # walk over drums._kick_corpus_walk), so re-calling it here would
+        # burn an extra rng draw and risk producing a DIFFERENT walk than
+        # the one already stored from the section's original generation
+        # -- the opposite of "re-lock." It's also unnecessary: like
+        # two_step/blast/double_kick/burst, its hit positions come purely
+        # from guitar_cells' own DURATIONS (the timeline it walks), which
+        # blending never changes -- only is_rest values at the boundary
+        # do -- so the original kick cells already stayed valid.
+        if kick_style is not None and kick_style != "corpus":
             this_section["kick"] = kick_pattern_for_style(this_section["guitar_take_a"], kick_style)
 
     # X.27 -- real pinch-harmonic accent, applied last (after blending) so

@@ -11,6 +11,9 @@ from midi_vocab import (
     DEFAULT_CACHE_PATH,
     DEFAULT_CORPUS_DIR,
     FALLBACK_HIT_CHANCE,
+    _ioi_transitions_from_sequence,
+    _pool_kick_ioi_markov,
+    _snap_to_bucket,
     aggregate_vocabulary,
     build_vocabulary,
     extract_corpus_stats,
@@ -100,6 +103,86 @@ def test_extract_file_stats_rejects_missing_ticks_per_beat():
         extract_file_stats(midi_file=mid)
 
 
+# --- extract_file_stats: real kick-onset (note 36) IOI sequence ------------
+
+
+def test_extract_file_stats_captures_real_kick_ioi_sequence():
+    mid = _synthetic_midi_file(ticks_per_beat=480, beats=4, note=36)
+    stats = extract_file_stats(midi_file=mid)
+    assert stats["kick_ioi_beats"] == pytest.approx([1.0, 1.0, 1.0])
+
+
+def test_extract_file_stats_kick_ioi_beats_empty_when_fewer_than_two_kicks():
+    mid = _synthetic_midi_file(ticks_per_beat=480, beats=1, note=36)
+    stats = extract_file_stats(midi_file=mid)
+    assert stats["kick_ioi_beats"] == []
+
+
+def test_extract_file_stats_kick_ioi_beats_ignores_non_kick_notes():
+    # Only note 36 counts positionally -- snare/hihat onsets must never
+    # leak into the kick-IOI sequence.
+    mid = mido.MidiFile(ticks_per_beat=480)
+    track = mido.MidiTrack()
+    mid.tracks.append(track)
+    track.append(mido.Message("note_on", note=38, velocity=100, time=0))
+    track.append(mido.Message("note_off", note=38, velocity=0, time=240))
+    track.append(mido.Message("note_on", note=38, velocity=100, time=0))
+    track.append(mido.Message("note_off", note=38, velocity=0, time=240))
+
+    stats = extract_file_stats(midi_file=mid)
+
+    assert stats["kick_ioi_beats"] == []
+
+
+# --- real kick-IOI bucket snapping + bigram transitions ---------------------
+
+
+def test_snap_to_bucket_picks_nearest_real_bucket():
+    assert _snap_to_bucket(0.26) == pytest.approx(0.25)
+    assert _snap_to_bucket(0.34) == pytest.approx(0.333)
+    assert _snap_to_bucket(1.9) == pytest.approx(2.0)
+
+
+def test_ioi_transitions_from_sequence_captures_a_real_alternating_pattern():
+    # A known, deterministic alternating IOI sequence -- proves real
+    # bigram capture (0.25->0.5 and 0.5->0.25 both strong), not just a
+    # noisy marginal split a density-only summary would report for the
+    # same data. Mirrors test_reference_vocab.py's own already-proven
+    # pattern for the guitar-riff Markov feature.
+    iois = [0.25, 0.5, 0.25, 0.5, 0.25, 0.5, 0.25]
+    transitions = _ioi_transitions_from_sequence(iois)
+    assert transitions[0.25] == {0.5: 3}
+    assert transitions[0.5] == {0.25: 3}
+
+
+def test_ioi_transitions_from_sequence_snaps_before_counting():
+    iois = [0.26, 0.49, 0.24]  # snaps to 0.25, 0.5, 0.25
+    transitions = _ioi_transitions_from_sequence(iois)
+    assert transitions[0.25] == {0.5: 1}
+    assert transitions[0.5] == {0.25: 1}
+
+
+def test_pool_kick_ioi_markov_only_uses_the_breakdown_pack():
+    files = [
+        {"pack": "whack_breakdown", "kick_ioi_beats": [0.25, 0.25, 0.25]},
+        {"pack": "jj_lamb", "kick_ioi_beats": [2.0, 2.0, 2.0]},  # must be ignored
+    ]
+    pooled = _pool_kick_ioi_markov(files)
+    assert pooled == {0.25: {0.25: 100.0}}
+
+
+def test_pool_kick_ioi_markov_none_when_breakdown_pack_has_no_kick_data():
+    files = [
+        {"pack": "whack_breakdown", "kick_ioi_beats": []},
+        {"pack": "jj_lamb", "kick_ioi_beats": [0.25, 0.25]},
+    ]
+    assert _pool_kick_ioi_markov(files) is None
+
+
+def test_pool_kick_ioi_markov_none_for_empty_corpus():
+    assert _pool_kick_ioi_markov([]) is None
+
+
 # --- extract_corpus_stats: glob-based walk + graceful skip handling --------
 
 
@@ -167,6 +250,30 @@ def test_aggregate_vocabulary_buckets_by_bpm_and_pack(tmp_path):
     assert "pack_a" in vocab["by_pack"]
 
 
+def test_aggregate_vocabulary_includes_real_kick_ioi_markov_from_breakdown_pack(tmp_path):
+    pack_dir = tmp_path / "whack_breakdown"
+    pack_dir.mkdir(parents=True)
+    m = _synthetic_midi_file(ticks_per_beat=480, beats=5, note=36)  # 4 real 1.0-beat IOIs
+    m.save(str(pack_dir / "1. 140 BPM.mid"))
+
+    extraction = extract_corpus_stats(tmp_path)
+    vocab = aggregate_vocabulary(extraction)
+
+    assert vocab["kick_ioi_markov"] == {1.0: {1.0: 100.0}}
+
+
+def test_aggregate_vocabulary_kick_ioi_markov_none_without_breakdown_pack(tmp_path):
+    pack_dir = tmp_path / "jj_lamb"
+    pack_dir.mkdir(parents=True)
+    m = _synthetic_midi_file(ticks_per_beat=480, beats=5, note=36)
+    m.save(str(pack_dir / "Groove 01.mid"))
+
+    extraction = extract_corpus_stats(tmp_path)
+    vocab = aggregate_vocabulary(extraction)
+
+    assert vocab["kick_ioi_markov"] is None
+
+
 def test_build_and_load_vocabulary_round_trip(tmp_path):
     pack_dir = tmp_path / "pack_a" / "01 - 140 - 160 BPM" / "Grooves"
     pack_dir.mkdir(parents=True)
@@ -203,6 +310,12 @@ def test_cached_vocabulary_json_has_expected_shape():
         assert "median" in bucket["fill_length_beats"]
         assert "max" in bucket["fill_length_beats"]
         assert isinstance(bucket["avg_distinct_notes_per_file"], (int, float))
+
+    km = vocab.get("kick_ioi_markov")
+    assert km is not None, "real corpus includes whack_breakdown -- kick_ioi_markov must be populated"
+    for row in km.values():
+        assert isinstance(row, dict) and row
+        assert sum(row.values()) == pytest.approx(100.0, abs=0.1)
 
 
 # --- vocabulary_informed_hit_chance: bad-input handling --------------------
@@ -328,3 +441,6 @@ def test_real_corpus_extraction_produces_plausible_stats():
     for bucket in vocab["by_bpm_bucket"].values():
         if bucket["file_count"] > 0:
             assert bucket["avg_hits_per_beat"] > 0
+
+    assert vocab["kick_ioi_markov"] is not None
+    assert len(vocab["kick_ioi_markov"]) > 0

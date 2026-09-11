@@ -642,6 +642,15 @@ def build_preset_from_corpus(
         feel=feel,
         open_chance=0.5,
         octave_stab=True,
+        # Deliberately still a fixed default, not calibrated here like
+        # `feel` above: real kick-pattern data (`kick="corpus"`, see
+        # drums._kick_corpus_walk) lives in `engine/data/midi_vocab.json`
+        # -- a genre-specific drum-only corpus, entirely separate from
+        # THIS function's own per-song `corpus` argument -- so there is
+        # no real per-song field here to calibrate a kick choice from.
+        # `labyrinth.json` overrides this field to `"corpus"` by hand;
+        # rebuilding that preset from this function will silently revert
+        # it back to `"euclid"` unless re-applied.
         kick="euclid",
         vocab=Vocab(weights=aggregate, motion=0.45, markov=riff_markov),
         pedal=pedal_bias,

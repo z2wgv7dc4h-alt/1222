@@ -9,7 +9,7 @@
   "feel": "triplet",
   "open_chance": 0.5,
   "octave_stab": true,
-  "kick": "euclid",
+  "kick": "corpus",
   "pedal": 0.95,
   "vocab": {
     "weights": {

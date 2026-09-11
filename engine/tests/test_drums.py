@@ -2,6 +2,7 @@ import random
 
 import pytest
 
+import midi_vocab
 from drums import (
     FALLBACKS,
     ROLE_TO_NOTE,
@@ -300,6 +301,77 @@ def test_kick_pattern_for_style_blast_hits_every_cell_regardless_of_rests():
     blast = kick_pattern_for_style(guitar_cells, "blast")
     assert all(not c["is_rest"] and c["role"] == "KICK" for c in blast)
     assert len(blast) == len(guitar_cells)
+
+
+# --- "corpus" kick style: real, corpus-informed Markov walk over real ------
+# --- kick-to-kick timing gaps (see midi_vocab._pool_kick_ioi_markov) --------
+
+
+def test_kick_pattern_for_style_corpus_requires_rng():
+    cells = [{"duration": 0.5, "is_rest": False} for _ in range(4)]
+    with pytest.raises(ValueError):
+        kick_pattern_for_style(cells, "corpus")
+
+
+def test_kick_pattern_for_style_corpus_requires_a_built_cache(monkeypatch):
+    cells = [{"duration": 0.5, "is_rest": False} for _ in range(4)]
+
+    def _raise_missing():
+        raise FileNotFoundError("no cache")
+
+    monkeypatch.setattr(midi_vocab, "load_vocabulary", _raise_missing)
+    with pytest.raises(ValueError):
+        kick_pattern_for_style(cells, "corpus", rng=random.Random(1))
+
+
+def test_kick_pattern_for_style_corpus_requires_real_kick_ioi_markov_data(monkeypatch):
+    cells = [{"duration": 0.5, "is_rest": False} for _ in range(4)]
+    monkeypatch.setattr(midi_vocab, "load_vocabulary", lambda: {"kick_ioi_markov": None})
+    with pytest.raises(ValueError):
+        kick_pattern_for_style(cells, "corpus", rng=random.Random(1))
+
+
+def test_kick_pattern_for_style_corpus_deterministic_single_bucket_hits_every_evenly_spaced_slot(
+    monkeypatch,
+):
+    # A cache with a single real transition (100% self-transition on a
+    # 0.5-beat bucket) makes the walk fully deterministic -- both the
+    # marginal fallback (the first pick, with no previous bucket yet) and
+    # every subsequent conditioned pick resolve to the same one bucket,
+    # so this is hand-checkable exactly, not just statistically. JSON
+    # string keys ("0.5") on purpose -- proves the real float(...)
+    # conversion `kick_pattern_for_style` performs on the loaded cache
+    # actually works, not just a pre-converted fixture.
+    cells = [{"duration": 0.5, "is_rest": False} for _ in range(8)]  # 4 beats
+    monkeypatch.setattr(
+        midi_vocab, "load_vocabulary", lambda: {"kick_ioi_markov": {"0.5": {"0.5": 100.0}}}
+    )
+    result = kick_pattern_for_style(cells, "corpus", rng=random.Random(1))
+    hit_positions = [i for i, c in enumerate(result) if not c["is_rest"]]
+    assert hit_positions == list(range(8))
+    for c in result:
+        assert c["role"] == "KICK"
+    assert len(result) == len(cells)
+
+
+def test_kick_pattern_for_style_corpus_extreme_tables_produce_measurably_different_density(
+    monkeypatch,
+):
+    cells = [{"duration": 0.25, "is_rest": False} for _ in range(32)]  # 8 beats
+
+    monkeypatch.setattr(
+        midi_vocab, "load_vocabulary", lambda: {"kick_ioi_markov": {"0.125": {"0.125": 100.0}}}
+    )
+    dense = kick_pattern_for_style(cells, "corpus", rng=random.Random(1))
+
+    monkeypatch.setattr(
+        midi_vocab, "load_vocabulary", lambda: {"kick_ioi_markov": {"2.0": {"2.0": 100.0}}}
+    )
+    sparse = kick_pattern_for_style(cells, "corpus", rng=random.Random(1))
+
+    dense_hits = sum(1 for c in dense if not c["is_rest"])
+    sparse_hits = sum(1 for c in sparse if not c["is_rest"])
+    assert dense_hits > sparse_hits * 3  # a real, substantial, measurable difference
 
 
 @pytest.mark.parametrize("preset_id", sorted(load_all_presets().keys()))

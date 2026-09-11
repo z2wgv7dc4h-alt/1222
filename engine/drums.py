@@ -22,8 +22,11 @@ Hard law from CLAUDE.md that every function here obeys:
 
 from __future__ import annotations
 
+import json
 import random
+from collections import defaultdict
 
+import midi_vocab
 from midi_vocab import vocabulary_informed_hit_chance
 from rhythm import RhythmRegistry, pick_blast_type
 
@@ -395,6 +398,79 @@ def _kick_burst(guitar_cells: list[dict]) -> list[dict]:
     return out
 
 
+def _pick_ioi_bucket(
+    row: dict[float, float] | None, marginal: dict[float, float], rng: random.Random
+) -> float:
+    """Real accumulate-and-compare weighted pick over float IOI-bucket
+    keys -- a small local equivalent of `theory._weighted_choice`, needed
+    because that shared helper forces an `int()` cast on the key it
+    returns and would silently truncate a fractional bucket (e.g.
+    0.333 -> 0). Falls back to `marginal` when `row` is `None`/empty,
+    mirroring `theory.pick_pitch_interval_markov`'s own honest-fallback
+    convention -- never fabricates a distribution for an unseen
+    context."""
+    weights = row if row else marginal
+    total = sum(weights.values())
+    if total <= 0:
+        raise ValueError("weights must sum to a positive total")
+    r = rng.random() * total
+    acc = 0.0
+    picked = None
+    for bucket, w in weights.items():
+        acc += w
+        picked = bucket
+        if r <= acc:
+            return bucket
+    return picked
+
+
+def _kick_corpus_walk(
+    guitar_cells: list[dict], rng: random.Random, markov: dict[float, dict[float, float]]
+) -> list[dict]:
+    """"corpus" kick style: real, corpus-informed kick placement via a
+    first-order Markov walk over real kick-to-kick IOI buckets (see
+    `midi_vocab._pool_kick_ioi_markov`) -- genuinely learned SEQUENTIAL
+    timing tendencies mined from the real `whack_breakdown` reference
+    pack, not a fixed, hand-chosen metric formula the way every other
+    named style in this module is.
+
+    Starts at beat 0.0; each step picks the next real IOI bucket
+    (conditioned on the previous bucket via `markov`, falling back to the
+    marginal distribution -- pooled from every row -- for the walk's
+    first step or any bucket the corpus never actually observed a
+    transition from) and marks the guitar cell containing that beat
+    position as a real KICK hit, via the same `_cell_starts`/
+    `_time_to_cell_index` mechanism `_cyclic_hit_indices` already uses --
+    until the section's total beat length is exhausted.
+
+    Raises `ValueError` if `markov` is falsy (empty/`None`) -- fails
+    closed rather than silently degrading to a fabricated pattern; the
+    only real caller, `kick_pattern_for_style`'s dedicated `"corpus"`
+    branch, already guarantees this before calling in."""
+    if not markov:
+        raise ValueError("_kick_corpus_walk requires a real, non-empty markov table")
+
+    starts, total_beats = _cell_starts(guitar_cells)
+    marginal: dict[float, float] = defaultdict(float)
+    for row in markov.values():
+        for bucket, count in row.items():
+            marginal[bucket] += count
+
+    hit_indices: set[int] = set()
+    t = 0.0
+    prev_bucket: float | None = None
+    while t < total_beats - _EPS:
+        idx = _time_to_cell_index(starts, t)
+        if idx is not None:
+            hit_indices.add(idx)
+        row = markov.get(prev_bucket) if prev_bucket is not None else None
+        bucket = _pick_ioi_bucket(row, dict(marginal), rng)
+        t += bucket
+        prev_bucket = bucket
+
+    return _cells_from_hit_indices(guitar_cells, hit_indices, "KICK")
+
+
 _KICK_STYLES = {
     "bounce": kick_follows_guitar,
     "lock": kick_follows_guitar,
@@ -425,10 +501,27 @@ def kick_pattern_for_style(
     `"blast"` are real, distinct mechanisms -- see `_kick_sparse`/
     `_kick_euclid`/`_kick_two_step`/`_kick_blast`.
 
+    `"corpus"` is the one real, RANDOMIZED, corpus-informed style (see
+    `_kick_corpus_walk`) -- handled by its own explicit branch below,
+    before the uniform `_KICK_STYLES` dict dispatch, rather than changing
+    every other (fully deterministic) handler's signature to accept an
+    `rng`/`markov` they don't need. Loads the cached `kick_ioi_markov`
+    table via `midi_vocab.load_vocabulary()` at call time (a fresh load
+    per call, matching `vocabulary_informed_hit_chance`'s own existing
+    precedent -- no extra caching layer). A missing/corrupt cache, or one
+    with no real `kick_ioi_markov` data at all, raises `ValueError`
+    (fails closed, matching every other bad-input contract in this
+    module -- never silently degrades to a fabricated pattern); JSON
+    string keys are converted back to real floats here, the same
+    string-vs-int/float key discipline `reference_vocab.py`'s own
+    corpus-loading code already established.
+
     `rng` is accepted for interface symmetry with the rest of this
-    project's generation calls (every real style here is currently fully
-    deterministic given `guitar_cells`, same as `kick_follows_guitar`
-    itself), but is not required by any current style.
+    project's generation calls; every deterministic style here ignores
+    it (same as before), but `"corpus"` requires it -- `ValueError` if
+    `rng` is `None` for that style, same "a real per-section choice
+    needs a real seeded source" convention `resolve_kick_style` already
+    uses elsewhere in this module.
 
     Raises `ValueError` on an unrecognized style name rather than silently
     falling back to a default style -- per project law (anti-patterns.md),
@@ -436,6 +529,28 @@ def kick_pattern_for_style(
     """
     if not guitar_cells:
         raise ValueError("guitar_cells must be non-empty")
+    if style == "corpus":
+        if rng is None:
+            raise ValueError("kick style 'corpus' requires an rng")
+        try:
+            vocab = midi_vocab.load_vocabulary()
+        except (FileNotFoundError, json.JSONDecodeError) as exc:
+            raise ValueError(
+                "kick style 'corpus' requires a built midi_vocab cache "
+                "(run midi_vocab.build_vocabulary())"
+            ) from exc
+        raw_markov = vocab.get("kick_ioi_markov")
+        if not raw_markov:
+            raise ValueError(
+                "kick style 'corpus' requires a real, non-empty 'kick_ioi_markov' "
+                "entry in the cached vocabulary (run midi_vocab.build_vocabulary() "
+                "against a corpus that includes real whack_breakdown data)"
+            )
+        markov = {
+            float(prev): {float(nxt): pct for nxt, pct in row.items()}
+            for prev, row in raw_markov.items()
+        }
+        return _kick_corpus_walk(guitar_cells, rng, markov)
     handler = _KICK_STYLES.get(style)
     if handler is None:
         raise ValueError(

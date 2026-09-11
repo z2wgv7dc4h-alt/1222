@@ -84,6 +84,75 @@ _HITS_PER_BEAT_TO_HIT_CHANCE = 4.0
 _MIN_HIT_CHANCE = 0.05
 _MAX_HIT_CHANCE = 1.0
 
+# Note 36 ("Bass Drum 1") is the one note number trustworthy across an
+# ARBITRARY foreign MIDI pack's own authoring convention -- kick/snare are
+# the two notes essentially every real-world drum-MIDI convention (GM,
+# Superior Drummer, EZdrummer, Slate, ...) agrees on; everything past that
+# is genuinely kit-dependent (this project's OWN kit already remaps note 48
+# away from GM's meaning -- see `drums.py`'s own module docstring). Only
+# note 36 is tracked positionally below; a real, documented, deliberate
+# scope limit, not an oversight.
+_KICK_NOTE = 36
+
+# Real IOI (inter-onset-interval) bucket vocabulary for the kick-pattern
+# Markov chain below -- evidenced directly, not guessed: measuring every
+# real kick-to-kick gap across the "whack_breakdown" pack's 104 real files
+# (4446 real gaps) found dominant clusters at 0.25/0.5/1.0/0.75 beats (the
+# power-of-2 + dotted family) plus a real, smaller but non-trivial cluster
+# around 0.167/0.333 beats (the triplet family -- the same real triplet
+# character `reference_vocab.build_preset_from_corpus`'s own rhythm-feel
+# calibration independently confirmed corpus-wide for guitar rhythm).
+_KICK_IOI_BUCKETS: tuple[float, ...] = (0.125, 0.1667, 0.25, 0.333, 0.5, 0.75, 1.0, 1.5, 2.0)
+
+# Only this pack is genuinely breakdown-genre-specific programming (the
+# three JJ packs are generic multi-genre groove packs spanning 70-240 BPM,
+# not written for this project's own breakdown/chug convention) -- pooling
+# the kick-pattern Markov chain from every pack would dilute a real,
+# genre-relevant signal with a lot of irrelevant material.
+_KICK_MARKOV_PACK = "whack_breakdown"
+
+
+def _snap_to_bucket(value: float, buckets: tuple[float, ...] = _KICK_IOI_BUCKETS) -> float:
+    """Nearest-bucket snap for a real measured IOI -- never fabricates a
+    value outside the real, evidenced bucket vocabulary above."""
+    return min(buckets, key=lambda b: abs(b - value))
+
+
+def _ioi_transitions_from_sequence(iois: list[float]) -> dict[float, dict[float, int]]:
+    """Real bigram transition COUNTS over bucket-snapped consecutive IOIs
+    -- deliberately raw counts, not a per-file percentage (mirrors
+    `reference_vocab._interval_transitions_from_sequence`'s own,
+    already-proven reasoning: a single file's own transition table is too
+    sparse for a reliable per-file percentage; pool raw counts across many
+    real files first, normalize once at the very end)."""
+    counts: dict[float, dict[float, int]] = defaultdict(lambda: defaultdict(int))
+    snapped = [_snap_to_bucket(v) for v in iois]
+    for prev, nxt in zip(snapped, snapped[1:]):
+        counts[prev][nxt] += 1
+    return {k: dict(v) for k, v in counts.items()}
+
+
+def _pool_kick_ioi_markov(files: list[dict[str, Any]]) -> dict[float, dict[float, float]] | None:
+    """Real corpus-wide pooling of `_ioi_transitions_from_sequence` across
+    every file in the real, genre-specific `_KICK_MARKOV_PACK` -- raw
+    counts summed first, then each `prev`-row normalized to real
+    percentages once at the end (same shape as `reference_vocab.
+    _pool_transition_counts`). Returns `None` when no real kick-IOI data
+    exists at all in that pack, rather than fabricating an empty table."""
+    totals: dict[float, dict[float, int]] = defaultdict(lambda: defaultdict(int))
+    for f in files:
+        if f.get("pack") != _KICK_MARKOV_PACK:
+            continue
+        for prev, row in _ioi_transitions_from_sequence(f.get("kick_ioi_beats", [])).items():
+            for nxt, count in row.items():
+                totals[prev][nxt] += count
+    if not totals:
+        return None
+    return {
+        prev: {nxt: round(100.0 * count / sum(row.values()), 4) for nxt, count in row.items()}
+        for prev, row in totals.items()
+    }
+
 
 def _bpm_from_path(path: Path) -> float | None:
     """Best-effort BPM extraction from this corpus's own folder/file naming
@@ -134,7 +203,7 @@ def extract_file_stats(
 
     Returns `{"hits": int, "beats": float, "hits_per_beat": float,
     "distinct_notes": int, "note_counts": {note: count}, "tempo_bpm":
-    float|None}`.
+    float|None, "kick_ioi_beats": list[float]}`.
 
     Duration (`beats`) is measured via `ticks_per_beat` against the file's
     own tick data, not derived from tempo: ticks-per-beat already gives an
@@ -143,6 +212,17 @@ def extract_file_stats(
     found (if any) -- most files in this corpus carry no tempo meta at all
     (their BPM is documented in the filename/folder instead, see
     `_bpm_from_path`).
+
+    `kick_ioi_beats` is the real, chronological sequence of gaps (in
+    beats) between consecutive note-36 ("KICK" in every common MIDI
+    drum-map convention, GM included) onsets -- note 36 is deliberately
+    the ONLY note this function tracks positionally, since it is the one
+    note number trustworthy across an arbitrary pack's own foreign kit
+    convention (this project's own kit already remaps other notes, e.g.
+    48 is a hi-hat here, not GM's hi-mid tom -- see `drums.py`'s own
+    module docstring). Computed per-track (never bridging a gap across
+    two different tracks) then concatenated; `[]` when a file has fewer
+    than two real note-36 onsets in any single track.
     """
     if midi_file is None:
         if path is None:
@@ -157,16 +237,25 @@ def extract_file_stats(
     hits = 0
     note_counts: Counter[int] = Counter()
     tempo_usec: int | None = None
+    kick_ioi_beats: list[float] = []
     for track in midi_file.tracks:
         abs_ticks = 0
+        kick_onset_ticks: list[int] = []
         for msg in track:
             abs_ticks += msg.time
             if msg.type == "note_on" and getattr(msg, "velocity", 0) > 0:
                 hits += 1
                 note_counts[msg.note] += 1
+                if msg.note == _KICK_NOTE:
+                    kick_onset_ticks.append(abs_ticks)
             elif msg.type == "set_tempo" and tempo_usec is None:
                 tempo_usec = msg.tempo
         total_ticks = max(total_ticks, abs_ticks)
+        kick_ioi_beats.extend(
+            (b - a) / ticks_per_beat
+            for a, b in zip(kick_onset_ticks, kick_onset_ticks[1:])
+            if b > a
+        )
 
     beats = total_ticks / ticks_per_beat
     hits_per_beat = (hits / beats) if beats > _EPS else 0.0
@@ -179,6 +268,7 @@ def extract_file_stats(
         "distinct_notes": len(note_counts),
         "note_counts": dict(note_counts),
         "tempo_bpm": tempo_bpm,
+        "kick_ioi_beats": kick_ioi_beats,
     }
 
 
@@ -256,7 +346,13 @@ def aggregate_vocabulary(extraction: dict[str, Any]) -> dict[str, Any]:
     bucketed by BPM range and, separately, by source pack. Per bucket/pack:
     average hits-per-beat, a min/median/max distribution of FILL lengths in
     beats (only files classified `"kind": "fill"`), and the average count of
-    distinct MIDI note numbers per file (a density-of-vocabulary proxy)."""
+    distinct MIDI note numbers per file (a density-of-vocabulary proxy).
+
+    Also computes a real, corpus-wide `kick_ioi_markov` (see
+    `_pool_kick_ioi_markov`) -- a first-order Markov chain over real
+    kick-to-kick timing gaps, pooled only from the genre-specific
+    `_KICK_MARKOV_PACK`, `None` when that pack contributed no real kick
+    data at all."""
     by_bucket: dict[str, list[dict[str, Any]]] = defaultdict(list)
     by_pack: dict[str, list[dict[str, Any]]] = defaultdict(list)
     for f in extraction["files"]:
@@ -269,6 +365,7 @@ def aggregate_vocabulary(extraction: dict[str, Any]) -> dict[str, Any]:
         "skipped_files": extraction["skipped"],
         "by_bpm_bucket": {b: _summarize(items) for b, items in sorted(by_bucket.items())},
         "by_pack": {p: _summarize(items) for p, items in sorted(by_pack.items())},
+        "kick_ioi_markov": _pool_kick_ioi_markov(extraction["files"]),
     }
 
 

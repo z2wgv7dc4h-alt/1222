@@ -24,4 +24,4 @@ COMMANDS
 Auto OFF when you walk away. No overnight Auto.
 
 LAW: docs\DECISIONS.md and CLAUDE.md
-ARCHIVE: PROGRESS.md and git ac047fd
+ARCHIVE: docs/archive/ (FCC denied). git ac047fd

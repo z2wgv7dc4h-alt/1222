@@ -39,4 +39,4 @@ No bank file → labyrinth falls back to Markov. That is degradation, not a pass
 
 ## History
 
-Session novels: `PROGRESS.md` (archive). Pre-cleanup TASKS/CURRENT: git `ac047fd`. Do not resurrect them into the queue.
+Session novels: `docs/archive/` (FCC Read denied). Pre-cleanup TASKS/CURRENT: git `ac047fd`. Do not resurrect them into the queue.

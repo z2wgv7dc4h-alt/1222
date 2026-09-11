@@ -12,7 +12,10 @@
       "Write(docs/archive/**)",
       "Read(engine/riff_model.py)",
       "Edit(engine/riff_model.py)",
-      "Write(engine/riff_model.py)"
+      "Write(engine/riff_model.py)",
+      "Read(engine/riff_corpus.py)",
+      "Edit(engine/riff_corpus.py)",
+      "Write(engine/riff_corpus.py)"
     ]
   },
   "hooks": {

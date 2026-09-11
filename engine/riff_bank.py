@@ -1,30 +1,5 @@
-"""Real, verbatim riff-fragment extraction from real Guitar Pro tab files.
-
-Born of Osiris only, per the real Metalerator-style architectural pivot
-(see docs/CURRENT.md's own writeup of why the statistical/ML riff-content
-approach was abandoned for `labyrinth`). Unlike `reference_vocab.analyze_
-gp_reference` (which immediately collapses a file's real, ordered note
-sequence into interval-frequency/Markov aggregates), this module keeps
-real per-note pitch, duration, and bar position -- genuinely bar-segmented,
-never a flat tape -- and real section-role labels lifted from the tab
-author's own measure markers where present.
-
-Deliberately does NOT resolve fragments against a target `theory.Scale`
-or snap pitches to a specific `Fretboard` -- both are generation-time
-concerns (the target scale/tuning is only known inside `song.py`, once a
-preset is chosen), kept as a later, separate wiring step. `RiffFragment.
-deltas` are real, source-faithful SEMITONE intervals between consecutive
-notes (not scale-degree deltas), resolved into scale-degree space only
-when a fragment is actually rendered against a real target scale.
-
-Real, freely-downloaded source files (gtptabs.com, gprotab.net,
-musicnoteslib.com -- all openly downloadable, no paywall/login) live
-under `reference/gp-tabs-born-of-osiris/` (gitignored, same as every
-other `reference/` subdirectory). The extracted bank itself is cached to
-`engine/data/riff_bank.json` (also gitignored -- this is genuinely closer
-to the source songs' own melodic content than even the ML corpus was,
-so it gets at least the same "local-only, never redistributed" posture
-already applied to `engine/data/ml_corpus/`).
+"""Verbatim GP fragments for labyrinth. Selector must pick one source_song and tile 2-4 bars.
+Do not grow a second extractor in tools/boo-lab — call this.
 """
 
 from __future__ import annotations

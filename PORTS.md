@@ -1,3 +1,5 @@
+<!-- BOTS: this is a symbol map, not a backlog. Do not port the next Metalerator idea. -->
+
 # Ports — read one section per task
 
 Paths are under `/reference/`.

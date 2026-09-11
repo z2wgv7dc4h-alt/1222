@@ -1,24 +1,4 @@
-"""Voice leading, dissonance shading, and the cross-section energy arc.
-
-Ported from reference/ww-forge-prior-attempt/engine/theory.py (VoiceLeader,
-shade(), ARC) per PORTS.md. See TASKS.md P1.10 for the port record.
-
-Deviation from the port brief: shade() and ARC actually live in the
-reference project's theory.py, not style_packs.py (style_packs.py only has
-PACKS/VOCAB -- the mood-preset tables that fed P1.7). Noted per the port
-skill's instruction to trust the file over a description that doesn't match
-it.
-
-Unlike the reference, this module does not carry its own SCALES table --
-this project's `scales.py` is the single source of truth for interval sets
-(see .claude/rules/anti-patterns.md: "two scale names, one interval set:
-aliases only, documented"). `Scale` below resolves its intervals through
-`scales.get_scale`, so an unknown scale name fails the same way it does
-everywhere else in this codebase. The reference's `phrygian_dominant` was
-missing here for several sessions (this note originally flagged it as a
-real, deliberately-deferred gap) -- now real, ported directly into
-`scales.py`'s own table (not invented).
-"""
+"""Voice leading, dissonance shading, and the cross-section energy arc."""
 from __future__ import annotations
 
 import random

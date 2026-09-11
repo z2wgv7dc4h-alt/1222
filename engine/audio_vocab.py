@@ -1,32 +1,4 @@
-"""Real-audio structural/tonal vocabulary -- the audio-analogue of
-`midi_vocab.py`'s MIDI-corpus mining.
-
-Per CLAUDE.md's law ("Grid is the writer. Audio models are paint after the
-score."), nothing here writes or transcribes notes. This module extracts
-STATISTICAL/STRUCTURAL features from a real audio file -- tempo, a
-harmonic/percussive rhythm-density split, and coarse tonal-brightness
-descriptors -- as reference DATA a preset or generation parameter can be
-informed by, exactly the same role the MIDI-vocabulary cache already plays.
-It never transcribes a melody, chord, or riff, and never stores or
-reproduces the audio itself; only small numeric summaries are kept.
-
-Uses `librosa` (BSD-licensed) for decoding and analysis -- added as a
-project dependency alongside `mido`, same rationale: the pragmatic,
-well-established choice over hand-rolling DSP. `analyze_track` runs on any
-audio file directly (using librosa's own harmonic/percussive split as a
-cheap proxy for "drum-like" vs "guitar-like" content).
-
-Optional, not a hard dependency: for real per-instrument stems (actual
-drums vs bass vs vocals vs other, rather than a harmonic/percussive
-approximation), run Meta's open-source `demucs` model LOCALLY first --
-`python -m demucs --two-stems=drums <file>` -- then call `analyze_track` on
-each resulting stem file separately. `demucs` is intentionally not added to
-requirements.txt (it pulls in PyTorch, a heavy dependency this project
-doesn't otherwise need) -- install it ad hoc (`pip install demucs`) only
-when a real separation pass is wanted. Never upload audio to a third-party
-"online demucs" site for this -- run the real model locally instead, so
-the file never leaves the machine.
-"""
+"""Real-audio structural/tonal vocabulary -- the audio-analogue of"""
 from __future__ import annotations
 
 import math

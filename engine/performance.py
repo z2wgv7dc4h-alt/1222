@@ -1,28 +1,4 @@
-"""Double-tracking: two independently-humanized performances of one riff.
-
-Per god-tier-metal-scope.md ### 17.1 and the documented mistake in ### 18.3:
-an earlier attempt's "double-tracking" was just one performance copied and
-time-shifted +8 MIDI ticks -- not two independent takes, which they flagged
-themselves as unfinished. This module exists specifically so that mistake
-cannot silently recur: `double_track` always draws its two takes' jitter
-from two DIFFERENT `random.Random` instances, never one take derived from
-the other by a fixed offset.
-
-X.21 -- real open-string-vs-muted articulation via velocity, ported from the
-real reference (`reference/ww-forge-prior-attempt/engine/riff_engine.py`):
-`wants_open = rng.random() < open_chance` (line 125) decides per-hit whether
-a note is an open ringing accent or a muted chug, and the real emitted
-velocities (lines 183/187) are `120` for an open hit vs `88`/`96`/`100`
-otherwise -- `artic.py`'s real `PALM_MUTE_VELOCITY_THRESHOLD = 110` confirms
-opens are always emitted comfortably above that line, everything else
-comfortably below. This is the real, previously-unwired purpose of
-`preset.open_chance` (X.20 removed its INCORRECT prior use as `hit_chance`).
-Deliberately a simplified 2-tier port (open=120 / muted=88, dropping the
-reference's accent/downbeat 3rd-4th tiers) -- ships the real, dominant,
-audible contrast without plumbing `atmosphere.find_accents`' accent data
-through a new call chain; the richer tiering is a real, deliberately
-deferred refinement, not silently dropped.
-"""
+"""Double-tracking: two independently-humanized performances of one riff."""
 from __future__ import annotations
 
 import random

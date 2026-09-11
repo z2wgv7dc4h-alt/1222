@@ -1,26 +1,4 @@
-"""Motif system: rhythm + scale-degree contour, developed across sections.
-
-Phase 3 ("Motif/riff") of the engine. Per god-tier-metal-scope.md ## 4:
-"generate a short thematic cell once (rhythm + contour, not fixed pitches)
-and *develop* it across sections (transposition, augmentation/diminution,
-inversion, fragmentation) instead of every section rolling independently."
-
-A `Motif` pairs a pitch-agnostic rhythm cell (from `rhythm.generate_rhythm`,
-`{"duration": float, "is_rest": bool}` dicts) with a list of SCALE-DEGREE
-DELTAS -- not absolute pitches -- one delta per non-rest hit in the cell.
-Deltas are relative motion (e.g. +2 = up two scale degrees from wherever the
-line currently sits), which is what makes one motif replayable against a
-different root or `Scale` later (see `render_motif`) without regenerating
-anything.
-
-Hard law from CLAUDE.md/anti-patterns.md this file obeys:
-  - Seeded RNG only: every random draw goes through a `random.Random`
-    instance passed in by the caller.
-  - A validator that is not called is not done: the cell/delta count
-    invariant is checked in `Motif.__post_init__`, so it is enforced on
-    EVERY construction path (including every develop op below), not just
-    a standalone function tests could call and production code could skip.
-"""
+"""Motif system: rhythm + scale-degree contour, developed across sections."""
 from __future__ import annotations
 
 import random

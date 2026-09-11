@@ -235,6 +235,47 @@ def test_generate_riff_motif_arc_energy_none_generates_unconditioned(tmp_path, m
     assert seen_buckets == [None]
 
 
+def test_generate_riff_motif_stays_within_the_real_register_bound_under_extreme_climb(tmp_path, monkeypatch):
+    # Real bug, found via direct listening feedback + measurement: `motif.
+    # degree_delta_for_interval` is structurally biased non-negative (0
+    # negative deltas across every real interval class, confirmed
+    # empirically), so a long continuous walk (this function's own real
+    # use case -- one riff spanning a whole section, unlike every other
+    # real pitch-generation path in this project, which uses SHORT,
+    # repeated/tiled motifs) compounds into a runaway climb the existing
+    # fretboard octave-snap then yanks back down repeatedly, producing an
+    # audible zigzag -- not a training-data quality problem. Force the
+    # WORST real case directly: every real token proposes the largest
+    # real interval class (11) at the smallest real duration, maximizing
+    # real upward climbing pressure over many real notes.
+    from theory import Scale
+
+    checkpoint_path = tmp_path / "model.pt"
+    corpus_dir = tmp_path / "corpus"
+    _write_synthetic_corpus(corpus_dir)
+    riff_model.train(
+        corpus_dir=corpus_dir, checkpoint_path=checkpoint_path,
+        seed=0, epochs=1, batch_size=4, val_song_count=1,
+    )
+
+    extreme_pairs = [(11, riff_corpus.DURATION_BUCKETS[0])] * 200
+    monkeypatch.setattr(riff_model, "generate_riff_tokens", lambda *a, **kw: extreme_pairs)
+
+    scale = Scale(root=0, name="minor")
+    base_degree = 3
+    motif = riff_model.generate_riff_motif(
+        seed=1, scale=scale, base_degree=base_degree, total_beats=1000.0,
+        checkpoint_path=checkpoint_path, corpus_dir=None,
+    )
+
+    anchor_pitch = scale.degree(base_degree)
+    degree_index = base_degree
+    for d in motif.deltas:
+        degree_index += d
+        pitch = scale.degree(degree_index)
+        assert anchor_pitch - riff_model._RIFF_REGISTER_SPAN_SEMITONES <= pitch <= anchor_pitch + riff_model._RIFF_REGISTER_SPAN_SEMITONES
+
+
 # --- v2: restored real verse pedal-bias -------------------------------------
 
 

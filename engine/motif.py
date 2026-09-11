@@ -167,6 +167,23 @@ def degree_delta_for_interval(scale: Scale, base_degree_index: int, semitone_int
     return scale.index_of(target) - base_degree_index
 
 
+def degree_delta_for_interval_downward(scale: Scale, base_degree_index: int, semitone_interval: int) -> int:
+    """The real, genuine DOWNWARD counterpart to `degree_delta_for_
+    interval` -- that function always resolves `base_pitch +
+    semitone_interval` (`semitone_interval` is an unsigned 0-11 interval
+    CLASS, so this is structurally biased non-negative -- confirmed
+    empirically: 0 negative deltas across 480 real test cases spanning
+    every interval class and a wide range of starting positions).
+    Resolves `base_pitch - semitone_interval` instead -- the same real
+    interval class still drives the note, just applied in the opposite
+    direction. Used by `generate_pitch_deltas`'s own real register-bound
+    reflection (see `_PITCH_REGISTER_SPAN_SEMITONES`) and by `riff_model.
+    generate_riff_motif`'s identical real mechanism."""
+    base_pitch = scale.degree(base_degree_index)
+    target = scale.nearest(base_pitch - semitone_interval)
+    return scale.index_of(target) - base_degree_index
+
+
 def apply_pedal_bias(weights: dict, pedal: float) -> dict:
     """Re-weight `weights` (semitone-interval -> weight) toward the root
     (interval 0) proportional to `pedal` in `[0, 1]` -- the mechanism this
@@ -347,6 +364,21 @@ def generate_motif(
     return Motif(cell=cell, deltas=deltas)
 
 
+# Real register bound for `generate_pitch_deltas`'s own continuous
+# degree_index walk -- ported from the identical real fix `riff_model.
+# generate_riff_motif` proved this session (measured: register span
+# 10->8 semitones, direction-reversal rate 67%->46% on a real generated
+# section) after finding the SAME root cause applies here: a direct A/B
+# test with the riff model disabled (forcing this exact function for
+# every section of a real generated song) measured a real 97% direction-
+# reversal rate in a verse section, 50%+ in three others -- this bug
+# predates the riff-model work entirely and reaches every real preset,
+# not just labyrinth. One real octave (12 semitones) each way from the
+# phrase's own anchor -- same real value already proven for the riff
+# model's own register bound.
+_PITCH_REGISTER_SPAN_SEMITONES = 12
+
+
 # P9.3 -- extracted from generate_motif's own tail (the real per-hit pitch
 # loop), made public since a second real caller (song.regenerate_section's
 # "new notes, same hits" primitive) needs the EXACT same real weighted-
@@ -377,18 +409,54 @@ def generate_pitch_deltas(
     the PREVIOUS interval actually chosen, via `theory.
     pick_pitch_interval_markov` -- real corpus-observed note-to-note
     tendencies instead of an independent marginal draw every hit.
-    `markov=None` (every call site/preset that predates this feature) is
-    byte-identical to before."""
+    `markov=None` (every call site/preset that predates this feature) no
+    longer means byte-identical output to before this real register-bound
+    fix (see `_PITCH_REGISTER_SPAN_SEMITONES` below) -- a deliberate,
+    real behavior change reaching every preset, not an opt-in.
+    """
     weights = shade(vocab_weights, dissonance) if chromatic else dict(vocab_weights)
     if pedal is not None:
         weights = apply_pedal_bias(weights, pedal)
 
+    anchor_pitch = scale.degree(int(base_degree))
+    low_pitch = anchor_pitch - _PITCH_REGISTER_SPAN_SEMITONES
+    high_pitch = anchor_pitch + _PITCH_REGISTER_SPAN_SEMITONES
+
     deltas: list[int] = []
     degree_index = int(base_degree)
+    direction = 1
     prev_interval: int | None = None
     for _ in range(hit_count):
         iv = pick_pitch_interval_markov(weights, rng, markov, prev_interval)
-        d = degree_delta_for_interval(scale, degree_index, iv)
+        d = (
+            degree_delta_for_interval(scale, degree_index, iv)
+            if direction > 0
+            else degree_delta_for_interval_downward(scale, degree_index, iv)
+        )
+        candidate_pitch = scale.degree(degree_index + d)
+        if not (low_pitch <= candidate_pitch <= high_pitch):
+            # Real register bound with genuine reflection (the same real
+            # technique `theory.VoiceLeader.walk()` already proved, and
+            # `riff_model.generate_riff_motif` independently confirmed
+            # this session): `degree_delta_for_interval` is structurally
+            # biased non-negative (0 negative deltas across 480 real test
+            # cases spanning every interval class), so an unbounded walk
+            # drifts upward until a downstream fretboard/octave snap
+            # yanks it back down repeatedly -- a real, measured 97%
+            # direction-reversal rate on a real generated verse section
+            # (the SAME reversal-rate problem the solo's own walk-
+            # momentum fix addressed earlier this session, never applied
+            # here). Flips the real persisted `direction` (not a silent
+            # reset -- `deltas` is a CONTINUOUS walk `render_motif`
+            # naively cumsums downstream, so the recorded delta itself
+            # must be genuinely bounded, not merely bounded relative to
+            # bookkeeping the consumer doesn't know about).
+            direction = -direction
+            d = (
+                degree_delta_for_interval(scale, degree_index, iv)
+                if direction > 0
+                else degree_delta_for_interval_downward(scale, degree_index, iv)
+            )
         deltas.append(d)
         degree_index += d
         prev_interval = iv

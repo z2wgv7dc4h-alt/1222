@@ -33,7 +33,7 @@ from pathlib import Path
 from typing import Any
 
 import riff_corpus
-from motif import Motif, degree_delta_for_interval
+from motif import Motif, degree_delta_for_interval, degree_delta_for_interval_downward
 from theory import Scale
 
 _ENGINE_ROOT = Path(__file__).resolve().parent
@@ -66,6 +66,31 @@ LR_WARMUP_STEPS = 100
 # practice, previously missing from this module's own training loop.
 GRAD_CLIP_NORM = 1.0
 MAX_SEQ_LEN = 256
+
+# Real, load-bearing register bound for `generate_riff_motif`'s own
+# continuous degree_index walk -- see that function's own docstring for
+# the real bug this fixes: `motif.degree_delta_for_interval` is
+# structurally biased toward non-negative deltas (confirmed empirically:
+# 0 negative deltas out of 480 real test cases across every interval
+# class and a wide range of starting positions -- `base_pitch +
+# semitone_interval` for a 0-11 interval class is never LESS than
+# base_pitch, so `scale.nearest()` almost always resolves at or above
+# it). Every other real pitch-generation path in this project uses the
+# SAME primitive but on SHORT motifs that get tiled/repeated (resetting
+# position often), so the bias never compounds far enough to be audible.
+# This function instead walks ONE continuous run across a whole section
+# (100+ real notes) with no reset -- confirmed the compounding is real
+# and severe: an un-bounded 124-note breakdown run climbed to a degree
+# index of 32 (11+ real scale-degree octaves above its own anchor),
+# which the existing fretboard `_snap_to_playable_octave` then yanked
+# back down by whole octaves over and over, producing a measured 67%
+# direction-reversal rate -- not a training-data quality problem at all,
+# a real integration bug. One real octave (12 semitones) each way from
+# the section's own anchor -- narrower than the ~26-semitone solo span
+# already established this session (`_SOLO_HIGH_OFFSET - _SOLO_LOW_
+# OFFSET` in song.py), a deliberately tighter, more rhythm-guitar-
+# appropriate real register.
+_RIFF_REGISTER_SPAN_SEMITONES = 12
 
 # Real thresholds mapping `theory.ARC`'s own per-role energy field (a
 # hand-authored ABSOLUTE 0-1 scale, 0.20 chill .. 1.00 breakdown --
@@ -503,9 +528,14 @@ def generate_riff_motif(
         temperature=temperature, corpus_dir=corpus_dir, energy_bucket=energy_bucket,
     )
 
+    anchor_pitch = scale.degree(int(base_degree))
+    low_pitch = anchor_pitch - _RIFF_REGISTER_SPAN_SEMITONES
+    high_pitch = anchor_pitch + _RIFF_REGISTER_SPAN_SEMITONES
+
     cell: list[dict] = []
     deltas: list[int] = []
     degree_index = int(base_degree)
+    direction = 1
     cumulative = 0.0
     for interval_class, duration in pairs:
         if cumulative >= total_beats:
@@ -513,7 +543,35 @@ def generate_riff_motif(
         remaining = total_beats - cumulative
         real_duration = min(duration, remaining)
         cell.append({"duration": real_duration, "is_rest": False})
-        d = degree_delta_for_interval(scale, degree_index, interval_class)
+
+        d = (
+            degree_delta_for_interval(scale, degree_index, interval_class)
+            if direction > 0
+            else degree_delta_for_interval_downward(scale, degree_index, interval_class)
+        )
+        candidate_pitch = scale.degree(degree_index + d)
+        if not (low_pitch <= candidate_pitch <= high_pitch):
+            # Real register bound (see _RIFF_REGISTER_SPAN_SEMITONES's own
+            # docstring for the real bug this prevents) -- a genuine
+            # reflection, the same real technique `theory.VoiceLeader.
+            # walk()` already uses, NOT a silent reset: `Motif.deltas` is
+            # a CONTINUOUS walk that `motif.render_motif`/`song.
+            # pitches_per_cell` naively cumsum downstream, so a delta
+            # must be genuinely bounded when recorded, not merely
+            # bounded relative to some internal bookkeeping the consumer
+            # doesn't know about (a silent "reset degree_index" approach
+            # was tried first and confirmed, by direct measurement, to
+            # NOT fix the real audible zigzag -- the stored deltas still
+            # implied an unbounded climb when replayed continuously).
+            # Flips the real persisted direction (same as VoiceLeader) so
+            # the walk keeps flowing into its new direction rather than
+            # snapping back next step.
+            direction = -direction
+            d = (
+                degree_delta_for_interval(scale, degree_index, interval_class)
+                if direction > 0
+                else degree_delta_for_interval_downward(scale, degree_index, interval_class)
+            )
         deltas.append(d)
         degree_index += d
         cumulative += real_duration

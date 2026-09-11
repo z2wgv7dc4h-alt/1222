@@ -115,7 +115,7 @@ from performance import double_track, humanize_take
 from presets import Preset, get_tuning, load_all_presets, load_tunings, resolve_preset_id
 from progression import CHORUS_PROGRESSIONS, VERSE_PROGRESSIONS, pitches_per_cell_with_progression
 from riff import harmonize_line
-import riff_model
+import riff_bank
 from structure import generate_section_sequence, judge, tempo_at
 from theory import Scale, VoiceLeader, arc
 
@@ -128,57 +128,51 @@ __all__ = ["compose_song", "compose_song_from_preset", "regenerate_section", "pi
 _RIFF_MODEL_PRESET_ID = "labyrinth"
 
 
-def _try_riff_model_motif(
-    preset: Preset, role: str, arc_row: dict, scale: Scale, base_degree: int,
+_riff_bank_cache: list["riff_bank.RiffFragment"] | None = None
+
+
+def _load_riff_bank() -> list["riff_bank.RiffFragment"]:
+    """Real, lazy, process-wide cache of the local riff-fragment bank
+    (gitignored, see riff_bank.py's own docstring) -- loaded once, an
+    empty list (not an error) when no bank file exists locally, matching
+    the same "missing local-only asset degrades gracefully" posture
+    `riff_model.DEFAULT_CHECKPOINT_PATH.exists()` already established."""
+    global _riff_bank_cache
+    if _riff_bank_cache is None:
+        if riff_bank.DEFAULT_RIFF_BANK_PATH.exists():
+            _riff_bank_cache = riff_bank.load_riff_bank(riff_bank.DEFAULT_RIFF_BANK_PATH)
+        else:
+            _riff_bank_cache = []
+    return _riff_bank_cache
+
+
+def _try_riff_bank_motif(
+    preset: Preset, role: str, scale: Scale, base_degree: int,
     total_beats: float, rng: random.Random,
 ) -> Motif | None:
-    """Real, corpus-trained riff generation for `labyrinth` ONLY, when a
-    trained checkpoint is actually present locally -- `None` (falling back
-    to the existing `theme_source`/Markov path unchanged) for every other
-    preset, and for `labyrinth` itself on any checkout without a trained
-    model file (the checkpoint is gitignored/local-only, see riff_model.py's
-    own docstring on why).
+    """Real, verbatim riff-fragment-bank generation for `labyrinth` ONLY --
+    the Metalerator-style replacement for the earlier trained-model path
+    (`riff_model.py`, now unused for `labyrinth`'s main riff; kept in the
+    codebase for its own real, still-valid determinism/anti-memorization
+    machinery, just no longer this preset's pitch-content source). `None`
+    (falling back to the existing `theme_source`/Markov path unchanged)
+    for every other preset, and for `labyrinth` itself whenever no local
+    bank file exists or the bank has zero real fragments for `role` --
+    the exact same graceful-degradation contract the model path already
+    established, so a fresh checkout with no bank behaves identically to
+    before this feature existed.
 
-    v2 -- real section-role awareness, added after direct listening
-    feedback that v1's model output had zero awareness of which role it
-    was writing for, making every section sound undifferentiated:
-      - `arc_row["energy"]` (the SAME real value already driving this
-        section's `hit_chance`) is threaded through as `arc_energy`,
-        conditioning the model's own sampling on real section intensity
-        (see `riff_model.generate_riff_motif`/`energy_bucket_from_arc_
-        energy`).
-      - `role == "verse"` gets the SAME real pedal-bias character
-        `_VERSE_PEDAL_BIAS` already gives the OLD Markov path, restored
-        via a real post-hoc pull (`riff_model.apply_pedal_bias_to_motif`)
-        since the model has no `weights` dict to bias before generation.
-
-    Draws real values from `rng` to seed the model's own separate
-    deterministic generator (and, for verse, the pedal-pull draws) -- but
-    ONLY inside this branch, so a checkout with no trained checkpoint
-    (every automated test, and any fresh clone) consumes the exact same
-    rng stream as before this function existed; zero behavior change for
-    anyone not opted in.
-
-    A real `RuntimeError` (the memorization-threshold safeguard) or
-    `FileNotFoundError` here falls back to `None` rather than crashing
-    song generation -- an untrained/over-memorizing model degrades to the
-    existing real generation path, never a hard failure.
+    Draws from `rng` (via `riff_bank.select_and_resolve_motif`'s own real
+    fragment selection) ONLY inside this branch, same real "zero rng-
+    stream change for anyone not opted in" discipline already proven for
+    the model path.
     """
     if preset.id != _RIFF_MODEL_PRESET_ID:
         return None
-    if not riff_model.DEFAULT_CHECKPOINT_PATH.exists():
+    fragments = _load_riff_bank()
+    if not fragments:
         return None
-    seed = rng.randrange(2**31)
-    try:
-        motif = riff_model.generate_riff_motif(
-            seed=seed, scale=scale, base_degree=base_degree, total_beats=total_beats,
-            arc_energy=arc_row["energy"],
-        )
-    except (FileNotFoundError, RuntimeError):
-        return None
-    if role == "verse":
-        motif = riff_model.apply_pedal_bias_to_motif(motif, _VERSE_PEDAL_BIAS, rng)
-    return motif
+    return riff_bank.select_and_resolve_motif(fragments, role, total_beats, scale, base_degree, rng)
 
 # A section is `preset.bars` bars of 4/4; slots are sixteenth/eighth/quarter
 # notes -- a reasonable default vocabulary for chug-driven metal rhythm.
@@ -737,6 +731,7 @@ def _generate_one_section(
     hit_chance_bias: float = 0.0,
     motif_override: Motif | None = None,
     blast_fill_chance: float | None = None,
+    themes: ThemeRegistry | None = None,
 ) -> tuple[dict, str | None, str | None]:
     """Real, standalone per-section generation. Returns `(section, kick_
     style, blast_type)` -- `section` has no `"tempo_drop"` key yet (whole-
@@ -758,6 +753,18 @@ def _generate_one_section(
     every downstream real step (kick/snare/hihat/blast/bass/lead/chord)
     still runs fresh against it, same as any other real section.
     exactly.
+
+    `themes`: the SAME `ThemeRegistry` `theme_source` is itself bound to
+    (when it's the real, cross-section-caching `_shared_theme_source`) --
+    given so the riff-bank path (`_try_riff_bank_motif`) can check whether
+    this role already has a cached base theme (only try the bank on a
+    genuine first occurrence) and `seed()` its own real result into that
+    SAME registry, so later occurrences of the role reuse/develop it via
+    the normal `theme_source` path instead of bypassing this registry --
+    the exact real bug the earlier trained-model path had. `None` (the
+    `regenerate_section` single-section caller, whose own `theme_source`
+    never caches at all) means "always try the bank fresh, nothing to
+    seed" -- consistent with that caller's own existing semantics.
     """
     arc_row = arc(role=role)
     section_feel = _resolve_section_feel(role, preset, rng)
@@ -769,14 +776,19 @@ def _generate_one_section(
     if motif_override is not None:
         m: Motif = motif_override
     else:
-        riff_model_theme = _try_riff_model_motif(
-            preset, role, arc_row, scale, arc_row["start_degree"], total_beats, rng,
-        )
-        if riff_model_theme is not None:
-            base_theme = riff_model_theme
+        theme_key = f"theme-{role}"
+        riff_bank_theme = None
+        if themes is None or theme_key not in themes:
+            riff_bank_theme = _try_riff_bank_motif(
+                preset, role, scale, arc_row["start_degree"], total_beats, rng,
+            )
+        if riff_bank_theme is not None:
+            base_theme = riff_bank_theme
+            if themes is not None:
+                themes.seed(theme_key, base_theme)
         else:
             base_theme = theme_source(
-                f"theme-{role}", total_beats, _ALLOWED_LENGTHS,
+                theme_key, total_beats, _ALLOWED_LENGTHS,
                 hit_chance,
                 rng, scale, preset.vocab.weights, chromatic=chromatic,
                 dissonance=arc_row["dissonance"],
@@ -1250,7 +1262,7 @@ def _generate_attempt(
         section, kick_style, blast_type = _generate_one_section(
             rng, preset, role, occurrence, scale, guitar_fb, bass_fb,
             total_beats, chromatic, previous_role, _shared_theme_source,
-            blast_fill_chance=blast_fill_chance,
+            blast_fill_chance=blast_fill_chance, themes=themes,
         )
         kick_styles.append(kick_style)
         blast_types.append(blast_type)

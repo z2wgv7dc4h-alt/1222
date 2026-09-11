@@ -621,3 +621,19 @@ class ThemeRegistry:
 
     def __contains__(self, theme_id: str) -> bool:
         return theme_id in self._cache
+
+    def seed(self, theme_id: str, motif: Motif) -> None:
+        """Register `motif` as `theme_id`'s own base theme when nothing is
+        cached for it yet -- lets an alternate real generator (e.g.
+        `riff_bank.select_and_resolve_motif`) become a role's canonical
+        first-occurrence theme, so later occurrences of that role reuse
+        and develop it via the normal `get_or_create` path exactly like a
+        Markov-generated theme already does, instead of bypassing this
+        registry entirely (the real bug `_try_riff_model_motif` had: it
+        drew a completely fresh motif on every occurrence, so `_develop_
+        theme` was developing a different random base each time rather
+        than genuinely relating repeated sections to each other). A no-op
+        when `theme_id` is already cached -- never overwrites a real,
+        already-established theme."""
+        if theme_id not in self._cache:
+            self._cache[theme_id] = motif

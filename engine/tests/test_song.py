@@ -1835,166 +1835,125 @@ def test_compose_song_blast_fill_chance_override_is_real():
 
 
 # ---------------------------------------------------------------------------
-# Real, local, trained riff model for Born of Osiris ("labyrinth") ONLY --
-# `_try_riff_model_motif` must be a genuine no-op (byte-identical to the
+# Real, verbatim riff-fragment bank for Born of Osiris ("labyrinth") ONLY --
+# `_try_riff_bank_motif` must be a genuine no-op (byte-identical to the
 # pre-existing Markov/statistical path) for every OTHER preset, and for
-# `labyrinth` itself whenever no trained checkpoint is present locally
-# (every automated test environment, and any fresh checkout -- the
-# checkpoint is gitignored/local-only).
+# `labyrinth` itself whenever no local bank file exists or the bank has no
+# real fragments for the requested role (every automated test environment,
+# and any fresh checkout -- the bank file is gitignored/local-only, see
+# riff_bank.py's own docstring).
 # ---------------------------------------------------------------------------
 
+from riff_bank import RiffFragment
 
-_FAKE_ARC_ROW = {"energy": 0.60, "register": 0, "dissonance": 0.35, "start_degree": 0, "letter": "A", "density": 0.65}
+
+@pytest.fixture(autouse=True)
+def _reset_riff_bank_cache():
+    """`song._load_riff_bank` caches process-wide -- reset it before and
+    after every test in this module so one test's monkeypatched bank path
+    can never leak into another's."""
+    import song
+
+    song._riff_bank_cache = None
+    yield
+    song._riff_bank_cache = None
 
 
-def test_try_riff_model_motif_is_none_for_every_non_labyrinth_preset():
-    import riff_model
-    from song import _try_riff_model_motif
+def _write_bank(tmp_path, fragments):
+    import riff_bank
+
+    path = tmp_path / "riff_bank.json"
+    riff_bank.save_riff_bank(fragments, path)
+    return path
+
+
+_VERSE_FRAGMENT = RiffFragment(
+    source_song="Fixture Song", source_file="fixture.gp5", measure_index=0,
+    cell=[{"duration": 0.5, "is_rest": False} for _ in range(8)],
+    deltas=[0, 2, -2, 0, 3, -3, 0, 1],
+    role="verse", raw_marker="Verse",
+)
+
+
+def test_try_riff_bank_motif_is_none_for_every_non_labyrinth_preset(tmp_path, monkeypatch):
+    import riff_bank
+    from song import _try_riff_bank_motif
     from theory import Scale
 
+    monkeypatch.setattr(riff_bank, "DEFAULT_RIFF_BANK_PATH", _write_bank(tmp_path, [_VERSE_FRAGMENT]))
     scale = Scale(root=0, name="minor")
     for preset_id in ALL_PRESET_IDS:
         if preset_id == "labyrinth":
             continue
         preset = load_all_presets()[preset_id]
-        result = _try_riff_model_motif(preset, "breakdown", _FAKE_ARC_ROW, scale, 0, 8.0, random.Random(1))
+        result = _try_riff_bank_motif(preset, "verse", scale, 0, 8.0, random.Random(1))
         assert result is None
 
 
-def test_try_riff_model_motif_is_none_without_a_real_checkpoint_present(tmp_path, monkeypatch):
-    import riff_model
-    from song import _try_riff_model_motif
+def test_try_riff_bank_motif_is_none_without_a_real_bank_file_present(tmp_path, monkeypatch):
+    import riff_bank
+    from song import _try_riff_bank_motif
     from theory import Scale
 
-    monkeypatch.setattr(riff_model, "DEFAULT_CHECKPOINT_PATH", tmp_path / "does_not_exist.pt")
+    monkeypatch.setattr(riff_bank, "DEFAULT_RIFF_BANK_PATH", tmp_path / "does_not_exist.json")
     preset = load_all_presets()["labyrinth"]
     scale = Scale(root=0, name="minor")
-    result = _try_riff_model_motif(preset, "breakdown", _FAKE_ARC_ROW, scale, 0, 8.0, random.Random(1))
+    result = _try_riff_bank_motif(preset, "verse", scale, 0, 8.0, random.Random(1))
     assert result is None
 
 
-def test_try_riff_model_motif_is_none_without_consuming_extra_rng_when_unavailable():
-    # The real, load-bearing guarantee: a checkout with no trained
-    # checkpoint must consume the EXACT SAME rng stream as before this
-    # feature existed -- zero behavior change for anyone not opted in.
-    from song import _try_riff_model_motif
+def test_try_riff_bank_motif_is_none_without_consuming_extra_rng_when_unavailable():
+    # The real, load-bearing guarantee: a checkout with no local bank file
+    # must consume the EXACT SAME rng stream as before this feature
+    # existed -- zero behavior change for anyone not opted in.
+    from song import _try_riff_bank_motif
     from theory import Scale
 
     preset = load_all_presets()["deathcore"]  # not labyrinth
     scale = Scale(root=0, name="minor")
     rng = random.Random(1)
-    _try_riff_model_motif(preset, "breakdown", _FAKE_ARC_ROW, scale, 0, 8.0, rng)
+    _try_riff_bank_motif(preset, "verse", scale, 0, 8.0, rng)
     expected_next = random.Random(1).random()
     assert rng.random() == pytest.approx(expected_next)
 
 
-def test_try_riff_model_motif_uses_the_real_model_when_a_checkpoint_exists(tmp_path, monkeypatch):
-    import riff_model
-    from song import _try_riff_model_motif
-    from theory import Scale
-    from motif import Motif
-
-    fake_checkpoint = tmp_path / "model.pt"
-    fake_checkpoint.write_text("not a real checkpoint, just needs to exist")
-    monkeypatch.setattr(riff_model, "DEFAULT_CHECKPOINT_PATH", fake_checkpoint)
-
-    fake_motif = Motif(cell=[{"duration": 1.0, "is_rest": False}], deltas=[0])
-    calls = []
-
-    def fake_generate_riff_motif(seed, scale, base_degree, total_beats, arc_energy=None):
-        calls.append((seed, base_degree, total_beats, arc_energy))
-        return fake_motif
-
-    monkeypatch.setattr(riff_model, "generate_riff_motif", fake_generate_riff_motif)
-
-    preset = load_all_presets()["labyrinth"]
-    scale = Scale(root=0, name="minor")
-    # "breakdown" role -- no pedal-bias post-process, so `result` is
-    # exactly `fake_motif` with no further mutation to account for.
-    result = _try_riff_model_motif(preset, "breakdown", _FAKE_ARC_ROW, scale, 3, 8.0, random.Random(1))
-
-    assert result is fake_motif
-    assert len(calls) == 1
-    assert calls[0][1] == 3  # base_degree threaded through
-    assert calls[0][2] == 8.0  # total_beats threaded through
-    assert calls[0][3] == pytest.approx(0.60)  # arc_row["energy"] threaded through
-
-
-def test_try_riff_model_motif_falls_back_to_none_on_real_model_errors(tmp_path, monkeypatch):
-    import riff_model
-    from song import _try_riff_model_motif
+def test_try_riff_bank_motif_returns_none_when_bank_has_no_fragments_for_role(tmp_path, monkeypatch):
+    import riff_bank
+    from song import _try_riff_bank_motif
     from theory import Scale
 
-    fake_checkpoint = tmp_path / "model.pt"
-    fake_checkpoint.write_text("not a real checkpoint, just needs to exist")
-    monkeypatch.setattr(riff_model, "DEFAULT_CHECKPOINT_PATH", fake_checkpoint)
-
-    def raises_runtime_error(seed, scale, base_degree, total_beats, arc_energy=None):
-        raise RuntimeError("simulated memorization-threshold failure")
-
-    monkeypatch.setattr(riff_model, "generate_riff_motif", raises_runtime_error)
-
+    monkeypatch.setattr(riff_bank, "DEFAULT_RIFF_BANK_PATH", _write_bank(tmp_path, [_VERSE_FRAGMENT]))
     preset = load_all_presets()["labyrinth"]
     scale = Scale(root=0, name="minor")
-    result = _try_riff_model_motif(preset, "breakdown", _FAKE_ARC_ROW, scale, 0, 8.0, random.Random(1))
+    result = _try_riff_bank_motif(preset, "breakdown", scale, 0, 8.0, random.Random(1))
     assert result is None
 
 
-def test_try_riff_model_motif_applies_real_pedal_bias_for_verse_only(tmp_path, monkeypatch):
-    import riff_model
-    from song import _try_riff_model_motif
+def test_try_riff_bank_motif_uses_the_real_bank_when_fragments_exist(tmp_path, monkeypatch):
+    import riff_bank
+    from song import _try_riff_bank_motif
     from theory import Scale
-    from motif import Motif
 
-    fake_checkpoint = tmp_path / "model.pt"
-    fake_checkpoint.write_text("not a real checkpoint, just needs to exist")
-    monkeypatch.setattr(riff_model, "DEFAULT_CHECKPOINT_PATH", fake_checkpoint)
-
-    # A real, deliberately non-zero delta sequence -- if pedal bias is
-    # really applied, SOME of these should come back as 0 (verse) but
-    # NONE should for a role that isn't verse (byte-identical to the
-    # model's own raw output).
-    fake_motif = Motif(cell=[{"duration": 0.5, "is_rest": False} for _ in range(40)], deltas=[3] * 40)
-    monkeypatch.setattr(riff_model, "generate_riff_motif", lambda **kw: fake_motif)
-
+    monkeypatch.setattr(riff_bank, "DEFAULT_RIFF_BANK_PATH", _write_bank(tmp_path, [_VERSE_FRAGMENT]))
     preset = load_all_presets()["labyrinth"]
     scale = Scale(root=0, name="minor")
-
-    verse_result = _try_riff_model_motif(preset, "verse", _FAKE_ARC_ROW, scale, 0, 20.0, random.Random(1))
-    assert verse_result is not fake_motif  # a real, new Motif, not the raw model output
-    assert verse_result.cell == fake_motif.cell  # rhythm shape untouched
-    assert any(d == 0 for d in verse_result.deltas)  # real pedal pulls actually happened
-    assert any(d == 3 for d in verse_result.deltas)  # not EVERY hit forced to root either
-
-    breakdown_result = _try_riff_model_motif(preset, "breakdown", _FAKE_ARC_ROW, scale, 0, 20.0, random.Random(1))
-    assert breakdown_result is fake_motif  # untouched -- no pedal-bias post-process for this role
-    assert breakdown_result.deltas == [3] * 40
+    result = _try_riff_bank_motif(preset, "verse", scale, 0, 4.0, random.Random(1))
+    assert result is not None
+    assert result.hit_count == len(result.deltas)
 
 
-def test_generate_one_section_uses_the_real_riff_model_for_labyrinth_when_available(tmp_path, monkeypatch):
+def test_generate_one_section_uses_the_real_riff_bank_for_labyrinth_when_available(tmp_path, monkeypatch):
     """End-to-end: `_generate_one_section` (not just the helper in
-    isolation) actually wires a real riff-model motif into `labyrinth`'s
-    guitar cells when a checkpoint is present."""
-    import riff_model
+    isolation) actually wires a real bank motif into `labyrinth`'s guitar
+    cells when a local bank file with matching-role fragments exists."""
+    import riff_bank
     from song import _generate_one_section
     from theory import Scale
     from fretboard import Fretboard
     from bass import build_bass_fretboard
     from presets import get_tuning, load_tunings
-    from motif import Motif
 
-    fake_checkpoint = tmp_path / "model.pt"
-    fake_checkpoint.write_text("not a real checkpoint, just needs to exist")
-    monkeypatch.setattr(riff_model, "DEFAULT_CHECKPOINT_PATH", fake_checkpoint)
-
-    fake_motif = Motif(
-        cell=[{"duration": 0.5, "is_rest": False} for _ in range(8)],
-        deltas=[0, 1, -1, 0, 2, -2, 0, 1],
-    )
-    monkeypatch.setattr(
-        riff_model, "generate_riff_motif",
-        lambda seed, scale, base_degree, total_beats, arc_energy=None: fake_motif,
-    )
+    monkeypatch.setattr(riff_bank, "DEFAULT_RIFF_BANK_PATH", _write_bank(tmp_path, [_VERSE_FRAGMENT]))
 
     preset = load_all_presets()["labyrinth"]
     tunings = load_tunings()
@@ -2004,10 +1963,58 @@ def test_generate_one_section_uses_the_real_riff_model_for_labyrinth_when_availa
     scale = Scale(root=tuning.open[0], name=preset.scale)
 
     def theme_source_that_must_not_be_called(*a, **kw):
-        raise AssertionError("theme_source must not be called when the riff model is available")
+        raise AssertionError("theme_source must not be called when the riff bank has real coverage")
 
     section, _kick, _blast = _generate_one_section(
         random.Random(1), preset, "verse", 0, scale, guitar_fb, bass_fb,
         4.0, False, None, theme_source_that_must_not_be_called,
     )
     assert len(section["guitar_take_a"]) == 8
+
+
+def test_generate_one_section_seeds_riff_bank_theme_for_real_cross_section_reuse(tmp_path, monkeypatch):
+    """The real fix for the earlier riff-model's own ThemeRegistry-bypass
+    bug: a role's FIRST occurrence draws from the bank and seeds that
+    result as the role's canonical base theme; a SECOND occurrence of the
+    same role must NOT draw a second, unrelated bank motif -- it reuses/
+    develops the seeded one via the normal `theme_source`/`_develop_theme`
+    path, exactly like the Markov path already does."""
+    import riff_bank
+    from song import _generate_one_section
+    from motif import ThemeRegistry
+    from theory import Scale
+    from fretboard import Fretboard
+    from bass import build_bass_fretboard
+    from presets import get_tuning, load_tunings
+
+    monkeypatch.setattr(riff_bank, "DEFAULT_RIFF_BANK_PATH", _write_bank(tmp_path, [_VERSE_FRAGMENT]))
+
+    calls = []
+    real_select = riff_bank.select_and_resolve_motif
+
+    def counting_select(*a, **kw):
+        calls.append(1)
+        return real_select(*a, **kw)
+
+    monkeypatch.setattr(riff_bank, "select_and_resolve_motif", counting_select)
+
+    preset = load_all_presets()["labyrinth"]
+    tunings = load_tunings()
+    tuning = get_tuning(preset.tuning_key, tunings)
+    guitar_fb = Fretboard(tuning.open)
+    bass_fb = build_bass_fretboard(tuning.open)
+    scale = Scale(root=tuning.open[0], name=preset.scale)
+
+    themes = ThemeRegistry()
+
+    def shared_theme_source(key, *a, **kw):
+        return themes.get_or_create(key, *a, **kw)
+
+    for occurrence in (0, 1):
+        _generate_one_section(
+            random.Random(1), preset, "verse", occurrence, scale, guitar_fb, bass_fb,
+            4.0, False, None, shared_theme_source, themes=themes,
+        )
+
+    assert len(calls) == 1  # the bank was consulted only on the real first occurrence
+    assert "theme-verse" in themes  # the bank result was genuinely seeded into the registry

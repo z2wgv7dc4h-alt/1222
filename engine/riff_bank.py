@@ -30,10 +30,14 @@ already applied to `engine/data/ml_corpus/`).
 from __future__ import annotations
 
 import json
+import random
 import re
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
+
+from motif import Motif, degree_delta_for_interval, degree_delta_for_interval_downward
+from theory import Scale
 
 try:
     import guitarpro
@@ -46,7 +50,16 @@ __all__ = [
     "build_riff_bank",
     "save_riff_bank",
     "load_riff_bank",
+    "select_and_resolve_motif",
+    "DEFAULT_RIFF_BANK_PATH",
 ]
+
+_EPS = 1e-6
+
+_ENGINE_ROOT = Path(__file__).resolve().parent
+# Same real precedent as `riff_model.DEFAULT_CHECKPOINT_PATH` -- a default
+# location callers can check for existence before trying to use it.
+DEFAULT_RIFF_BANK_PATH = _ENGINE_ROOT / "data" / "riff_bank.json"
 
 # GM guitar-family program range (nylon/steel/jazz/clean/muted/overdriven/
 # distortion/harmonics) -- the same real GM-program convention this
@@ -300,3 +313,128 @@ def save_riff_bank(fragments: list[RiffFragment], path: str | Path) -> None:
 def load_riff_bank(path: str | Path) -> list[RiffFragment]:
     data: list[dict[str, Any]] = json.loads(Path(path).read_text(encoding="utf-8"))
     return [RiffFragment(**d) for d in data]
+
+
+# Real register bound for a chained fragment sequence -- same real, already-
+# proven value as `motif._PITCH_REGISTER_SPAN_SEMITONES` and `riff_model.
+# _RIFF_REGISTER_SPAN_SEMITONES` (one real octave each way from the chain's
+# own anchor). Kept as this module's own constant rather than importing
+# motif's private one, matching `riff_model.py`'s own existing precedent of
+# each generator module declaring the same real value independently.
+_FRAGMENT_REGISTER_SPAN_SEMITONES = 12
+
+
+def _trim_fragment_cell(fragment: RiffFragment, max_beats: float) -> tuple[list[dict], list[int]]:
+    """Real cell/delta trim so a chained fragment never overshoots the
+    section's own remaining beat budget -- same "final cell corrected to
+    land exactly on total_beats" discipline `rhythm.generate_rhythm`
+    already uses, applied per-fragment here since a real fragment's own
+    beat-sum isn't guaranteed to be a clean 4.0 (a real tab bar can be a
+    non-4/4 measure or carry a transcription-quirky partial beat)."""
+    cells: list[dict] = []
+    deltas: list[int] = []
+    used = 0.0
+    delta_i = 0
+    for c in fragment.cell:
+        is_hit = not c["is_rest"]
+        if used + c["duration"] > max_beats + _EPS:
+            remaining = max_beats - used
+            if remaining > _EPS:
+                cells.append({"duration": remaining, "is_rest": c["is_rest"]})
+                if is_hit:
+                    deltas.append(fragment.deltas[delta_i])
+            break
+        cells.append(dict(c))
+        if is_hit:
+            deltas.append(fragment.deltas[delta_i])
+            delta_i += 1
+        used += c["duration"]
+    return cells, deltas
+
+
+def select_and_resolve_motif(
+    fragments: list[RiffFragment],
+    role: str,
+    total_beats: float,
+    scale: Scale,
+    base_degree: int,
+    rng: random.Random,
+) -> Motif | None:
+    """Real, section-length `Motif` chained from real bank fragments
+    matching `role`. Returns `None` when the bank has zero real coverage
+    for this role -- an honest "no bank data" case, never a fabricated
+    substitute; the caller falls back to the existing Markov path exactly
+    as it already does for any other `None` real-generator result (same
+    contract `_try_riff_model_motif` already established).
+
+    Chains real 1-bar fragments (drawn with replacement -- a role with
+    sparse real coverage legitimately reuses its own fragments rather
+    than falling back) until `total_beats` is filled, trimming the final
+    fragment to land exactly on it. Each fragment's own real semitone-
+    interval shape is resolved into scale-degree deltas via `motif.
+    degree_delta_for_interval`/`_downward` -- the same already-proven,
+    already-tested primitives `motif.generate_pitch_deltas` and `riff_
+    model.generate_riff_motif` both use. The real SOURCE direction (was
+    this interval originally up or down in the actual tab) is preserved
+    by default -- genuine verbatim shape -- and only reflected (the same
+    real technique proven at both of those other call sites) when it
+    would carry the chain outside `_FRAGMENT_REGISTER_SPAN_SEMITONES` of
+    `base_degree`, so chaining many real fragments together can never
+    reproduce the same unbounded-register-walk bug fixed earlier this
+    session.
+    """
+    candidates = [f for f in fragments if f.role == role]
+    if not candidates:
+        return None
+
+    anchor_pitch = scale.degree(int(base_degree))
+    low_pitch = anchor_pitch - _FRAGMENT_REGISTER_SPAN_SEMITONES
+    high_pitch = anchor_pitch + _FRAGMENT_REGISTER_SPAN_SEMITONES
+
+    cell: list[dict] = []
+    deltas: list[int] = []
+    degree_index = int(base_degree)
+    accumulated_beats = 0.0
+
+    while accumulated_beats < total_beats - _EPS:
+        fragment = rng.choice(candidates)
+        remaining = total_beats - accumulated_beats
+        frag_beats = sum(c["duration"] for c in fragment.cell)
+        if frag_beats > remaining + _EPS:
+            take_cells, take_deltas = _trim_fragment_cell(fragment, remaining)
+        else:
+            take_cells, take_deltas = [dict(c) for c in fragment.cell], list(fragment.deltas)
+
+        if not take_cells:
+            break
+
+        delta_i = 0
+        for c in take_cells:
+            cell.append(c)
+            if c["is_rest"]:
+                continue
+            semitone_delta = take_deltas[delta_i]
+            delta_i += 1
+            if semitone_delta == 0:
+                d = 0
+            else:
+                iv = abs(semitone_delta)
+                source_upward = semitone_delta > 0
+                d = (
+                    degree_delta_for_interval(scale, degree_index, iv)
+                    if source_upward
+                    else degree_delta_for_interval_downward(scale, degree_index, iv)
+                )
+                candidate_pitch = scale.degree(degree_index + d)
+                if not (low_pitch <= candidate_pitch <= high_pitch):
+                    d = (
+                        degree_delta_for_interval_downward(scale, degree_index, iv)
+                        if source_upward
+                        else degree_delta_for_interval(scale, degree_index, iv)
+                    )
+            deltas.append(d)
+            degree_index += d
+
+        accumulated_beats += sum(c["duration"] for c in take_cells)
+
+    return Motif(cell=cell, deltas=deltas)

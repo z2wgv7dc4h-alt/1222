@@ -225,3 +225,77 @@ def test_save_and_load_riff_bank_round_trips_exactly(tmp_path):
     rb.save_riff_bank([fragment], out_path)
     loaded = rb.load_riff_bank(out_path)
     assert loaded == [fragment]
+
+
+# --- select_and_resolve_motif -------------------------------------------------
+
+import random
+
+from theory import Scale
+
+_SCALE = Scale(root=40, name="minor")
+
+_ONE_BAR_FRAGMENT = rb.RiffFragment(
+    source_song="Fixture Song", source_file="fixture.gp5", measure_index=0,
+    cell=[{"duration": 1.0, "is_rest": False} for _ in range(4)],
+    deltas=[0, 2, -2, 1],
+    role="verse", raw_marker="Verse",
+)
+
+
+def test_select_and_resolve_motif_returns_none_with_no_matching_role():
+    result = rb.select_and_resolve_motif([_ONE_BAR_FRAGMENT], "breakdown", 4.0, _SCALE, 0, random.Random(1))
+    assert result is None
+
+
+def test_select_and_resolve_motif_chains_fragments_to_fill_total_beats():
+    result = rb.select_and_resolve_motif([_ONE_BAR_FRAGMENT], "verse", 8.0, _SCALE, 0, random.Random(1))
+    assert result is not None
+    assert sum(c["duration"] for c in result.cell) == pytest.approx(8.0)
+    assert result.hit_count == len(result.deltas) == 8  # two real 4-hit bars chained
+
+
+def test_select_and_resolve_motif_trims_the_final_fragment_to_land_exactly_on_total_beats():
+    # 6.0 beats isn't a multiple of the fragment's own 4.0-beat bar --
+    # the second real fragment draw must be trimmed, not overshoot.
+    result = rb.select_and_resolve_motif([_ONE_BAR_FRAGMENT], "verse", 6.0, _SCALE, 0, random.Random(1))
+    assert result is not None
+    assert sum(c["duration"] for c in result.cell) == pytest.approx(6.0)
+
+
+def test_select_and_resolve_motif_stays_within_the_real_register_bound_under_extreme_climb():
+    # An extreme synthetic fragment -- every real hit a large upward leap,
+    # never a downward one -- mirrors the exact real test pattern already
+    # used for motif.generate_pitch_deltas/riff_model.generate_riff_motif
+    # to prove the register-bound reflection actually engages rather than
+    # reproducing the same unbounded-walk bug fixed earlier this session.
+    climbing_fragment = rb.RiffFragment(
+        source_song="Fixture Song", source_file="fixture.gp5", measure_index=0,
+        cell=[{"duration": 1.0, "is_rest": False} for _ in range(4)],
+        deltas=[0, 11, 11, 11],
+        role="verse", raw_marker="Verse",
+    )
+    result = rb.select_and_resolve_motif(
+        [climbing_fragment], "verse", 64.0, _SCALE, 0, random.Random(1),
+    )
+    assert result is not None
+    pitches = []
+    degree_index = 0
+    for d in result.deltas:
+        degree_index += d
+        pitches.append(_SCALE.degree(degree_index))
+    anchor = _SCALE.degree(0)
+    span = rb._FRAGMENT_REGISTER_SPAN_SEMITONES
+    assert all(anchor - span <= p <= anchor + span for p in pitches)
+    # A genuinely unbounded climb would use only one direction -- real
+    # reflection means the register bound was actually hit and turned.
+    assert any(p2 < p1 for p1, p2 in zip(pitches, pitches[1:]))
+
+
+def test_select_and_resolve_motif_draws_with_replacement_when_only_one_fragment_covers_a_role():
+    # A role with exactly one real fragment must still be able to fill a
+    # long section by reusing it -- sparse real coverage is legitimate,
+    # not a hard stop.
+    result = rb.select_and_resolve_motif([_ONE_BAR_FRAGMENT], "verse", 16.0, _SCALE, 0, random.Random(1))
+    assert result is not None
+    assert result.hit_count == 16

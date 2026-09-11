@@ -43,4 +43,6 @@ engine/data/riff_bank.json
 # (not a session scratchpad, which does not survive between sessions) so
 # a future session can find and reuse them without re-downloading. See
 # docs/CURRENT.md's own handoff note for the exact paths.
-tools/
+tools/*
+!tools/boo-lab/
+!tools/boo-lab/**

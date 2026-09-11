@@ -1,0 +1,29 @@
+[project]
+name = "boo-lab"
+version = "0.1.0"
+description = "Listen to your CDs, pin riff/hook/breakdown/solo, extract tabs you own."
+requires-python = ">=3.11"
+dependencies = [
+  "pyguitarpro>=0.9",
+  "fastapi>=0.110",
+  "uvicorn>=0.27",
+  "pydantic>=2",
+]
+
+[project.optional-dependencies]
+guess = ["allin1"]
+stems = ["demucs"]
+dev = ["pytest"]
+
+[project.scripts]
+boo-lab = "boo_lab.cli:main"
+
+[build-system]
+requires = ["setuptools>=45"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+boo_lab = ["static/*"]

@@ -6,7 +6,13 @@
       "Write(../Ww/**)",
       "Read(../123/**)",
       "Edit(../123/**)",
-      "Write(../123/**)"
+      "Write(../123/**)",
+      "Read(docs/archive/**)",
+      "Edit(docs/archive/**)",
+      "Write(docs/archive/**)",
+      "Read(engine/riff_model.py)",
+      "Edit(engine/riff_model.py)",
+      "Write(engine/riff_model.py)"
     ]
   },
   "hooks": {
@@ -60,7 +66,7 @@
           },
           {
             "type": "prompt",
-            "prompt": "You are at Stop. Do the close skill if engine/ or docs changed: update CURRENT.md, TASKS.md, PROGRESS.md, then git add/commit this repo only (ignore assets/ and reference/). git push only if origin exists. Do not start the next task. Do not /clear. Then {\"decision\":\"stop\"}."
+            "prompt": "Stop. Do not append PROGRESS.md. Do not read docs/archive. Do not import riff_model.py. Do not start the next task. Do not push unless the user asked. Then {\"decision\":\"stop\"}."
           }
         ]
       }

@@ -1,9 +1,8 @@
 ---
 name: scope
-description: Open the correct god-tier-metal-scope.md heading for the current TASKS id. Use at the start of any P1+ task.
+description: Open one scope heading only when the current TASKS box names it.
 ---
 
-1. Read docs/CURRENT.md for the task id (P1.4 etc).
-2. Read SCOPE-INDEX.md. Open only the listed headings in god-tier-metal-scope.md.
-3. If the scope file is missing, say so and stop. Do not invent the missing text.
-4. Do not read the rest of the scope file.
+Default: do not open god-tier-metal-scope.md.
+If TASKS.md ## Now names a heading, open SCOPE-INDEX.md then that heading only.
+Do not read docs/archive.

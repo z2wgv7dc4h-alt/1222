@@ -1,28 +1,8 @@
-"""Real, small, LOCAL (never cloud) trained sequence model for Born of
-Osiris riff generation -- the model this session's own listening feedback
-("all of them are bad," after eight real statistical/corpus-calibration
-fixes) motivated: `preset.vocab.markov` (a first-order Markov chain) has no
-memory beyond one step, so it fundamentally cannot plan a riff's shape
-across a real multi-bar phrase. A small decoder-only Transformer, trained
-on this project's own real, locally-held Born-of-Osiris corpus
-(`riff_corpus.py`), can.
+"""UNUSED. Do not import from song.py.
 
-Genuinely, deliberately scoped to ONLY the `labyrinth` preset's rhythm-
-guitar riff content -- see the approved plan. Every other preset keeps its
-existing statistical generation untouched.
+Local Transformer experiment for labyrinth. Listening rejected it (v20 nonsense).
+Bank + tile is the labyrinth writer. This file stays so git history is intact.
 
-"Grid is the writer" stays true even with a trained model in the loop: this
-module's own output is real `(interval_class, duration_beats)` TOKENS, never
-final notes -- `song.py`'s existing note-realization pipeline
-(`degree_delta_for_interval`, fretboard-reachability) still resolves and
-validates every note exactly as it does for every other generation path.
-The model proposes a real phrase shape; the deterministic engine still has
-final say.
-
-A genuine, deliberate departure from this project's "no AI/cloud model" law
-as originally understood -- explicit, approved, LOCAL-ONLY (this file never
-calls out to any network service), and still fully seeded/deterministic at
-inference time (see `_seed_everything`).
 """
 from __future__ import annotations
 

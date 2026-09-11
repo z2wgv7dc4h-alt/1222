@@ -1,14 +1,4 @@
-"""Real lead/melodic line generation, driven by `theory.VoiceLeader`.
-
-Per god-tier-metal-scope.md ## 4: "current 'lead' is literally the rhythm
-riff transposed up an octave. Needs actual phrase-based melodic writing --
-target-note (chord-tone) landing on strong beats ... occasional wide
-sweep-style interval leaps."
-
-This wires an ACTUAL `VoiceLeader` (not an ad hoc weight dict) to a real
-preset's `vocab`, so the lead's interval choices carry the same style
-character as everything else generated from that preset.
-"""
+"""Real lead/melodic line generation, driven by `theory.VoiceLeader`."""
 from __future__ import annotations
 
 import random

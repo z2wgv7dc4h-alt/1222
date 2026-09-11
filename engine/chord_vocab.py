@@ -1,28 +1,4 @@
-"""Named chord-quality vocabulary, wired into the real fretboard solver.
-
-Gap this closes (TASKS.md X.6b): `chords.solve_chord` is already a GENERIC
-fretboard-fingering solver -- it accepts any interval tuple, not just power
-chords -- but nothing in this project had a NAMED vocabulary of real chord
-qualities beyond the ad-hoc power-chord/triad tuples used inline in
-`riff.py` (e.g. `(0, 7, 12)`), and nothing in `song.py`'s real generation
-path ever reached for a richer chord on the ambient/clean/melodic
-(`chill`/`interlude`) sections the project's own scope doc names as a
-standing goal (Periphery-style extended-chord ambient sections).
-
-`CHORD_QUALITIES` below follows the exact convention of `scales.py`'s
-`SCALES` dict (a semitone-offset-from-root tuple per name) and
-`get_chord_quality` mirrors `scales.get_scale`'s "raise ValueError on an
-unknown name, never fabricate a fallback" contract.
-
-`voice_named_chord` wires that table into the existing solver stack by
-calling `riff.voice_chord_section` (which itself calls `chords.solve_chord`)
--- fingering selection itself is NOT reimplemented here, only the
-name-to-intervals lookup is new. Per `chords.solve_chord`'s own documented
-contract ("return [] rather than fabricate") and `voice_chord_section`'s
-("raise ValueError rather than fabricate"), this module never invents a
-fingering either: an unknown quality name or an unreachable chord both
-raise `ValueError`.
-"""
+"""Named chord-quality vocabulary, wired into the real fretboard solver."""
 from __future__ import annotations
 
 from fretboard import Fretboard

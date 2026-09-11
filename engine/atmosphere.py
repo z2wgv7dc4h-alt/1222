@@ -1,29 +1,4 @@
-"""Atmosphere: Phase 7 -- cheap, zero-dependency placeholder pads/hits.
-
-Per PORTS.md's `keys_gen.py` row and god-tier-metal-scope.md sec. 18.2, this
-is a stand-in atmosphere layer using plain General MIDI program numbers,
-ahead of any real sample library (a later Phase 8 concern). Three small
-pieces:
-
-  - P7.1: GM program constants + voicing shapes for a warm pad and an
-    orchestra-hit stab.
-  - P7.2: doubling the guitar's own motif contour on a synth voice, reusing
-    `motif.render_motif` directly rather than reimplementing pitch
-    rendering, at an optional transposition (octave doubling, harmony
-    interval, or none).
-  - P7.3: placing orchestral stabs at structurally accented cell positions
-    in a section's rhythm cell list -- wired against a real
-    `structure.generate_section_content` result's motif, not just a
-    standalone function tests could call.
-
-Hard law from CLAUDE.md/anti-patterns.md this file obeys:
-  - Grid is the writer: nothing here calls an audio model; it only picks
-    GM program numbers and MIDI pitch lists.
-  - A mechanism designed but not called from real generation is not done:
-    `synth_double` and `find_accents` are exercised end-to-end against a
-    real `structure.generate_section_content` result in
-    tests/test_atmosphere.py, not just against hand-built fixtures.
-"""
+"""Atmosphere: Phase 7 -- cheap, zero-dependency placeholder pads/hits."""
 from __future__ import annotations
 
 from motif import Motif, render_motif

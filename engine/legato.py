@@ -1,33 +1,4 @@
-"""Legato-run generation: TASKS.md X.6a.
-
-Gap this closes (per the task brief, not god-tier-metal-scope.md's own
-wording): `lead.py`'s `generate_lead_line` is built on `theory.VoiceLeader`,
-a "leap and settle" model -- pick a weighted interval, snap it into the
-scale, then place it in whichever register sits closest to the previous
-note. That is a genuinely different phrasing shape from a real legato run
-(rapid hammer-on/pull-off, or tapped, motion through several CONSECUTIVE
-scale degrees in one continuous rhythmic burst). Nothing in this engine
-modeled that distinct articulation before this module.
-
-Where this deliberately differs from VoiceLeader:
-  - VoiceLeader.pick() is a probabilistic weighted-interval choice, snapped
-    into whichever octave is nearest the previous note. A legato run is a
-    deterministic, CONTIGUOUS walk of the scale (`scale.step`), one degree
-    at a time -- that contiguity is the actual defining feature of a
-    legato lick, not an implementation detail.
-  - fret_positions_for_run below is explicitly biased toward ONE STRING
-    (real legato technique -- hammer-on/pull-off works because the fretting
-    hand stays put on a single string; jumping strings mid-run is sweep/
-    tapping-across-strings, a different technique this module is not
-    modeling).
-
-Per CLAUDE.md's law: Grid is the writer (no cloud/AI model here), every
-random draw goes through a caller-supplied `random.Random`, and every pitch
-this module hands back is scale-legal and (where a fretboard is given) a
-real `(string, fret)` -- `fret_positions_for_run` raises rather than
-fabricating a position for an unplayable pitch, matching
-`fretboard.Fretboard.pitch_to_fret`'s own discipline.
-"""
+"""Legato-run generation: TASKS.md X.6a."""
 from __future__ import annotations
 
 import random

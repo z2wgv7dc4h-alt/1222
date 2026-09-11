@@ -1,41 +1,4 @@
-"""Reference-MIDI density/placement vocabulary -- Phase 4 task P4.4.
-
-god-tier-metal-scope.md sec. 18.6 identified a real, legally-clean MIDI
-reference corpus (Whack Studio's "Breakdown Essentials" GM pack, plus
-JJDoge's free "Lakeside Camping" / "Lamb Chops" / "Dreaming In Theaters"
-groove packs) extracted to `reference/midi-corpus/` (gitignored -- 1967
-`.mid` files across four packs, organized by BPM-range folders with
-Grooves/Fills subfolders).
-
-This module mines that corpus for realistic drum-fill DENSITY vocabulary --
-hits-per-beat, fill length in beats, how many distinct note numbers a fill
-touches -- as reference DATA, never as literal patterns to copy. Per
-CLAUDE.md's law ("Grid is the writer. Audio models are paint after the
-score."), `rhythm.py`/`drums.py` remain the actual writer: this corpus only
-teaches `vocabulary_informed_hit_chance` what realistic fill density looks
-like at a given BPM, as one more input alongside the caller's own
-`hit_chance` choice.
-
-Three-stage pipeline, deliberately split so tests never have to touch the
-1967-file corpus:
-  1. `extract_file_stats` / `extract_corpus_stats` -- parse real `.mid` files
-     with `mido` (added to requirements.txt; pure-Python, MIT-licensed --
-     the pragmatic choice over hand-rolling a binary MIDI parser).
-  2. `aggregate_vocabulary` -- roll per-file stats into small summary
-     buckets (by BPM range and by source pack).
-  3. `build_vocabulary` writes that summary to a small cached JSON file
-     (`engine/data/midi_vocab.json`); `load_vocabulary` /
-     `vocabulary_informed_hit_chance` read the cache -- nothing downstream
-     re-parses MIDI on every call.
-
-Hard law from CLAUDE.md this file obeys:
-  - Grid is the writer. This module only produces a density *parameter*
-    (`hit_chance`); it never emits notes/cells itself.
-  - Seeded RNG: N/A here -- this module is pure data extraction/lookup, no
-    randomness.
-  - Glob the directory (`rglob("*.mid")`), never a hardcoded file list --
-    anti-patterns.md.
-"""
+"""Reference-MIDI density/placement vocabulary -- Phase 4 task P4.4."""
 
 from __future__ import annotations
 

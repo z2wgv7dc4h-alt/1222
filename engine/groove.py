@@ -1,15 +1,4 @@
-"""Groove-grammar: named rhythmic-cell generators.
-
-Per god-tier-metal-scope.md ## 4: "named rhythmic cells (e.g. ... 'gallop',
-'stutter-chug') that can be sequenced and varied, replacing the flat
-per-eighth-note coin flip." These are pitch-agnostic cell generators (same
-`{"duration": float, "is_rest": bool}` shape as `rhythm.py`) that each encode
-a genuinely different rhythmic DEVICE, not just different random parameters
-over the same shape.
-
-Both build on `rhythm.tile_cell` (already-tested exact-fill/truncation
-behaviour) rather than re-deriving fill/truncation logic here.
-"""
+"""Groove-grammar: named rhythmic-cell generators."""
 from __future__ import annotations
 
 import random

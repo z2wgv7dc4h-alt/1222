@@ -1,36 +1,4 @@
-"""Real Reaper `.rpp` project-file export (Phase 8, headless): a complete,
-directly-openable Reaper project built from a composed song, entirely
-offline -- no live `reapy` connection, no Reaper process, no socket.
-
-Per the user's own explicit requirement ("all being done in the background
-... I'm not running Reaper myself"), this sidesteps the live-bridge
-approach investigated first (`reapy`/`reapy-boost`): that path hit a real,
-reproducible connection bug in this environment that needed console
-access to diagnose. Verified with the user directly (2026-09-08) that
-nothing Phase 8 actually needs -- project assembly, FX chains, tempo
-automation, and rendering to audio (REAPER's real `-renderproject` CLI
-flag) -- requires a live connection; all of it is expressible as a static
-project file REAPER opens/renders on its own.
-
-The `.rpp` text format below is NOT guessed. It was reverse-engineered
-from a real, ground-truth file: this project's own `midi_export.
-song_to_midi` output, imported into a real, currently-installed REAPER
-7.79 via `reaper.exe -new file.mid -saveas out.rpp`, then read back and
-compared field-by-field (project header, `<TRACK>`, `<ITEM>`,
-`<SOURCE MIDI>`, and the `<X ...>` track-name meta-event block, which
-decodes to the exact standard MIDI "sequence/track name" meta-event
-`0xFF 0x03 <name bytes>` -- confirmed by base64-decoding it directly, not
-assumed). Every fixed field below (`PEAKCOL`, `AUTOMODE`, `FIXEDLANES`,
-etc.) is REAPER's own real default, copied from that ground-truth file,
-not invented.
-
-Reuses `midi_export`'s already-real event-extraction functions
-(`_cell_events`/`_lead_events_for_section`/`_section_beats`/
-`_pad_events_for_section`/`_accent_events_for_section`) rather than
-re-deriving per-track note/timing data a second time -- one source of
-truth for "what notes are in this song," two serializers (Standard MIDI
-File, and this real Reaper project format) on top of it.
-"""
+"""Real Reaper `.rpp` project-file export (Phase 8, headless): a complete,"""
 from __future__ import annotations
 
 import base64

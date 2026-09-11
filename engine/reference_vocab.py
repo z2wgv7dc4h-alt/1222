@@ -1,40 +1,4 @@
-"""Real, format-agnostic reference-song analysis: parses a real MIDI,
-Guitar Pro, or audio file and measures its own real tonal/interval
-character (per-track key estimate, interval-vocabulary percentages,
-register, note density) -- never reproduces the source's actual notes or
-melody in any output, only extracts statistical summaries, per this
-project's own established "pattern analysis, never reproduction"
-discipline (god-tier-metal-scope.md sec.14.2 item 12).
-
-Found necessary via direct user listening feedback ("you're just
-guessing"): ad hoc analysis of one real reference MIDI measurably
-improved generated output the same session. This module makes that real
-technique tested and reusable for every future reference the user
-supplies, accumulating into a real local corpus
-(`engine/data/reference_corpus.json`) rather than a fresh one-off script
-each time -- the same real cache pattern `midi_vocab.py` already
-established for the drum-fill corpus (`extract_*` -> `add_reference`/
-`build_vocabulary` -> a committed JSON cache of DERIVED STATISTICS only,
-never the source's own notes).
-
-Three real input formats, one shared real analysis core:
-  - MIDI (`pretty_midi`) -- the format used for this session's own
-    real reference.
-  - Guitar Pro `.gp*` (`pyguitarpro`) -- more precise than audio
-    transcription (exact fret-resolved pitch, `Note.realValue`) and, per
-    a real web search, far more available for a specific song than a raw
-    MIDI transcription.
-  - Audio (`librosa` via `audio_vocab.py`) -- tempo/structural stats
-    always; a real note-level vocabulary too when `basic_pitch` (already
-    installed in this environment) can transcribe it, honestly flagged
-    `"transcription": "structural_only"` when it can't rather than
-    silently claiming note-level precision it doesn't have.
-
-Key estimation reuses `audio_vocab.py`'s own real Krumhansl-Schmuckler
-profile arrays directly (not duplicated) -- the same real technique,
-just correlated against a symbolic (MIDI/GP note) pitch-class histogram
-instead of audio chroma.
-"""
+"""Real, format-agnostic reference-song analysis: parses a real MIDI,"""
 from __future__ import annotations
 
 import json

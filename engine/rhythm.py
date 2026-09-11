@@ -1,25 +1,4 @@
-"""Rhythm/timing structure -- pitch-agnostic.
-
-Phase 2 ("Rhythm") of the engine. Nothing in this file knows or cares about
-pitch; a cell is just {"duration": float, "is_rest": bool}. Pitch/timbre is
-layered on top of these skeletons by other code.
-
-Hard law from CLAUDE.md that every function here obeys:
-  - Grid is the writer. No cloud/AI model anywhere in this file.
-  - Seeded RNG only: every random draw goes through a `random.Random`
-    instance passed in by the caller. Nothing here touches the global
-    `random` module, so two independent calls with the same seed produce
-    provably identical output and never interfere with each other or with
-    parallel work.
-  - One class per job.
-
-Documented historical mistake this file explicitly does NOT repeat: an
-earlier attempt faked triplet feel by cherry-picking indices
-{0,2,3,5,6,8,10,11,13,14} out of a 16-slot 16th-note grid ("the fake 3+3+2
-grid"). `tuplet_grid()` below produces genuine evenly-spaced compound-meter
-subdivisions instead -- see its docstring and the guard test in
-tests/test_rhythm.py.
-"""
+"""Rhythm/timing structure -- pitch-agnostic."""
 
 from __future__ import annotations
 

@@ -1,30 +1,4 @@
-"""Structure -- Phase 6 of the engine: song-level shape.
-
-Everything below this file is section-level (a rhythm cell, a Motif, a
-drum fill). This module is the first thing that thinks about a whole SONG:
-what order sections come in, how they're stitched together at the seams,
-mid-section devices (half-time drops), how a section's melodic anchor
-(scale degree) shifts across the arc, whether a generated section is any
-good, and how tempo can move across the section sequence.
-
-Ported per PORTS.md from two functions in
-reference/ww-forge-prior-attempt/engine/song_writer.py
-(`pickup`, `flatten`/`_bridge`) and one from
-reference/ww-forge-prior-attempt/engine/riff_engine.py (`judge`), each
-adapted from that project's raw MIDI-slot-list data shapes to this
-project's rhythm-cell shapes (`{"duration", "is_rest"}` from `rhythm.py`,
-optionally carrying `velocity` from `performance.humanize_take`/
-`slam.mark_pinch_harmonics`, or `role`/`roles` from `drums.py`).
-
-Hard law from CLAUDE.md/anti-patterns.md this file obeys:
-  - Seeded RNG only: every random draw goes through a `random.Random`
-    instance passed in by the caller.
-  - A mechanism designed but not called from real generation is not done:
-    `generate_song_sections` below is what actually calls `theory.arc()`
-    and threads its `start_degree` into `motif.generate_motif` for a real
-    section sequence -- `arc()` having a `start_degree` field was already
-    true before this file existed; this file is what makes it matter.
-"""
+"""Structure -- Phase 6 of the engine: song-level shape."""
 from __future__ import annotations
 
 import random

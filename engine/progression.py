@@ -1,28 +1,4 @@
-"""Real per-bar tonal-center progression -- X.30, the second half of the
-Metalerator verse/chorus finding (the first half, X.29, wired verse/chorus
-as real structure-graph roles).
-
-Ported per PORTS.md from `reference/metalerator/metalerator/misc/
-generate_song.py`'s real `CHORD_PROGRESSIONS` table and `rhythm_guitar/
-chorus/chorus.py`'s own (denser) table of the same shape: a named, real
-4-bar sequence of scale-degree offsets from the song's tonic. The source's
-own real device: `set_root_note(bar) = self.current_scale[self.
-progression[bar]]` -- each bar's riff root is looked up fresh from
-`progression[bar]`, not one fixed root held for the whole section. This
-project has never modulated a tonal center anywhere; every section has held
-one fixed `start_degree` (from `theory.arc()`) the whole way through --
-directly answers `god-tier-metal-scope.md` sec.2 ("Key/tonal-center
-modulation across sections... needs a concept of home key vs modulated key
-per section") and sec.14.2 item 5, both OPEN until now.
-
-This module only adds a per-bar ANCHOR on top of `motif.render_motif`'s
-existing per-hit rendering -- `motif.py` itself is untouched. Real,
-additive-on-top-of-`start_degree` design (not a replacement): a section's
-existing `arc_row["start_degree"]` anchor still applies, the progression
-modulates AROUND it, consistent with this project's existing all-additive
-degree-stacking convention (base_degree + delta + register already stack
-this way everywhere else in `song.py`).
-"""
+"""Real per-bar tonal-center progression -- X.30, the second half of the"""
 from __future__ import annotations
 
 from motif import Motif

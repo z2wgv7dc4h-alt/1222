@@ -1,24 +1,4 @@
-"""Drums -- Phase 4 of the engine.
-
-Drums reference articulations by a semantic ROLE, never a raw MIDI note.
-This is deliberate and load-bearing: the user's real SFZ kit (confirmed in
-god-tier-metal-scope.md sec. 11.7) maps note numbers to articulations in a
-way that conflicts with older/other conventions -- e.g. on THIS kit note 48
-is a hi-hat "swish/open" articulation, not an extra tom, and note 63 is a
-rototom, not a "closed hat" as an older internal vocabulary assumed. A
-different kit could remap every note. By writing the generation logic
-against roles (`KICK`, `SNARE`, ...) and resolving role -> note only through
-`note_for_role`, swapping kits means swapping `ROLE_TO_NOTE`/`FALLBACKS`,
-never touching generation code.
-
-Hard law from CLAUDE.md that every function here obeys:
-  - Grid is the writer. No cloud/AI model anywhere in this file.
-  - Seeded RNG only: every random draw goes through a `random.Random`
-    instance passed in by the caller.
-  - One class per job (this module defines none of its own -- it reuses
-    `rhythm.RhythmRegistry` for the shared-sequence mechanism rather than
-    inventing a second cache).
-"""
+"""Drums -- Phase 4 of the engine."""
 
 from __future__ import annotations
 

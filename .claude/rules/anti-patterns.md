@@ -7,3 +7,7 @@
 - Two scale names, one interval set: aliases only, documented.
 - STATUS.md and CURRENT.md may only claim what grep or pytest just showed.
 - One `engine/` folder only — the one with `pyproject.toml`. Source modules go directly inside it. Never `engine/engine/`.
+- Do not treat PROGRESS.md or docs/archive as a backlog.
+- Do not `/next` past TASKS.md ## Now.
+- Labyrinth bank: one song, multi-bar tile. Role-bag bars are the failed demo.
+- tools/boo-lab is the FLAC pin UI. Do not build a second one.

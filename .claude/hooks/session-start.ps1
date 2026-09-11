@@ -25,11 +25,11 @@ if (Test-Path $cur) {
 $tasks = Join-Path $root "TASKS.md"
 if (Test-Path $tasks) {
   Write-Output ""
-  Write-Output "===== TASKS ## Next (head) ====="
+  Write-Output "===== TASKS ## Now (head) ====="
   $on = $false
   $n = 0
   foreach ($l in (Get-Content $tasks)) {
-    if ($l -match '^## Next') { $on = $true }
+    if ($l -match '^## Now') { $on = $true }
     elseif ($on -and $l -match '^## ') { break }
     if ($on) {
       Write-Output $l

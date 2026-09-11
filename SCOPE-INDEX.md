@@ -1,3 +1,5 @@
+<!-- bots: do not open god-tier-metal-scope.md unless TASKS names a heading. This index is not a backlog. -->
+
 # Scope headings (not the whole file)
 
 File: `god-tier-metal-scope.md` in the repo root (copy from the handoff zip).

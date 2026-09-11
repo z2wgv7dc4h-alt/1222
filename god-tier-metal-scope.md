@@ -1,3 +1,5 @@
+<!-- BOTS: do not read this file end to end. Open one heading named by the ticket. Scope line "no pre-made MIDI" is overturned for labyrinth — see docs/DECISIONS.md. -->
+
 # God Tier Metal — Djent / Tech-Deathcore Generation & Production Suite — Project Scope
 
 ## Goal

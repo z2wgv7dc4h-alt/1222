@@ -1,32 +1,37 @@
 # CURRENT
 
-task: real fix for a CORE pitch-generation bug (`generate_pitch_deltas`, motif.py, register-bound reflection, reaches every preset) PLUS a real deathcore preset miscalibration (`kick="blast"` was applied to every section, not just climactic ones -- deathcore was the only preset using "blast" as its BASE style, contradicting its own description). Riff-model v1/v2 (Born of Osiris ONLY, `labyrinth`) still real and shipped underneath this.
-phase: cross-cutting -- real audit-driven fixes, one at a time per direct user correction
-status: Phase 1 AND Phase 2 of the riff-bank pivot are DONE and demoed. `fluidsynth` was missing from this session's PATH -- installed the real official v2.6.0 Windows build from github.com/FluidSynth/fluidsynth's own releases (extracted to the session scratchpad, NOT added to the repo/PATH permanently -- a future session will need to re-locate or reinstall it, see handoff note below). Rendered and sent `phase2_riffbank_demo.mp3` (seed 1, labyrinth) -- outcome not yet confirmed by the user.
-last_pytest: engine/ 803 passed, 1 skipped; editor/backend/ 34 passed (unchanged this pass)
+task: real, verbatim, section-aware riff-fragment bank for `labyrinth` (Born of Osiris), replacing the old statistical/ML riff-pitch generation entirely. See "## HANDOFF NOTE" below for the full, current, authoritative status -- this file's own history (further down) documents how the project arrived here (the register-bound fix, the deathcore kick fix, the capability audit, the architectural fork) but that history is DONE and superseded by the handoff note for anything about current state.
+phase: cross-cutting, session handed off to a different AI -- see handoff note for the real next action
+status: Phase 1 (data + extraction) AND Phase 2 (wiring into song.py) of the riff-bank pivot are DONE, committed, pushed, and demoed. See handoff note.
+last_pytest: engine/ 803 passed, 1 skipped; editor/backend/ 34 passed
+updated: 2026-09-12
 
 ---
 
-## HANDOFF NOTE (2026-09-12) -- session ending here, user is handing this off to a different AI/session
+## HANDOFF NOTE (2026-09-12) -- authoritative current status, session ending here, handed to a different AI
 
-**What's actually done and verified, right now:**
-- The riff-fragment-bank pivot (Phase 1: data + extraction, Phase 2: wiring into `song.py`) is COMPLETE for the `labyrinth` preset. `_try_riff_bank_motif` (song.py) replaces the old ML `riff_model.py` path entirely for labyrinth's main riff. `ThemeRegistry.seed()` (motif.py, new) fixes the real cross-section-reuse bug the old model path had. 803 tests pass, 0 regressions. All committed and pushed (see git log, most recent real commits: the riff_bank Phase 1 commit, then the Phase 2 wiring -- **NOTE: Phase 2's wiring commit was NOT YET MADE as of this handoff note being written -- see "immediate next action" below, do this FIRST**).
-- `engine/data/riff_bank.json` (2,328 real fragments, 23 songs) exists LOCALLY on this machine only (gitignored, per `.gitignore`'s own real justification -- too close to the source songs' melodic content to commit). **A fresh checkout / different machine will have NO riff bank file and will silently fall back to the old Markov path for labyrinth** (this is intentional graceful degradation, not a bug -- but it means "does labyrinth sound right" can't be verified on a machine without first re-running the real data-acquisition+extraction steps documented in this same CURRENT.md file, a few entries up, under the Phase 1 writeup).
-- `reference/gp-tabs-born-of-osiris/` (the raw downloaded GP tab files themselves) also exists LOCALLY ONLY (gitignored). If the riff bank JSON is ever lost, these raw files are what `riff_bank.build_riff_bank()` would need to re-extract from -- re-downloading them is documented (3 real sources: gtptabs.com, gprotab.net, musicnoteslib.com) in the Phase 1 CURRENT.md entry above.
+**Done and verified, right now (confirmed via `git log`, real commits `0601b1c` then `1988d22`, both pushed to `origin/main`):**
+- The riff-fragment-bank pivot is COMPLETE for `labyrinth`. `song._try_riff_bank_motif` replaces the old ML `riff_model.py` path entirely for labyrinth's main riff (riff_model.py itself still exists in the repo, just unused for labyrinth now). `motif.ThemeRegistry.seed()` (new) fixes the real cross-section-reuse bug the old model path had. 803 tests pass, 0 regressions.
+- A real end-to-end demo was rendered and sent (`phase2_riffbank_demo.mp3`, labyrinth seed 1) -- **outcome not yet confirmed by the user; this is the actual next real step, not more code.**
 
-**Real, honest mistakes/detours this session that a future session should know about (so they aren't repeated):**
-1. Spent real effort chasing several tab sources that turned out to be dead ends -- `gtp-tabs.ru` (exact duplicate of gtptabs.com), `guitartabs.cc` (secretly an Ultimate-Guitar mirror), `tabs.guru` (a pure link-aggregator, not a host), `azchords.com` (real songs, but its download endpoint is currently broken server-side, not a client-side problem). Don't re-attempt these without a real reason to think they've changed.
-2. User asked to bypass Songsterr's paywall (and later, to automate/screenshot around it) -- both declined. This is a settled, repeated decision this session, not an open question -- don't re-litigate it.
-3. `fluidsynth` was not on this session's PATH despite earlier-session render work having used it -- it was reinstalled fresh (portable zip in the scratchpad, NOT a permanent system install). The NEXT session will very likely hit this exact same gap again since nothing was installed system-wide -- check for `fluidsynth`/`ffmpeg` on PATH early, don't assume either is there.
-4. Earlier in this session (before the riff-bank pivot), there was a real, repeated pattern of "find one bug, immediately find three more while fixing it, stack an ever-growing plan" -- the user corrected this twice, explicitly. Stay narrowly scoped to one real, verifiable step at a time; this whole riff-bank pivot itself was deliberately split into Phase 1 (data+extraction only) and Phase 2 (wiring) for exactly this reason.
-5. The core architectural finding that MOTIVATED this whole pivot (worth re-reading a few entries up in this file): the old statistical/ML approach was diagnosed as genuinely incapable of "proper" music, not just buggy -- confirmed via a full session's real track record (every individual bug fix verified correct, zero improvement in the user's own "still sounds weird" verdict across ~15 iterations). Don't revert to that approach without addressing why it was abandoned.
+**Real local file paths on THIS machine -- these are durable, project-relative paths (not a session scratchpad, which does not survive between sessions), all gitignored/local-only:**
+- Riff fragment bank (2,328 real fragments, 23 songs): `engine/data/riff_bank.json`
+- Raw downloaded GP tab files (source for the above): `reference/gp-tabs-born-of-osiris/{gtptabs,gprotab,musicnoteslib}/`
+- Render tools (missing from PATH this session, reinstalled here permanently so a future session doesn't need to re-download): `tools/fluidsynth/bin/fluidsynth.exe`, `tools/soundfonts/GeneralUser-GS.sf2`, `tools/ffmpeg.exe`
+- Rendered demo (durable copy): `C:\Users\RIGGUSPIG\Desktop\phase2_riffbank_demo.mp3`
 
-**Immediate next action for whoever picks this up:**
-1. `cd engine && python -m pytest -q` to reconfirm the 803-passed baseline still holds.
-2. `git status` -- if `riff_bank.py`/the song.py wiring/the new tests aren't yet committed, commit and push them (this session ran out of budget before confirming that step completed -- verify, don't assume).
-3. Ask the user directly whether `phase2_riffbank_demo.mp3` (sent this session, outcome not yet confirmed) actually sounds better/more composed than the old ML-model output -- that real listening-feedback loop is the actual next real step, not more code changes.
-updated: 2026-09-12
-note: Direct continuation of the same-day listening-feedback loop. After the real pedal-guitar architecture landed, user: "I think it needs me to be able to feed you songs and you learn from that." This formalizes the session's own ad hoc reference-MIDI analysis into a real, tested, standing capability, closing scope §17.6's own "not yet a standalone tool" gap.
+A fresh checkout / different machine will have NONE of the above and will silently fall back to the old Markov path for labyrinth (intentional graceful degradation, not a bug) -- re-acquiring the tab corpus is documented under the Phase 1 entry further down this file (3 real free sources: gtptabs.com, gprotab.net, musicnoteslib.com); render tools would need re-downloading same as this session did.
+
+**Real, honest mistakes/detours this session -- don't repeat these:**
+1. Chased several tab sources that turned out to be dead ends -- `gtp-tabs.ru` (exact duplicate of gtptabs.com), `guitartabs.cc` (secretly an Ultimate-Guitar mirror), `tabs.guru` (a pure link-aggregator, not a host), `azchords.com` (real songs, but its download endpoint is currently broken server-side).
+2. User asked to bypass Songsterr's paywall (and later, to automate/screenshot around it) -- both declined, twice. Settled, not open.
+3. `fluidsynth`/`ffmpeg` were missing from this session's PATH despite earlier sessions having used them -- now fixed permanently (see local paths above). A future session should check `tools/` FIRST before assuming either needs reinstalling.
+4. Earlier this session (before the riff-bank pivot), there was a real, repeated pattern of "find one bug, immediately find three more while fixing it, stack an ever-growing plan" -- the user corrected this twice. Stay narrowly scoped to one real, verifiable step at a time.
+5. The core finding that motivated this whole pivot: the old statistical/ML approach was diagnosed as genuinely incapable of "proper" music, not just buggy -- confirmed via a full session's real track record (every individual bug fix verified correct, zero improvement in the user's own "still sounds weird" verdict across ~15 iterations). Don't revert to it without addressing why it was abandoned.
+
+**Immediate next action:**
+1. `cd engine && python -m pytest -q` to reconfirm the 803-passed baseline.
+2. Ask the user whether `phase2_riffbank_demo.mp3` actually sounds better/more composed than the old ML-model output -- that real listening-feedback loop is what everything else in this handoff is waiting on.
 
 New `engine/reference_vocab.py`: real, format-agnostic per-song analysis across THREE real input formats -- MIDI (`pretty_midi`), Guitar Pro `.gp*` (`pyguitarpro`, confirmed already installed), and audio (`librosa`/`audio_vocab.py`, with a real note-level vocabulary too via `basic_pitch` -- also already installed -- honestly flagged `structural_only` when transcription isn't available/fails). Real Krumhansl-Schmuckler key correlation reused directly from `audio_vocab.py`'s own profile arrays. A real, accumulating local corpus cache (`engine/data/reference_corpus.json`, committed -- derived statistics only, same precedent as the already-committed `midi_vocab.json`, never the source songs' own notes). `build_preset_from_corpus` averages real per-song interval vocabulary (one vote per song) and writes a real preset JSON file, auto-discoverable via the existing preset glob.
 

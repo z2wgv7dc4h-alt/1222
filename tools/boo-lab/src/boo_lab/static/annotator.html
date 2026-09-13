@@ -2,304 +2,830 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>boo-lab</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&family=Instrument+Serif&display=swap" rel="stylesheet" />
+  <script src="https://unpkg.com/wavesurfer.js@7.8.16/dist/wavesurfer.min.js"></script>
+  <script src="https://unpkg.com/wavesurfer.js@7.8.16/dist/plugins/regions.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@coderline/alphatab@1.3.1/dist/alphaTab.min.js"></script>
   <style>
-    :root {
-      --bg: #0c0c0d;
-      --panel: #161618;
-      --line: #2a2a2e;
-      --text: #e8e6e3;
-      --mute: #8a8680;
-      --riff: #c4a35a;
-      --hook: #6ea8d6;
-      --break: #c45c4a;
-      --solo: #7dba7a;
-    }
+    :root { --bg:#07080b; --panel:#101218; --line:#262a33; --text:#ece8e1; --mute:#8b8680;
+      --riff:#d4b06a; --hook:#7eb4d8; --break:#d46555; --solo:#7dba7a; --intro:#8a7a9a; --gold:#d4b06a; }
     * { box-sizing: border-box; }
-    html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
-      font: 15px/1.4 "Segoe UI", system-ui, sans-serif; }
-    .app { display: grid; grid-template-columns: 260px 1fr; height: 100%; }
-    aside { background: var(--panel); border-right: 1px solid var(--line); display: flex; flex-direction: column; }
-    aside h1 { margin: 0; padding: 18px 16px 8px; font-size: 15px; letter-spacing: .12em; text-transform: uppercase; color: var(--mute); }
-    aside p { margin: 0 16px 12px; color: var(--mute); font-size: 12px; }
-    #list { flex: 1; overflow: auto; }
-    .t { padding: 10px 16px; cursor: pointer; border-left: 3px solid transparent; }
-    .t:hover { background: #1d1d20; }
-    .t.on { background: #1d1d20; border-left-color: var(--break); }
-    .t .name { display: block; }
-    .t .meta { display: block; font-size: 11px; color: var(--mute); }
-    .dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; margin-right: 4px; background: #3a3a3e; }
-    .dot.ok { background: #7dba7a; }
-    main { display: flex; flex-direction: column; min-width: 0; padding: 20px 28px 16px; }
-    header.now { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; }
-    header.now h2 { margin: 0; font-size: 22px; font-weight: 600; }
-    header.now span { color: var(--mute); font-size: 13px; }
-    canvas { width: 100%; height: 88px; display: block; background: #101012; border: 1px solid var(--line); cursor: pointer; margin: 18px 0 8px; }
-    #hint { color: var(--mute); font-size: 12px; min-height: 16px; }
-    .transport { display: flex; align-items: center; gap: 10px; margin: 8px 0 16px; flex-wrap: wrap; }
-    .transport button, .pins button {
-      background: #222226; color: var(--text); border: 1px solid var(--line);
-      padding: 8px 14px; font: inherit; cursor: pointer;
+    html, body { margin:0; height:100vh; background:
+      radial-gradient(1200px 500px at 70% -10%, #1a140c 0%, transparent 50%),
+      var(--bg); color:var(--text);
+      font:15px/1.45 "Instrument Sans", "Segoe UI", system-ui, sans-serif; overflow:hidden; }
+    .app { display:grid; grid-template-columns:272px 1fr; grid-template-rows:1fr 100px; height:100vh; }
+    .app > aside:not(.drawer) { grid-row:1 / -1; background:linear-gradient(180deg,#14161c,#0d0f14);
+      border-right:1px solid var(--line); overflow-y:scroll; overflow-x:hidden; }
+    .app > aside h1 { margin:0; padding:22px 20px 6px; font-family:"Instrument Serif", serif; font-size:28px; font-weight:400; letter-spacing:.02em; color:var(--gold); }
+    .app > aside p { margin:0 16px 8px; color:var(--mute); font-size:12px; }
+    .filters { display:flex; gap:6px; padding:0 16px 10px; flex-wrap:wrap; }
+    .filters button { padding:4px 8px; font-size:12px; }
+    .filters button.on { border-color:var(--riff); color:var(--riff); }
+    #dropzone { margin:8px 16px 12px; padding:12px; border:1px dashed #4a4030; border-radius:8px; color:var(--mute); font-size:12px; text-align:center; }
+    #dropzone.hot { border-color:var(--gold); color:var(--gold); }
+    #bandName { width:100%; margin-top:8px; padding:6px 8px; background:#111; color:var(--text); border:1px solid var(--line); }
+    #q { width:calc(100% - 32px); margin:0 16px 8px; padding:6px 8px; background:#111; color:var(--text); border:1px solid var(--line); }
+    .alb { padding:12px 16px 6px; font-size:11px; letter-spacing:.06em; text-transform:uppercase; color:var(--riff); cursor:pointer; user-select:none; }
+    .alb:hover { color:var(--text); }
+    .t { padding:10px 16px; cursor:pointer; border-left:3px solid transparent; }
+    .t:hover,.t.on { background:#1d1d20; }
+    .t.on { border-left-color:var(--break); }
+    .t .meta { display:block; font-size:11px; color:var(--mute); }
+    .dot { display:inline-block; width:6px; height:6px; border-radius:50%; margin-right:4px; background:#3a3a3e; }
+    .dot.ok { background:#7dba7a; }
+    .dot.part { background:#c4a35a; }
+    main { display:flex; flex-direction:column; min-width:0; padding:16px 24px 10px; overflow:auto; grid-column:2; grid-row:1; }
+    header.now { display:flex; align-items:center; gap:16px; }
+    header.now img { width:56px; height:56px; object-fit:cover; border-radius:6px; background:#111; border:1px solid var(--line); display:none; }
+    header.now img.on { display:block; }
+    header.now h2 { margin:0; font-family:"Instrument Serif", serif; font-size:24px; font-weight:400; letter-spacing:.01em; }
+    header.now span { color:var(--mute); font-size:13px; display:block; margin-top:4px; }
+    .alb img { width:28px; height:28px; object-fit:cover; border-radius:4px; margin-right:8px; vertical-align:middle; }
+    .workhead { position:sticky; top:0; z-index:6; background:#07080b; padding-bottom:4px; }
+    .lane { margin:10px 0 14px; }
+    .lane-lab { color:var(--mute); font-size:11px; letter-spacing:.08em; text-transform:uppercase; margin:0 0 4px; background:var(--bg); }
+    #wave { width:100%; height:150px; min-height:150px; background:#0a0c10; border:1px solid var(--line); overflow:hidden; position:relative; border-radius:6px; box-shadow:inset 0 0 40px #0008; }
+    #drums { width:100%; height:72px; min-height:72px; background:#0a0c10; border:1px solid var(--line); overflow:hidden; position:relative; border-radius:6px; }
+    .lane.idle { display:none; }
+    .lyrics { max-height:160px; overflow:auto; border:1px solid var(--line); border-radius:6px; background:#0a0c10; padding:6px 8px; }
+    .lyrics .ly { display:flex; align-items:center; gap:8px; padding:3px 0; color:#b8b0a4; font-size:13px; }
+    .lyrics .ly.on span.txt { color:var(--gold); }
+    .lyrics .ly span.txt { flex:1; cursor:pointer; }
+    .lyrics .ly button { padding:2px 8px; font-size:12px; }
+    .lytools { display:flex; gap:6px; margin:0 0 6px; }
+    #tabwrap { margin:0; background:#efe7d6; border:1px solid #c4b89a; min-height:140px; overflow:auto; max-height:320px; color:#1a1612; }
+    #tabwrap .empty { color:#5a5248; padding:16px; font-size:13px; }
+    .tab-help { color:#b8b0a4; font-size:12px; margin:6px 0 10px; text-transform:none; letter-spacing:0; }
+    .transport, .pins { display:flex; align-items:center; gap:8px; margin:8px 0 12px; flex-wrap:wrap; }
+    button { background:#1a1d24; color:var(--text); border:1px solid var(--line); padding:8px 14px; font:inherit; cursor:pointer; border-radius:6px; }
+    button:hover { border-color:#6a5a3a; color:#f3ead8; }
+    .time { font-variant-numeric:tabular-nums; color:var(--mute); min-width:7em; }
+    .pins button.riff { border-color:var(--riff); color:var(--riff); }
+    .pins button.hook { border-color:var(--hook); color:var(--hook); }
+    .pins button.break { border-color:var(--break); color:var(--break); }
+    .pins button.solo { border-color:var(--solo); color:var(--solo); }
+    .pins button.intro { border-color:var(--intro); color:var(--intro); }
+    .pins button.build { border-color:#d4a27a; color:#d4a27a; }
+    .pins button.chill { border-color:#6a9e9a; color:#6a9e9a; }
+    .pins button.pulse { border-color:#b07ad4; color:#b07ad4; }
+    .pins button.outro { border-color:#888; color:#888; }
+    table { width:100%; border-collapse:collapse; }
+    th, td { text-align:left; padding:8px 6px; border-bottom:1px solid var(--line); font-size:14px; }
+    th { color:var(--mute); font-weight:500; }
+    input, select { background:#111; color:var(--text); border:1px solid var(--line); padding:4px 6px; font:inherit; }
+    table input { width:6em; }
+    table select { width:9em; }
+    tr.on td { background:#1d1d22; }
+    .err { color:var(--mute); font-size:13px; min-height:18px; }
+    .err.bad { color:var(--break); }
+    button:disabled { opacity:.45; cursor:wait; }
+    .foot { color:var(--mute); font-size:12px; margin-top:auto; }
+    .lyrics { max-height:160px; overflow:auto; border:1px solid var(--line); border-radius:6px; background:#0a0c10; padding:8px 12px; }
+    .lyrics div { padding:4px 0; cursor:pointer; color:#b8b0a4; font-size:13px; }
+    .lyrics div:hover, .lyrics div.on { color:var(--gold); }
+    .drawer {
+      position:fixed; top:0; right:0; width:min(380px,92vw); height:100%;
+      background:#141416; border-left:1px solid var(--line); z-index:20;
+      transform:translateX(100%); transition:transform .22s ease; overflow:auto; padding:22px 22px 40px;
     }
-    .transport button:hover, .pins button:hover { border-color: #555; }
-    .time { font-variant-numeric: tabular-nums; color: var(--mute); min-width: 7em; }
-    .pins { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
-    .pins button { min-width: 7.5em; }
-    .pins button.riff { border-color: var(--riff); color: var(--riff); }
-    .pins button.hook { border-color: var(--hook); color: var(--hook); }
-    .pins button.break { border-color: var(--break); color: var(--break); }
-    .pins button.solo { border-color: var(--solo); color: var(--solo); }
-    table { width: 100%; border-collapse: collapse; }
-    th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--line); font-size: 14px; }
-    th { color: var(--mute); font-weight: 500; }
-    input { background: #111; color: var(--text); border: 1px solid var(--line); padding: 4px 6px; font: inherit; }
-    .foot { margin-top: auto; padding-top: 16px; color: var(--mute); font-size: 12px; }
-    .err { color: var(--break); font-size: 13px; min-height: 18px; }
+    .drawer.open { transform:translateX(0); }
+    .scrim { position:fixed; inset:0; background:#0008; z-index:19; display:none; }
+    .scrim.on { display:block; }
+    .drawer h3 { margin:0 0 10px; font-size:16px; }
+    .drawer h4 { margin:18px 0 6px; font-size:13px; color:var(--mute); text-transform:uppercase; letter-spacing:.08em; }
+    .drawer p, .drawer li { color:#c4c0ba; font-size:13px; line-height:1.5; }
+    .drawer ul { margin:0; padding-left:18px; }
+    .drawer .close { float:right; }
+    .vizdock { grid-column:2; grid-row:2; border-top:1px solid #2a2418; background:radial-gradient(80% 120% at 50% 120%, #1a1208 0%, #05060a 55%); position:relative; overflow:hidden; }
+    .vizdock:before { content:""; position:absolute; inset:0; pointer-events:none; box-shadow:inset 0 20px 40px #000a; }
+    .vizdock canvas { width:100%; height:100%; display:block; }
+    .vizdock label { position:absolute; left:18px; top:10px; font-size:10px; letter-spacing:.2em; text-transform:uppercase; color:#7a6a4a; pointer-events:none; z-index:1; }
   </style>
 </head>
 <body>
+<div class="scrim" id="scrim"></div>
+<aside class="drawer" id="howto">
+  <button type="button" class="close" id="btnCloseHow">Close</button>
+  <h3>How to mark a song</h3>
+  <p>Boxes are wavesurfer regions. Drag the body, drag an edge, click empty wave to seek. Overlaps are allowed when the roles differ.</p>
+  <h4>Buttons</h4>
+  <ul>
+    <li><b>Intro</b> — pads, swell, count-in</li>
+    <li><b>Build</b> — rising into a drop</li>
+    <li><b>Riff</b> — the repeating guitar idea</li>
+    <li><b>Hook</b> — the bit you hum</li>
+    <li><b>Breakdown</b> — half-time slam. Layer on a Riff if the guitar does not change</li>
+    <li><b>Solo</b> / <b>Chill</b> / <b>Pulse</b> / <b>Outro</b></li>
+  </ul>
+  <h4>Keys</h4>
+  <ul>
+    <li>Space — play / pause</li>
+    <li>1 riff · 2 hook · 3 breakdown · 4 solo</li>
+    <li>I intro · B build · C chill · P pulse</li>
+    <li>S save · N next with tab · J / K next / previous song</li>
+    <li>Delete — remove selected box · Ctrl+Z undo · ? this panel</li>
+  </ul>
+  <h4>Guess / Lyrics / Pack</h4>
+  <p><b>Guess</b> — GP markers + Demucs drums + librosa half-time. Optional draft boxes.</p>
+  <p><b>Lyrics</b> — fetch timed lines. Click a line to seek. − / + moves that line 0.2s. all −/+ shifts the whole song. Save lyrics writes work/lyrics.</p>
+  <p><b>Push git</b> — commits src + data + lyrics in the god-tier-metal repo and pushes. Needs git remotes already set on your machine.</p>
+  <p><b>Pack</b> — after Save, cut mix/drums/bass/other/vocals/no-vox for every box on this song into work/pack.</p>
+  <p><b>Drop</b> (sidebar) — type band name, drop zip/FLAC/GP. Copies into the corpus. Does not rename your rips.</p>
+</aside>
 <div class="app">
   <aside>
     <h1>boo-lab</h1>
-    <p>Four pins. Play. Save. Next.</p>
+    <p>Born of Osiris desk · green GP5 · grey none</p>
+    <div id="dropzone">Drop FLAC / GP / zip here
+      <input id="bandName" placeholder="band name e.g. veil of maya" />
+    </div>
+    <input id="q" placeholder="filter songs" />
+    <div class="filters">
+      <button type="button" data-f="all" class="on">All</button>
+      <button type="button" data-f="gp">GP5</button>
+      <button type="button" data-f="none">No tab</button>
+    </div>
     <div id="list"></div>
   </aside>
   <main>
-    <header class="now">
-      <h2 id="title">Load a map.csv</h2>
-      <span id="sub"></span>
-    </header>
-    <canvas id="wave" height="88"></canvas>
-    <div id="hint"></div>
-    <div class="transport">
-      <button type="button" id="btnPlay">Play</button>
-      <span class="time" id="clock">0:00 / 0:00</span>
-      <button type="button" id="btnEst">Guess sections</button>
-      <button type="button" id="btnSave">Save</button>
-      <button type="button" id="btnNext">Next track</button>
+    <div class="workhead">
+      <header class="now">
+        <img id="art" alt="" />
+        <div>
+          <h2 id="title">…</h2>
+          <span id="sub"></span>
+        </div>
+      </header>
+      <div class="transport">
+        <button type="button" id="btnPlay">Play</button>
+        <span class="time" id="clock">0:00 / 0:00</span>
+        <button type="button" id="btnEst">Guess</button>
+        <button type="button" id="btnSave">Save</button>
+        <button type="button" id="btnLyrics">Lyrics</button>
+        <button type="button" id="btnPack">Pack</button>
+        <button type="button" id="btnPlayBox">Play box</button>
+        <button type="button" id="btnUndo">Undo</button>
+        <button type="button" id="btnDump">JSON</button>
+        <button type="button" id="btnNext">Next tab</button>
+        <button type="button" id="btnGit">Push git</button>
+        <button type="button" id="btnHow">How</button>
+      </div>
+      <div class="pins">
+        <button type="button" class="intro" data-role="intro">Intro</button>
+        <button type="button" class="build" data-role="build">Build</button>
+        <button type="button" class="riff" data-role="verse">Riff</button>
+        <button type="button" class="hook" data-role="chorus">Hook</button>
+        <button type="button" class="break" data-role="breakdown">Breakdown</button>
+        <button type="button" class="solo" data-role="solo">Solo</button>
+        <button type="button" class="chill" data-role="chill">Chill</button>
+        <button type="button" class="pulse" data-role="pulse">Pulse</button>
+        <button type="button" class="outro" data-role="outro">Outro</button>
+      </div>
+      <div class="err" id="err">Space play · 1 riff 2 hook 3 slam · I intro B build C chill P pulse · S save J/K songs</div>
     </div>
-    <div class="pins">
-      <button type="button" class="riff" data-role="verse">Riff 1</button>
-      <button type="button" class="hook" data-role="chorus">Hook</button>
-      <button type="button" class="break" data-role="breakdown">Breakdown</button>
-      <button type="button" class="solo" data-role="solo">Solo</button>
+    <div class="lane">
+      <div class="lane-lab">mix — drag boxes, click empty to seek</div>
+      <div id="wave"></div>
     </div>
-    <div class="err" id="err"></div>
+    <div class="lane idle" id="drumlane">
+      <div class="lane-lab">drums</div>
+      <div id="drums"></div>
+    </div>
+    <div class="lane idle" id="lyriclane">
+      <div class="lane-lab">lyrics — click line to seek · − / + nudge that line</div>
+      <div class="lytools">
+        <button type="button" id="btnLyBack">all −0.2s</button>
+        <button type="button" id="btnLyFwd">all +0.2s</button>
+        <button type="button" id="btnLySave">Save lyrics</button>
+      </div>
+      <div id="lyricbox" class="lyrics"></div>
+    </div>
+    <div class="lane" id="tablane" hidden>
+      <div id="tabwrap"><div class="empty" id="tabmsg"></div></div>
+    </div>
     <table>
-      <thead><tr><th>pin</th><th>start</th><th></th></tr></thead>
+      <thead><tr><th>region</th><th>start</th><th>end</th><th></th></tr></thead>
       <tbody id="rows"></tbody>
     </table>
-    <p class="foot">Space play · 1 riff · 2 hook · 3 breakdown · 4 solo · G guess · S save · N next · click wave to seek</p>
-    <audio id="audio"></audio>
+    <p class="foot">Drag a box. Click empty wave to seek. Different roles may overlap. S save · N next</p>
   </main>
+  <div class="vizdock">
+    <label>scope</label>
+    <canvas id="viz"></canvas>
+  </div>
 </div>
 <script>
-const audio = document.getElementById("audio");
-const canvas = document.getElementById("wave");
-const ctx = canvas.getContext("2d");
-const PIN_ROLES = [
-  { role: "verse", label: "Riff 1" },
-  { role: "chorus", label: "Hook" },
-  { role: "breakdown", label: "Breakdown" },
-  { role: "solo", label: "Solo" }
-];
-const COLOR = { verse: "#c4a35a", chorus: "#6ea8d6", breakdown: "#c45c4a", solo: "#7dba7a",
-  intro: "#555", outro: "#555", build: "#8a6", chill: "#446", interlude: "#446" };
+const ROLES = ["intro","build","verse","chorus","breakdown","solo","chill","pulse","outro"];
+const COLOR = {
+  riff:"rgba(255,168,16,0.40)",
+  verse:"rgba(255,168,16,0.40)",
+  hook:"rgba(64,176,255,0.42)",
+  chorus:"rgba(64,176,255,0.42)",
+  breakdown:"rgba(255,64,56,0.40)",
+  solo:"rgba(64,220,120,0.38)",
+  intro:"rgba(168,140,220,0.40)",
+  build:"rgba(255,128,64,0.38)",
+  chill:"rgba(64,200,196,0.36)",
+  pulse:"rgba(216,96,255,0.38)",
+  outro:"rgba(160,160,168,0.36)"
+};
+const LABEL = { verse:"Riff", chorus:"Hook", breakdown:"Breakdown", solo:"Solo", intro:"Intro", build:"Build", chill:"Chill", pulse:"Pulse", outro:"Outro" };
+let tracks=[], trackId=0, regs=[], sel=-1, undo=[], listFilter="all", listQ="";
+let shut={};
+let ws=null, drumsWs=null, regionsPlug=null, lock=false, tabApi=null;
+let audioCtx=null, analyser=null, vizSrc=null, vizRAF=0;
 
-let tracks = [], trackId = 0, peaks = [], duration = 1, pins = [];
-
-function fmt(t) {
-  if (!isFinite(t) || t < 0) t = 0;
-  const m = Math.floor(t / 60);
-  const s = Math.floor(t % 60);
-  return m + ":" + String(s).padStart(2, "0");
+function fmt(t){ t=Math.max(0,+t||0); return Math.floor(t/60)+":"+String(Math.floor(t%60)).padStart(2,"0"); }
+function showErr(m, bad){
+  const el=document.getElementById("err");
+  el.textContent=m||"Space play · 1 riff 2 hook 3 slam · I intro B build C chill P pulse · S save J/K songs";
+  el.classList.toggle("bad", !!bad);
 }
-function showErr(m) { document.getElementById("err").textContent = m || ""; }
+function openHow(on){
+  document.getElementById("howto").classList.toggle("open", on);
+  document.getElementById("scrim").classList.toggle("on", on);
+}
+document.getElementById("btnHow").onclick=()=>openHow(true);
+document.getElementById("btnCloseHow").onclick=()=>openHow(false);
+document.getElementById("scrim").onclick=()=>openHow(false);
 
-fetch("/api/tracks").then(r => r.json()).then(data => {
-  tracks = data.tracks || [];
-  renderList();
-  if (tracks.length) select(0);
-  else document.getElementById("title").textContent = "No tracks — run boo-lab scan";
-}).catch(() => showErr("Start with: boo-lab studio"));
+function RegionsApi(){
+  return window.RegionsPlugin || (window.WaveSurfer && WaveSurfer.Regions);
+}
 
-function renderList() {
-  const box = document.getElementById("list");
-  box.innerHTML = "";
-  tracks.forEach((t, i) => {
-    const d = document.createElement("div");
-    d.className = "t" + (i === trackId ? " on" : "");
-    d.innerHTML = "<span class=\"name\">" + (t.track || "untitled") + "</span>" +
-      "<span class=\"meta\"><span class=\"dot " + (t.has_flac ? "ok" : "") + "\"></span>flac " +
-      "<span class=\"dot " + (t.has_gp ? "ok" : "") + "\"></span>tab · " + (t.album || "") + "</span>";
-    d.onclick = () => select(i);
+let vizHist=[];
+function hookViz(){
+  if(vizRAF) cancelAnimationFrame(vizRAF);
+  const c=document.getElementById("viz");
+  if(!c) return;
+  const ctx=c.getContext("2d");
+  function sliceAt(ch, sr, t, n){
+    const i0=Math.floor(t*sr);
+    const span=Math.max(64, Math.floor(sr*0.04));
+    const out=new Float32Array(n);
+    for(let x=0;x<n;x++){
+      const i=Math.max(0, Math.min(ch.length-1, i0+Math.floor(x/n*span)));
+      out[x]=ch[i]||0;
+    }
+    return out;
+  }
+  function frame(){
+    vizRAF=requestAnimationFrame(frame);
+    const dpr=window.devicePixelRatio||1;
+    const w=c.width=Math.max(1,c.clientWidth*dpr);
+    const h=c.height=Math.max(1,c.clientHeight*dpr);
+    ctx.fillStyle="rgba(5,6,10,0.35)";
+    ctx.fillRect(0,0,w,h);
+    let buf=null;
+    try{ buf=ws&&ws.getDecodedData(); }catch(e){}
+    const t=ws&&ws.getCurrentTime?ws.getCurrentTime():0;
+    const playing=ws&&ws.isPlaying&&ws.isPlaying();
+    const n=Math.min(220, Math.floor(w/2));
+    if(buf){
+      const ch=buf.getChannelData(0);
+      const sr=buf.sampleRate||44100;
+      if(playing || !vizHist.length){
+        vizHist.unshift(sliceAt(ch,sr,t,n));
+        if(vizHist.length>18) vizHist.pop();
+      }
+    }
+    const layers=vizHist.length||1;
+    for(let L=layers-1;L>=0;L--){
+      const line=vizHist[L];
+      if(!line) continue;
+      const y0=h*0.18+L*(h*0.038);
+      const amp=(h*0.22)*(1-L/22);
+      const a=playing? (0.95-L*0.045) : (0.4-L*0.02);
+      ctx.beginPath();
+      ctx.strokeStyle="rgba(232,206,150,"+Math.max(0.05,a)+")";
+      ctx.lineWidth=(L===0?1.8:1)*dpr;
+      ctx.shadowColor=L===0?"rgba(212,160,80,0.55)":"transparent";
+      ctx.shadowBlur=L===0?12*dpr:0;
+      for(let x=0;x<n;x++){
+        const px=x/(n-1)*w;
+        const v=line[x]||0;
+        const y=y0-v*amp;
+        if(x===0) ctx.moveTo(px,y); else ctx.lineTo(px,y);
+      }
+      ctx.stroke();
+    }
+    ctx.shadowBlur=0;
+    if(buf){
+      const ch=buf.getChannelData(0);
+      const sr=buf.sampleRate||44100;
+      const i0=Math.floor(t*sr);
+      const bars=48;
+      const bw=w/bars;
+      for(let i=0;i<bars;i++){
+        let acc=0, cnt=0;
+        const a=i0+Math.floor(i/bars*sr*0.03);
+        const b=a+Math.floor(sr*0.03/bars);
+        for(let k=a;k<b;k+=8){
+          if(k>=0&&k<ch.length){ acc+=Math.abs(ch[k]); cnt++; }
+        }
+        const v=cnt?acc/cnt:0;
+        const bh=v*h*1.8;
+        ctx.fillStyle="rgba(180,80,50,"+(0.08+v*0.5)+")";
+        ctx.fillRect(i*bw, h-bh, Math.max(1,bw-2*dpr), bh);
+      }
+    }
+  }
+  frame();
+}
+function destroyWave(){
+  if(ws){ try{ ws.destroy(); }catch(e){} ws=null; regionsPlug=null; }
+  if(drumsWs){ try{ drumsWs.destroy(); }catch(e){} drumsWs=null; }
+}
+
+function paintRegions(){
+  if(!regionsPlug) return;
+  lock=true;
+  regionsPlug.clearRegions();
+  regs.forEach((p,i)=>{
+    const r=regionsPlug.addRegion({
+      id:"r"+i,
+      start:p.start,
+      end:Math.max(p.start+0.05, p.end),
+      color:COLOR[p.role]||"rgba(136,136,136,0.4)",
+      content:LABEL[p.role]||p.role,
+      drag:true,
+      resize:true
+    });
+    r._idx=i;
+  });
+  lock=false;
+}
+
+function pullRegions(){
+  if(!regionsPlug||lock) return;
+  const all=regionsPlug.getRegions();
+  all.forEach((r)=>{
+    const i=parseInt(String(r.id||"").replace("r",""),10);
+    if(isNaN(i)||!regs[i]) return;
+    regs[i].start=+r.start;
+    regs[i].end=+r.end;
+  });
+}
+
+function makeWave(url){
+  destroyWave();
+  const RP=RegionsApi();
+  if(!window.WaveSurfer || !RP){ showErr("wavesurfer failed to load — check network"); return; }
+  ws=WaveSurfer.create({
+    container:"#wave",
+    url:url,
+    height:110,
+    waveColor:"#5c6570",
+    progressColor:"#9aa8b8",
+    cursorColor:"#f4ead8",
+    barWidth:2,
+    barGap:1,
+    dragToSeek:true,
+    normalize:true
+  });
+  regionsPlug=ws.registerPlugin(RP.create());
+  ws.on("ready",()=>{
+    document.getElementById("clock").textContent=fmt(0)+" / "+fmt(ws.getDuration()||0);
+    paintRegions();
+    hookViz();
+  });
+  ws.on("play",()=>{ try{ if(audioCtx&&audioCtx.state==="suspended") audioCtx.resume(); }catch(e){} });
+  ws.on("timeupdate", t=>{
+    document.getElementById("clock").textContent=fmt(t)+" / "+fmt(ws.getDuration()||0);
+    if(window._playUntil!=null && t>=window._playUntil-0.03){
+      window._playUntil=null;
+      try{ ws.pause(); }catch(e){}
+    }
+    if(drumsWs && ws.isPlaying()) try{ drumsWs.setTime(t); }catch(e){}
+    const box=document.getElementById("lyricbox");
+    if(box && window._lyricLines){
+      const kids=[...box.children];
+      let cur=-1;
+      kids.forEach((el,i)=>{
+        const a=+el.dataset.start, b=window._lyricLines[i+1]?+window._lyricLines[i+1].start:1e9;
+        const on=t>=a && t<b;
+        el.classList.toggle("on", on);
+        if(on) cur=i;
+      });
+      if(cur>=0 && cur!==window._lyricCur && kids[cur] && ws.isPlaying()){
+        window._lyricCur=cur;
+        kids[cur].scrollIntoView({block:"nearest"});
+      }
+    }
+  });
+  ws.on("play",()=>document.getElementById("btnPlay").textContent="Pause");
+  ws.on("pause",()=>document.getElementById("btnPlay").textContent="Play");
+  regionsPlug.on("region-updated",()=>{ if(lock) return; pullRegions(); });
+  if(!window._booWaveUp){
+    window._booWaveUp=true;
+    document.getElementById("wave").addEventListener("pointerup",()=>{ if(!lock){ pullRegions(); table(); }});
+  }
+  regionsPlug.on("region-clicked",(reg, ev)=>{
+    if(ev && ev.stopPropagation) ev.stopPropagation();
+    const i=parseInt(String(reg.id).replace("r",""),10);
+    if(!isNaN(i)) sel=i;
+    table();
+    if(ws && ev && ev.clientX!=null){
+      const rect=document.getElementById("wave").getBoundingClientRect();
+      const dur=ws.getDuration()||0;
+      if(dur && rect.width){
+        ws.setTime(Math.max(0, Math.min(dur, (ev.clientX-rect.left)/rect.width*dur)));
+      } else ws.setTime(reg.start);
+    }
+  });
+}
+
+function loadDrums(id){
+  if(drumsWs){ try{ drumsWs.destroy(); }catch(e){} drumsWs=null; }
+  const lane=document.getElementById("drumlane");
+  if(lane) lane.classList.add("idle");
+  fetch("/api/drums/"+id).then(r=>{
+    if(!r.ok) return;
+    if(lane) lane.classList.remove("idle");
+    drumsWs=WaveSurfer.create({
+      container:"#drums",
+      url:"/api/drums/"+id,
+      height:96,
+      waveColor:"#5a4a4a",
+      progressColor:"#c45c4a",
+      cursorColor:"#f2f0ec",
+      barWidth:2,
+      barGap:1,
+      dragToSeek:true,
+      normalize:true,
+      interact:true
+    });
+    drumsWs.on("interaction", t=>{ if(ws) ws.setTime(t); });
+  }).catch(()=>{});
+}
+
+function paintLyrics(){
+  const box=document.getElementById("lyricbox");
+  if(!box) return;
+  box.innerHTML="";
+  const lines=window._lyricLines||[];
+  lines.forEach((row,i)=>{
+    const d=document.createElement("div");
+    d.className="ly";
+    d.dataset.start=row.start;
+    const back=document.createElement("button"); back.type="button"; back.textContent="−";
+    const fwd=document.createElement("button"); fwd.type="button"; fwd.textContent="+";
+    const txt=document.createElement("span"); txt.className="txt";
+    txt.textContent=fmt(row.start)+"  "+(row.text||"");
+    txt.onclick=()=>{ if(ws) ws.setTime(+row.start); };
+    back.onclick=ev=>{ ev.stopPropagation(); row.start=Math.max(0, +row.start-0.2); paintLyrics(); };
+    fwd.onclick=ev=>{ ev.stopPropagation(); row.start=+row.start+0.2; paintLyrics(); };
+    d.appendChild(back); d.appendChild(txt); d.appendChild(fwd);
     box.appendChild(d);
   });
 }
+function loadLyrics(id){
+  const box=document.getElementById("lyricbox");
+  if(!box) return;
+  box.textContent="…";
+  fetch("/api/lyrics/"+id).then(r=>r.json()).then(x=>{
+    const lines=x.lines||[];
+    const lane=document.getElementById("lyriclane");
+    if(!lines.length){
+      box.textContent=x.note||"press Lyrics to fetch";
+      if(lane) lane.classList.add("idle");
+      window._lyricLines=[];
+      return;
+    }
+    if(lane) lane.classList.remove("idle");
+    window._lyricLines=lines;
+    paintLyrics();
+  }).catch(()=>{ box.textContent="lyrics failed"; });
+}
+function loadTab(id){
+  return;
+  const box=document.getElementById("tabwrap");
+  box.innerHTML="";
+  const msg=document.createElement("div");
+  msg.className="empty";
+  msg.id="tabmsg";
+  box.appendChild(msg);
+  if(!window.alphaTab){ msg.textContent="AlphaTab failed to load (need internet)"; return; }
+  msg.textContent="rendering tab…";
+  fetch("/api/tab/"+id).then(r=>{
+    if(!r.ok){ msg.textContent="no tab file for AlphaTab"; return; }
+    box.innerHTML="";
+    const host=document.createElement("div");
+    box.appendChild(host);
+    try{
+      if(tabApi && tabApi.destroy) tabApi.destroy();
+    }catch(e){}
+    tabApi=new alphaTab.AlphaTabApi(host, {
+      file: "/api/tab/"+id,
+      core: { fontDirectory: "https://cdn.jsdelivr.net/npm/@coderline/alphatab@1.3.1/dist/font/" },
+      display: {
+        scale: 0.9,
+        resources: {
+          staffLineColor: "#3a342c",
+          barSeparatorColor: "#3a342c",
+          barNumberColor: "#5a5248",
+          mainGlyphColor: "#1a1612",
+          secondaryGlyphColor: "#3a342c",
+          scoreInfoColor: "#1a1612"
+        }
+      },
+      player: { enablePlayer: false }
+    });
+    tabApi.error.on(e=>{ msg.textContent="tab: "+(e&&e.message?e.message:e); });
+  }).catch(()=>{ msg.textContent="no tab file"; });
+}
 
-function select(i) {
-  trackId = i;
-  const t = tracks[i];
-  document.getElementById("title").textContent = t.track || "untitled";
-  document.getElementById("sub").textContent = (t.album || "") + (t.tuning ? " · " + t.tuning : "");
+function toggle(){ window._playUntil=null; if(!ws) return; ws.playPause(); }
+
+hookViz();
+fetch("/api/tracks").then(r=>r.json()).then(d=>{
+  tracks=d.tracks||[];
   renderList();
-  showErr("");
-  pins = [];
-  peaks = [];
-  audio.src = "/api/audio/" + t.id;
-  audio.load();
-  fetch("/api/sections/" + t.id).then(r => r.json()).then(secs => {
-    const human = secs.filter(s => s.source === "human");
-    const use = human.length ? human : secs;
-    pins = use.map(s => ({ role: s.role, start: +s.start })).sort((a,b) => a.start - b.start);
-    draw(); renderPins();
-    if (!use.length && t.has_flac) estimate();
+  if(!tracks.length){ showErr("no tracks in map.csv", true); return; }
+  const first=tracks.findIndex(t=>t.has_flac);
+  select(first>=0?first:0);
+}).catch(e=>showErr("tracks failed: "+e, true));
+
+function renderList(){
+  const box=document.getElementById("list"); box.innerHTML="";
+  const q=(listQ||"").toLowerCase();
+  let last="";
+  const cur=tracks[trackId];
+  tracks.forEach((t)=>{
+    if(listFilter==="gp" && !t.has_gp) return;
+    if(listFilter==="none" && t.has_gp) return;
+    const hay=((t.track||"")+" "+(t.album||"")).toLowerCase();
+    if(q && hay.indexOf(q)<0) return;
+    const alb=t.album||"unknown";
+    if(alb!==last){
+      const h=document.createElement("div");
+      h.className="alb";
+      const closed=!!shut[alb];
+      const face=tracks.find(x=>x.album===alb && x.has_cover);
+      h.innerHTML=(closed?"▸ ":"▾ ")+(face?'<img src="/api/cover/'+face.id+'" alt="" />':'')+" "+alb;
+      h.onclick=ev=>{ ev.stopPropagation(); shut[alb]=!shut[alb]; renderList(); };
+      box.appendChild(h); last=alb;
+    }
+    if(shut[alb]) return;
+    const d=document.createElement("div");
+    d.className="t"+(cur===t?" on":"");
+    d.dataset.tid=String(t.id);
+    const gpClass=t.gp_partial?"part":(t.has_gp?"ok":"");
+    const kind=(t.gp_kind||"").toUpperCase();
+    const gpWord=!t.has_gp?"no tab":(t.gp_partial?"partial "+kind:kind);
+    d.innerHTML="<span>"+(t.track||"")+"</span><span class='meta'><span class='dot "+(t.has_flac?"ok":"")+"'></span>flac <span class='dot "+gpClass+"'></span>"+gpWord+"</span>";
+    d.onclick=()=>select(tracks.indexOf(t)); box.appendChild(d);
+  });
+  const on=box.querySelector(".t.on");
+  if(on) on.scrollIntoView({block:"nearest"});
+}
+document.getElementById("q").oninput=e=>{ listQ=e.target.value; renderList(); };
+(function(){
+  const z=document.getElementById("dropzone");
+  if(!z) return;
+  z.addEventListener("dragover",e=>{ e.preventDefault(); z.classList.add("hot"); });
+  z.addEventListener("dragleave",()=>z.classList.remove("hot"));
+  z.addEventListener("drop",e=>{
+    e.preventDefault(); z.classList.remove("hot");
+    const files=e.dataTransfer&&e.dataTransfer.files;
+    if(!files||!files.length) return;
+    const fd=new FormData();
+    fd.append("band",(document.getElementById("bandName").value||"new_band").trim());
+    for(const f of files) fd.append("files", f, f.name);
+    showErr("ingesting "+files.length+" file(s)…");
+    fetch("/api/ingest",{method:"POST",body:fd}).then(async r=>{
+      const x=await r.json();
+      if(!r.ok) throw x.detail||JSON.stringify(x);
+      showErr("ingested "+(x.flac||0)+" flac · "+(x.gp5||0)+" gp5 · map "+(x.map_rows||0));
+      location.reload();
+    }).catch(err=>showErr("ingest: "+err,true));
+  });
+})();
+document.querySelectorAll(".filters button").forEach(b=>{
+  b.onclick=()=>{
+    listFilter=b.dataset.f;
+    document.querySelectorAll(".filters button").forEach(x=>x.classList.toggle("on", x===b));
+    renderList();
+  };
+});
+
+function select(i){
+  trackId=i; const t=tracks[i];
+  if(t && t.album) shut[t.album]=false;
+  document.getElementById("title").textContent=t.track||"";
+  document.getElementById("sub").textContent=t.album||"";
+  const art=document.getElementById("art");
+  if(t.has_cover){ art.src="/api/cover/"+t.id; art.classList.add("on"); }
+  else { art.removeAttribute("src"); art.classList.remove("on"); }
+  renderList(); showErr(""); regs=[]; sel=-1; window._lyricLines=null; vizHist=[];
+  makeWave("/api/audio/"+t.id+"?v="+encodeURIComponent(t.album+"/"+t.track));
+  loadDrums(t.id);
+  loadTab(t.id);
+  loadLyrics(t.id);
+  fetch("/api/sections/"+t.id).then(r=>r.json()).then(secs=>{
+    const use=secs.filter(s=>s.source==="human").length?secs.filter(s=>s.source==="human"):secs;
+    regs=use.map(s=>({role:s.role,start:+s.start,end:+s.end}));
+    table();
+    if(ws) paintRegions();
   });
 }
 
-audio.onloadedmetadata = () => { duration = audio.duration || 1; buildPeaks(); draw(); };
-audio.ontimeupdate = () => {
-  document.getElementById("clock").textContent = fmt(audio.currentTime) + " / " + fmt(audio.duration || 0);
-  draw();
-};
-document.getElementById("btnPlay").onclick = toggle;
-function toggle() {
-  if (audio.paused) audio.play().catch(() => showErr("Need a FLAC path in map.csv"));
-  else audio.pause();
+function snap(){ undo.push(JSON.stringify(regs)); if(undo.length>40) undo.shift(); }
+function add(role){
+  const t=ws?ws.getCurrentTime():0;
+  const dur=ws?ws.getDuration():30;
+  snap(); regs.push({role,start:t,end:Math.min(dur, t+8)}); sel=regs.length-1;
+  table(); paintRegions();
 }
-audio.onplay = () => document.getElementById("btnPlay").textContent = "Pause";
-audio.onpause = () => document.getElementById("btnPlay").textContent = "Play";
+document.querySelectorAll(".pins button").forEach(b=>b.onclick=()=>add(b.dataset.role));
+document.getElementById("btnPlay").onclick=toggle;
 
-canvas.onclick = (ev) => {
-  const r = canvas.getBoundingClientRect();
-  audio.currentTime = ((ev.clientX - r.left) / r.width) * duration;
-};
-
-function drop(role) {
-  const start = audio.currentTime || 0;
-  pins = pins.filter(p => p.role !== role);
-  pins.push({ role, start });
-  pins.sort((a,b) => a.start - b.start);
-  renderPins(); draw();
+function roleSelect(cur){
+  return "<select data-f='role'>"+ROLES.map(r=>"<option value='"+r+"'"+(r===cur?" selected":"")+">"+(LABEL[r]||r)+"</option>").join("")+"</select>";
 }
-document.querySelectorAll(".pins button").forEach(b => b.onclick = () => drop(b.dataset.role));
-
-function renderPins() {
-  const tb = document.getElementById("rows");
-  tb.innerHTML = "";
-  pins.forEach((p, i) => {
-    const label = (PIN_ROLES.find(x => x.role === p.role) || { label: p.role }).label;
-    const tr = document.createElement("tr");
-    tr.innerHTML = "<td style=\"color:" + (COLOR[p.role]||"#aaa") + "\">" + label + "</td>" +
-      "<td><input type=\"number\" step=\"0.01\" value=\"" + p.start.toFixed(2) + "\"></td>";
-    const td = document.createElement("td");
-    const x = document.createElement("button");
-    x.textContent = "remove";
-    x.onclick = () => { pins.splice(i, 1); renderPins(); draw(); };
-    td.appendChild(x); tr.appendChild(td);
-    tr.querySelector("input").onchange = (e) => {
-      pins[i].start = parseFloat(e.target.value);
-      pins.sort((a,b) => a.start - b.start);
-      renderPins(); draw();
+function table(){
+  const tb=document.getElementById("rows"); tb.innerHTML="";
+  regs.forEach((p,i)=>{
+    const tr=document.createElement("tr");
+    if(i===sel) tr.className="on";
+    const first=document.createElement("td"); first.innerHTML=roleSelect(p.role);
+    const tdS=document.createElement("td"); tdS.innerHTML="<input type='number' step='0.05' value='"+Number(p.start).toFixed(2)+"' data-f='start'>";
+    const tdE=document.createElement("td"); tdE.innerHTML="<input type='number' step='0.05' value='"+Number(p.end).toFixed(2)+"' data-f='end'>";
+    const td=document.createElement("td");
+    const x=document.createElement("button"); x.type="button"; x.textContent="remove";
+    x.onclick=ev=>{ ev.stopPropagation(); snap(); regs.splice(i,1); if(sel>=regs.length) sel=regs.length-1; table(); paintRegions(); };
+    td.appendChild(x);
+    tr.appendChild(first); tr.appendChild(tdS); tr.appendChild(tdE); tr.appendChild(td);
+    tr.onclick=ev=>{
+      const tag=ev.target.tagName;
+      if(tag==="SELECT"||tag==="OPTION"||tag==="INPUT"||tag==="BUTTON") return;
+      sel=i; document.querySelectorAll("#rows tr").forEach(r=>r.classList.remove("on")); tr.className="on";
     };
+    first.querySelector("select").onchange=e=>{ p.role=e.target.value; paintRegions(); };
+    tr.querySelectorAll("input").forEach(inp=>{
+      inp.onchange=()=>{
+        p[inp.dataset.f]=parseFloat(inp.value);
+        if(p.end<p.start) p.end=p.start+0.25;
+        paintRegions();
+      };
+    });
     tb.appendChild(tr);
   });
 }
 
-function pinsToSections() {
-  const dur = audio.duration || duration;
-  const ordered = pins.slice().sort((a,b) => a.start - b.start);
-  return ordered.map((p, i) => ({
-    role: p.role,
-    start: p.start,
-    end: i + 1 < ordered.length ? ordered[i + 1].start : dur
-  }));
+function dump(){
+  const t=tracks[trackId]||{};
+  const blob=new Blob([JSON.stringify({album:t.album,track:t.track,sections:regs},null,2)],{type:"application/json"});
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(blob);
+  a.download=(t.track||"track").replace(/[^a-z0-9]+/gi,"_")+"_sections.json";
+  a.click();
 }
-
-function estimate() {
-  showErr("Guessing…");
-  fetch("/api/estimate/" + tracks[trackId].id).then(r => {
-    if (!r.ok) return r.text().then(t => Promise.reject(t));
-    return r.json();
-  }).then(data => {
-    showErr("");
-    pins = (data.sections || []).map(s => ({ role: s.role, start: +s.start }));
-    renderPins(); draw();
-    document.getElementById("hint").textContent = data.bpm ? ("guess bpm " + Math.round(data.bpm)) : "";
-  }).catch(err => showErr(String(err).slice(0, 180)));
+function estimate(){
+  const merge = regs.length>0;
+  const btn=document.getElementById("btnEst");
+  btn.disabled=true;
+  showErr("Guess running — first time Demucs can take a few minutes. Leave this tab open.");
+  fetch("/api/estimate/"+tracks[trackId].id).then(async r=>{
+    const txt=await r.text();
+    let x; try{ x=JSON.parse(txt); }catch(e){ throw txt.slice(0,200); }
+    if(!r.ok) throw (typeof x.detail==="string"?x.detail:JSON.stringify(x.detail||x)).slice(0,240);
+    snap();
+    const draft=(x.sections||[]).map(s=>({role:s.role||"verse",start:+s.start,end:+s.end}));
+    if(merge){
+      draft.forEach(d=>{
+        const hit=regs.some(p=>p.role===d.role && Math.min(p.end,d.end)-Math.max(p.start,d.start) > 0.7*Math.min(p.end-p.start,d.end-d.start));
+        if(!hit) regs.push(d);
+      });
+    } else regs=draft;
+    sel=regs.length?0:-1;
+    table(); paintRegions();
+    loadDrums(tracks[trackId].id);
+    document.getElementById("sub").textContent=(x.sections||[]).length+" guessed";
+    showErr((x.notes||[]).join(" · "));
+  }).catch(e=>showErr("guess: "+e, true)).finally(()=>{ document.getElementById("btnEst").disabled=false; });
 }
-
-function save() {
-  fetch("/api/sections/" + tracks[trackId].id, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ sections: pinsToSections() })
-  }).then(r => r.json()).then(x => {
-    document.getElementById("hint").textContent = "saved " + x.saved + " sections";
-  }).catch(() => showErr("save failed"));
-}
-
-function next() {
-  if (trackId < tracks.length - 1) select(trackId + 1);
-}
-
-document.getElementById("btnEst").onclick = estimate;
-document.getElementById("btnSave").onclick = save;
-document.getElementById("btnNext").onclick = next;
-
-document.body.addEventListener("keydown", (e) => {
-  if (e.target.tagName === "INPUT") return;
-  if (e.code === "Space") { e.preventDefault(); toggle(); }
-  if (e.key === "1") drop("verse");
-  if (e.key === "2") drop("chorus");
-  if (e.key === "3") drop("breakdown");
-  if (e.key === "4") drop("solo");
-  if (e.key === "g" || e.key === "G") estimate();
-  if (e.key === "s" || e.key === "S") save();
-  if (e.key === "n" || e.key === "N") next();
-});
-
-function buildPeaks() {
-  const AC = window.AudioContext || window.webkitAudioContext;
-  const ac = new AC();
-  fetch(audio.src).then(r => r.arrayBuffer()).then(buf => ac.decodeAudioData(buf)).then(buf => {
-    const ch = buf.getChannelData(0);
-    const buckets = 800;
-    const step = Math.floor(ch.length / buckets) || 1;
-    peaks = [];
-    for (let i = 0; i < buckets; i++) {
-      let m = 0;
-      for (let j = 0; j < step; j++) m = Math.max(m, Math.abs(ch[i * step + j] || 0));
-      peaks.push(m);
-    }
-    draw();
-  }).catch(() => { peaks = []; draw(); });
-}
-
-function draw() {
-  const w = canvas.width = canvas.clientWidth * devicePixelRatio;
-  const h = canvas.height = 88 * devicePixelRatio;
-  ctx.clearRect(0, 0, w, h);
-  ctx.fillStyle = "#101012";
-  ctx.fillRect(0, 0, w, h);
-  pinsToSections().forEach(s => {
-    ctx.fillStyle = (COLOR[s.role] || "#444") + "55";
-    const x = (s.start / duration) * w;
-    const ww = ((s.end - s.start) / duration) * w;
-    ctx.fillRect(x, 0, ww, h);
-  });
-  if (peaks.length) {
-    ctx.fillStyle = "#6a6864";
-    const bw = w / peaks.length;
-    peaks.forEach((p, i) => {
-      const ph = p * h * 0.9;
-      ctx.fillRect(i * bw, (h - ph) / 2, Math.max(1, bw - 1), ph);
+function harvestTable(){
+  document.querySelectorAll("#rows tr").forEach((tr,i)=>{
+    if(!regs[i]) return;
+    tr.querySelectorAll("input").forEach(inp=>{
+      const v=parseFloat(inp.value);
+      if(!isNaN(v)) regs[i][inp.dataset.f]=v;
     });
-  }
-  ctx.fillStyle = "#f2f0ec";
-  ctx.fillRect((audio.currentTime / duration) * w, 0, 2 * devicePixelRatio, h);
+    const s=tr.querySelector("select");
+    if(s) regs[i].role=s.value;
+  });
 }
+function save(){
+  if(!regs.length){ showErr("no regions to save"); return; }
+  harvestTable();
+  const dur=ws? (ws.getDuration()||0):0;
+  if(dur<2){ showErr("wave not ready — wait until the clock shows the full length", true); return; }
+  regs.forEach(p=>{
+    p.start=+p.start||0;
+    p.end=+p.end||0;
+    if(p.end<=p.start) p.end=p.start+0.25;
+  });
+  if(regs.every(p=>p.end-p.start<1)){
+    showErr("refusing save — boxes are empty. type times, click off a field, then Save", true);
+    return;
+  }
+  fetch("/api/sections/"+tracks[trackId].id,{
+    method:"POST", headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({sections:regs.map(p=>({role:p.role,start:+p.start,end:+p.end}))})
+  }).then(async r=>{
+    const txt=await r.text();
+    let x; try{ x=JSON.parse(txt); }catch(e){ throw txt.slice(0,200); }
+    if(!r.ok) throw (typeof x.detail==="string"?x.detail:JSON.stringify(x.detail||x)).slice(0,240);
+    showErr("saved "+x.saved+" → data/sections.jsonl");
+    document.getElementById("sub").textContent="saved "+x.saved;
+  }).catch(e=>showErr("save failed: "+e, true));
+}
+function nextGreen(){
+  for(let i=trackId+1;i<tracks.length;i++) if(tracks[i].has_flac&&tracks[i].has_gp){ select(i); return; }
+}
+document.getElementById("btnEst").onclick=estimate;
+document.getElementById("btnSave").onclick=save;
+document.getElementById("btnDump").onclick=dump;
+document.getElementById("btnLyrics").onclick=()=>{
+  const t=tracks[trackId]; if(!t) return;
+  showErr("fetching lyrics…");
+  fetch("/api/lyrics/"+t.id,{method:"POST"}).then(r=>r.json()).then(x=>{
+    showErr(x.note||("lines "+(x.lines||[]).length));
+    loadLyrics(t.id);
+  }).catch(e=>showErr("lyrics: "+e,true));
+};
+function saveLyrics(){
+  const t=tracks[trackId]; if(!t) return;
+  const lines=window._lyricLines||[];
+  fetch("/api/lyrics/"+t.id,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({lines})})
+    .then(r=>r.json()).then(x=>{ showErr("lyrics saved "+(x.lines||[]).length+" lines"); loadLyrics(t.id); })
+    .catch(e=>showErr("lyrics save: "+e,true));
+}
+function shiftLyrics(dt){
+  (window._lyricLines||[]).forEach(r=>{ r.start=Math.max(0,+r.start+dt); });
+  paintLyrics();
+}
+document.getElementById("btnLyBack").onclick=()=>shiftLyrics(-0.2);
+document.getElementById("btnLyFwd").onclick=()=>shiftLyrics(0.2);
+document.getElementById("btnLySave").onclick=saveLyrics;
+document.getElementById("btnGit").onclick=()=>{
+  showErr("git push…");
+  fetch("/api/git/push",{method:"POST",headers:{"Content-Type":"application/json"},body:"{}"}).then(async r=>{
+    const x=await r.json();
+    showErr(x.ok?("pushed "+(x.root||"")):("git: "+(x.error||x.log||"failed")), !x.ok);
+  }).catch(e=>showErr("git: "+e,true));
+};
+document.getElementById("btnPack").onclick=()=>{
+  const t=tracks[trackId]; if(!t) return;
+  showErr("packing (Demucs if no cache)…");
+  fetch("/api/pack/"+t.id,{method:"POST"}).then(async r=>{
+    const x=await r.json();
+    showErr("pack written "+(x.written||0)+" skipped "+(x.skipped||0));
+  }).catch(e=>showErr("pack: "+e,true));
+};
+document.getElementById("btnUndo").onclick=()=>{ if(!undo.length) return; regs=JSON.parse(undo.pop()); sel=Math.min(sel,regs.length-1); table(); paintRegions(); };
+document.getElementById("btnPlayBox").onclick=()=>{
+  if(!ws){ showErr("wave not ready", true); return; }
+  pullRegions();
+  if(sel<0 && regs.length) sel=0;
+  if(sel<0||!regs[sel]){ showErr("click a coloured box or its table row first", true); return; }
+  const a=+regs[sel].start, b=Math.max(a+0.05, +regs[sel].end);
+  window._playUntil=b;
+  showErr("box "+fmt(a)+" → "+fmt(b));
+  table();
+  const hit=regionsPlug && regionsPlug.getRegions().find(r=>String(r.id)==="r"+sel);
+  try{
+    if(hit && typeof hit.play==="function"){ hit.play(); return; }
+  }catch(e){}
+  ws.setTime(a);
+  Promise.resolve(ws.play(a, b)).catch(()=>ws.play());
+};
+document.getElementById("btnNext").onclick=nextGreen;
+
+document.body.addEventListener("keydown",e=>{
+  if(e.target.tagName==="INPUT"||e.target.tagName==="SELECT") return;
+  if(e.code==="Space"){ e.preventDefault(); toggle(); }
+  if(e.key==="1") add("verse");
+  if(e.key==="2") add("chorus");
+  if(e.key==="3") add("breakdown");
+  if(e.key==="4") add("solo");
+  if(e.key==="s"||e.key==="S") save();
+  if(e.key==="i"||e.key==="I") add("intro");
+  if(e.key==="b"||e.key==="B") add("build");
+  if(e.key==="c"||e.key==="C") add("chill");
+  if(e.key==="p"||e.key==="P") add("pulse");
+  if(e.key==="n"||e.key==="N") nextGreen();
+  if(e.key==="j"||e.key==="J"){ if(trackId<tracks.length-1) select(trackId+1); }
+  if(e.key==="k"||e.key==="K"){ if(trackId>0) select(trackId-1); }
+  if(e.key==="?") openHow(true);
+  if(e.key==="Escape") openHow(false);
+  if((e.key==="Delete"||e.key==="Backspace") && sel>=0){ e.preventDefault(); snap(); regs.splice(sel,1); sel=Math.min(sel,regs.length-1); table(); paintRegions(); }
+  if((e.key==="z"||e.key==="Z") && (e.ctrlKey||e.metaKey)){ e.preventDefault(); if(undo.length){ regs=JSON.parse(undo.pop()); table(); paintRegions(); } }
+});
 </script>
 </body>
 </html>

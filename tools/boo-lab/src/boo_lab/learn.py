@@ -33,6 +33,19 @@ def role_prior(sections: list[dict]) -> dict[str, float]:
     return {k: v / n for k, v in c.items()}
 
 
+def record(lab_root: Path, album: str, track: str, sections: list[dict]) -> None:
+    path = lab_root / "data" / "learn-log.jsonl"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    rec = {"album": album, "track": track, "n": len(sections)}
+    with path.open("a", encoding="utf-8") as f:
+        f.write(json.dumps(rec) + "\n")
+
+
+def note(lab_root: Path) -> str:
+    secs = load_human_sections(lab_root / "data" / "sections.jsonl")
+    return "labelled %s boxes" % len(secs)
+
+
 def enough_to_train(sections: list[dict], min_per_role: int = 4) -> bool:
     c = Counter(s.get("role") for s in sections)
     useful = [k for k, v in c.items() if v >= min_per_role]

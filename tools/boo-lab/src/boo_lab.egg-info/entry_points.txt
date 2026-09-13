@@ -1,0 +1,2 @@
+[console_scripts]
+boo-lab = boo_lab.cli:main

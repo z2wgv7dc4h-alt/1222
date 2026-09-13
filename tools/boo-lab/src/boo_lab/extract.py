@@ -6,15 +6,37 @@ from pathlib import Path
 ROLE_WORDS = {
     "intro": "intro",
     "verse": "verse",
+    "riff": "verse",
+    "hook": "chorus",
     "chorus": "chorus",
     "break": "breakdown",
     "breakdown": "breakdown",
     "solo": "solo",
-    "bridge": "interlude",
+    "lead": "solo",
+    "bridge": "chill",
     "outro": "outro",
     "build": "build",
     "pre": "build",
+    "chill": "chill",
+    "clean": "chill",
+    "ambient": "chill",
+    "interlude": "chill",
+    "pulse": "pulse",
+    "synth": "pulse",
+    "techno": "pulse",
+    "electronic": "pulse",
+    "vibe": "pulse",
 }
+
+
+def gp_track_names(gp_path: Path) -> list[str]:
+    try:
+        import guitarpro as gp
+
+        song = gp.parse(str(gp_path))
+        return [t.name or f"track{i}" for i, t in enumerate(song.tracks)]
+    except Exception:
+        return []
 
 
 def infer_role(marker: str | None) -> str | None:
@@ -127,3 +149,43 @@ def _bars_to_cells(measures) -> tuple[list[dict], list[int]]:
         # keep lengths honest
         pass
     return cells, deltas
+
+
+def estimate_from_gp(gp_path: Path) -> dict:
+    """Turn GP measure markers + tempo map into second-based sections."""
+    import guitarpro as gp
+
+    song = gp.parse(str(gp_path))
+    bpm = float(getattr(getattr(song, "tempo", None), "value", None) or getattr(song, "tempo", 120) or 120)
+    track = _rhythm_track(song) or (song.tracks[0] if song.tracks else None)
+    if track is None:
+        return {"bpm": bpm, "sections": [], "reason": "no track"}
+    t = 0.0
+    cuts = []  # (time, role, raw)
+    for measure in track.measures:
+        header = getattr(measure, "header", None)
+        if header is not None:
+            tempo = getattr(header, "tempo", None)
+            val = getattr(tempo, "value", None) if tempo is not None else None
+            if val:
+                bpm = float(val)
+        marker = _marker_text(measure)
+        role = infer_role(marker)
+        if marker:
+            cuts.append((t, role or "verse", marker))
+        ts = getattr(measure, "timeSignature", None) or getattr(header, "timeSignature", None)
+        num = getattr(ts, "numerator", 4) if ts else 4
+        den_obj = getattr(ts, "denominator", 4) if ts else 4
+        den = getattr(den_obj, "value", den_obj) or 4
+        beats = float(num) * 4.0 / float(den)
+        t += beats * 60.0 / max(bpm, 1.0)
+    duration = t
+    if not cuts:
+        return {"bpm": bpm, "sections": [], "reason": "no markers in tab", "duration": duration}
+    sections = []
+    for i, (start, role, raw) in enumerate(cuts):
+        end = cuts[i + 1][0] if i + 1 < len(cuts) else duration
+        if end <= start:
+            end = start + 0.5
+        sections.append({"role": role, "start": round(start, 3), "end": round(end, 3), "source": "gp-marker", "raw": raw})
+    return {"bpm": bpm, "sections": sections, "duration": duration}

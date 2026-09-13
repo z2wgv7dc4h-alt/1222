@@ -28,7 +28,13 @@ def main(argv: list[str] | None = None) -> int:
 
     s = sub.add_parser("stems")
     s.add_argument("--album")
-    s.add_argument("--model", default="htdemucs_ft")
+    s.add_argument("--model", default="htdemucs")
+
+    s = sub.add_parser("pack", help="slice mix+stems for each saved human box")
+    s.add_argument("--album")
+
+    s = sub.add_parser("lyrics", help="fetch LRC / optional whisperx on vocals stem")
+    s.add_argument("--album")
 
     s = sub.add_parser("structure")
     s.add_argument("--album")
@@ -45,19 +51,35 @@ def main(argv: list[str] | None = None) -> int:
     s = sub.add_parser("annotate", help="local UI: listen to FLAC, click section bounds")
     s.add_argument("--port", type=int, default=8765)
 
-    args = p.parse_args(argv)
-    flac_root = Path(os.environ.get("BOO_FLAC_ROOT", "")) if os.environ.get("BOO_FLAC_ROOT") else None
-    gp_root = Path(os.environ.get("BOO_GP_ROOT", "")) if os.environ.get("BOO_GP_ROOT") else None
-    map_path = data_dir() / "map.csv"
+    s = sub.add_parser("ingest", help="copy a drop folder of zips/FLAC/GP into the corpus")
+    s.add_argument("drop", type=Path)
+    s.add_argument("--band", required=True)
 
+    args = p.parse_args(argv)
     env_file = root() / ".env"
     if env_file.exists():
         for line in env_file.read_text(encoding="utf-8").splitlines():
             if "=" in line and not line.strip().startswith("#"):
                 k, v = line.split("=", 1)
                 os.environ.setdefault(k.strip(), v.strip().strip('"'))
-        flac_root = Path(os.environ["BOO_FLAC_ROOT"]) if os.environ.get("BOO_FLAC_ROOT") else flac_root
-        gp_root = Path(os.environ["BOO_GP_ROOT"]) if os.environ.get("BOO_GP_ROOT") else gp_root
+    flac_val = os.environ.get("BOO_FLAC_ROOT") or ""
+    gp_val = os.environ.get("BOO_GP_ROOT") or ""
+    flac_root = Path(flac_val) if flac_val else None
+    gp_root = Path(gp_val) if gp_val else None
+    map_path = data_dir() / "map.csv"
+
+    if args.cmd == "ingest":
+        from .ingest import ingest
+
+        if not flac_root or not gp_root:
+            print("set BOO_FLAC_ROOT and BOO_GP_ROOT")
+            return 1
+        report = ingest(args.drop, flac_root, gp_root, args.band)
+        print(report)
+        drafted = scan_roots(flac_root, gp_root)
+        save_map(map_path, drafted)
+        print("map.csv", len(drafted), "rows")
+        return 0
 
     if args.cmd == "scan":
         drafted = scan_roots(flac_root, gp_root)
@@ -84,8 +106,31 @@ def main(argv: list[str] | None = None) -> int:
             if not fp or not Path(fp).exists():
                 print("SKIP stems", r.get("track"), "no flac")
                 continue
-            dest = run_demucs(Path(fp), out, model=args.model)
+            dest = run_demucs(Path(fp), out, model=args.model, two_stems=None)
             print("STEMS", r.get("track"), dest)
+        return 0
+
+    if args.cmd == "pack":
+        from .pack import build_pack
+
+        report = build_pack(root(), rows, root() / "work" / "stems")
+        print("pack", report)
+        return 0
+
+    if args.cmd == "lyrics":
+        from .lyrics import build_lyrics
+        from .stems import find_stem
+
+        n = 0
+        cache = root() / "work" / "stems"
+        for r in rows:
+            fp = r.get("flac_path")
+            flac = Path(fp) if fp else None
+            voc = find_stem(flac, cache, "vocals") if flac else None
+            payload = build_lyrics(root(), r.get("track") or "", flac, voc)
+            print("LYRICS", r.get("track"), payload.get("note"), "lines", len(payload.get("lines") or []))
+            n += 1
+        print("lyrics", n)
         return 0
 
     if args.cmd == "structure":
@@ -163,7 +208,6 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     if args.cmd in {"annotate", "studio"}:
-        import os
         from .annotator import create_app
 
         app = create_app(root(), flac_root, gp_root)

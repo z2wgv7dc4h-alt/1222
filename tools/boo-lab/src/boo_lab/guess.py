@@ -1,0 +1,271 @@
+from __future__ import annotations
+
+import re
+from pathlib import Path
+
+GP5_ROOTS = [
+    Path(r"C:\Users\RIGGUSPIG\Desktop\god-tier-metal\reference\gp-tabs\gp5"),
+    Path(r"C:\Users\RIGGUSPIG\Desktop\god-tier-metal\reference\gp-tabs"),
+    Path(r"C:\Users\RIGGUSPIG\Desktop\god-tier-metal\reference"),
+]
+
+
+def _norm(s: str) -> str:
+    s = (s or "").replace("∆", "A").replace("Δ", "A").replace("δ", "a").lower()
+    s = re.sub(r"^\d+\s*[-_.]\s*", "", s)
+    return re.sub(r"[^a-z0-9]+", "", s)
+
+
+def _prefer_gp5(gp: Path | None, track: str) -> Path | None:
+    cands: list[Path] = []
+    if gp:
+        p = Path(gp)
+        if p.suffix.lower() == ".gp5" and p.exists():
+            return p
+        sib = p.with_suffix(".gp5")
+        if sib.exists():
+            cands.append(sib)
+        if p.exists() and p.suffix.lower() == ".gp5":
+            cands.append(p)
+    key = _norm(track)
+    if not key and gp:
+        # "Born_Of_Osiris-Recreate-s77727" -> recreate
+        raw = _norm(Path(gp).stem)
+        raw = re.sub(r"^bornofosiris", "", raw)
+        raw = re.sub(r"s\d+$", "", raw)
+        key = raw
+    if key:
+        for root in GP5_ROOTS:
+            if not root.exists():
+                continue
+            try:
+                hits = list(root.rglob("*.gp5"))
+            except Exception:
+                continue
+            for hit in hits:
+                n = _norm(hit.stem)
+                if n == key or key in n or n in key:
+                    cands.append(hit)
+    for c in cands:
+        if c.exists() and c.suffix.lower() == ".gp5":
+            return c
+    return None
+
+
+def estimate_hybrid(
+    flac: Path | None,
+    gp: Path | None,
+    track: str = "",
+    cache: Path | None = None,
+) -> dict:
+    notes: list[str] = []
+    sections: list[dict] = []
+    bpm = None
+    beats: list[float] = []
+
+    gp_use = _prefer_gp5(gp, track)
+    key = _norm(track) or _norm(gp.stem if gp else "")
+    seen = 0
+    root0 = GP5_ROOTS[0]
+    if root0.exists():
+        seen = sum(1 for _ in root0.rglob("*.gp5"))
+    notes.append("key=%s gp5=%s files=%s" % (key or "?", root0, seen))
+    if gp_use:
+        notes.append("tab " + str(gp_use))
+        try:
+            from .extract import estimate_from_gp
+
+            g = estimate_from_gp(gp_use)
+            bpm = g.get("bpm") or bpm
+            if g.get("sections"):
+                sections.extend(g["sections"])
+                notes.append("gp markers")
+            else:
+                notes.append(g.get("reason") or "tab has no markers")
+        except Exception as e:
+            notes.append("gp parse: %s" % e)
+    else:
+        notes.append("no tab")
+
+    if flac and Path(flac).exists():
+        src = Path(flac)
+        if cache:
+            from .stems import ensure_drums
+
+            drum, why = ensure_drums(Path(flac), cache)
+            notes.append(why)
+            if drum:
+                src = drum
+        else:
+            drum = _drum_stem(Path(flac))
+            if drum:
+                src = drum
+                notes.append("drums " + drum.name)
+        try:
+            m = _librosa_beats(src)
+            beats = m.get("beats") or []
+            if m.get("bpm"):
+                bpm = m["bpm"]
+            ht = _half_time_spans(beats)
+            sections.extend(ht)
+            if ht:
+                notes.append("librosa half-time x%s" % len(ht))
+            else:
+                notes.append("librosa beats, no half-time")
+        except ImportError:
+            notes.append("pip install librosa soundfile")
+        except Exception as e:
+            notes.append("beats: %s" % e)
+        try:
+            kicks = _kick_spans(src)
+            if kicks:
+                sections.extend(kicks)
+                notes.append("kick IOI x%s" % len(kicks))
+        except ImportError:
+            pass
+        except Exception as e:
+            notes.append("kick: %s" % e)
+
+    if cache:
+        try:
+            from .learn import note as learn_note
+
+            notes.append(learn_note(cache.parent.parent))
+        except Exception:
+            pass
+
+    sections = _clean(sections)
+    return {"bpm": bpm, "beats": beats[:400], "sections": sections, "notes": notes}
+
+
+def _drum_stem(flac: Path) -> Path | None:
+    stem = flac.stem
+    parent = flac.parent
+    cands = [
+        parent / "stems" / (stem + ".wav"),
+        parent / "stems" / (stem + ".drums.wav"),
+        parent / "stems" / "drums.wav",
+        parent / (stem + ".drums.wav"),
+    ]
+    for c in cands:
+        if c.exists():
+            return c
+    return None
+
+
+def _scalar(x):
+    try:
+        import numpy as np
+        a = np.asarray(x).reshape(-1)
+        return float(a[0]) if a.size else None
+    except Exception:
+        try:
+            return float(x)
+        except Exception:
+            return None
+
+
+def _flist(x):
+    try:
+        import numpy as np
+        return [float(v) for v in np.asarray(x).reshape(-1)]
+    except Exception:
+        try:
+            return [float(v) for v in list(x)]
+        except Exception:
+            return []
+
+
+def _librosa_beats(wav: Path) -> dict:
+    import librosa
+
+    y, sr = librosa.load(str(wav), sr=22050, mono=True)
+    tempo, frames = librosa.beat.beat_track(y=y, sr=sr)
+    beats = _flist(librosa.frames_to_time(frames, sr=sr))
+    return {"beats": beats, "bpm": _scalar(tempo)}
+
+
+def _kick_spans(wav: Path) -> list[dict]:
+    import librosa
+    import numpy as np
+
+    y, sr = librosa.load(str(wav), sr=22050, mono=True)
+    hop = 512
+    spec = np.abs(librosa.stft(y, hop_length=hop))
+    freqs = librosa.fft_frequencies(sr=sr)
+    band = spec[freqs < 140].mean(axis=0)
+    env = librosa.util.normalize(band)
+    times = librosa.onset.onset_detect(onset_envelope=env, sr=sr, hop_length=hop, units="time")
+    spans = _half_time_spans(_flist(times), min_len=5.0)
+    for s in spans:
+        s["source"] = "kick"
+        s["role"] = "breakdown"
+    return spans
+
+
+def _half_time_spans(beats: list[float], min_len: float = 6.0) -> list[dict]:
+    if len(beats) < 24:
+        return []
+    ioi = [b - a for a, b in zip(beats, beats[1:])]
+    med = sorted(ioi)[len(ioi) // 2]
+    if med <= 0:
+        return []
+    win = 8
+    flags = []
+    for i in range(len(ioi)):
+        sl = ioi[max(0, i - win) : i + win]
+        local = sorted(sl)[len(sl) // 2]
+        flags.append(local > med * 1.65)
+    out = []
+    i = 0
+    while i < len(flags):
+        if not flags[i]:
+            i += 1
+            continue
+        j = i
+        while j < len(flags) and flags[j]:
+            j += 1
+        start = beats[i]
+        end = beats[min(j, len(beats) - 1)]
+        if end - start >= min_len:
+            out.append(
+                {
+                    "role": "breakdown",
+                    "start": round(start, 3),
+                    "end": round(end, 3),
+                    "source": "halftime",
+                }
+            )
+        i = j
+    return out
+
+
+def _clean(sections: list[dict]) -> list[dict]:
+    keep = []
+    for s in sections:
+        try:
+            start = float(s["start"])
+            end = float(s["end"])
+        except Exception:
+            continue
+        if end <= start:
+            continue
+        keep.append({**s, "start": start, "end": end})
+    keep.sort(key=lambda x: (x["start"], x["end"]))
+    out = []
+    for s in keep:
+        drop = False
+        for o in out:
+            if s.get("role") != o.get("role"):
+                continue
+            a, b = max(s["start"], o["start"]), min(s["end"], o["end"])
+            overlap = max(0.0, b - a)
+            span = min(s["end"] - s["start"], o["end"] - o["start"])
+            if span > 0 and overlap / span > 0.7:
+                o["start"] = min(o["start"], s["start"])
+                o["end"] = max(o["end"], s["end"])
+                drop = True
+                break
+        if not drop:
+            out.append(s)
+    return out

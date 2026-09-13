@@ -1,4 +1,8 @@
-# BoO corpus note — 2026-09-12
+# Corpus note
+
+Multi-band tree is `reference/audio-corpus/<band>/`. BoO remains the first band. Veil of Maya etc. must **not** live under `born_of_osiris/new_band`.
+
+# BoO disk quirks — 2026-09-12
 
 Tabs: uploaded zip (91 Guitar Pro files after ignoring songsterr-downloader source).
 FLACs: `C:\Users\RIGGUSPIG\Desktop\god-tier-metal\reference\audio-corpus\born_of_osiris`

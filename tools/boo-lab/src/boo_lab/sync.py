@@ -29,10 +29,59 @@ def _read_jsonl(path: Path) -> list[dict]:
     return rows
 
 
+def _enclosing_open(headers: list, i: int) -> int:
+    """Nearest prior `isRepeatOpen` measure at or before `i` (innermost)."""
+    for j in range(i, -1, -1):
+        if getattr(headers[j], "isRepeatOpen", False):
+            return j
+    return 0
+
+
+def _playback_order(measures: list) -> list[int]:
+    """Measure indices in real playback order, expanding repeat-open/close and
+    alternative endings. `repeatClose` is the number of EXTRA repeats (the
+    parser already subtracts 1), so a group plays `repeatClose + 1` times."""
+    headers = [m.header for m in measures]
+    n = len(measures)
+    order: list[int] = []
+    counts: dict[int, int] = {}
+    i = 0
+    guard = 0
+    while 0 <= i < n and guard < 200000:
+        guard += 1
+        h = headers[i]
+        alt = getattr(h, "repeatAlternative", 0)
+        if alt:
+            open_idx = _enclosing_open(headers, i)
+            if not (alt & (1 << counts.get(open_idx, 0))):
+                i += 1
+                continue
+        order.append(i)
+        if getattr(h, "isRepeatOpen", False):
+            # setdefault: a repeat group re-enters this index on every pass;
+            # resetting here would loop forever.
+            counts.setdefault(i, 0)
+        rc = getattr(h, "repeatClose", -1)
+        if rc != -1:
+            open_idx = _enclosing_open(headers, i)
+            if counts.get(open_idx, 0) < rc:
+                counts[open_idx] = counts.get(open_idx, 0) + 1
+                i = open_idx
+                continue
+        i += 1
+    return order
+
+
+
+
+
 def gp_onset_times(gp_path: Path) -> list[float] | None:
-    """Real note-start times (seconds) on the tab's own tempo/measure clock
-    -- the same walk `extract._measure_start_times` uses. `None` when the
-    GP cannot be parsed."""
+    """Real note-start times (seconds) on the tab's own tempo/measure clock,
+    in playback order (repeats expanded). `None` when the GP cannot be parsed.
+
+    Faithful where it matters: `song.tempo` (per-measure `header.tempo` only
+    when set), time signatures, repeat/unroll, dotted and tuplet beats.
+    """
     try:
         import guitarpro
 
@@ -47,26 +96,25 @@ def gp_onset_times(gp_path: Path) -> list[float] | None:
 
     onsets: list[float] = []
     t = 0.0
-    # `song.tempo` is the file's tempo; per-measure `header.tempo` is only set
-    # on change. Defaulting to 120 stretched every tab (a 195 BPM song walked
-    # 1.6x too long, so the clock never lined up with the audio).
+    # `song.tempo` is the file's tempo; defaulting to 120 stretched every tab
+    # (a 195 BPM song walked 1.6x too long, so the clock never lined up).
+    # Onsets and the measure advance share the same beat-duration arithmetic so
+    # the clock stays self-consistent; repeats are expanded via `_playback_order`.
     bpm = float(getattr(song, "tempo", None) or 120.0)
-    for measure in track.measures:
-        header = getattr(measure, "header", None)
-        if header is not None:
-            tempo = getattr(header, "tempo", None)
-            val = getattr(tempo, "value", None) if tempo is not None else None
-            if val:
-                bpm = float(val)
+    for idx in _playback_order(track.measures):
+        measure = track.measures[idx]
+        val = getattr(getattr(measure.header, "tempo", None), "value", None)
+        if val:
+            bpm = float(val)
         beat_seconds = 60.0 / max(bpm, 1.0)
         for voice in measure.voices:
             for beat in voice.beats:
                 if beat.notes:
                     onsets.append(round(t, 4))
-                beats_val = 4.0 / beat.duration.value
+                quarters = 4.0 / beat.duration.value
                 if beat.duration.isDotted:
-                    beats_val *= 1.5
-                t += beats_val * beat_seconds
+                    quarters *= 1.5
+                t += quarters * beat_seconds
             break
     return onsets
 

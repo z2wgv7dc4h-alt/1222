@@ -1,7 +1,7 @@
 # CURRENT
 
 updated: 2026-09-18
-pytest: engine riff_bank tests pass; boo-lab **167 passed**
+pytest: engine riff_bank tests pass; boo-lab **169 passed**
 
 ## Now
 
@@ -16,7 +16,7 @@ Lab pass (lab commit `69288bd`): interns now run on **GPU by default**
 repaired for modern natten + madmom on py3.12/numpy2 by `boo_lab/_natten_compat.py`;
 `setup.bat` + `constraints.txt` + `boo-lab doctor` make a fresh machine reproducible.
 `structure` wrote **125 drafts** (13 BoO tracks); `compare` on Rebirth (holdout):
-**F0.5=0.737 F3=0.800 role3=0.250**. 167 boo-lab tests pass.
+**F0.5=0.737 F3=0.800 role3=0.250**. 169 boo-lab tests pass.
 
 Real, done, verified, pushed this pass (tools/boo-lab/ + engine/riff_bank.py):
 - Labyrinth bank redesigned: ONE real song, ONE 2-4 bar contiguous riff,

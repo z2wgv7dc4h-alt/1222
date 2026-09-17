@@ -46,6 +46,34 @@ def test_sync_refuses_without_track(tmp_path):
         sync.sync_track(tmp_path, "A", None)
 
 
+class _H:
+    def __init__(self, **kw):
+        self.isRepeatOpen = kw.get("isRepeatOpen", False)
+        self.repeatAlternative = kw.get("repeatAlternative", 0)
+        self.repeatClose = kw.get("repeatClose", -1)
+
+
+class _M:
+    def __init__(self, **kw):
+        self.header = _H(**kw)
+
+
+def test_playback_order_expands_a_simple_repeat():
+    measures = [_M(), _M(isRepeatOpen=True), _M(repeatClose=1), _M()]
+    assert sync._playback_order(measures) == [0, 1, 2, 1, 2, 3]
+
+
+def test_playback_order_handles_alternative_endings():
+    measures = [
+        _M(),
+        _M(isRepeatOpen=True),
+        _M(repeatClose=1, repeatAlternative=1),
+        _M(repeatAlternative=2),
+        _M(),
+    ]
+    assert sync._playback_order(measures) == [0, 1, 2, 1, 3, 4]
+
+
 def test_gp_onset_times_uses_song_tempo(monkeypatch):
     class _Dur:
         value = 4

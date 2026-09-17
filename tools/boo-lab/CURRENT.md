@@ -4,7 +4,7 @@ Single source of truth for humans and later bots. If README/STATUS/LAW disagree 
 
 ## What this is
 
-A **section lab** for metal FLACs (Born of Osiris first, other bands via ingest). Output is `data/sections.jsonl` + optional Pack clips under `work/` (gitignored). It is not God Tier Metal, not a DAW, not a tab reader, not an auto-songwriter.
+A **section lab** for metal FLACs (Born of Osiris first, other bands via ingest). Human output is `data/sections.jsonl` — **keeper pins only** (`source=human`/`guess-accepted`, `heard=true`), each with a figure/function `layer` and a `figure_id` — plus optional Pack clips under `work/` (gitignored). Machines write `data/drafts.jsonl` (MSA/SongFormer/Guess) and never keepers. It is not God Tier Metal, not a DAW, not a tab reader, not an auto-songwriter.
 
 GitHub: `https://github.com/z2wgv7dc4h-alt/1222` path `tools/boo-lab`.  
 Tip that first shipped the night’s UI/guess work: `6482c30` `guess bpm fix, save harvest, riff colors`. Later local files (ingest hoist, catalogue unique match, gitutil ignore `work/`, docs) may still need a separate commit.
@@ -41,12 +41,17 @@ http://127.0.0.1:8765 — Ctrl+Shift+R after HTML. Restart the process after `.p
 | path | what |
 |---|---|
 | `data/map.csv` | scan result: album, track, flac path, gp path, match |
-| `data/sections.jsonl` | one JSON object per box. Save **replaces** that track’s rows, keeps other tracks |
+| `data/sections.jsonl` | **keeper** boxes only. Save **replaces** that track’s rows, keeps other tracks |
+| `data/drafts.jsonl` | machine drafts (`msa-draft`, `songformer-draft`, `guess`). Never keepers |
+| `data/holdout.csv` | fixed whole-song train/val reservation (`ensure_holdout`) |
+| `data/agree.jsonl` | two-pass keeper snapshots (`boo-lab agree --write`), pass 1/2 |
+| `data/compare.json` | drafts-vs-keepers report (`boo-lab compare`) |
+| `data/beats.jsonl` | beat/downbeat grid (`boo-lab beats`) |
+| `data/corpus_health.json` | pipeline state (`boo-lab report`) |
 | `data/rebirth-sections.jsonl` | reference labels for Rebirth |
-| `work/stems/` | Demucs cache (gitignored) |
-| `work/drop/` | ingest landing (gitignored) |
-| `work/pack/` or pack output | sliced mix/drums/bass/other/novox + meta (gitignored) |
-| `work/lyrics/` | LRC cache |
+| `work/stems/` | Demucs cache, 6-stem `htdemucs_6s` preferred (gitignored) |
+| `work/msa/` | raw allin1/SongFormer payloads (gitignored) |
+| `work/drop/`, `work/pack/`, `work/jams/`, `work/lyrics/` | outputs (gitignored) |
 
 Never commit FLACs, GP, stems, zips, tokens, `.venv`.
 
@@ -61,6 +66,13 @@ intro, build, riff, hook, breakdown, solo, chill, pulse, outro.
 - **Chill** = energy sit-down, not “quiet intro.”
 - **Build** = rise that is not the hook itself.
 - **Intro** on an instrumental album door (Rebirth) may span the whole file; Pulse/Build/Outro layer on top.
+
+Layers and provenance:
+
+- Figure roles (`riff hook solo pulse`) and function roles (`intro build breakdown chill outro`) **may overlap each other**; two boxes of the **same** role overlapping by more than 50 ms is rejected on Save.
+- `figure_id` defaults to `"{role}-A"`; a returning figure keeps the same `figure_id`.
+- `source`: `human` / `guess-accepted` are keepers; `guess` / `msa-draft` / `songformer-draft` are drafts.
+- `heard`: only boxes you actually listened to. Save writes keepers only (`source` keeper **and** `heard=true`); unheard boxes are dropped. This is why old pins need `boo-lab hear` first.
 
 ## Rebirth (A Higher Place, 86.63s)
 
@@ -84,11 +96,14 @@ If Save wrote six `0.00–0.25` rows, the pins fired before duration loaded. Pas
 - Left: albums collapse, cover thumb if `cover.jpg` / `folder.jpg` / `Cover/` / Cyrillic `Сover.jpg` sits next to FLACs.
 - Green GP5 = matched tab. Partial only if notes/name say stub/fragment/bass-only.
 - Mix lane: drag boxes. Click empty wave to seek. Clicking a box edge should not steal the next pin — leave a gap or seek first.
-- Drums lane: display of cached stem, **not** proof Guess ran.
-- Table is source of truth on Save (`harvestTable`). Blur number fields before Save.
+- Stem lane: pick any cached Demucs stem (drums/bass/guitar/piano/other/vocals); the drum-confidence note flags sections the classifier is unsure about.
+- Table is source of truth on Save (`harvestTable`); columns role / figure / start / end / source / heard. Blur number fields before Save.
+- **Heard** gates the save: untick it and the box is dropped. A heard draft saves as `guess-accepted`.
+- **Load drafts** appends `data/drafts.jsonl` rows unheard; **VAL** badge marks holdout songs.
 - Play = whole track. Play box = selected region only.
 - Guess merges drafts if boxes already exist; do not Guess a finished song.
-- Lyrics: click line to seek; ±0.2 nudge; Save lyrics.
+- Lyrics: click line to seek (incl. force-aligned plain lyrics); ±0.2 nudge; Save lyrics.
+- Remove album: deletes one album's FLAC/GP under the configured roots, drops its pins/holdout, rescans. Confirm required.
 - Drop zone: zip or folder. Type band first. No RAR.
 - Push git: best-effort. Cmd is the real backup.
 
@@ -140,7 +155,7 @@ BoO rip folders that lie (Discovery living under “Soul Sphere”, Simulation u
 
 ## Pack / learning
 
-For each **human** box: mix clip + drums/bass/other/no-vox if stems exist + `meta.json` (times, role, gp path). Vocals removed via Demucs stems, not by a second product. Rhythm vs lead vs keys is **not** auto-split; “other” is the leftover stem. That is enough until 20 labelled songs.
+For each **keeper** box: mix clip + drums/bass/guitar/piano/other/vocals + no-vox (6-stem where cached) + `meta.json` (times, role, `figure_id`, source, split, gp path). Default Demucs model is 6-stem `htdemucs_6s`; guitar/piano are isolated, no-vox is mixed from the six. A track cached only under the old 4-stem model still packs (guitar/piano simply absent). That is enough until 20 labelled songs.
 
 ## Git
 
@@ -170,16 +185,43 @@ git push
 `GET /api/tab/{id}`  
 `GET|POST /api/sections/{id}`  
 `GET /api/estimate/{id}` Guess  
+`GET /api/stem/{id}/{name}` any cached stem  
+`GET /api/analysis/{id}` drum onsets/confidence for the song  
+`POST /api/album/remove` `{album, confirm}`  
+`GET /api/drafts?album=&track=` machine drafts  
 `POST /api/ingest` multipart `band` + `files`  
 `GET|POST|PUT /api/lyrics/{id}`  
 `POST /api/pack/{id}`  
 `POST /api/git/push`
 
-Track id is **map row index after album sort**. Lookup audio by album+track so “Rebirth” cannot stream “Machine.”
+Track id is **map row index after album sort**; audio/cover/tab/drums/stem/lyrics/pack resolve by
+album+track so “Rebirth” cannot stream “Machine.”
 
 ## CLI
 
-`init-map` `scan` `studio`/`annotate` `ingest DROP --band` `stems` `pack` `lyrics` `structure` `extract` `gate` `export-bank`
+`init-map` `scan` `studio`/`annotate` `ingest` `stems` `pack` `drums` `vocals` `holdout` `lyrics`
+`structure` `beats` `audit` `extract` `gate` `report` `export-bank` `agree` `compare` `hear`
+`export-jams`
+
+`structure` writes `data/drafts.jsonl` only (allin1 → `msa-draft`; SongFormer when
+`SONGFORMER_HOME`/import → `songformer-draft`). `agree` snapshots keeper pins (pass 1/2) and diffs
+them; `compare` scores drafts vs keepers per source; `export-jams` writes JAMS 0.3 figure/function
+layers; `beats` writes `beat_this`/allin1 beat grids; `hear` flips `heard` on one song's keepers.
+None of them writes `sections.jsonl` except the studio Save.
+
+Optional interns: `pip install -e ".[intern]"` (allin1, beat-this, jams, mir_eval); `.[pitch]`
+torchcrepe; `.[align]` whisperx. Never default dependencies.
+
+## Research outputs (machines may draft, not label)
+
+- `data/drafts.jsonl` — allin1 `msa-draft`, SongFormer `songformer-draft`, Guess `guess`.
+- `boo-lab agree --album X --track Y --write` — snapshot keepers as pass 1 (first) or pass 2 (re-pin); `--diff` gives role-agnostic boundary hit-rate @0.5s/@3.0s plus role/figure agreement. Never a pass 3.
+- `boo-lab compare [--album X]` — drafts vs keepers per song **and per source**: precision/recall/F @0.5/@3 plus role agreement; marks `split=holdout` (never skipped). Writes `data/compare.json`.
+- `boo-lab export-jams --out DIR` — one `.jams` per keeper song, `segment_lab_figure` + `segment_lab_function`; holdout skipped.
+- `boo-lab beats [--album X]` — `data/beats.jsonl` (`beat_this` preferred, allin1 fallback).
+- `boo-lab audit` — sources/overlaps/heard/short-box hygiene.
+
+Reading: **F3 high + role agreement low = the intern finds the edges but names them wrong.**
 
 ## Decisions (do not reopen without a new fact)
 
@@ -191,6 +233,10 @@ Track id is **map row index after album sort**. Lookup audio by album+track so �
 - Overlaps are layered roles, not two riffs of the same name.
 - Guess never overwrites a careful Save if the user does not press Guess.
 - Art is local files next to FLACs, not MusicBrainz.
+- **A keeper is heard.** Machines write drafts; they never write keepers.
+- allin1 / SongFormer / beat_this / jams / mir_eval are optional **intern** extras, never default deps.
+- 6-stem Demucs (`htdemucs_6s`) is the default; old 4-stem caches stay valid.
+- `boo-lab hear` is per-track only; never blanket `heard=true` over the catalog.
 
 ## Bugs that already bit us (regressions to refuse)
 

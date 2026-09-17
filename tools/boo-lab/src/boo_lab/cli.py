@@ -83,6 +83,13 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("--album")
     s.add_argument("--track")
 
+    s = sub.add_parser("hear", help="mark already-keeper pins heard=true for one song")
+    s.add_argument("--album")
+    s.add_argument("--track")
+
+    s = sub.add_parser("beats", help="write beat/downbeat grid (beat_this or allin1)")
+    s.add_argument("--album")
+
     s = sub.add_parser("annotate", help="local UI: listen to FLAC, click section bounds")
     s.add_argument("--port", type=int, default=8765)
 
@@ -188,6 +195,18 @@ def main(argv: list[str] | None = None) -> int:
         print("wrote", data_dir() / "compare.json")
         return 0
 
+    if args.cmd == "hear":
+        from .hear import mark_heard
+
+        try:
+            report = mark_heard(root(), getattr(args, "album", None), getattr(args, "track", None))
+        except ValueError as exc:
+            print("refuse:", exc)
+            return 1
+        print("hear: flipped %d row(s) heard=true for %s / %s (%d rows total)"
+              % (report["flipped"], report["album"], report["track"], report["rows"]))
+        return 0
+
     if args.cmd == "stems":
         from .stems import run_demucs
 
@@ -245,50 +264,18 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     if args.cmd == "structure":
-        from .schema import stamp_box
-        from .structure import run_allin1, segments_from_allin1
+        from .structure import build_drafts
 
-        out_dir = root() / "work" / "msa"
-        out_dir.mkdir(parents=True, exist_ok=True)
-        draft_path = data_dir() / "drafts.jsonl"
-        keep = []
-        if draft_path.exists():
-            for line in draft_path.read_text(encoding="utf-8").splitlines():
-                if not line.strip():
-                    continue
-                rec = json.loads(line)
-                key = (rec.get("album"), rec.get("track"))
-                if any((r.get("album"), r.get("track")) == key for r in rows):
-                    continue
-                keep.append(rec)
-        written = 0
-        with draft_path.open("w", encoding="utf-8") as f:
-            for rec in keep:
-                f.write(json.dumps(rec) + "\n")
-            for r in rows:
-                fp = r.get("flac_path")
-                if not fp or not Path(fp).exists():
-                    print("SKIP structure", r.get("track"), "no flac")
-                    continue
-                try:
-                    payload = run_allin1(Path(fp))
-                except Exception as exc:
-                    print("SKIP structure", r.get("track"), exc)
-                    continue
-                (out_dir / f"{r.get('track')}.json").write_text(
-                    json.dumps(payload, indent=2, default=str), encoding="utf-8"
-                )
-                for seg in segments_from_allin1(payload):
-                    rec = stamp_box(
-                        seg["start"], seg["end"], seg.get("role") or seg.get("label"),
-                        source="msa-draft",
-                        extra={"album": r.get("album"), "track": r.get("track"),
-                               "msa_label": seg.get("label") or ""},
-                    )
-                    f.write(json.dumps(rec) + "\n")
-                    written += 1
-                print("DRAFT", r.get("track"), payload.get("bpm"), "→ data/drafts.jsonl")
-        print("wrote", written, "drafts (sections.jsonl untouched)")
+        report = build_drafts(root(), rows)
+        print("wrote", report["written"], "drafts (sections.jsonl untouched)"
+              + (" [allin1 + songformer]" if report.get("songformer") else " [allin1]"))
+        return 0
+
+    if args.cmd == "beats":
+        from .beats import build_beats
+
+        report = build_beats(root(), rows, getattr(args, "album", None))
+        print("beats", report)
         return 0
 
     if args.cmd == "extract":

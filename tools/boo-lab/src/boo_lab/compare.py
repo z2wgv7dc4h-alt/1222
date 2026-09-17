@@ -15,7 +15,7 @@ from pathlib import Path
 from .holdout import load_holdout, split_for
 from .schema import canonical_role, is_keeper, msa_label_to_lab
 
-DRAFT_SOURCES = frozenset({"msa-draft", "guess"})
+DRAFT_SOURCES = frozenset({"msa-draft", "guess", "songformer-draft"})
 
 
 def _read_jsonl(path: Path) -> list[dict]:
@@ -59,13 +59,15 @@ def keeper_rows(lab_root: Path) -> tuple[dict[tuple[str, str], list[dict]], int]
     return by_song, warned
 
 
-def draft_rows(lab_root: Path) -> dict[tuple[str, str], list[dict]]:
-    by_song: dict[tuple[str, str], list[dict]] = {}
+def draft_rows(lab_root: Path) -> dict[tuple[str, str], dict[str, list[dict]]]:
+    """`{(album,track): {source: [boxes]}}` for every draft source."""
+    by_song: dict[tuple[str, str], dict[str, list[dict]]] = {}
     for rec in _read_jsonl(Path(lab_root) / "data" / "drafts.jsonl"):
-        if (rec.get("source") or "") not in DRAFT_SOURCES:
+        source = rec.get("source") or ""
+        if source not in DRAFT_SOURCES:
             continue
         key = (rec.get("album") or "", rec.get("track") or "")
-        by_song.setdefault(key, []).append(rec)
+        by_song.setdefault(key, {}).setdefault(source, []).append(rec)
     return by_song
 
 
@@ -155,25 +157,30 @@ def compare(lab_root: Path, album: str | None = None, track: str | None = None) 
             continue
         if track and t != track:
             continue
-        m = compare_song(keepers_by[key], drafts_by[key])
-        c = m.pop("_counts")
-        for k in ("0_5", "3_0"):
-            for f in ("matched_ref", "n_ref", "matched_pred", "n_pred"):
-                micro[k][f] += c[k][f]
-        micro["role_pairs"] += m["hit_pairs_3_0"]
-        micro["role_same"] += round(m["role_agree_3_0"] * m["hit_pairs_3_0"])
-        m["album"] = a
-        m["track"] = t
-        m["split"] = "holdout" if split_for(a, t, holdout) == "val" else "train"
-        tracks.append(m)
+        # One row per draft source, so a second intern prints its own row.
+        for source in sorted(drafts_by[key]):
+            m = compare_song(keepers_by[key], drafts_by[key][source])
+            c = m.pop("_counts")
+            for k in ("0_5", "3_0"):
+                for f in ("matched_ref", "n_ref", "matched_pred", "n_pred"):
+                    micro[k][f] += c[k][f]
+            micro["role_pairs"] += m["hit_pairs_3_0"]
+            micro["role_same"] += round(m["role_agree_3_0"] * m["hit_pairs_3_0"])
+            m["album"] = a
+            m["track"] = t
+            m["source"] = source
+            m["split"] = "holdout" if split_for(a, t, holdout) == "val" else "train"
+            tracks.append(m)
 
     def _f(c: dict) -> float:
         p = c["matched_pred"] / c["n_pred"] if c["n_pred"] else 0.0
         r = c["matched_ref"] / c["n_ref"] if c["n_ref"] else 0.0
         return round((2 * p * r / (p + r)) if (p + r) else 0.0, 4)
 
+    distinct_tracks = len({(t["album"], t["track"]) for t in tracks})
     micro_out = {
-        "n_tracks": len(tracks),
+        "n_tracks": distinct_tracks,
+        "n_rows": len(tracks),
         "f_0_5": _f(micro["0_5"]),
         "f_3_0": _f(micro["3_0"]),
         "role_agree_3_0": round(micro["role_same"] / micro["role_pairs"], 4) if micro["role_pairs"] else 0.0,
@@ -182,15 +189,15 @@ def compare(lab_root: Path, album: str | None = None, track: str | None = None) 
 
 
 def format_report(report: dict) -> str:
-    lines = ["%-34s %-8s %6s %7s %6s %6s %8s %s" % (
-        "album", "track", "n_keep", "n_draft", "F0.5", "F3", "role3", "split")]
+    lines = ["%-28s %-8s %-15s %6s %7s %6s %6s %8s %s" % (
+        "album", "track", "source", "n_keep", "n_draft", "F0.5", "F3", "role3", "split")]
     for t in report["tracks"]:
-        lines.append("%-34s %-8s %6d %7d %6.3f %6.3f %8.3f %s" % (
-            (t["album"] or "")[:34], (t["track"] or "")[:8],
+        lines.append("%-28s %-8s %-15s %6d %7d %6.3f %6.3f %8.3f %s" % (
+            (t["album"] or "")[:28], (t["track"] or "")[:8], (t.get("source") or "")[:15],
             t["n_keep"], t["n_draft"], t["f_0_5"], t["f_3_0"], t["role_agree_3_0"], t["split"]))
     m = report["micro"]
-    lines.append("micro (n=%d): F0.5=%.3f F3=%.3f role3=%.3f"
-                 % (m["n_tracks"], m["f_0_5"], m["f_3_0"], m["role_agree_3_0"]))
+    lines.append("micro (tracks=%d rows=%d): F0.5=%.3f F3=%.3f role3=%.3f"
+                 % (m["n_tracks"], m["n_rows"], m["f_0_5"], m["f_3_0"], m["role_agree_3_0"]))
     if report.get("warned_legacy_heard_missing"):
         lines.append("warning: %d legacy keeper row(s) had no heard flag (treated as keepers)"
                      % report["warned_legacy_heard_missing"])

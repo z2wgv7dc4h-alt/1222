@@ -17,6 +17,7 @@ def test_keepers():
     assert is_keeper("human")
     assert not is_keeper("msa-draft")
     assert not is_keeper("guess")
+    assert not is_keeper("songformer-draft")
 
 
 def test_same_role_overlap_detected():

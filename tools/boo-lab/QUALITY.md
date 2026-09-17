@@ -27,8 +27,9 @@ Missing any one → not a keeper. Drafts may exist. They are not the set.
 - `.gp` / `.gpx` named `.gp5` → reject (content sniff).
 - Holdout track in `sections.jsonl` → reject.
 - `boo-lab structure` writing `sections.jsonl` → that binary is banned.
-- Unheard Guess or MSA box saved as human → reject.
-- Extract / Pack reading `source=guess` or `msa-draft` → reject.
+- Unheard Guess / MSA / SongFormer box saved as human → reject.
+- Extract / Pack reading `source=guess`, `msa-draft`, or `songformer-draft` → reject.
+- Keeper box with `heard` missing → not a keeper until `boo-lab hear` (per track).
 
 ## Protocol (SALAMI discipline, metal words)
 
@@ -42,9 +43,13 @@ Pin in this order, one album at a time:
 6. Hook only if something is singable or is the chorus guitar hook. Loud ≠ hook.
 7. Save. Run `audit`. Fix overlaps. Pack. Listen to 3 random clips cold.
 
-A week later, re-pin one track without looking. Write disagreements in `data/agree.jsonl`:
-`{track, boundary_err_sec, role_agree, figure_id_agree, note}`.
-That file is your inter-annotator stand-in. Two people is better.
+A week later, re-pin one track without looking, then snapshot it with
+`boo-lab agree --album X --track Y --write` (first snapshot = pass 1, the re-pin = pass 2) and read
+`boo-lab agree --album X --track Y --diff` for boundary hit-rate @0.5 s / @3 s and role/figure
+agreement. `data/agree.jsonl` is your inter-annotator stand-in. Two people is better.
+
+Old pins (before `heard` existed) are not keepers until you re-listen and run
+`boo-lab hear --album X --track Y` — one track at a time, never the whole catalog.
 
 ## What “done” is for an album
 
@@ -66,9 +71,10 @@ Export keepers to JAMS, two annotations per file:
 - `segment_open` / custom namespace `segment_lab_figure` — riff, hook, solo, pulse + `figure_id`
 - `segment_lab_function` — intro, build, breakdown, chill, outro
 
-Then you can run `mir_eval` hit-rate at 0.5 s and 3 s against Guess/allin1/SongFormer
-**without letting those models into the jsonl.** That comparison is how you prove
-the set is stricter than SOTA, not how you build the set.
+Then `boo-lab compare --album X` scores Guess/allin1/SongFormer drafts against the keepers
+(precision/recall/F @0.5 s / @3 s + role agreement; `mir_eval` optional) **without letting those
+models into the jsonl.** `boo-lab beats` stores the beat grid for reference. That comparison is how
+you prove the set is stricter than SOTA, not how you build the set.
 
 ## Machines (interns)
 

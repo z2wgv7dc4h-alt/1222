@@ -34,8 +34,20 @@ def test_perfect_match_f_is_one(tmp_path):
     assert report["micro"]["n_tracks"] == 1
     t = report["tracks"][0]
     assert t["n_keep"] == 1 and t["n_draft"] == 1
+    assert t["source"] == "msa-draft"
     assert t["f_0_5"] == 1.0 and t["f_3_0"] == 1.0
     assert t["role_agree_3_0"] == 1.0
+
+
+def test_two_draft_sources_emit_two_rows(tmp_path):
+    lab = _lab(tmp_path,
+               [_keeper("riff", 0, 4)],
+               [_draft("riff", 0, 4, source="msa-draft"),
+                _draft("hook", 0, 4, source="songformer-draft")])
+    report = compare.compare(lab)
+    assert report["micro"]["n_tracks"] == 1
+    assert report["micro"]["n_rows"] == 2
+    assert {t["source"] for t in report["tracks"]} == {"msa-draft", "songformer-draft"}
 
 
 def test_offset_two_seconds_low_f05_high_f3(tmp_path):

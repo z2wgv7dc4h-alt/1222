@@ -329,6 +329,28 @@ def create_app(lab_root: Path, flac_root: Path | None, gp_root: Path | None) -> 
                     found.append(rec)
         return {"sections": found}
 
+    @app.get("/api/beats/{track_id}")
+    def api_beats(track_id: int):
+        """Beat/downbeat grid for the selected song (data/beats.jsonl), so the
+        studio can draw ticks and snap box edges. Empty when not computed."""
+        meta = _meta(track_id)
+        if not meta:
+            return {"beats": [], "downbeats": [], "source": ""}
+        path = lab_root / "data" / "beats.jsonl"
+        if path.exists():
+            for line in path.read_text(encoding="utf-8").splitlines():
+                if not line.strip():
+                    continue
+                try:
+                    rec = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if rec.get("album") == meta["album"] and rec.get("track") == meta["track"]:
+                    return {"beats": rec.get("beats") or [],
+                            "downbeats": rec.get("downbeats") or [],
+                            "source": rec.get("source") or ""}
+        return {"beats": [], "downbeats": [], "source": ""}
+
     @app.get("/api/estimate/{track_id}")
     def api_estimate(track_id: int):
         row = _resolved(track_id)
@@ -342,6 +364,7 @@ def create_app(lab_root: Path, flac_root: Path | None, gp_root: Path | None) -> 
             Path(gp) if gp else None,
             track=row.get("track") or "",
             cache=lab_root / "work" / "stems",
+            album=row.get("album") or "",
         )
         return payload
 

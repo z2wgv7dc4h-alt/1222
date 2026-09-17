@@ -341,6 +341,28 @@ def test_analysis_endpoint_returns_measured_confidence(tmp_path):
     assert secs[0]["drum_class_counts"]["hihat"] == 9
 
 
+def test_beats_endpoint_returns_the_grid_for_the_track(tmp_path):
+    lab = _lab(tmp_path)
+    (lab / "data" / "beats.jsonl").write_text(
+        json.dumps({"album": "A", "track": "T", "beats": [0.5, 1.0, 1.5],
+                    "downbeats": [0.0], "source": "beat_this"}) + "\n"
+        + json.dumps({"album": "A", "track": "Other", "beats": [9.9], "downbeats": [], "source": "x"}) + "\n",
+        encoding="utf-8",
+    )
+    client = TestClient(ann.create_app(lab, None, None))
+    tid = client.get("/api/tracks").json()["tracks"][0]["id"]
+    got = client.get("/api/beats/%d" % tid).json()
+    assert got["beats"] == [0.5, 1.0, 1.5] and got["downbeats"] == [0.0]
+    assert got["source"] == "beat_this"
+
+
+def test_beats_endpoint_empty_when_not_computed(tmp_path):
+    lab = _lab(tmp_path)
+    client = TestClient(ann.create_app(lab, None, None))
+    tid = client.get("/api/tracks").json()["tracks"][0]["id"]
+    assert client.get("/api/beats/%d" % tid).json() == {"beats": [], "downbeats": [], "source": ""}
+
+
 def _removable_lab(tmp_path, flac_path=None):
     from boo_lab.holdout import write_holdout
 

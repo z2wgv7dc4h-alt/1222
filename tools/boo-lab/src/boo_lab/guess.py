@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 import re
 from pathlib import Path
@@ -70,16 +71,42 @@ def _prefer_gp5(gp: Path | None, track: str) -> Path | None:
     return None
 
 
+def _sync_for(lab_root: Path | None, album: str, track: str) -> dict | None:
+    """The recorded tab-vs-audio witness for one song (`data/sync.jsonl`), or
+    `None` when it was never run. Lets Guess refuse to emit tab-marker times
+    for a tab already measured as misaligned."""
+    if lab_root is None:
+        return None
+    path = Path(lab_root) / "data" / "sync.jsonl"
+    if not path.exists():
+        return None
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        try:
+            rec = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if (rec.get("track") or "") != track:
+            continue
+        if album and (rec.get("album") or "") != album:
+            continue
+        return rec
+    return None
+
+
 def estimate_hybrid(
     flac: Path | None,
     gp: Path | None,
     track: str = "",
     cache: Path | None = None,
+    album: str = "",
 ) -> dict:
     notes: list[str] = []
     sections: list[dict] = []
     bpm = None
     beats: list[float] = []
+    lab_root = Path(cache).parent.parent if cache else None
 
     gp_use = _prefer_gp5(gp, track)
     key = _norm(track) or _norm(gp.stem if gp else "")
@@ -96,8 +123,17 @@ def estimate_hybrid(
             g = estimate_from_gp(gp_use)
             bpm = g.get("bpm") or bpm
             if g.get("sections"):
-                sections.extend(g["sections"])
-                notes.append("gp markers")
+                sync_rec = _sync_for(lab_root, album, track)
+                if sync_rec is not None and sync_rec.get("sync_ok") is False:
+                    # Gate: don't propose times from a tab measured as misaligned.
+                    lag = sync_rec.get("lag_sec")
+                    notes.append(
+                        "tab markers dropped: sync not ok%s — paint by hand (`boo-lab sync`)"
+                        % ("" if lag is None else " (lag %.2fs)" % lag)
+                    )
+                else:
+                    sections.extend(g["sections"])
+                    notes.append("gp markers" + (" (sync ok)" if sync_rec is not None else ""))
             else:
                 notes.append(g.get("reason") or "tab has no markers")
         except Exception as e:

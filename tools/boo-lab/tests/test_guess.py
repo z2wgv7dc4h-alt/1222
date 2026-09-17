@@ -3,6 +3,7 @@ audio fixture. Covers the half-time detector, the section cleaner, and the
 coverage-note logic (threshold + exact message format)."""
 from __future__ import annotations
 
+import json
 import types
 
 import pytest
@@ -134,3 +135,45 @@ def test_coverage_note_flags_uncovered_tail_with_exact_message(tmp_path, monkeyp
 def test_coverage_note_suppressed_within_five_seconds_of_end(tmp_path, monkeypatch):
     result = _wire_estimate(monkeypatch, tmp_path, covered_end=96.0)  # 4.0s uncovered
     assert not any(n.startswith("Guess reached") for n in result["notes"])
+
+
+# --- tab-marker sync gate ----------------------------------------------------
+
+
+def _wire_gp_estimate(tmp_path, monkeypatch, sync_ok):
+    lab = tmp_path / "lab"
+    (lab / "data").mkdir(parents=True)
+    (lab / "data" / "sync.jsonl").write_text(
+        json.dumps({"album": "A", "track": "Fixture", "sync_ok": sync_ok, "lag_sec": 0.05}) + "\n",
+        encoding="utf-8",
+    )
+    flac = tmp_path / "song.flac"
+    flac.write_bytes(b"x")
+    monkeypatch.setattr(soundfile, "info",
+                        lambda *a, **k: types.SimpleNamespace(frames=int(22050 * 100), samplerate=22050))
+    monkeypatch.setattr(g, "GP5_ROOTS", [tmp_path / "no_gp5"])
+    monkeypatch.setattr(g, "_prefer_gp5", lambda gp, track: tmp_path / "x.gp5")
+    import boo_lab.extract as ex
+    monkeypatch.setattr(ex, "estimate_from_gp", lambda p: {
+        "bpm": 120, "duration": 10,
+        "sections": [{"role": "riff", "start": 0, "end": 5, "source": "gp-marker"}],
+    })
+    import boo_lab.stems as st
+    monkeypatch.setattr(st, "ensure_drums", lambda f, c: (None, "none"))
+    monkeypatch.setattr(g, "_librosa_beats", lambda wav: {"beats": [i * 0.5 for i in range(30)], "bpm": 120.0})
+    monkeypatch.setattr(g, "_half_time_spans", lambda beats, min_len=6.0: [])
+    monkeypatch.setattr(g, "_kick_spans", lambda wav: [])
+    return g.estimate_hybrid(flac, tmp_path / "x.gp5", track="Fixture",
+                             cache=lab / "work" / "stems", album="A")
+
+
+def test_guess_drops_tab_markers_when_sync_not_ok(tmp_path, monkeypatch):
+    res = _wire_gp_estimate(tmp_path, monkeypatch, sync_ok=False)
+    assert not any(s.get("source") == "gp-marker" for s in res["sections"])
+    assert any("sync not ok" in n for n in res["notes"])
+
+
+def test_guess_keeps_tab_markers_when_sync_ok(tmp_path, monkeypatch):
+    res = _wire_gp_estimate(tmp_path, monkeypatch, sync_ok=True)
+    assert any(s.get("source") == "gp-marker" for s in res["sections"])
+    assert any("gp markers (sync ok)" in n for n in res["notes"])

@@ -137,7 +137,7 @@
     <li><b>source</b> — where the row came from (<code>human</code>, or a draft like Guess / msa-draft). Leave it — Save handles it.</li>
     <li><b>heard</b> — tick once you've truly listened. Unticked boxes are thrown away on Save.</li>
   </ul>
-  <p><b>heard is the gate.</b> Only ticked boxes are saved (as <code>human</code>, or <code>guess-accepted</code> if the row started as a draft). Nothing unticked survives. There is no in-app undo, but each Save keeps the previous file as <code>data/sections.jsonl.bak</code>.</p>
+  <p><b>heard is the gate.</b> Only ticked boxes are saved (as <code>human</code>, or <code>guess-accepted</code> if the row started as a draft). Nothing unticked survives. <b>Undo</b> (button or Ctrl+Z) steps back through this session's edits; each Save also keeps the previous file as <code>data/sections.jsonl.bak</code>.</p>
   <p><b>Same-role overlap</b> — two boxes of the <i>same</i> role overlapping by more than 50&nbsp;ms refuses the whole Save and names the pair. Different roles may overlap freely.</p>
   <h4>Roles (pick the plainest one)</h4>
   <ul>
@@ -206,6 +206,7 @@
         <button type="button" id="btnPack">Pack</button>
         <button type="button" id="btnPlayBox">Play box</button>
         <button type="button" id="btnUndo">Undo</button>
+        <label style="display:inline-flex;align-items:center;gap:4px;font-size:12px;white-space:nowrap" title="Snap box edges to the nearest downbeat (run `boo-lab beats` first)"><input type="checkbox" id="snapBeat" checked> Snap beats</label>
         <button type="button" id="btnDump">JSON</button>
         <button type="button" id="btnNext">Next GP</button>
         <button type="button" id="btnGit">Push git</button>
@@ -294,6 +295,7 @@ const LABEL = { riff:"Riff", hook:"Hook", breakdown:"Breakdown", solo:"Solo", in
 let tracks=[], trackId=0, regs=[], sel=-1, undo=[], listFilter="all", listQ="";
 let shut={};
 let ws=null, drumsWs=null, regionsPlug=null, lock=false, curStem="drums";
+let beatsData={beats:[],downbeats:[]}, snapping=false;
 let audioCtx=null, analyser=null, vizSrc=null, vizRAF=0;
 
 function fmt(t){ t=Math.max(0,+t||0); return Math.floor(t/60)+":"+String(Math.floor(t%60)).padStart(2,"0"); }
@@ -482,6 +484,60 @@ function destroyWave(){
   if(drumsWs){ try{ drumsWs.destroy(); }catch(e){} drumsWs=null; }
 }
 
+function loadBeats(id){
+  fetch("/api/beats/"+id).then(r=>r.json()).then(x=>{
+    beatsData={beats:x.beats||[],downbeats:x.downbeats||[]};
+    drawBeatGrid();
+    if(beatsData.downbeats.length)
+      document.getElementById("sub").textContent += " · beats "+beatsData.downbeats.length;
+  }).catch(()=>{ beatsData={beats:[],downbeats:[]}; drawBeatGrid(); });
+}
+
+function drawBeatGrid(){
+  const host=document.getElementById("wave");
+  if(!host) return;
+  let cv=document.getElementById("beatcanvas");
+  if(!cv){
+    cv=document.createElement("canvas"); cv.id="beatcanvas";
+    cv.style.cssText="position:absolute;left:0;top:0;pointer-events:none;z-index:6";
+    host.appendChild(cv);
+  }
+  const dur=(ws&&ws.getDuration())||0, w=host.clientWidth, h=host.clientHeight;
+  cv.width=Math.max(0,w); cv.height=Math.max(0,h);
+  if(!dur||!w||!beatsData.beats.length && !beatsData.downbeats.length) return;
+  const ctx=cv.getContext("2d"); ctx.clearRect(0,0,w,h);
+  const line=(times,alpha,top)=>{
+    if(!times||!times.length) return;
+    ctx.strokeStyle="rgba(244,234,216,"+alpha+")"; ctx.beginPath();
+    for(const t of times){ const x=Math.round((t/dur)*w)+0.5; ctx.moveTo(x,h); ctx.lineTo(x,top); }
+    ctx.stroke();
+  };
+  line(beatsData.beats,"0.18",h*0.5);
+  line(beatsData.downbeats,"0.5",h*0.25);
+}
+
+function snapTime(t){
+  const on=document.getElementById("snapBeat");
+  if(on && !on.checked) return t;
+  let best=null,bd=1e9;
+  for(const c of (beatsData.downbeats||[])){ const d=Math.abs(c-t); if(d<bd){bd=d;best=c;} }
+  if(best!=null && bd<=0.25) return best;             // downbeat within 250 ms
+  for(const c of (beatsData.beats||[])){ const d=Math.abs(c-t); if(d<bd){bd=d;best=c;} }
+  return (best!=null && bd<=0.12)? best : t;          // else nearest beat within 120 ms
+}
+
+function snapRegion(reg){
+  if(lock||snapping||!reg) { pullRegions(); return; }
+  const s=snapTime(+reg.start), e=snapTime(+reg.end);
+  if(Math.abs(s-reg.start)>1e-6 || Math.abs(e-reg.end)>1e-6){
+    snapping=true;
+    try{ reg.setOptions({start:s,end:Math.max(s+0.05,e)}); }
+    catch(_){ try{ reg.start=s; reg.end=Math.max(s+0.05,e); }catch(__){} }
+    snapping=false;
+  }
+  pullRegions();
+}
+
 function paintRegions(){
   if(!regionsPlug) return;
   lock=true;
@@ -532,6 +588,7 @@ function makeWave(url){
   ws.on("ready",()=>{
     document.getElementById("clock").textContent=fmt(0)+" / "+fmt(ws.getDuration()||0);
     paintRegions();
+    drawBeatGrid();
     buildSpec();
   });
   ws.on("play",()=>{ try{ if(audioCtx&&audioCtx.state==="suspended") audioCtx.resume(); }catch(e){} });
@@ -560,10 +617,11 @@ function makeWave(url){
   });
   ws.on("play",()=>document.getElementById("btnPlay").textContent="Pause");
   ws.on("pause",()=>document.getElementById("btnPlay").textContent="Play");
-  regionsPlug.on("region-updated",()=>{ if(lock) return; pullRegions(); });
+  regionsPlug.on("region-updated",(reg)=>{ if(lock) return; snapRegion(reg); });
   if(!window._booWaveUp){
     window._booWaveUp=true;
     document.getElementById("wave").addEventListener("pointerup",()=>{ if(!lock){ pullRegions(); table(); }});
+    window.addEventListener("resize",()=>drawBeatGrid());
   }
   regionsPlug.on("region-clicked",(reg, ev)=>{
     if(ev && ev.stopPropagation) ev.stopPropagation();
@@ -793,6 +851,7 @@ function select(i){
   makeWave("/api/audio/"+t.id+"?v="+encodeURIComponent(t.album+"/"+t.track));
   loadStem(t.id, curStem);
   loadAnalysis(t.id);
+  loadBeats(t.id);
   loadLyrics(t.id);
   fetch("/api/sections/"+t.id).then(r=>r.json()).then(secs=>{
     regs=secs.map(s=>{

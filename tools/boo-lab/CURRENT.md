@@ -117,6 +117,7 @@ If Save ever wrote six `0.00–0.25` rows, the pins fired before duration loaded
 - Mix lane: drag boxes. Click empty wave to seek. Clicking a box edge should not steal the next pin — leave a gap or seek first.
 - Spectrogram: real mel spectrogram of the already-decoded buffer under the mix; **Wave / Spec / Both** toggle (default Both), click to seek, current boxes overlaid. Waveform stays WaveSurfer.
 - Stem lane: pick any cached Demucs stem (drums/bass/guitar/piano/other/vocals); the drum-confidence note flags sections the classifier is unsure about.
+- Beat grid: `GET /api/beats/{id}` (from `data/beats.jsonl`); the studio draws faint beat / brighter downbeat ticks over the waveform, and with **Snap beats** on, a dragged box edge snaps to the nearest downbeat (≤250 ms) else nearest beat (≤120 ms). Run `boo-lab beats` first, else no ticks/snap.
 - Table is source of truth on Save (`harvestTable`); columns role / figure / form / uniq / inst / bar0 / bar1 / start / end / source / heard. Blur number fields before Save.
 - **Heard** gates the save: untick it and the box is dropped. A heard draft saves as `guess-accepted`.
 - **Every write to `sections.jsonl` is atomic** (`schema.write_jsonl_atomic`): Save, `boo-lab hear`, and album-remove all use temp + `fsync` + `os.replace`, so a crash/full disk/aborted write leaves the file intact. Album-remove parses the file *before* deleting anything and aborts (400, nothing removed) on a malformed line; `hear` likewise refuses rather than drop a malformed line.

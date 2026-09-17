@@ -2,6 +2,11 @@
 
 ## 2026-09-18
 
+### Beat grid in the studio + Guess sync gate
+
+- **Beat grid used.** New `GET /api/beats/{id}` serves `data/beats.jsonl`; the studio draws beat/downbeat ticks over the waveform and, with **Snap beats** (default on), snaps a dragged box edge to the nearest downbeat (≤250 ms) else nearest beat (≤120 ms). Previously `beats.jsonl` was written and never read.
+- **Guess gates on sync.** `estimate_hybrid` now reads `data/sync.jsonl` for the song: if the tab was measured as **not** `sync_ok`, its marker sections are dropped with a note ("tab markers dropped: sync not ok … paint by hand"); if `sync_ok`, they're kept and the note says so. A tab known to misalign no longer silently supplies wrong times.
+
 ### Guess reads the tab's section structure
 
 - `extract.estimate_from_gp` now walks the tab in **playback order** (repeats expanded) instead of once, and carries the marker's **section identity**: `form` = the letter (`A`/`B`/`C1`), `figure_id` = `role-token` (`riff-B`), and `unique` when the letter occurs once. A repeated letter (`02`'s `B`, `10`'s `A/B/F`, `12`'s `A/C/D`) now shows up as the *same returning section* rather than a fresh riff. The last box reaches the repeat-aware tab length (`_playback_duration`). The studio's Guess now uses those `form`/`figure_id`/`unique` fields instead of hardcoding `A`/`<role>-A`. Roles still come from `infer_role` (letters aren't roles; `C1 - Solo` → solo).

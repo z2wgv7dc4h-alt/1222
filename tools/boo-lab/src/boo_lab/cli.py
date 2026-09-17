@@ -79,6 +79,10 @@ def main(argv: list[str] | None = None) -> int:
     s = sub.add_parser("export-jams", help="export keeper pins as JAMS 0.3 (figure/function layers)")
     s.add_argument("--out", type=Path, required=True)
 
+    s = sub.add_parser("compare", help="read-only machine drafts vs human keepers")
+    s.add_argument("--album")
+    s.add_argument("--track")
+
     s = sub.add_parser("annotate", help="local UI: listen to FLAC, click section bounds")
     s.add_argument("--port", type=int, default=8765)
 
@@ -173,6 +177,15 @@ def main(argv: list[str] | None = None) -> int:
 
         report = export_jams(root(), args.out, rows)
         print("export-jams", report)
+        return 0
+
+    if args.cmd == "compare":
+        from .compare import compare, format_report, write_report
+
+        report = compare(root(), getattr(args, "album", None), getattr(args, "track", None))
+        print(format_report(report))
+        write_report(report, data_dir() / "compare.json")
+        print("wrote", data_dir() / "compare.json")
         return 0
 
     if args.cmd == "stems":

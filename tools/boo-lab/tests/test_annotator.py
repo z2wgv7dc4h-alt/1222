@@ -79,10 +79,102 @@ def test_sections_legacy_role_is_canonicalized_on_read_and_write(tmp_path):
     got = client.get("/api/sections/%d" % tid).json()
     assert got[0]["role"] == "riff"  # stored legacy "verse"
 
-    resp = client.post("/api/sections/%d" % tid, json={"sections": [{"role": "chorus", "start": 0.0, "end": 2.0}]})
+    resp = client.post("/api/sections/%d" % tid, json={"sections": [
+        {"role": "chorus", "start": 0.0, "end": 2.0, "source": "human", "heard": True},
+    ]})
     assert resp.status_code == 200 and resp.json()["saved"] == 1
     saved = [json.loads(l) for l in (lab / "data" / "sections.jsonl").read_text(encoding="utf-8").splitlines() if l.strip()]
     assert saved[0]["role"] == "hook"
+    assert saved[0]["source"] == "human" and saved[0]["heard"] is True
+    assert saved[0]["figure_id"] == "hook-A" and saved[0]["layer"] == "figure"
+
+
+def _sections_rows(lab):
+    path = lab / "data" / "sections.jsonl"
+    return [json.loads(l) for l in path.read_text(encoding="utf-8").splitlines() if l.strip()]
+
+
+def test_save_drops_unheard_and_unaccepted_drafts(tmp_path):
+    lab = _lab(tmp_path)
+    client = TestClient(ann.create_app(lab, None, None))
+    tid = client.get("/api/tracks").json()["tracks"][0]["id"]
+    resp = client.post("/api/sections/%d" % tid, json={"sections": [
+        {"role": "riff", "start": 0, "end": 2, "source": "human", "heard": True},
+        {"role": "hook", "start": 3, "end": 5, "source": "human", "heard": False},
+        {"role": "breakdown", "start": 6, "end": 8, "source": "msa-draft", "heard": False},
+        {"role": "solo", "start": 9, "end": 11, "source": "guess", "heard": False},
+        {"role": "pulse", "start": 12, "end": 14},  # legacy, no source/heard
+    ]})
+    assert resp.status_code == 200 and resp.json()["saved"] == 1
+    rows = _sections_rows(lab)
+    assert len(rows) == 1
+    assert rows[0]["role"] == "riff"
+    assert rows[0]["source"] == "human" and rows[0]["heard"] is True
+
+
+def test_save_keeps_heard_drafts_as_guess_accepted(tmp_path):
+    lab = _lab(tmp_path)
+    client = TestClient(ann.create_app(lab, None, None))
+    tid = client.get("/api/tracks").json()["tracks"][0]["id"]
+    resp = client.post("/api/sections/%d" % tid, json={"sections": [
+        {"role": "solo", "start": 0, "end": 2, "source": "guess", "heard": True},
+        {"role": "breakdown", "start": 3, "end": 5, "source": "msa-draft", "heard": True, "msa_label": "break"},
+        {"role": "riff", "start": 6, "end": 8, "source": "guess-accepted", "heard": True},
+    ]})
+    assert resp.status_code == 200 and resp.json()["saved"] == 3
+    rows = _sections_rows(lab)
+    assert {r["source"] for r in rows} == {"guess-accepted"}
+    assert {r["role"] for r in rows} == {"solo", "breakdown", "riff"}
+    # extra keys stamp_box doesn't know are preserved
+    assert any(r.get("msa_label") == "break" for r in rows)
+
+
+def test_save_rejects_same_role_overlap_and_writes_nothing(tmp_path):
+    lab = _lab(tmp_path)
+    client = TestClient(ann.create_app(lab, None, None))
+    tid = client.get("/api/tracks").json()["tracks"][0]["id"]
+    before = (lab / "data" / "sections.jsonl").read_text(encoding="utf-8")
+    resp = client.post("/api/sections/%d" % tid, json={"sections": [
+        {"role": "riff", "start": 0, "end": 4, "source": "human", "heard": True},
+        {"role": "riff", "start": 2, "end": 6, "source": "human", "heard": True},
+    ]})
+    assert resp.status_code == 400
+    assert "overlap" in resp.json()["detail"]
+    assert (lab / "data" / "sections.jsonl").read_text(encoding="utf-8") == before
+
+
+def test_save_allows_figure_over_function_overlap(tmp_path):
+    lab = _lab(tmp_path)
+    client = TestClient(ann.create_app(lab, None, None))
+    tid = client.get("/api/tracks").json()["tracks"][0]["id"]
+    resp = client.post("/api/sections/%d" % tid, json={"sections": [
+        {"role": "riff", "start": 0, "end": 4, "source": "human", "heard": True},
+        {"role": "breakdown", "start": 2, "end": 6, "source": "human", "heard": True},
+    ]})
+    assert resp.status_code == 200 and resp.json()["saved"] == 2
+
+
+def test_save_never_overwrites_drafts(tmp_path):
+    lab = _lab(tmp_path)
+    draft = lab / "data" / "drafts.jsonl"
+    draft.write_text(json.dumps({"album": "A", "track": "T", "role": "riff", "source": "msa-draft"}) + "\n", encoding="utf-8")
+    client = TestClient(ann.create_app(lab, None, None))
+    tid = client.get("/api/tracks").json()["tracks"][0]["id"]
+    client.post("/api/sections/%d" % tid, json={"sections": [
+        {"role": "riff", "start": 0, "end": 2, "source": "human", "heard": True}]})
+    assert json.loads(draft.read_text(encoding="utf-8"))["source"] == "msa-draft"
+
+
+def test_api_drafts_returns_only_that_track(tmp_path):
+    lab = _lab(tmp_path)
+    (lab / "data" / "drafts.jsonl").write_text(
+        json.dumps({"album": "A", "track": "T", "start": 0, "end": 1, "role": "riff", "source": "msa-draft"}) + "\n"
+        + json.dumps({"album": "A", "track": "Other", "start": 0, "end": 1, "role": "hook", "source": "msa-draft"}) + "\n",
+        encoding="utf-8",
+    )
+    client = TestClient(ann.create_app(lab, None, None))
+    got = client.get("/api/drafts", params={"album": "A", "track": "T"}).json()["drafts"]
+    assert len(got) == 1 and got[0]["role"] == "riff"
 
 
 def test_stem_endpoint_serves_known_and_rejects_unknown(tmp_path):

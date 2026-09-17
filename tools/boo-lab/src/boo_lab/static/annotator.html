@@ -117,7 +117,9 @@
 <aside class="drawer" id="howto">
   <button type="button" class="close" id="btnCloseHow">Close</button>
   <h3>How to mark a song</h3>
-  <p>Boxes are wavesurfer regions. Drag the body, drag an edge, click empty wave to seek. Overlaps are allowed when the roles differ.</p>
+  <p>Boxes are wavesurfer regions. Drag the body, drag an edge, click empty wave to seek. Overlaps are allowed when the roles differ. Each row also carries a <b>figure</b> id, a <b>source</b>, and an <b>heard</b> checkbox.</p>
+  <p><b>Heard</b> — a box is only saved when you tick heard (you actually listened to it). Unheard boxes and raw drafts are dropped on Save. A heard draft becomes <code>guess-accepted</code>; a heard human box stays <code>human</code>.</p>
+  <p><b>Same-role overlap</b> — two boxes of the same role overlapping by more than 50&nbsp;ms is rejected with the pair shown. Different roles (a figure over a function) may overlap freely.</p>
   <h4>Buttons</h4>
   <ul>
     <li><b>Intro</b> — pads, swell, count-in</li>
@@ -136,7 +138,8 @@
     <li>Delete — remove selected box · Ctrl+Z undo · ? this panel</li>
   </ul>
   <h4>Guess / Lyrics / Pack</h4>
-  <p><b>Guess</b> — GP markers + Demucs drums + librosa half-time. Optional draft boxes. The status line also reports how much of the track Guess actually reached.</p>
+  <p><b>Guess</b> — GP markers + Demucs drums + librosa half-time. Adds <code>source=guess</code> draft boxes (unheard). The status line also reports how much of the track Guess actually reached.</p>
+  <p><b>Load drafts</b> — pull MSA <code>source=msa-draft</code> boxes from <code>data/drafts.jsonl</code> for this song, appended into the table as unheard. Tick heard to accept one as <code>guess-accepted</code>. Drafts are never auto-saved and Save never rewrites <code>drafts.jsonl</code>.</p>
   <p><b>Stem picker</b> — under the drums lane, switch between any cached demucs stem: drums / bass / guitar / piano / other / vocals (6-stem). Playhead stays linked to the mix.</p>
   <p><b>Drum confidence</b> — if the per-section classifier flags snare-undercount on a dense mix, the lane says so; hover for the reason. Treat those boxes as “verify by ear”, not ground truth.</p>
   <p><b>VAL badge</b> — songs reserved for the whole-song validation split are tagged VAL in the header; everything else is training.</p>
@@ -175,6 +178,7 @@
         <button type="button" id="btnPlay">Play</button>
         <span class="time" id="clock">0:00 / 0:00</span>
         <button type="button" id="btnEst">Guess</button>
+        <button type="button" id="btnDrafts">Load drafts</button>
         <button type="button" id="btnSave">Save</button>
         <button type="button" id="btnLyrics">Lyrics</button>
         <button type="button" id="btnPack">Pack</button>
@@ -221,7 +225,7 @@
       <div id="lyricbox" class="lyrics"></div>
     </div>
     <table>
-      <thead><tr><th>region</th><th>start</th><th>end</th><th></th></tr></thead>
+      <thead><tr><th>role</th><th>figure</th><th>start</th><th>end</th><th>source</th><th>heard</th><th></th></tr></thead>
       <tbody id="rows"></tbody>
     </table>
     <p class="foot">Drag a box. Click empty wave to seek. Different roles may overlap. S save · N next</p>
@@ -666,8 +670,11 @@ function select(i){
   loadAnalysis(t.id);
   loadLyrics(t.id);
   fetch("/api/sections/"+t.id).then(r=>r.json()).then(secs=>{
-    const use=secs.filter(s=>s.source==="human").length?secs.filter(s=>s.source==="human"):secs;
-    regs=use.map(s=>({role:canonRole(s.role),start:+s.start,end:+s.end}));
+    regs=secs.map(s=>{
+      const role=canonRole(s.role);
+      return {role,start:+s.start,end:+s.end,figure_id:s.figure_id|| (role+"-A"),
+              source:s.source||"human",heard:!!s.heard};
+    });
     table();
     if(ws) paintRegions();
   });
@@ -677,37 +684,55 @@ function snap(){ undo.push(JSON.stringify(regs)); if(undo.length>40) undo.shift(
 function add(role){
   const t=ws?ws.getCurrentTime():0;
   const dur=ws?ws.getDuration():30;
-  snap(); regs.push({role,start:t,end:Math.min(dur, t+8)}); sel=regs.length-1;
+  snap(); regs.push({role,start:t,end:Math.min(dur, t+8),figure_id:role+"-A",source:"human",heard:false}); sel=regs.length-1;
   table(); paintRegions();
 }
 document.querySelectorAll(".pins button").forEach(b=>b.onclick=()=>add(b.dataset.role));
 document.getElementById("btnPlay").onclick=toggle;
 
+const SOURCE_OPTS=["human","guess-accepted","guess","msa-draft"];
 function roleSelect(cur){
   return "<select data-f='role'>"+ROLES.map(r=>"<option value='"+r+"'"+(r===cur?" selected":"")+">"+(LABEL[r]||r)+"</option>").join("")+"</select>";
 }
+function sourceSelect(cur){
+  return "<select data-f='source'>"+SOURCE_OPTS.map(o=>"<option value='"+o+"'"+(o===cur?" selected":"")+">"+o+"</option>").join("")+"</select>";
+}
+function escAttr(s){ return String(s==null?"":s).replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;"); }
 function table(){
   const tb=document.getElementById("rows"); tb.innerHTML="";
   regs.forEach((p,i)=>{
     const tr=document.createElement("tr");
     if(i===sel) tr.className="on";
-    const first=document.createElement("td"); first.innerHTML=roleSelect(p.role);
-    const tdS=document.createElement("td"); tdS.innerHTML="<input type='number' step='0.05' value='"+Number(p.start).toFixed(2)+"' data-f='start'>";
-    const tdE=document.createElement("td"); tdE.innerHTML="<input type='number' step='0.05' value='"+Number(p.end).toFixed(2)+"' data-f='end'>";
-    const td=document.createElement("td");
+    const cRole=document.createElement("td"); cRole.innerHTML=roleSelect(p.role);
+    const cFig=document.createElement("td"); cFig.innerHTML="<input type='text' data-f='figure_id' value='"+escAttr(p.figure_id|| (p.role+"-A"))+"'>";
+    const cS=document.createElement("td"); cS.innerHTML="<input type='number' step='0.05' value='"+Number(p.start).toFixed(2)+"' data-f='start'>";
+    const cE=document.createElement("td"); cE.innerHTML="<input type='number' step='0.05' value='"+Number(p.end).toFixed(2)+"' data-f='end'>";
+    const cSrc=document.createElement("td"); cSrc.innerHTML=sourceSelect(p.source||"human");
+    const cH=document.createElement("td"); cH.innerHTML="<input type='checkbox' data-f='heard'"+(p.heard?" checked":"")+">";
+    const cX=document.createElement("td");
     const x=document.createElement("button"); x.type="button"; x.textContent="remove";
     x.onclick=ev=>{ ev.stopPropagation(); snap(); regs.splice(i,1); if(sel>=regs.length) sel=regs.length-1; table(); paintRegions(); };
-    td.appendChild(x);
-    tr.appendChild(first); tr.appendChild(tdS); tr.appendChild(tdE); tr.appendChild(td);
+    cX.appendChild(x);
+    tr.appendChild(cRole); tr.appendChild(cFig); tr.appendChild(cS); tr.appendChild(cE);
+    tr.appendChild(cSrc); tr.appendChild(cH); tr.appendChild(cX);
     tr.onclick=ev=>{
       const tag=ev.target.tagName;
       if(tag==="SELECT"||tag==="OPTION"||tag==="INPUT"||tag==="BUTTON") return;
       sel=i; document.querySelectorAll("#rows tr").forEach(r=>r.classList.remove("on")); tr.className="on";
     };
-    first.querySelector("select").onchange=e=>{ p.role=e.target.value; paintRegions(); };
+    cRole.querySelector("select").onchange=e=>{
+      const old=p.role; p.role=e.target.value;
+      if(!p.figure_id || p.figure_id===old+"-A"){ p.figure_id=p.role+"-A"; cFig.querySelector("input").value=p.figure_id; }
+      paintRegions();
+    };
+    cSrc.querySelector("select").onchange=e=>{ p.source=e.target.value; };
     tr.querySelectorAll("input").forEach(inp=>{
       inp.onchange=()=>{
-        p[inp.dataset.f]=parseFloat(inp.value);
+        const f=inp.dataset.f;
+        if(f==="heard"){ p.heard=!!inp.checked; return; }
+        if(f==="figure_id"){ p.figure_id=inp.value.trim(); return; }
+        const v=parseFloat(inp.value);
+        if(!isNaN(v)) p[f]=v;
         if(p.end<p.start) p.end=p.start+0.25;
         paintRegions();
       };
@@ -734,7 +759,10 @@ function estimate(){
     let x; try{ x=JSON.parse(txt); }catch(e){ throw txt.slice(0,200); }
     if(!r.ok) throw (typeof x.detail==="string"?x.detail:JSON.stringify(x.detail||x)).slice(0,240);
     snap();
-    const draft=(x.sections||[]).map(s=>({role:canonRole(s.role),start:+s.start,end:+s.end}));
+    const draft=(x.sections||[]).map(s=>{
+      const role=canonRole(s.role);
+      return {role,start:+s.start,end:+s.end,figure_id:role+"-A",source:"guess",heard:false};
+    });
     if(merge){
       draft.forEach(d=>{
         const hit=regs.some(p=>p.role===d.role && Math.min(p.end,d.end)-Math.max(p.start,d.start) > 0.7*Math.min(p.end-p.start,d.end-d.start));
@@ -751,12 +779,12 @@ function estimate(){
 function harvestTable(){
   document.querySelectorAll("#rows tr").forEach((tr,i)=>{
     if(!regs[i]) return;
-    tr.querySelectorAll("input").forEach(inp=>{
-      const v=parseFloat(inp.value);
-      if(!isNaN(v)) regs[i][inp.dataset.f]=v;
-    });
-    const s=tr.querySelector("select");
-    if(s) regs[i].role=s.value;
+    const role=tr.querySelector("select[data-f='role']"); if(role) regs[i].role=role.value;
+    const fig=tr.querySelector("input[data-f='figure_id']"); if(fig) regs[i].figure_id=fig.value.trim();
+    const s=tr.querySelector("input[data-f='start']"); if(s){ const v=parseFloat(s.value); if(!isNaN(v)) regs[i].start=v; }
+    const e=tr.querySelector("input[data-f='end']"); if(e){ const v=parseFloat(e.value); if(!isNaN(v)) regs[i].end=v; }
+    const src=tr.querySelector("select[data-f='source']"); if(src) regs[i].source=src.value;
+    const h=tr.querySelector("input[data-f='heard']"); if(h) regs[i].heard=!!h.checked;
   });
 }
 function save(){
@@ -775,7 +803,8 @@ function save(){
   }
   fetch("/api/sections/"+tracks[trackId].id,{
     method:"POST", headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({sections:regs.map(p=>({role:p.role,start:+p.start,end:+p.end}))})
+    body:JSON.stringify({sections:regs.map(p=>({role:p.role,start:+p.start,end:+p.end,
+      figure_id:p.figure_id,source:p.source,heard:!!p.heard}))})
   }).then(async r=>{
     const txt=await r.text();
     let x; try{ x=JSON.parse(txt); }catch(e){ throw txt.slice(0,200); }
@@ -787,7 +816,24 @@ function save(){
 function nextGreen(){
   for(let i=trackId+1;i<tracks.length;i++) if(tracks[i].has_flac&&tracks[i].has_gp){ select(i); return; }
 }
+function loadDrafts(){
+  const t=tracks[trackId]; if(!t) return;
+  const q=new URLSearchParams({album:t.album||"",track:t.track||""});
+  fetch("/api/drafts?"+q.toString()).then(r=>r.json()).then(x=>{
+    const ds=x.drafts||[];
+    if(!ds.length){ showErr("no drafts for this song — run boo-lab structure"); return; }
+    snap();
+    ds.forEach(d=>{
+      const role=canonRole(d.role);
+      regs.push({role,start:+d.start,end:+d.end,figure_id:d.figure_id|| (role+"-A"),
+                 source:(d.source==="guess"?"guess":"msa-draft"),heard:false});
+    });
+    table(); paintRegions();
+    showErr("loaded "+ds.length+" draft(s) as unheard — tick heard to accept");
+  }).catch(e=>showErr("drafts: "+e,true));
+}
 document.getElementById("btnEst").onclick=estimate;
+document.getElementById("btnDrafts").onclick=loadDrafts;
 document.getElementById("btnSave").onclick=save;
 document.getElementById("btnDump").onclick=dump;
 document.getElementById("btnLyrics").onclick=()=>{

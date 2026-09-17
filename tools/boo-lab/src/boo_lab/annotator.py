@@ -8,44 +8,19 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from .catalogue import load_map, resolve
+from .schema import (
+    SOURCES,
+    ROLES as _SCHEMA_ROLES,
+    canonical_role,
+    same_role_overlaps,
+    stamp_box,
+)
 
-# Real canonical role vocabulary, per tools/boo-lab/CURRENT.md's "## Roles"
-# section and the pipeline's own `extract._BOO_LAB_TO_ENGINE_ROLE`. The UI
-# used to write legacy `verse`/`chorus`, which the human-section loader now
-# silently drops -- so everything is canonicalized through `canonical_role`.
-ROLES = [
-    "intro",
-    "build",
-    "riff",
-    "hook",
-    "breakdown",
-    "solo",
-    "chill",
-    "pulse",
-    "outro",
-]
-
-# Legacy/aliased labels -> the canonical vocabulary above.
-_ROLE_ALIASES = {
-    "verse": "riff",
-    "chorus": "hook",
-    "interlude": "chill",
-    "lead": "solo",
-    "inst": "solo",
-    "instrumental": "solo",
-}
+# Lab role vocabulary + pin schema live in schema.py (single source of truth).
+ROLES = list(_SCHEMA_ROLES)
 
 # Real demucs stems boo-lab can cache and the annotator can serve.
 STEM_NAMES = ("drums", "bass", "guitar", "piano", "other", "vocals")
-
-
-def canonical_role(role: str | None) -> str:
-    """Map any stored/legacy role onto the canonical vocabulary; an unknown
-    or empty role falls back to `riff` (the old default was `verse`, which
-    is now an alias of `riff` anyway)."""
-    text = (role or "").strip().lower()
-    text = _ROLE_ALIASES.get(text, text)
-    return text if text in ROLES else "riff"
 
 
 def _within(path: Path, root: Path | None) -> bool:
@@ -382,8 +357,30 @@ def create_app(lab_root: Path, flac_root: Path | None, gp_root: Path | None) -> 
                     found.append({**rec, "role": canonical_role(rec.get("role"))})
         return found
 
+    @app.get("/api/drafts")
+    def api_drafts(album: str = "", track: str = ""):
+        """Real MSA/Guess drafts for one song from `data/drafts.jsonl`. Never
+        written back as keeper pins -- the UI shows them unheard for review."""
+        path = lab_root / "data" / "drafts.jsonl"
+        out = []
+        if path.exists():
+            for line in path.read_text(encoding="utf-8").splitlines():
+                if not line.strip():
+                    continue
+                try:
+                    rec = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if (rec.get("album") or "") == album and (rec.get("track") or "") == track:
+                    out.append(rec)
+        return {"drafts": out}
+
     @app.post("/api/sections/{track_id}")
     async def api_save(track_id: int, request: Request):
+        """Keeper-only save via `schema.stamp_box`. Writes `sections.jsonl`
+        keepers (source human/guess-accepted AND heard); drops unheard boxes
+        and raw `guess`/`msa-draft`; a heard draft is stamped
+        `guess-accepted`. Same-role overlap >50ms fails the whole save."""
         meta = _meta(track_id)
         if not meta:
             return JSONResponse({"detail": "bad track id", "saved": 0}, status_code=400)
@@ -394,6 +391,50 @@ def create_app(lab_root: Path, flac_root: Path | None, gp_root: Path | None) -> 
         sections = body.get("sections") if isinstance(body, dict) else body
         if not isinstance(sections, list):
             return JSONResponse({"detail": "need sections list", "saved": 0}, status_code=400)
+
+        known = {"start", "end", "role", "layer", "figure_id", "source", "heard", "album", "track"}
+        keepers: list[dict] = []
+        for s in sections:
+            if not isinstance(s, dict):
+                continue
+            try:
+                start = float(s.get("start"))
+                end = float(s.get("end"))
+            except (TypeError, ValueError):
+                continue
+            if end <= start:
+                end = start + 0.25
+
+            raw_source = s.get("source")
+            source = raw_source if raw_source in SOURCES else "human"
+            if not s.get("heard"):
+                continue  # unheard boxes are dropped, never pinned
+            if source in {"guess", "msa-draft"}:
+                source = "guess-accepted"  # a heard/checked draft is accepted
+
+            rec = stamp_box(
+                start, end, s.get("role"),
+                source=source, figure_id=s.get("figure_id"), heard=True,
+                extra={k: v for k, v in s.items() if k not in known},
+            )
+            rec["album"] = meta["album"]
+            rec["track"] = meta["track"]
+            keepers.append(rec)
+
+        overlaps = same_role_overlaps(keepers)
+        if overlaps:
+            i, j, role = overlaps[0]
+            lo = max(keepers[i]["start"], keepers[j]["start"])
+            hi = min(keepers[i]["end"], keepers[j]["end"])
+            return JSONResponse(
+                {
+                    "detail": "same-role overlap: %s boxes overlap %.2f-%.2fs" % (role, lo, hi),
+                    "overlaps": [{"role": r, "i": x, "j": y} for x, y, r in overlaps],
+                    "saved": 0,
+                },
+                status_code=400,
+            )
+
         old = []
         if sec_path.exists():
             for line in sec_path.read_text(encoding="utf-8").splitlines():
@@ -403,36 +444,17 @@ def create_app(lab_root: Path, flac_root: Path | None, gp_root: Path | None) -> 
                 if rec.get("album") == meta["album"] and rec.get("track") == meta["track"]:
                     continue
                 old.append(rec)
-        new = []
-        for s in sections:
-            try:
-                start = float(s.get("start"))
-                end = float(s.get("end"))
-            except Exception:
-                continue
-            if end <= start:
-                end = start + 0.25
-            new.append(
-                {
-                    "album": meta["album"],
-                    "track": meta["track"],
-                    "start": start,
-                    "end": end,
-                    "role": canonical_role(s.get("role")),
-                    "source": "human",
-                }
-            )
         sec_path.parent.mkdir(parents=True, exist_ok=True)
         with sec_path.open("w", encoding="utf-8") as f:
-            for rec in old + new:
+            for rec in old + keepers:
                 f.write(json.dumps(rec) + "\n")
         try:
             from .learn import record
 
-            record(lab_root, meta["album"], meta["track"], new)
+            record(lab_root, meta["album"], meta["track"], keepers)
         except Exception:
             pass
-        return {"saved": len(new), "path": str(sec_path)}
+        return {"saved": len(keepers), "path": str(sec_path)}
 
     @app.post("/api/ingest")
     async def api_ingest(band: str = Form("new_band"), files: list[UploadFile] = File(...)):

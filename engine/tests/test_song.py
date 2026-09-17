@@ -18,12 +18,56 @@ from song import (
     _resolve_hit_chance,
     compose_song,
     pitches_per_cell,
+    RiffBankCoverageError,
 )
 from motif import Motif, invert, transpose
 from structure import generate_section_sequence
 
 
 ALL_PRESET_IDS = sorted(load_all_presets().keys())
+
+# The `labyrinth` preset writes its main riff from the tab riff bank and
+# HARD-FAILS (RiffBankCoverageError) on a role the bank cannot cover -- today
+# `chill`/`outro`, because no such marker exists anywhere in the corpus. That
+# is the deliberate, documented stop (docs/DECISIONS.md: "hard-fail or drop the
+# role", never silent Markov). These helpers retry a few fixed seeds so the
+# bank-gated preset is still exercised wherever it CAN compose.
+_BANK_TOLERANT_SEEDS = (4, 0, 1, 2, 3, 5, 6, 7)
+
+
+def _compose_song_bank_tolerant(preset_id, *, num_sections=8, seeds=_BANK_TOLERANT_SEEDS):
+    last = None
+    for seed in seeds:
+        try:
+            return compose_song(preset_id, seed=seed, num_sections=num_sections)
+        except RiffBankCoverageError as exc:
+            last = exc
+    raise AssertionError(f"{preset_id}: no seed composed; last error: {last}")
+
+
+def _generate_attempt_bank_tolerant(preset, *, num_sections=8, seeds=_BANK_TOLERANT_SEEDS):
+    last = None
+    for seed in seeds:
+        try:
+            return _generate_attempt(random.Random(seed), preset, num_sections=num_sections)
+        except RiffBankCoverageError as exc:
+            last = exc
+    raise AssertionError(f"{preset.id}: no seed composed; last error: {last}")
+
+
+def test_labyrinth_hard_fails_on_a_bank_uncovered_role():
+    """docs/DECISIONS.md: a labyrinth role with no bank fragments must be a
+    real, loud stop (RiffBankCoverageError), never a silent Markov fallback.
+    `chill`/`outro` have no bank coverage, so some seed must trip it."""
+    raised = False
+    for seed in range(20):
+        try:
+            compose_song("labyrinth", seed=seed, num_sections=8)
+        except RiffBankCoverageError as exc:
+            assert "no real 2-4 bar contiguous riff" in str(exc)
+            raised = True
+            break
+    assert raised, "expected labyrinth to hard-fail on a bank-uncovered role"
 
 
 @pytest.mark.parametrize("preset_id", ALL_PRESET_IDS)
@@ -603,7 +647,7 @@ def test_every_preset_gets_a_real_snare_backbeat_wired_for_every_role():
     """X.9: snare_pattern_for_role must be wired for EVERY preset (not
     metalcore-specific) and every section, with chill/interlude silent."""
     for preset_id in load_all_presets():
-        song = compose_song(preset_id, seed=4, num_sections=8)
+        song = _compose_song_bank_tolerant(preset_id)
         saw_hits = False
         for section in song["sections"]:
             snare = section["snare"]
@@ -621,7 +665,7 @@ def test_every_preset_gets_a_real_hihat_layer_wired_for_every_role():
     """X.11: hihat_pattern_for_role must be wired for EVERY preset, with
     chill/interlude silent, matching the same table as snare/kick."""
     for preset_id in load_all_presets():
-        song = compose_song(preset_id, seed=4, num_sections=8)
+        song = _compose_song_bank_tolerant(preset_id)
         saw_hits = False
         for section in song["sections"]:
             hihat = section["hihat"]
@@ -648,7 +692,7 @@ def test_every_preset_gets_silent_kick_for_chill_and_interlude():
     breather section. Fixed to match the same real rule, for every real
     preset, not just metalcore."""
     for preset_id in load_all_presets():
-        song = compose_song(preset_id, seed=4, num_sections=8)
+        song = _compose_song_bank_tolerant(preset_id)
         saw_hits = False
         for section in song["sections"]:
             kick = section["kick"]
@@ -1278,7 +1322,7 @@ def test_breakdown_and_outro_sections_get_a_real_pinch_harmonic_accent():
     must show a real pinch-harmonic accent on their own true final hit,
     for every real preset -- not gated to one genre."""
     for preset_id in load_all_presets():
-        song = _generate_attempt(random.Random(4), load_all_presets()[preset_id], num_sections=8)
+        song = _generate_attempt_bank_tolerant(load_all_presets()[preset_id])
         saw_accent = False
         for section in song["sections"]:
             if section["role"] not in _PINCH_HARMONIC_ROLES:

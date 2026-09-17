@@ -59,7 +59,7 @@ Do not `/next` the old queue.
 | What | Path |
 |---|---|
 | Bank 2328 bars / 23 songs | `engine/data/riff_bank.json` |
-| GP sources | `reference/gp-tabs-born-of-osiris/` |
+| GP sources | `reference/gp-tabs/` |
 | FluidSynth | `tools/fluidsynth/bin/fluidsynth.exe` |
 | Soundfont | `tools/soundfonts/GeneralUser-GS.sf2` |
 | ffmpeg | `tools/ffmpeg.exe` |

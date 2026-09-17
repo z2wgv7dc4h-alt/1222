@@ -18,15 +18,19 @@ GP     C:\Users\RIGGUSPIG\Desktop\god-tier-metal\reference\gp-tabs
 
 ## Start
 
+Easiest (scans, then serves): run `START.bat`.
+
+Manual equivalent:
+
 ```
 cd C:\Users\RIGGUSPIG\Desktop\god-tier-metal\tools\boo-lab
 .venv\Scripts\activate
-set BOO_FLAC_ROOT=C:\Users\RIGGUSPIG\Desktop\god-tier-metal\reference\audio-corpus
-set BOO_GP_ROOT=C:\Users\RIGGUSPIG\Desktop\god-tier-metal\reference\gp-tabs
 python -m boo_lab.cli scan
 python -m boo_lab.cli studio --port 8765
 ```
 
+Corpus roots come from `.env` (`BOO_FLAC_ROOT` = the **corpus** root, e.g.
+`...\reference\audio-corpus`, not a band folder; `BOO_GP_ROOT` = `...\reference\gp-tabs`).
 Open http://127.0.0.1:8765 — Ctrl+Shift+R after HTML changes. One server only.
 
 ## Install

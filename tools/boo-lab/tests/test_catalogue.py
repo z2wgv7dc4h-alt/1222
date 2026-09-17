@@ -88,6 +88,7 @@ def test_save_and_load_map_round_trip(tmp_path):
     rows = [{
         "album": "A", "track": "T", "year": "", "flac": "f",
         "gp": "g", "tuning": "drop_g_7", "match": "yes", "notes": "n",
+        "flac_sha256": "",
     }]
     path = tmp_path / "map.csv"
     cat.save_map(path, rows)
@@ -104,6 +105,33 @@ def test_save_map_writes_blanks_for_missing_fields(tmp_path):
 def test_load_map_missing_file_fails_closed(tmp_path):
     with pytest.raises(FileNotFoundError):
         cat.load_map(tmp_path / "nope.csv")
+
+
+def test_fill_hashes_writes_sha256_only_for_empty_cells(tmp_path):
+    import hashlib
+
+    flac = tmp_path / "a.flac"
+    flac.write_bytes(b"hello")
+    missing = tmp_path / "nope.flac"
+    cat.save_map(tmp_path / "map.csv", [
+        {"album": "A", "track": "T", "flac": str(flac)},
+        {"album": "A", "track": "U", "flac": str(missing)},
+        {"album": "A", "track": "V", "flac": str(flac), "flac_sha256": "deadbeef"},
+    ])
+
+    report = cat.fill_hashes(tmp_path / "map.csv")
+
+    rows = cat.load_map(tmp_path / "map.csv")
+    assert report["filled"] == 1
+    assert rows[0]["flac_sha256"] == hashlib.sha256(b"hello").hexdigest()
+    assert rows[1]["flac_sha256"] == ""
+    assert rows[2]["flac_sha256"] == "deadbeef"
+
+
+def test_save_map_preserves_unknown_columns(tmp_path):
+    path = tmp_path / "m.csv"
+    cat.save_map(path, [{"album": "A", "track": "T", "custom_col": "keep"}])
+    assert cat.load_map(path)[0]["custom_col"] == "keep"
 
 
 # --- scan_roots --------------------------------------------------------------

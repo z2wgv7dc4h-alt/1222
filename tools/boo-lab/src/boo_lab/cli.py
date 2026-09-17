@@ -30,6 +30,8 @@ def main(argv: list[str] | None = None) -> int:
 
     sub.add_parser("init-map", help="write data/map.csv template if missing")
     sub.add_parser("scan", help="draft map.csv from BOO_FLAC_ROOT + BOO_GP_ROOT")
+    s = sub.add_parser("hash", help="fill empty map.csv flac_sha256 cells")
+    s.add_argument("--album")
     st = sub.add_parser("studio", help="same as annotate")
     st.add_argument("--port", type=int, default=8765)
 
@@ -90,6 +92,10 @@ def main(argv: list[str] | None = None) -> int:
     s = sub.add_parser("beats", help="write beat/downbeat grid (beat_this or allin1)")
     s.add_argument("--album")
 
+    s = sub.add_parser("sync", help="tab-vs-audio clock witness for one song")
+    s.add_argument("--album")
+    s.add_argument("--track")
+
     s = sub.add_parser("annotate", help="local UI: listen to FLAC, click section bounds")
     s.add_argument("--port", type=int, default=8765)
 
@@ -133,6 +139,13 @@ def main(argv: list[str] | None = None) -> int:
         if not map_path.exists():
             save_map(map_path, [{k: "" for k in FIELDS}])
         print(map_path)
+        return 0
+
+    if args.cmd == "hash":
+        from .catalogue import fill_hashes
+
+        report = fill_hashes(map_path, getattr(args, "album", None))
+        print("hash: filled %d of %d row(s) -> %s" % (report["filled"], report["rows"], map_path))
         return 0
 
     rows = load_map(map_path) if map_path.exists() else []
@@ -205,6 +218,17 @@ def main(argv: list[str] | None = None) -> int:
             return 1
         print("hear: flipped %d row(s) heard=true for %s / %s (%d rows total)"
               % (report["flipped"], report["album"], report["track"], report["rows"]))
+        return 0
+
+    if args.cmd == "sync":
+        from .sync import sync_track
+
+        try:
+            record = sync_track(root(), getattr(args, "album", None), getattr(args, "track", None))
+        except ValueError as exc:
+            print("refuse:", exc)
+            return 1
+        print("sync", record)
         return 0
 
     if args.cmd == "stems":

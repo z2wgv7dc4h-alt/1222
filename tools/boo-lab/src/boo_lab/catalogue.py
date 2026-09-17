@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+import hashlib
 from pathlib import Path
 
 FIELDS = [
@@ -12,21 +13,63 @@ FIELDS = [
     "tuning",
     "match",
     "notes",
+    "flac_sha256",
 ]
 
 
 def load_map(path: Path) -> list[dict]:
+    """Keep every column present in the CSV, including unknown extras."""
     with path.open(newline="", encoding="utf-8") as f:
         return list(csv.DictReader(f))
 
 
 def save_map(path: Path, rows: list[dict]) -> None:
+    """Write `FIELDS` first, then any extra columns found in the rows, so a
+    load→save round-trip never drops an unknown column."""
+    keys = list(FIELDS)
+    for row in rows:
+        for key in row:
+            if key not in keys:
+                keys.append(key)
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", newline="", encoding="utf-8") as f:
-        w = csv.DictWriter(f, fieldnames=FIELDS, extrasaction="ignore")
+        w = csv.DictWriter(f, fieldnames=keys, extrasaction="ignore")
         w.writeheader()
         for row in rows:
-            w.writerow({k: row.get(k, "") for k in FIELDS})
+            w.writerow({k: row.get(k, "") for k in keys})
+
+
+def sha256_file(path: Path, chunk: int = 1 << 20) -> str:
+    """Hex sha256 of a file, or "" when it can't be read."""
+    digest = hashlib.sha256()
+    try:
+        with Path(path).open("rb") as f:
+            for block in iter(lambda: f.read(chunk), b""):
+                digest.update(block)
+        return digest.hexdigest()
+    except Exception:
+        return ""
+
+
+def fill_hashes(map_path: Path, album: str | None = None) -> dict:
+    """Fill empty `flac_sha256` cells only (never rehash a populated cell).
+    Missing files are left empty."""
+    rows = load_map(map_path) if map_path.exists() else []
+    filled = 0
+    for row in rows:
+        if album and (row.get("album") or "").casefold() != album.casefold():
+            continue
+        if row.get("flac_sha256"):
+            continue
+        flac = row.get("flac") or ""
+        p = Path(flac) if flac else None
+        if p and p.exists():
+            digest = sha256_file(p)
+            if digest:
+                row["flac_sha256"] = digest
+                filled += 1
+    save_map(map_path, rows)
+    return {"filled": filled, "rows": len(rows)}
 
 
 def resolve(row: dict, flac_root: Path | None, gp_root: Path | None) -> dict:
@@ -121,6 +164,7 @@ def scan_roots(flac_root: Path | None, gp_root: Path | None) -> list[dict]:
                     "tuning": "drop_g_7",
                     "match": "yes" if gp else "unknown",
                     "notes": "",
+                    "flac_sha256": sha256_file(fp),
                 }
             )
     rows.sort(key=lambda r: ((r.get("album") or ""), r.get("track") or ""))

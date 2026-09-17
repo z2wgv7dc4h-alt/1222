@@ -1,8 +1,12 @@
 import json
 
+import pytest
+
 from boo_lab.audit import audit_lab
 from boo_lab.schema import (
+    canonical_role,
     is_keeper,
+    load_section_rows,
     msa_label_to_lab,
     same_role_overlaps,
     stamp_box,
@@ -14,12 +18,51 @@ def test_msa_maps_to_lab_not_pop():
     assert msa_label_to_lab("chorus") == "hook"
 
 
-def test_keepers():
-    assert is_keeper(None)
+def test_keepers_fail_closed():
+    assert not is_keeper(None)
+    assert not is_keeper("")
+    assert not is_keeper("   ")
     assert is_keeper("human")
+    assert is_keeper("guess-accepted")
     assert not is_keeper("msa-draft")
     assert not is_keeper("guess")
     assert not is_keeper("songformer-draft")
+    assert not is_keeper("not-a-real-source")
+
+
+def test_canonical_role_returns_none_for_unmappable():
+    assert canonical_role(None) is None
+    assert canonical_role("") is None
+    assert canonical_role("   ") is None
+    assert canonical_role("bogus") is None
+    assert canonical_role("verse") == "riff"
+    assert all(canonical_role(r) == r for r in
+               ("intro", "build", "riff", "hook", "breakdown", "solo", "chill", "pulse", "outro"))
+
+
+def test_stamp_box_rejects_unknown_role_and_source():
+    with pytest.raises(ValueError):
+        stamp_box(0, 1, None)
+    with pytest.raises(ValueError):
+        stamp_box(0, 1, "not-a-role")
+    with pytest.raises(ValueError):
+        stamp_box(0, 1, "riff", source="not-a-real-source")
+    with pytest.raises(ValueError):
+        stamp_box(0, 1, "riff", source=None)
+
+
+def test_load_section_rows_keeps_keepers_drops_drafts_and_malformed(tmp_path):
+    p = tmp_path / "sections.jsonl"
+    p.write_text(
+        json.dumps({"album": "A", "track": "T", "role": "riff", "source": "human"}) + "\n"
+        + json.dumps({"album": "A", "track": "T", "role": "riff", "source": "msa-draft"}) + "\n"
+        + json.dumps({"album": "A", "track": "U", "role": "intro"}) + "\n"  # no source: not keeper
+        + "{ not json\n",
+        encoding="utf-8",
+    )
+    rows = load_section_rows(p)
+    assert len(rows) == 1
+    assert rows[0]["source"] == "human" and rows[0]["track"] == "T"
 
 
 def test_same_role_overlap_detected():

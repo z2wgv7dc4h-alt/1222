@@ -3,7 +3,23 @@ signal (the documented classify_drum_onsets snare-undercount/cymbal-
 over-read failure mode). Synthetic onsets only."""
 from __future__ import annotations
 
+import json
+
 from boo_lab import drums_extract as de
+
+
+def test_build_drum_patterns_ignores_non_keeper_rows(tmp_path):
+    lab = tmp_path / "lab"
+    (lab / "data").mkdir(parents=True)
+    (lab / "data" / "sections.jsonl").write_text(
+        json.dumps({"album": "A", "track": "T", "start": 0.0, "end": 5.0, "role": "riff", "source": "human"}) + "\n"
+        + json.dumps({"album": "A", "track": "T", "start": 6.0, "end": 9.0, "role": "intro", "source": "msa-draft"}) + "\n",
+        encoding="utf-8",
+    )
+    report = de.build_drum_patterns(lab, [], lab / "work" / "stems")
+    assert report["sections"] == 1  # the msa-draft row is not a labeled section
+    rows = [json.loads(l) for l in (lab / "data" / "drum_patterns.jsonl").read_text(encoding="utf-8").splitlines() if l.strip()]
+    assert len(rows) == 1 and rows[0]["role"] == "riff"
 
 
 def _onsets(*roles):

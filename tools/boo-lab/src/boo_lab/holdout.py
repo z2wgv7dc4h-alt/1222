@@ -23,21 +23,6 @@ HOLDOUT_FILENAME = "holdout.csv"
 _TARGET_EVERY = 8
 
 
-def _load_sections(lab_root: Path) -> list[dict]:
-    path = Path(lab_root) / "data" / "sections.jsonl"
-    rows: list[dict] = []
-    if not path.exists():
-        return rows
-    for line in path.read_text(encoding="utf-8").splitlines():
-        if not line.strip():
-            continue
-        try:
-            rows.append(json.loads(line))
-        except json.JSONDecodeError:
-            continue
-    return rows
-
-
 def candidate_songs(rows: list[dict], sections: list[dict]) -> list[tuple[str, str]]:
     """Real, sorted `(album, track)` universe eligible for the split:
     every map row that is matched with a real GP file on disk, plus every
@@ -95,10 +80,15 @@ def ensure_holdout(lab_root: Path, rows: list[dict]) -> set[tuple[str, str]]:
     """The fixed reserved set: an existing `data/holdout.csv` is always
     honored as-is; otherwise a deterministic set is selected from the real
     current candidates and written once."""
+    from .schema import load_section_rows
+
     existing = load_holdout(lab_root)
     if existing:
         return existing
-    candidates = candidate_songs(rows, _load_sections(lab_root))
+    # Keepers-only: a validation split must be reserved from real labeled
+    # songs, never from machine drafts. Shares schema's single reader.
+    sections = load_section_rows(Path(lab_root) / "data" / "sections.jsonl")
+    candidates = candidate_songs(rows, sections)
     holdout = select_holdout(candidates)
     write_holdout(lab_root, holdout)
     return holdout

@@ -90,9 +90,9 @@ def test_human_role_at_returns_covering_role_or_none():
 
 def test_load_human_sections_parses_and_translates_roles(tmp_path):
     (tmp_path / "sections.jsonl").write_text(
-        json.dumps({"album": "A", "track": "T", "start": 0.0, "end": 1.5, "role": "intro"}) + "\n"
-        + json.dumps({"album": "A", "track": "T", "start": 1.5, "end": 3.0, "role": "riff"}) + "\n"
-        + json.dumps({"album": "A", "track": "T", "start": 3.0, "end": 4.0, "role": "pulse"}) + "\n",
+        json.dumps({"album": "A", "track": "T", "start": 0.0, "end": 1.5, "role": "intro", "source": "human"}) + "\n"
+        + json.dumps({"album": "A", "track": "T", "start": 1.5, "end": 3.0, "role": "riff", "source": "human"}) + "\n"
+        + json.dumps({"album": "A", "track": "T", "start": 3.0, "end": 4.0, "role": "pulse", "source": "human"}) + "\n",
         encoding="utf-8",
     )
     out = ex.load_human_sections(tmp_path)
@@ -107,8 +107,8 @@ def test_load_human_sections_skips_malformed_and_incomplete_lines(tmp_path):
     (tmp_path / "sections.jsonl").write_text(
         "not json\n"
         "\n"
-        + json.dumps({"album": "A", "track": "T", "start": 0.0, "end": 1.0, "role": "intro"}) + "\n"
-        + json.dumps({"album": "A", "track": "T", "role": "build"}) + "\n"
+        + json.dumps({"album": "A", "track": "T", "start": 0.0, "end": 1.0, "role": "intro", "source": "human"}) + "\n"
+        + json.dumps({"album": "A", "track": "T", "role": "build", "source": "human"}) + "\n"
         + "{broken\n",
         encoding="utf-8",
     )

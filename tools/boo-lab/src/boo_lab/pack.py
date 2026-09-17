@@ -8,21 +8,6 @@ def _safe(s: str) -> str:
     return "".join(c if c.isalnum() or c in "-_." else "_" for c in (s or ""))[:80]
 
 
-def _load_sections(path: Path) -> list[dict]:
-    if not path.exists():
-        return []
-    out = []
-    for line in path.read_text(encoding="utf-8").splitlines():
-        if not line.strip():
-            continue
-        rec = json.loads(line)
-        from .schema import is_keeper
-
-        if rec.get("role") and is_keeper(rec.get("source")):
-            out.append(rec)
-    return out
-
-
 def _slice(src: Path, dest: Path, start: float, end: float) -> bool:
     if not src.exists():
         return False
@@ -94,11 +79,12 @@ def _sum_no_vox(parts: list[Path], dest: Path) -> bool:
 
 def build_pack(lab_root: Path, rows: list[dict], cache: Path) -> dict:
     from .holdout import ensure_holdout, split_for
+    from .schema import load_section_rows
     from .stems import find_stem, run_demucs
 
     holdout = ensure_holdout(lab_root, rows)
     sec_path = lab_root / "data" / "sections.jsonl"
-    sections = _load_sections(sec_path)
+    sections = load_section_rows(sec_path)
     by_song: dict[tuple[str, str], list[dict]] = {}
     for s in sections:
         by_song.setdefault((s.get("album") or "", s.get("track") or ""), []).append(s)

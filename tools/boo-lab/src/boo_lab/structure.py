@@ -138,7 +138,7 @@ def build_drafts(lab_root: Path, rows: list[dict]) -> dict:
     """Write MSA (allin1) and, when available, SongFormer machine drafts to
     `data/drafts.jsonl`. NEVER writes `sections.jsonl`. Drafts for tracks not
     in `rows` (e.g. another album) are preserved."""
-    from .schema import stamp_box
+    from .schema import canonical_role, stamp_box
 
     lab_root = Path(lab_root)
     out_dir = lab_root / "work" / "msa"
@@ -177,8 +177,11 @@ def build_drafts(lab_root: Path, rows: list[dict]) -> dict:
                 (out_dir / f"{r.get('track')}.json").write_text(
                     json.dumps(payload, indent=2, default=str), encoding="utf-8")
                 for seg in segments_from_allin1(payload):
+                    role = canonical_role(seg.get("role") or seg.get("label"))
+                    if role is None:
+                        continue  # unmapped label: never fabricate a role
                     rec = stamp_box(
-                        seg["start"], seg["end"], seg.get("role") or seg.get("label"),
+                        seg["start"], seg["end"], role,
                         source="msa-draft",
                         extra={"album": r.get("album"), "track": r.get("track"),
                                "msa_label": seg.get("label") or ""},
@@ -197,8 +200,11 @@ def build_drafts(lab_root: Path, rows: list[dict]) -> dict:
                     (out_dir / f"{r.get('track')}.songformer.json").write_text(
                         json.dumps(sres, indent=2, default=str), encoding="utf-8")
                     for seg in segments_from_songformer(sres):
+                        role = canonical_role(seg.get("role") or seg.get("label"))
+                        if role is None:
+                            continue  # unmapped label: never fabricate a role
                         rec = stamp_box(
-                            seg["start"], seg["end"], seg.get("role") or seg.get("label"),
+                            seg["start"], seg["end"], role,
                             source="songformer-draft",
                             extra={"album": r.get("album"), "track": r.get("track"),
                                    "msa_label": seg.get("label") or "",

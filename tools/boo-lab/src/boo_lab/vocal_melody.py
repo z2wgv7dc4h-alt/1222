@@ -172,22 +172,6 @@ def extract_vocal_melody(
     return notes
 
 
-def _load_sections(path: Path) -> list[dict]:
-    """Same honest read as pack.py/drums_extract.py's own `_load_sections`:
-    every real human-labeled row in `data/sections.jsonl`, empty list (not
-    an error) when nothing has been labeled yet."""
-    if not path.exists():
-        return []
-    out = []
-    for line in path.read_text(encoding="utf-8").splitlines():
-        if not line.strip():
-            continue
-        rec = json.loads(line)
-        if rec.get("source") == "human" or rec.get("role"):
-            out.append(rec)
-    return out
-
-
 def build_vocal_melody(lab_root: Path, rows: list[dict], cache: Path) -> dict:
     """For every row in `data/sections.jsonl`, extract that track's real
     vocal melody from its cached demucs vocals stem (once per track), then
@@ -202,10 +186,11 @@ def build_vocal_melody(lab_root: Path, rows: list[dict], cache: Path) -> dict:
     an empty `notes` list -- an honest gap, not a dropped row.
     """
     from .holdout import ensure_holdout, split_for
+    from .schema import load_section_rows
 
     holdout = ensure_holdout(lab_root, rows)
     sec_path = lab_root / "data" / "sections.jsonl"
-    sections = _load_sections(sec_path)
+    sections = load_section_rows(sec_path)
     by_song: dict[tuple[str, str], list[dict]] = {}
     for s in sections:
         by_song.setdefault((s.get("album") or "", s.get("track") or ""), []).append(s)

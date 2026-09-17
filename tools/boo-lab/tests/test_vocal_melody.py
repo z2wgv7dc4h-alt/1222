@@ -2,9 +2,24 @@
 pitch/timing-only output contract; no real audio fixture."""
 from __future__ import annotations
 
+import json
+
 import pytest
 
 from boo_lab import vocal_melody as vm
+
+
+def test_build_vocal_melody_ignores_non_keeper_rows(tmp_path):
+    lab = tmp_path / "lab"
+    (lab / "data").mkdir(parents=True)
+    (lab / "data" / "sections.jsonl").write_text(
+        json.dumps({"album": "A", "track": "T", "start": 0.0, "end": 5.0, "role": "riff", "source": "human"}) + "\n"
+        + json.dumps({"album": "A", "track": "T", "start": 6.0, "end": 9.0, "role": "intro", "source": "msa-draft"}) + "\n",
+        encoding="utf-8",
+    )
+    vm.build_vocal_melody(lab, [], lab / "work" / "stems")
+    rows = [json.loads(l) for l in (lab / "data" / "vocal_melody.jsonl").read_text(encoding="utf-8").splitlines() if l.strip()]
+    assert len(rows) == 1 and rows[0]["role"] == "riff"
 
 
 def test_extract_vocal_melody_rejects_unknown_backend(tmp_path):

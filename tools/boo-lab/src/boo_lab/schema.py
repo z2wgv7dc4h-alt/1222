@@ -1,6 +1,8 @@
 """Pin schema. Humans → sections.jsonl. Machines → drafts.jsonl."""
 from __future__ import annotations
 
+import json
+from pathlib import Path
 from typing import Any
 
 ROLES = (
@@ -31,23 +33,58 @@ _ALIASES = {
 }
 
 
-def canonical_role(role: str | None) -> str:
+def canonical_role(role: str | None) -> str | None:
+    """This project's canonical role, or `None` when the input maps to none.
+
+    Never fabricates a role: an unknown/empty/None role returns `None`
+    (mirroring `engine/riff_bank._resolve_role` and `extract.py`'s deliberate
+    dropping of `pulse`). Callers must handle `None` honestly -- a box with no
+    resolvable role is rejected at Save, not stamped as a riff."""
     text = (role or "").strip().lower()
     text = _ALIASES.get(text, text)
-    return text if text in ROLES else "riff"
+    return text if text in ROLES else None
 
 
-def layer_for(role: str) -> str:
+def layer_for(role: str | None) -> str:
     return "figure" if canonical_role(role) in FIGURE_ROLES else "function"
 
 
-def msa_label_to_lab(label: str | None) -> str:
+def msa_label_to_lab(label: str | None) -> str | None:
     text = (label or "").strip().lower()
     return MSA_TO_LAB.get(text, canonical_role(text))
 
 
 def is_keeper(source: str | None) -> bool:
-    return True if not source else source in KEEPER_SOURCES
+    """Fail closed: only an explicit keeper source counts. Missing/empty/None
+    is NOT a keeper (it is an unstamped or malformed row)."""
+    return source in KEEPER_SOURCES
+
+
+def load_section_rows(path: str | Path, *, keepers_only: bool = True) -> list[dict]:
+    """The ONE reader for `data/sections.jsonl`.
+
+    `keepers_only` (default) keeps only real labeled rows -- a truthy `role`
+    AND `is_keeper(source)` (the project law; matches pack.py's original
+    check). Malformed lines are skipped. Every consumer that reads labeled
+    boxes (pack/drums/vocal/holdout) goes through this, so the "source ==
+    human" precedence bug cannot reappear in a copy."""
+    path = Path(path)
+    if not path.exists():
+        return []
+    out: list[dict] = []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        try:
+            rec = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(rec, dict):
+            continue
+        if keepers_only and not (rec.get("role") and is_keeper(rec.get("source"))):
+            continue
+        out.append(rec)
+    return out
 
 
 def same_role_overlaps(boxes: list[dict[str, Any]]) -> list[tuple[int, int, str]]:
@@ -83,7 +120,16 @@ def stamp_box(start: float, end: float, role: str | None, *, source: str = "huma
               instrument: str | None = None,
               start_bar: Any = None, end_bar: Any = None,
               extra: dict[str, Any] | None = None) -> dict[str, Any]:
-    role = canonical_role(role)
+    canon = canonical_role(role)
+    if canon is None:
+        raise ValueError(
+            f"unknown role {role!r}; expected one of {sorted(ROLES)}"
+        )
+    if source not in SOURCES:
+        raise ValueError(
+            f"unknown source {source!r}; expected one of {sorted(SOURCES)}"
+        )
+    role = canon
     inst = (instrument or "").strip().lower()
     rec: dict[str, Any] = {
         "start": float(start), "end": float(end), "role": role,
@@ -94,7 +140,7 @@ def stamp_box(start: float, end: float, role: str | None, *, source: str = "huma
         "instrument": inst if inst in INSTRUMENTS else "",
         "start_bar": _bars(start_bar),
         "end_bar": _bars(end_bar),
-        "source": source if source in SOURCES else "human",
+        "source": source,
         "heard": bool(heard),
     }
     if extra:

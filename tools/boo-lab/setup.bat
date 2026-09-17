@@ -24,24 +24,26 @@ if not exist ".venv\Scripts\python.exe" (
 call ".venv\Scripts\activate.bat"
 python -m pip install --upgrade pip wheel setuptools
 
-REM GPU torch first: RTX 50xx / Blackwell needs the cu128 index. Without an
-REM NVIDIA GPU the plain PyPI (CPU) wheel is correct.
+REM GPU torch first: RTX 50xx / Blackwell needs the cu128 index. The CUDA
+REM build is hard-pinned in constraints.txt (torch==2.8.0+cu128), so a later
+REM extras install cannot silently swap in the PyPI 2.8.0+cpu wheel. Only the
+REM CUDA path uses -c: there is no +cu128 wheel for a CPU-only machine.
 where nvidia-smi >nul 2>nul
-REM Pin 2.8.0: whisperx requires torch~=2.8.0, and 2.8.0+cu128 is the
-REM Blackwell/RTX-50xx-capable build. A newer/plain wheel breaks one or other.
+set "CONSTRAINT="
 if !errorlevel!==0 (
   echo Installing CUDA torch ^(cu128^) ...
-  python -m pip install "torch==2.8.0" "torchaudio==2.8.0" "torchvision==0.23.0" --index-url https://download.pytorch.org/whl/cu128
+  set "CONSTRAINT=-c constraints.txt"
+  python -m pip install -c constraints.txt "torch==2.8.0" "torchaudio==2.8.0" "torchvision==0.23.0" --index-url https://download.pytorch.org/whl/cu128
 ) else (
   echo No NVIDIA GPU detected -- installing CPU torch.
   python -m pip install "torch==2.8.0" "torchaudio==2.8.0" "torchvision==0.23.0"
 )
 
 echo Installing boo-lab + core + interns ...
-python -m pip install -c constraints.txt -e "." python-multipart
-python -m pip install -c constraints.txt -e ".[intern]"
-python -m pip install -c constraints.txt -e ".[pitch]"
-python -m pip install -c constraints.txt -e ".[align]"
+python -m pip install !CONSTRAINT! -e "." python-multipart
+python -m pip install !CONSTRAINT! -e ".[intern]"
+python -m pip install !CONSTRAINT! -e ".[pitch]"
+python -m pip install !CONSTRAINT! -e ".[align]"
 
 if not "%FLAC%"=="" (
   ( echo BOO_FLAC_ROOT=%FLAC%

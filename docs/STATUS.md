@@ -2,7 +2,7 @@
 
 Wiring only. Listen is not a pytest row.
 
-Active work is the lab: `tools/boo-lab` — see `tools/boo-lab/CURRENT.md` (**171 tests**).
+Active work is the lab: `tools/boo-lab` — see `tools/boo-lab/CURRENT.md` (**172 tests**).
 
 | Area | State | Note |
 |---|---|---|

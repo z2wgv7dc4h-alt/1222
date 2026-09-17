@@ -9,6 +9,11 @@
   alternative endings — and advances by the same beat arithmetic as the onsets. GP clock matches
   audio length within ~2% for 10 of 13 (was 0.85–1.76×). `catalogue._key`/scan now matches
   space-numbered `NN Title.gp5` (`07 Exist` had silently unmatched). `sync_ok`: 02/06/10 (was 0).
+- **Sync metric.** `best_lag_and_score` now blurs both envelopes (~120 ms) before correlating, so an
+  onset only has to land near a tab note instead of exactly on it. Wrong-peak lags collapsed
+  (13: 64 s→1.0 s, 11: 116 s→4.5 s, 05: 6.1 s→1.0 s). Added `best_clock_fit` (clock-rate search) as
+  a `clock_ratio` **diagnostic** — deliberately not used to override the raw peak, since on a tab
+  that's short because a section is missing it finds bogus rates. `sync_ok`: 3 → **5** (02/04/06/08/10).
 - **Refinements.** Demucs subprocess gets an explicit `--device` from `device.py` (was implicitly
   choosing); `beats` allin1 fallback caches under `work/allin1`; `doctor --require-interns` exits
   non-zero when an intern is missing and `setup.bat` aborts on it, so a broken install fails at
@@ -28,7 +33,7 @@
 - **Real drafts.** `structure --album "2009 - A Higher Place"` wrote 125 `msa-draft` rows,
   `sections.jsonl` untouched; `compare` reports F0.5=0.737 F3=0.800 role3=0.250 on Rebirth.
 - **Repo hygiene.** `data/{drafts,beats,compare,sync,agree}.*` and `*.egg-info/` gitignored;
-  `boo_lab.egg-info` untracked. Tests: `test_natten_compat`, `test_device`, `test_doctor` → 171.
+  `boo_lab.egg-info` untracked. Tests: `test_natten_compat`, `test_device`, `test_doctor` → 172.
 
 ## 2026-09-17
 

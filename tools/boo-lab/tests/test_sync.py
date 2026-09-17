@@ -34,6 +34,14 @@ def test_two_second_shift_is_not_ok():
     assert sync.decide(lag, score) is False
 
 
+def test_best_clock_fit_recovers_a_uniform_rate():
+    g = _env([i * 1.0 for i in range(1, 10)], n=1200)
+    a = _env([i * 1.1 for i in range(1, 10)], n=1200)
+    ratio, _lag, score = sync.best_clock_fit(g, a, 0.01, span=0.12, step=0.01)
+    assert ratio == pytest.approx(1.1, abs=0.01)
+    assert score > 0.9
+
+
 def test_low_score_is_not_ok():
     import numpy as np
 

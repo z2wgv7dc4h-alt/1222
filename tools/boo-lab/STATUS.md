@@ -4,7 +4,7 @@ Canonical detail: **CURRENT.md**; commands in **README.md**.
 
 Works: studio keeps pins (`human`/`guess-accepted` + `heard`) in `sections.jsonl`; mel
 spectrogram under the WaveSurfer waveform; 6-stem picker; drafts; `hear`/`sync`/`hash`;
-`agree`/`compare`/`export-jams`/`beats`/`audit`/`report`; **171 tests pass**.
+`agree`/`compare`/`export-jams`/`beats`/`audit`/`report`; **172 tests pass**.
 Interns (allin1 structure, beat_this, torchcrepe) run on **CUDA** when present
 (RTX 5080, `torch 2.8.0+cu128`); `boo-lab doctor` reports the build. allin1 works
 without an old natten build via `_natten_compat` (legacy NATTEN API + madmom
@@ -15,14 +15,14 @@ On disk now:
 - `data/drafts.jsonl` — 125 `msa-draft` rows across the 13 A Higher Place tracks (allin1, GPU).
 - `data/beats.jsonl` — 13 tracks (`beat_this` preferred).
 - `data/compare.json` — drafts vs keepers. Rebirth (holdout): **F0.5=0.737 F3=0.800 role3=0.250**.
-- `data/sync.jsonl` — 13 A Higher Place tracks. `gp_onset_times` now reads `song.tempo` and walks
-  the tab in **playback order** (repeat-open/close + alternative endings expanded, measure advance
-  from the same beat arithmetic). GP clock now matches audio length within ~2% for 10 of 13.
-  **3 `sync_ok`**: `02 - Elimination` (lag −0.093 s, 0.23), `06 - Starved` (−0.093 s, 0.39),
-  `10 - A Higher Place` (0.023 s, 0.52); was 0 before. Still failing: `12` just over tolerance
-  (−0.42 s); `03/05/08` find a wrong correlation peak despite near-right length; `02/08/11` tabs
-  are 12–23% short of the recording. `01 - Rebirth` has no tab (`no-gp`). Perfect tabs in
-  `gp5/A Higher Place/`; old duplicates in `reference/gp-tabs-superseded/`.
+- `data/sync.jsonl` — 13 A Higher Place tracks. `gp_onset_times` reads `song.tempo` and walks the
+  tab in **playback order** (repeats + alternative endings expanded). The correlation now blurs
+  both sides (~120 ms) before peaking, so an onset only has to land *near* a tab note — that fixed
+  most wrong-peak lags (13: 64 s→1.0 s, 11: 116 s→4.5 s, 05: 6.1 s→1.0 s). `clock_ratio` is recorded
+  as a diagnostic (a non-unit best rate hints the notated tempo differs) but never overrides the raw
+  peak. **5 `sync_ok`** (was 0 → 3 → 5): `02`, `04`, `06`, `08`, `10` at lags −0.07…−0.14 s. Still
+  failing: `12/13` lags 0.4–1.0 s (real lead-in or residual), `03/05` ~1 s, `07/09/11` wrong peak /
+  low score. `01 - Rebirth` has no tab (`no-gp`). Perfect tabs in `gp5/A Higher Place/`.
 - `data/agree.jsonl` — Rebirth pass 1 (6 boxes). Pass 2 needs a human re-pin, then
   `boo-lab agree --album X --track Y --diff`.
 - `data/map.csv` — 71 rows, 55 `match=yes`; `flac_sha256` only once `scan`/`hash` runs.

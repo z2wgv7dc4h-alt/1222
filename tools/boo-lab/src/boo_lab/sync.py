@@ -3,8 +3,11 @@
 Builds a coarse onset series from the GP5 (note starts in seconds on the
 tab's own tempo/measure clock) and one from the audio (librosa onset
 strength, guitar stem if cached else the mix), then scores their normalized
-cross-correlation. `sync_ok` means the tab clock is within 350 ms of the
-audio. No new dependencies (numpy + librosa only).
+cross-correlation. Both sides are blurred (~120 ms) first, so an onset only
+has to land *near* a tab note -- a raw impulse comb against a broad envelope
+is too spiky and latches wrong peaks on repeated riffs. `sync_ok` means the
+tab clock is within 350 ms of the audio at the same rate. No new dependencies
+(numpy + librosa only).
 """
 from __future__ import annotations
 
@@ -13,6 +16,8 @@ from pathlib import Path
 
 LAG_TOLERANCE = 0.35  # seconds -- sync_ok requires |lag| below this
 SCORE_THRESHOLD = 0.15  # normalized cross-correlation peak
+SMOOTH_SECONDS = 0.12  # blur before correlating: onsets need only land near each other
+RATE_TOLERANCE = 0.015  # sync_ok requires the tab clock rate within 1.5% of the audio
 
 
 def _read_jsonl(path: Path) -> list[dict]:
@@ -142,9 +147,22 @@ def audio_envelope(path: Path):
     return env, hop / float(sr)
 
 
-def best_lag_and_score(env_gp, env_audio, hop_s: float) -> tuple[float, float]:
-    """Normalized cross-correlation peak of two 1-D envelopes. Returns
-    `(lag_seconds, score)`; sign of lag is not meaningful for the witness."""
+def _smooth(env, window_frames: int):
+    import numpy as np
+
+    if window_frames <= 1:
+        return env
+    kernel = np.ones(window_frames, dtype=float) / window_frames
+    return np.convolve(env, kernel, mode="same")
+
+
+def best_lag_and_score(
+    env_gp, env_audio, hop_s: float, smooth_s: float = SMOOTH_SECONDS
+) -> tuple[float, float]:
+    """Normalized cross-correlation peak of two 1-D envelopes, after blurring
+    both so an onset only has to land *near* a tab note (a raw impulse comb vs
+    a broad envelope is too spiky and picks wrong peaks on repeated riffs).
+    Returns `(lag_seconds, score)`; sign of lag is not meaningful."""
     import numpy as np
 
     a = np.asarray(env_gp, dtype=float)
@@ -154,6 +172,10 @@ def best_lag_and_score(env_gp, env_audio, hop_s: float) -> tuple[float, float]:
         return 0.0, 0.0
     a = np.pad(a, (0, n - a.size))
     b = np.pad(b, (0, n - b.size))
+    if hop_s > 0 and smooth_s > 0:
+        w = max(1, int(round(smooth_s / hop_s)))
+        a = _smooth(a, w)
+        b = _smooth(b, w)
     a = a - a.mean()
     b = b - b.mean()
     denom = float(np.linalg.norm(a) * np.linalg.norm(b))
@@ -162,6 +184,31 @@ def best_lag_and_score(env_gp, env_audio, hop_s: float) -> tuple[float, float]:
     corr = np.correlate(a, b, mode="full") / denom
     k = int(np.argmax(corr))
     return (k - (n - 1)) * hop_s, float(corr[k])
+
+
+def best_clock_fit(
+    env_gp, env_audio, hop_s: float, span: float = 0.12, step: float = 0.01
+) -> tuple[float, float, float]:
+    """Fit a clock RATE as well as an offset: search `a` in [1-span, 1+span],
+    resample the GP envelope by `a`, keep the best. Returns `(ratio, lag, score)`.
+    This separates "the tab is notated at a different tempo" (a fixable rate)
+    from "the tab is wrong"."""
+    import numpy as np
+
+    g = np.asarray(env_gp, dtype=float)
+    if g.size == 0:
+        return 1.0, 0.0, 0.0
+    src = np.arange(g.size, dtype=float)
+    best = (1.0, 0.0, -1.0)
+    k = int(round(span / step))
+    for i in range(-k, k + 1):
+        ratio = 1.0 + i * step
+        m = max(2, int(round(g.size * ratio)))
+        resampled = np.interp(np.linspace(0, g.size - 1, m), src, g)
+        lag, score = best_lag_and_score(resampled, env_audio, hop_s)
+        if score > best[2]:
+            best = (ratio, lag, score)
+    return best
 
 
 def decide(lag_sec: float, score: float) -> bool:
@@ -232,11 +279,18 @@ def sync_track(lab_root: Path, album: str | None, track: str | None) -> dict:
     env_audio, hop_s = audio_envelope(Path(src))
     env_gp = envelope_from_times(onsets, len(env_audio), hop_s)
     lag, score = best_lag_and_score(env_gp, env_audio, hop_s)
+    # Diagnostic only: a rate that fits better than the raw peak can mean a
+    # notated tempo difference, but on a tab that's short because a section is
+    # missing it also finds bogus peaks -- so it never overrides the raw lag.
+    ratio, _rlag, rscore = best_clock_fit(env_gp, env_audio, hop_s, span=0.08)
+    rec["clock_ratio"] = round(ratio, 4)
     rec["lag_sec"] = round(lag, 4)
     rec["score"] = round(score, 4)
     rec["sync_ok"] = decide(lag, score)
     if rec["sync_ok"]:
         rec["note"] = "ok"
+    elif abs(ratio - 1.0) > RATE_TOLERANCE and rscore > score + 0.03:
+        rec["note"] = "clock x%.3f (notated tempo differs)" % ratio
     elif abs(lag) >= LAG_TOLERANCE:
         rec["note"] = "lag %.3fs > %.3fs" % (abs(lag), LAG_TOLERANCE)
     else:

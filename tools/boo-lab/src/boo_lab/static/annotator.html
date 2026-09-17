@@ -7,7 +7,6 @@
   <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&family=Instrument+Serif&display=swap" rel="stylesheet" />
   <script src="https://unpkg.com/wavesurfer.js@7.8.16/dist/wavesurfer.min.js"></script>
   <script src="https://unpkg.com/wavesurfer.js@7.8.16/dist/plugins/regions.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@coderline/alphatab@1.3.1/dist/alphaTab.min.js"></script>
   <style>
     :root { --bg:#07080b; --panel:#101218; --line:#262a33; --text:#ece8e1; --mute:#8b8680;
       --riff:#d4b06a; --hook:#7eb4d8; --break:#d46555; --solo:#7dba7a; --intro:#8a7a9a; --gold:#d4b06a; }
@@ -56,9 +55,6 @@
     .lyrics .ly span.txt { flex:1; cursor:pointer; }
     .lyrics .ly button { padding:2px 8px; font-size:12px; }
     .lytools { display:flex; gap:6px; margin:0 0 6px; }
-    #tabwrap { margin:0; background:#efe7d6; border:1px solid #c4b89a; min-height:140px; overflow:auto; max-height:320px; color:#1a1612; }
-    #tabwrap .empty { color:#5a5248; padding:16px; font-size:13px; }
-    .tab-help { color:#b8b0a4; font-size:12px; margin:6px 0 10px; text-transform:none; letter-spacing:0; }
     .transport, .pins { display:flex; align-items:center; gap:8px; margin:8px 0 12px; flex-wrap:wrap; }
     button { background:#1a1d24; color:var(--text); border:1px solid var(--line); padding:8px 14px; font:inherit; cursor:pointer; border-radius:6px; }
     button:hover { border-color:#6a5a3a; color:#f3ead8; }
@@ -103,6 +99,15 @@
     .vizdock:before { content:""; position:absolute; inset:0; pointer-events:none; box-shadow:inset 0 20px 40px #000a; }
     .vizdock canvas { width:100%; height:100%; display:block; }
     .vizdock label { position:absolute; left:18px; top:10px; font-size:10px; letter-spacing:.2em; text-transform:uppercase; color:#7a6a4a; pointer-events:none; z-index:1; }
+    .badge { display:none; margin-left:auto; font-size:11px; letter-spacing:.08em; text-transform:uppercase; padding:3px 9px; border:1px solid var(--line); border-radius:999px; color:var(--mute); }
+    .badge.on { display:inline-block; }
+    .badge.val { color:var(--gold); border-color:#6a5a3a; }
+    .lane-lab { display:flex; align-items:center; gap:6px; }
+    .stembtns { display:inline-flex; gap:4px; }
+    .stembtns button { padding:1px 8px; font-size:10px; letter-spacing:.04em; border-radius:999px; color:var(--mute); }
+    .stembtns button.on { border-color:var(--riff); color:var(--riff); }
+    .conf { margin-left:8px; text-transform:none; letter-spacing:0; font-size:11px; color:#c4a35a; }
+    .conf.bad { color:var(--break); }
   </style>
 </head>
 <body>
@@ -129,10 +134,13 @@
     <li>Delete — remove selected box · Ctrl+Z undo · ? this panel</li>
   </ul>
   <h4>Guess / Lyrics / Pack</h4>
-  <p><b>Guess</b> — GP markers + Demucs drums + librosa half-time. Optional draft boxes.</p>
+  <p><b>Guess</b> — GP markers + Demucs drums + librosa half-time. Optional draft boxes. The status line also reports how much of the track Guess actually reached.</p>
+  <p><b>Stem picker</b> — under the drums lane, switch between any cached demucs stem: drums / bass / guitar / piano / other / vocals (6-stem). Playhead stays linked to the mix.</p>
+  <p><b>Drum confidence</b> — if the per-section classifier flags snare-undercount on a dense mix, the lane says so; hover for the reason. Treat those boxes as “verify by ear”, not ground truth.</p>
+  <p><b>VAL badge</b> — songs reserved for the whole-song validation split are tagged VAL in the header; everything else is training.</p>
   <p><b>Lyrics</b> — fetch timed lines. Click a line to seek. − / + moves that line 0.2s. all −/+ shifts the whole song. Save lyrics writes work/lyrics.</p>
   <p><b>Push git</b> — commits src + data + lyrics in the god-tier-metal repo and pushes. Needs git remotes already set on your machine.</p>
-  <p><b>Pack</b> — after Save, cut mix/drums/bass/other/vocals/no-vox for every box on this song into work/pack.</p>
+  <p><b>Pack</b> — after Save, cut mix/drums/bass/other/guitar/piano/vocals/no-vox for every box on this song into work/pack (plus a train/val tag).</p>
   <p><b>Drop</b> (sidebar) — type band name, drop zip/FLAC/GP. Copies into the corpus. Does not rename your rips.</p>
 </aside>
 <div class="app">
@@ -158,6 +166,7 @@
           <h2 id="title">…</h2>
           <span id="sub"></span>
         </div>
+        <span class="badge" id="splitbadge"></span>
       </header>
       <div class="transport">
         <button type="button" id="btnPlay">Play</button>
@@ -169,15 +178,15 @@
         <button type="button" id="btnPlayBox">Play box</button>
         <button type="button" id="btnUndo">Undo</button>
         <button type="button" id="btnDump">JSON</button>
-        <button type="button" id="btnNext">Next tab</button>
+        <button type="button" id="btnNext">Next GP</button>
         <button type="button" id="btnGit">Push git</button>
         <button type="button" id="btnHow">How</button>
       </div>
       <div class="pins">
         <button type="button" class="intro" data-role="intro">Intro</button>
         <button type="button" class="build" data-role="build">Build</button>
-        <button type="button" class="riff" data-role="verse">Riff</button>
-        <button type="button" class="hook" data-role="chorus">Hook</button>
+        <button type="button" class="riff" data-role="riff">Riff</button>
+        <button type="button" class="hook" data-role="hook">Hook</button>
         <button type="button" class="break" data-role="breakdown">Breakdown</button>
         <button type="button" class="solo" data-role="solo">Solo</button>
         <button type="button" class="chill" data-role="chill">Chill</button>
@@ -191,7 +200,11 @@
       <div id="wave"></div>
     </div>
     <div class="lane idle" id="drumlane">
-      <div class="lane-lab">drums</div>
+      <div class="lane-lab">
+        <span id="stemlab">stem</span>
+        <span class="stembtns" id="stembtns"></span>
+        <span class="conf" id="drumconf"></span>
+      </div>
       <div id="drums"></div>
     </div>
     <div class="lane idle" id="lyriclane">
@@ -202,9 +215,6 @@
         <button type="button" id="btnLySave">Save lyrics</button>
       </div>
       <div id="lyricbox" class="lyrics"></div>
-    </div>
-    <div class="lane" id="tablane" hidden>
-      <div id="tabwrap"><div class="empty" id="tabmsg"></div></div>
     </div>
     <table>
       <thead><tr><th>region</th><th>start</th><th>end</th><th></th></tr></thead>
@@ -218,12 +228,12 @@
   </div>
 </div>
 <script>
-const ROLES = ["intro","build","verse","chorus","breakdown","solo","chill","pulse","outro"];
+const ROLES = ["intro","build","riff","hook","breakdown","solo","chill","pulse","outro"];
+const ROLE_ALIAS = { verse:"riff", chorus:"hook", interlude:"chill", lead:"solo", inst:"solo", instrumental:"solo" };
+function canonRole(r){ r=String(r||"").toLowerCase().trim(); r=ROLE_ALIAS[r]||r; return ROLES.includes(r)?r:"riff"; }
 const COLOR = {
   riff:"rgba(255,168,16,0.40)",
-  verse:"rgba(255,168,16,0.40)",
   hook:"rgba(64,176,255,0.42)",
-  chorus:"rgba(64,176,255,0.42)",
   breakdown:"rgba(255,64,56,0.40)",
   solo:"rgba(64,220,120,0.38)",
   intro:"rgba(168,140,220,0.40)",
@@ -232,10 +242,10 @@ const COLOR = {
   pulse:"rgba(216,96,255,0.38)",
   outro:"rgba(160,160,168,0.36)"
 };
-const LABEL = { verse:"Riff", chorus:"Hook", breakdown:"Breakdown", solo:"Solo", intro:"Intro", build:"Build", chill:"Chill", pulse:"Pulse", outro:"Outro" };
+const LABEL = { riff:"Riff", hook:"Hook", breakdown:"Breakdown", solo:"Solo", intro:"Intro", build:"Build", chill:"Chill", pulse:"Pulse", outro:"Outro" };
 let tracks=[], trackId=0, regs=[], sel=-1, undo=[], listFilter="all", listQ="";
 let shut={};
-let ws=null, drumsWs=null, regionsPlug=null, lock=false, tabApi=null;
+let ws=null, drumsWs=null, regionsPlug=null, lock=false, curStem="drums";
 let audioCtx=null, analyser=null, vizSrc=null, vizRAF=0;
 
 function fmt(t){ t=Math.max(0,+t||0); return Math.floor(t/60)+":"+String(Math.floor(t%60)).padStart(2,"0"); }
@@ -438,16 +448,30 @@ function makeWave(url){
   });
 }
 
-function loadDrums(id){
+function renderStemButtons(t){
+  const box=document.getElementById("stembtns");
+  if(!box) return;
+  box.innerHTML="";
+  (t&&t.stems||[]).forEach(n=>{
+    const b=document.createElement("button");
+    b.type="button"; b.textContent=n; b.className=(n===curStem?"on":"");
+    b.onclick=()=>{ curStem=n; renderStemButtons(t); loadStem(t.id,n); };
+    box.appendChild(b);
+  });
+}
+function loadStem(id,name){
   if(drumsWs){ try{ drumsWs.destroy(); }catch(e){} drumsWs=null; }
   const lane=document.getElementById("drumlane");
+  const lab=document.getElementById("stemlab");
+  if(lab) lab.textContent=name||"stem";
   if(lane) lane.classList.add("idle");
-  fetch("/api/drums/"+id).then(r=>{
+  const url="/api/stem/"+id+"/"+encodeURIComponent(name);
+  fetch(url).then(r=>{
     if(!r.ok) return;
     if(lane) lane.classList.remove("idle");
     drumsWs=WaveSurfer.create({
       container:"#drums",
-      url:"/api/drums/"+id,
+      url:url,
       height:96,
       waveColor:"#5a4a4a",
       progressColor:"#c45c4a",
@@ -460,6 +484,23 @@ function loadDrums(id){
     });
     drumsWs.on("interaction", t=>{ if(ws) ws.setTime(t); });
   }).catch(()=>{});
+}
+function loadAnalysis(id){
+  const el=document.getElementById("drumconf");
+  if(!el) return;
+  el.textContent=""; el.className="conf"; el.title="";
+  fetch("/api/analysis/"+id).then(r=>r.json()).then(x=>{
+    const secs=x.sections||[];
+    if(!secs.length){ el.textContent=""; return; }
+    const bad=secs.filter(s=>s.low_confidence);
+    if(bad.length){
+      el.textContent="⚠ "+bad.length+"/"+secs.length+" drum sections low-confidence (snare undercount) — verify by ear";
+      el.className="conf bad";
+      el.title=bad.map(s=>s.role+": "+(s.confidence_reason||"")).join("\n");
+    } else {
+      el.textContent=secs.length+" drum sections classified";
+    }
+  }).catch(()=>{ el.textContent=""; });
 }
 
 function paintLyrics(){
@@ -500,44 +541,6 @@ function loadLyrics(id){
     paintLyrics();
   }).catch(()=>{ box.textContent="lyrics failed"; });
 }
-function loadTab(id){
-  return;
-  const box=document.getElementById("tabwrap");
-  box.innerHTML="";
-  const msg=document.createElement("div");
-  msg.className="empty";
-  msg.id="tabmsg";
-  box.appendChild(msg);
-  if(!window.alphaTab){ msg.textContent="AlphaTab failed to load (need internet)"; return; }
-  msg.textContent="rendering tab…";
-  fetch("/api/tab/"+id).then(r=>{
-    if(!r.ok){ msg.textContent="no tab file for AlphaTab"; return; }
-    box.innerHTML="";
-    const host=document.createElement("div");
-    box.appendChild(host);
-    try{
-      if(tabApi && tabApi.destroy) tabApi.destroy();
-    }catch(e){}
-    tabApi=new alphaTab.AlphaTabApi(host, {
-      file: "/api/tab/"+id,
-      core: { fontDirectory: "https://cdn.jsdelivr.net/npm/@coderline/alphatab@1.3.1/dist/font/" },
-      display: {
-        scale: 0.9,
-        resources: {
-          staffLineColor: "#3a342c",
-          barSeparatorColor: "#3a342c",
-          barNumberColor: "#5a5248",
-          mainGlyphColor: "#1a1612",
-          secondaryGlyphColor: "#3a342c",
-          scoreInfoColor: "#1a1612"
-        }
-      },
-      player: { enablePlayer: false }
-    });
-    tabApi.error.on(e=>{ msg.textContent="tab: "+(e&&e.message?e.message:e); });
-  }).catch(()=>{ msg.textContent="no tab file"; });
-}
-
 function toggle(){ window._playUntil=null; if(!ws) return; ws.playPause(); }
 
 hookViz();
@@ -620,14 +623,24 @@ function select(i){
   const art=document.getElementById("art");
   if(t.has_cover){ art.src="/api/cover/"+t.id; art.classList.add("on"); }
   else { art.removeAttribute("src"); art.classList.remove("on"); }
+  const badge=document.getElementById("splitbadge");
+  if(badge){
+    const split=(t.split||"train").toLowerCase();
+    badge.textContent=split.toUpperCase();
+    badge.className="badge on"+(split==="val"?" val":"");
+    badge.title=(split==="val"?"whole-song validation (holdout)":"training")+" split";
+  }
   renderList(); showErr(""); regs=[]; sel=-1; window._lyricLines=null; vizHist=[];
+  const stems=t.stems||[];
+  curStem = stems.includes("drums") ? "drums" : (stems[0]||"drums");
+  renderStemButtons(t);
   makeWave("/api/audio/"+t.id+"?v="+encodeURIComponent(t.album+"/"+t.track));
-  loadDrums(t.id);
-  loadTab(t.id);
+  loadStem(t.id, curStem);
+  loadAnalysis(t.id);
   loadLyrics(t.id);
   fetch("/api/sections/"+t.id).then(r=>r.json()).then(secs=>{
     const use=secs.filter(s=>s.source==="human").length?secs.filter(s=>s.source==="human"):secs;
-    regs=use.map(s=>({role:s.role,start:+s.start,end:+s.end}));
+    regs=use.map(s=>({role:canonRole(s.role),start:+s.start,end:+s.end}));
     table();
     if(ws) paintRegions();
   });
@@ -694,7 +707,7 @@ function estimate(){
     let x; try{ x=JSON.parse(txt); }catch(e){ throw txt.slice(0,200); }
     if(!r.ok) throw (typeof x.detail==="string"?x.detail:JSON.stringify(x.detail||x)).slice(0,240);
     snap();
-    const draft=(x.sections||[]).map(s=>({role:s.role||"verse",start:+s.start,end:+s.end}));
+    const draft=(x.sections||[]).map(s=>({role:canonRole(s.role),start:+s.start,end:+s.end}));
     if(merge){
       draft.forEach(d=>{
         const hit=regs.some(p=>p.role===d.role && Math.min(p.end,d.end)-Math.max(p.start,d.start) > 0.7*Math.min(p.end-p.start,d.end-d.start));
@@ -703,7 +716,7 @@ function estimate(){
     } else regs=draft;
     sel=regs.length?0:-1;
     table(); paintRegions();
-    loadDrums(tracks[trackId].id);
+    loadStem(tracks[trackId].id, curStem);
     document.getElementById("sub").textContent=(x.sections||[]).length+" guessed";
     showErr((x.notes||[]).join(" · "));
   }).catch(e=>showErr("guess: "+e, true)).finally(()=>{ document.getElementById("btnEst").disabled=false; });
@@ -809,8 +822,8 @@ document.getElementById("btnNext").onclick=nextGreen;
 document.body.addEventListener("keydown",e=>{
   if(e.target.tagName==="INPUT"||e.target.tagName==="SELECT") return;
   if(e.code==="Space"){ e.preventDefault(); toggle(); }
-  if(e.key==="1") add("verse");
-  if(e.key==="2") add("chorus");
+  if(e.key==="1") add("riff");
+  if(e.key==="2") add("hook");
   if(e.key==="3") add("breakdown");
   if(e.key==="4") add("solo");
   if(e.key==="s"||e.key==="S") save();

@@ -9,17 +9,43 @@ from fastapi.staticfiles import StaticFiles
 
 from .catalogue import load_map, resolve
 
+# Real canonical role vocabulary, per tools/boo-lab/CURRENT.md's "## Roles"
+# section and the pipeline's own `extract._BOO_LAB_TO_ENGINE_ROLE`. The UI
+# used to write legacy `verse`/`chorus`, which the human-section loader now
+# silently drops -- so everything is canonicalized through `canonical_role`.
 ROLES = [
     "intro",
     "build",
-    "verse",
-    "chorus",
+    "riff",
+    "hook",
     "breakdown",
     "solo",
-    "interlude",
     "chill",
+    "pulse",
     "outro",
 ]
+
+# Legacy/aliased labels -> the canonical vocabulary above.
+_ROLE_ALIASES = {
+    "verse": "riff",
+    "chorus": "hook",
+    "interlude": "chill",
+    "lead": "solo",
+    "inst": "solo",
+    "instrumental": "solo",
+}
+
+# Real demucs stems boo-lab can cache and the annotator can serve.
+STEM_NAMES = ("drums", "bass", "guitar", "piano", "other", "vocals")
+
+
+def canonical_role(role: str | None) -> str:
+    """Map any stored/legacy role onto the canonical vocabulary; an unknown
+    or empty role falls back to `riff` (the old default was `verse`, which
+    is now an alias of `riff` anyway)."""
+    text = (role or "").strip().lower()
+    text = _ROLE_ALIASES.get(text, text)
+    return text if text in ROLES else "riff"
 
 
 def create_app(lab_root: Path, flac_root: Path | None, gp_root: Path | None) -> FastAPI:
@@ -35,24 +61,29 @@ def create_app(lab_root: Path, flac_root: Path | None, gp_root: Path | None) -> 
         s = re.sub(r"^\d+\s*[-_.]\s*", "", s)
         return re.sub(r"[^a-z0-9]+", "", s)
 
-    _gp5_cache: dict = {"t": 0.0, "idx": {}}
+    _gp5_cache: dict = {"t": None, "idx": {}}
 
     def _gp5_index() -> dict[str, Path]:
-        root = Path(r"C:\Users\RIGGUSPIG\Desktop\god-tier-metal\reference\gp-tabs\gp5")
-        if not root.exists():
+        # Real GP root (BOO_GP_ROOT) -- no hardcoded absolute path. `.gp5`
+        # (and modern `.gp`) files are indexed by normalized stem so the
+        # sidebar can show a green match even when map.csv has no gp_path.
+        roots = [gp_root] if gp_root and gp_root.exists() else []
+        if not roots:
             return {}
         try:
-            stamp = root.stat().st_mtime
+            stamp = tuple(p.stat().st_mtime for p in roots)
         except Exception:
-            stamp = 0.0
+            stamp = None
         if _gp5_cache["idx"] and _gp5_cache["t"] == stamp:
             return _gp5_cache["idx"]
         idx: dict[str, Path] = {}
-        try:
-            for p in root.rglob("*.gp5"):
-                idx[_norm_name(p.stem)] = p
-        except Exception:
-            return _gp5_cache["idx"] or idx
+        for root in roots:
+            try:
+                for pattern in ("*.gp5", "*.gp4", "*.gp3", "*.gp"):
+                    for p in root.rglob(pattern):
+                        idx.setdefault(_norm_name(p.stem), p)
+            except Exception:
+                continue
         _gp5_cache["t"] = stamp
         _gp5_cache["idx"] = idx
         return idx
@@ -88,6 +119,11 @@ def create_app(lab_root: Path, flac_root: Path | None, gp_root: Path | None) -> 
             rows = [resolve(r, flac_root, gp_root) for r in load_map(map_path)]
         except Exception:
             return []
+        from .holdout import ensure_holdout, split_for
+        from .stems import find_stem
+
+        holdout = ensure_holdout(lab_root, rows)
+        stem_cache = lab_root / "work" / "stems"
         idx = _gp5_index()
         out = []
         for i, r in enumerate(rows):
@@ -129,6 +165,12 @@ def create_app(lab_root: Path, flac_root: Path | None, gp_root: Path | None) -> 
                             break
                 except Exception:
                     pass
+            stems = []
+            if flac_ok and fp:
+                try:
+                    stems = [n for n in STEM_NAMES if find_stem(Path(fp), stem_cache, n)]
+                except Exception:
+                    stems = []
             out.append(
                 {
                     "id": i,
@@ -141,6 +183,8 @@ def create_app(lab_root: Path, flac_root: Path | None, gp_root: Path | None) -> 
                     "gp_name": gp5.name if gp5 else "",
                     "gp_kind": (gp5.suffix.lower().lstrip(".") if gp5 else ""),
                     "has_cover": bool(_cover_near(fp)),
+                    "split": split_for(r.get("album"), r.get("track"), holdout),
+                    "stems": stems,
                 }
             )
         out.sort(key=lambda t: ((t.get("album") or ""), t.get("track") or ""))
@@ -186,7 +230,7 @@ def create_app(lab_root: Path, flac_root: Path | None, gp_root: Path | None) -> 
         row = _resolved(track_id)
         if not row:
             raise HTTPException(404)
-        path = row.get("flac_path")
+        path = row.get("flac_path") or row.get("flac")
         if not path or not Path(path).exists():
             raise HTTPException(404, "flac missing — set BOO_FLAC_ROOT and map.csv")
         return FileResponse(path, media_type="audio/flac")
@@ -212,7 +256,7 @@ def create_app(lab_root: Path, flac_root: Path | None, gp_root: Path | None) -> 
         row = _resolved(track_id)
         if not row:
             raise HTTPException(404)
-        flac = row.get("flac_path")
+        flac = row.get("flac_path") or row.get("flac")
         if not flac:
             raise HTTPException(404)
         from .stems import find_drums
@@ -221,6 +265,44 @@ def create_app(lab_root: Path, flac_root: Path | None, gp_root: Path | None) -> 
         if not p:
             raise HTTPException(404, "no drums stem yet — press Guess")
         return FileResponse(p, media_type="audio/wav")
+
+    @app.get("/api/stem/{track_id}/{name}")
+    def api_stem(track_id: int, name: str):
+        """Serve any real cached demucs stem (drums/bass/guitar/piano/
+        other/vocals) for the 6-stem lane picker."""
+        if name not in STEM_NAMES:
+            raise HTTPException(404, "unknown stem")
+        row = _resolved(track_id)
+        if not row:
+            raise HTTPException(404)
+        flac = row.get("flac_path") or row.get("flac")
+        if not flac:
+            raise HTTPException(404)
+        from .stems import find_stem
+
+        p = find_stem(Path(flac), lab_root / "work" / "stems", name)
+        if not p:
+            raise HTTPException(404, "no %s stem cached" % name)
+        return FileResponse(p, media_type="audio/wav")
+
+    @app.get("/api/analysis/{track_id}")
+    def api_analysis(track_id: int):
+        """Real per-section drum classification rows (from
+        data/drum_patterns.jsonl) for the selected song -- used to surface
+        the measured `low_confidence` flag in the UI."""
+        meta = _meta(track_id)
+        if not meta:
+            return {"sections": []}
+        path = lab_root / "data" / "drum_patterns.jsonl"
+        found = []
+        if path.exists():
+            for line in path.read_text(encoding="utf-8").splitlines():
+                if not line.strip():
+                    continue
+                rec = json.loads(line)
+                if rec.get("album") == meta["album"] and rec.get("track") == meta["track"]:
+                    found.append(rec)
+        return {"sections": found}
 
     @app.get("/api/estimate/{track_id}")
     def api_estimate(track_id: int):
@@ -259,7 +341,7 @@ def create_app(lab_root: Path, flac_root: Path | None, gp_root: Path | None) -> 
                     continue
                 rec = json.loads(line)
                 if rec.get("album") == meta["album"] and rec.get("track") == meta["track"]:
-                    found.append(rec)
+                    found.append({**rec, "role": canonical_role(rec.get("role"))})
         return found
 
     @app.post("/api/sections/{track_id}")
@@ -298,7 +380,7 @@ def create_app(lab_root: Path, flac_root: Path | None, gp_root: Path | None) -> 
                     "track": meta["track"],
                     "start": start,
                     "end": end,
-                    "role": s.get("role") or "verse",
+                    "role": canonical_role(s.get("role")),
                     "source": "human",
                 }
             )
@@ -339,12 +421,12 @@ def create_app(lab_root: Path, flac_root: Path | None, gp_root: Path | None) -> 
 
     @app.get("/api/lyrics/{track_id}")
     def api_lyrics(track_id: int):
-        rows = [resolve(r, flac_root, gp_root) for r in load_map(map_path)]
-        if track_id < 0 or track_id >= len(rows):
+        row = _resolved(track_id)
+        if not row:
             return {"lines": [], "note": "bad id"}
         from .lyrics import load_lyrics
 
-        track = rows[track_id].get("track") or ""
+        track = row.get("track") or ""
         cached = load_lyrics(lab_root, track)
         if cached.get("lines"):
             return cached
@@ -352,24 +434,24 @@ def create_app(lab_root: Path, flac_root: Path | None, gp_root: Path | None) -> 
 
     @app.post("/api/lyrics/{track_id}")
     def api_lyrics_refresh(track_id: int):
-        rows = [resolve(r, flac_root, gp_root) for r in load_map(map_path)]
-        if track_id < 0 or track_id >= len(rows):
+        row = _resolved(track_id)
+        if not row:
             return {"lines": [], "note": "bad id"}
         from .lyrics import build_lyrics
         from .stems import find_stem
 
-        flac = rows[track_id].get("flac_path")
+        flac = row.get("flac_path")
         voc = find_stem(Path(flac), lab_root / "work" / "stems", "vocals") if flac else None
-        return build_lyrics(lab_root, rows[track_id].get("track") or "", Path(flac) if flac else None, voc)
+        return build_lyrics(lab_root, row.get("track") or "", Path(flac) if flac else None, voc)
 
     @app.post("/api/pack/{track_id}")
     def api_pack(track_id: int):
-        rows = [resolve(r, flac_root, gp_root) for r in load_map(map_path)]
-        if track_id < 0 or track_id >= len(rows):
+        row = _resolved(track_id)
+        if not row:
             return JSONResponse({"detail": "bad id"}, status_code=400)
         from .pack import build_pack
 
-        return build_pack(lab_root, [rows[track_id]], lab_root / "work" / "stems")
+        return build_pack(lab_root, [row], lab_root / "work" / "stems")
 
     @app.put("/api/lyrics/{track_id}")
     def api_lyrics_save(track_id: int, body: dict):

@@ -21,6 +21,27 @@ def _drafts(lab):
     return [json.loads(l) for l in path.read_text(encoding="utf-8").splitlines() if l.strip()]
 
 
+def test_zero_row_run_does_not_blank_existing_drafts(tmp_path, monkeypatch):
+    lab, flac = _lab(tmp_path)
+    draft = lab / "data" / "drafts.jsonl"
+    draft.write_text(
+        json.dumps({"album": "Other", "track": "X", "role": "riff", "source": "msa-draft"}) + "\n",
+        encoding="utf-8",
+    )
+    before = draft.read_text(encoding="utf-8")
+
+    def _boom(p, cache_dir=None):
+        raise RuntimeError("allin1 failed")
+
+    monkeypatch.setattr(structure, "run_allin1", _boom)
+    monkeypatch.setattr(structure, "songformer_available", lambda: False)
+
+    report = structure.build_drafts(lab, [{"album": "A", "track": "T", "flac_path": str(flac)}])
+
+    assert report["written"] == 0
+    assert draft.read_text(encoding="utf-8") == before  # existing drafts preserved
+
+
 def test_writes_msa_and_songformer_sources(tmp_path, monkeypatch):
     lab, flac = _lab(tmp_path)
     monkeypatch.setattr(structure, "run_allin1", lambda p, **k: {

@@ -2,8 +2,6 @@ from __future__ import annotations
 
 import json
 import math
-import os
-import tempfile
 from pathlib import Path
 
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
@@ -18,6 +16,7 @@ from .schema import (
     canonical_role,
     same_role_overlaps,
     stamp_box,
+    write_jsonl_atomic,
 )
 
 # Lab role vocabulary + pin schema live in schema.py (single source of truth).
@@ -31,30 +30,9 @@ _PROMOTABLE_SOURCES = SOURCES - KEEPER_SOURCES
 # Real demucs stems boo-lab can cache and the annotator can serve.
 STEM_NAMES = ("drums", "bass", "guitar", "piano", "other", "vocals")
 
-
-def _atomic_write_jsonl(path: Path, rows: list[dict]) -> None:
-    """Write `rows` to `path` atomically: a temp file in the same directory,
-    flush + fsync, then `os.replace` (atomic on Windows and POSIX). A crash,
-    full disk, or power loss mid-write leaves the original file intact --
-    `sections.jsonl` is the one artifact here that cannot be regenerated."""
-    path = Path(path)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    fd, tmp_name = tempfile.mkstemp(
-        prefix=path.name + ".", suffix=".tmp", dir=str(path.parent)
-    )
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8") as f:
-            for rec in rows:
-                f.write(json.dumps(rec) + "\n")
-            f.flush()
-            os.fsync(f.fileno())
-        os.replace(tmp_name, path)
-    except BaseException:
-        try:
-            os.unlink(tmp_name)
-        except OSError:
-            pass
-        raise
+# One atomic writer for every JSONL store (schema.write_jsonl_atomic). Kept
+# under the local name so callers/tests patch a single symbol.
+_atomic_write_jsonl = write_jsonl_atomic
 
 
 def _within(path: Path, root: Path | None) -> bool:

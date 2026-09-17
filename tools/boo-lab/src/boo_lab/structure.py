@@ -138,7 +138,7 @@ def build_drafts(lab_root: Path, rows: list[dict]) -> dict:
     """Write MSA (allin1) and, when available, SongFormer machine drafts to
     `data/drafts.jsonl`. NEVER writes `sections.jsonl`. Drafts for tracks not
     in `rows` (e.g. another album) are preserved."""
-    from .schema import canonical_role, stamp_box
+    from .schema import canonical_role, stamp_box, write_jsonl_atomic
 
     lab_root = Path(lab_root)
     out_dir = lab_root / "work" / "msa"
@@ -158,60 +158,60 @@ def build_drafts(lab_root: Path, rows: list[dict]) -> dict:
             keep.append(rec)
 
     use_songformer = songformer_available()
-    written = 0
-    with draft_path.open("w", encoding="utf-8") as f:
-        for rec in keep:
-            f.write(json.dumps(rec) + "\n")
-        for r in rows:
-            fp = r.get("flac_path")
-            if not fp or not Path(fp).exists():
-                print("SKIP structure", r.get("track"), "no flac")
-                continue
+    new_recs: list[dict] = []
+    for r in rows:
+        fp = r.get("flac_path")
+        if not fp or not Path(fp).exists():
+            print("SKIP structure", r.get("track"), "no flac")
+            continue
 
+        try:
+            payload = run_allin1(Path(fp), cache_dir=lab_root / "work" / "allin1")
+        except Exception as exc:
+            print("SKIP structure", r.get("track"), exc)
+            payload = None
+        if payload is not None:
+            (out_dir / f"{r.get('track')}.json").write_text(
+                json.dumps(payload, indent=2, default=str), encoding="utf-8")
+            for seg in segments_from_allin1(payload):
+                role = canonical_role(seg.get("role") or seg.get("label"))
+                if role is None:
+                    continue  # unmapped label: never fabricate a role
+                new_recs.append(stamp_box(
+                    seg["start"], seg["end"], role,
+                    source="msa-draft",
+                    extra={"album": r.get("album"), "track": r.get("track"),
+                           "msa_label": seg.get("label") or ""},
+                ))
+            print("DRAFT", r.get("track"), payload.get("bpm"), "-> data/drafts.jsonl")
+
+        if use_songformer:
             try:
-                payload = run_allin1(Path(fp), cache_dir=lab_root / "work" / "allin1")
+                sres = run_songformer(Path(fp))
             except Exception as exc:
-                print("SKIP structure", r.get("track"), exc)
-                payload = None
-            if payload is not None:
-                (out_dir / f"{r.get('track')}.json").write_text(
-                    json.dumps(payload, indent=2, default=str), encoding="utf-8")
-                for seg in segments_from_allin1(payload):
+                print("SKIP songformer", r.get("track"), exc)
+                sres = None
+            if sres is not None:
+                (out_dir / f"{r.get('track')}.songformer.json").write_text(
+                    json.dumps(sres, indent=2, default=str), encoding="utf-8")
+                for seg in segments_from_songformer(sres):
                     role = canonical_role(seg.get("role") or seg.get("label"))
                     if role is None:
                         continue  # unmapped label: never fabricate a role
-                    rec = stamp_box(
+                    new_recs.append(stamp_box(
                         seg["start"], seg["end"], role,
-                        source="msa-draft",
+                        source="songformer-draft",
                         extra={"album": r.get("album"), "track": r.get("track"),
-                               "msa_label": seg.get("label") or ""},
-                    )
-                    f.write(json.dumps(rec) + "\n")
-                    written += 1
-                print("DRAFT", r.get("track"), payload.get("bpm"), "-> data/drafts.jsonl")
+                               "msa_label": seg.get("label") or "",
+                               "source_model": "songformer"},
+                    ))
+                print("SONGFORMER", r.get("track"), "-> data/drafts.jsonl")
 
-            if use_songformer:
-                try:
-                    sres = run_songformer(Path(fp))
-                except Exception as exc:
-                    print("SKIP songformer", r.get("track"), exc)
-                    sres = None
-                if sres is not None:
-                    (out_dir / f"{r.get('track')}.songformer.json").write_text(
-                        json.dumps(sres, indent=2, default=str), encoding="utf-8")
-                    for seg in segments_from_songformer(sres):
-                        role = canonical_role(seg.get("role") or seg.get("label"))
-                        if role is None:
-                            continue  # unmapped label: never fabricate a role
-                        rec = stamp_box(
-                            seg["start"], seg["end"], role,
-                            source="songformer-draft",
-                            extra={"album": r.get("album"), "track": r.get("track"),
-                                   "msa_label": seg.get("label") or "",
-                                   "source_model": "songformer"},
-                        )
-                        f.write(json.dumps(rec) + "\n")
-                        written += 1
-                    print("SONGFORMER", r.get("track"), "-> data/drafts.jsonl")
-
-    return {"written": written, "out": str(draft_path), "songformer": use_songformer}
+    # Non-destructive on a zero-row run (same discipline as `beats`): a failed
+    # or no-op structure pass must never blank a good `data/drafts.jsonl`.
+    # Atomic replace only when something was actually produced.
+    if new_recs:
+        write_jsonl_atomic(draft_path, keep + new_recs)
+    else:
+        print("structure: 0 drafts written; leaving existing", draft_path.name, "untouched")
+    return {"written": len(new_recs), "out": str(draft_path), "songformer": use_songformer}

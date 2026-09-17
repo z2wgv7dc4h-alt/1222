@@ -108,6 +108,12 @@ _MARKER_ROLE_KEYWORDS: list[tuple[str, str]] = [
     ("breakdown", "breakdown"),
     ("solo", "solo"),
     ("outro", "outro"),
+    # Forward-looking: no marker in the current corpus matches these, so this
+    # changes zero counts today. Added so the first tab actually labelled
+    # Chill/Clean/Ambient resolves to `chill` instead of silently role=None.
+    ("chill", "chill"),
+    ("clean", "chill"),
+    ("ambient", "chill"),
 ]
 
 # Real junk-marker filter: a marker whose own text is clearly not a

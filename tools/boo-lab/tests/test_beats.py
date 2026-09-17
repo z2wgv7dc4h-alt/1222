@@ -58,6 +58,43 @@ def test_skips_when_no_tracker(tmp_path, monkeypatch):
     assert report["written"] == 0 and report["skipped"] == 1
 
 
+def _existing(tmp_path):
+    lab, flac = _lab(tmp_path)
+    out = lab / "data" / "beats.jsonl"
+    out.write_text(
+        '{"album":"A","track":"T","beats":[1.0],"downbeats":[],"source":"beat_this"}\n',
+        encoding="utf-8",
+    )
+    return lab, flac, out, out.read_text(encoding="utf-8")
+
+
+def test_zero_rows_does_not_blank_existing_file(tmp_path):
+    lab, flac, out, before = _existing(tmp_path)
+    report = beats.build_beats(lab, [])
+    assert report["written"] == 0
+    assert out.read_text(encoding="utf-8") == before
+
+
+def test_all_skipped_does_not_blank_existing_file(tmp_path, monkeypatch):
+    lab, flac, out, before = _existing(tmp_path)
+    monkeypatch.setattr(beats, "_beat_this", _raise_ie)
+    monkeypatch.setattr(beats, "_allin1", _raise_ie)
+
+    report = beats.build_beats(lab, [{"album": "A", "track": "T", "flac_path": str(flac)}])
+
+    assert report["written"] == 0 and report["skipped"] == 1
+    assert out.read_text(encoding="utf-8") == before
+
+
+def test_album_mismatch_does_not_blank_existing_file(tmp_path):
+    lab, flac, out, before = _existing(tmp_path)
+    report = beats.build_beats(
+        lab, [{"album": "A", "track": "T", "flac_path": str(flac)}], album="Nonexistent"
+    )
+    assert report["written"] == 0
+    assert out.read_text(encoding="utf-8") == before
+
+
 def test_album_filter_and_missing_flac(tmp_path, monkeypatch):
     lab, flac = _lab(tmp_path)
     monkeypatch.setattr(beats, "_beat_this", lambda p: ([1.0], [0.0], "beat_this"))

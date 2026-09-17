@@ -53,28 +53,36 @@ def build_beats(lab_root: Path, rows: list[dict], album: str | None = None) -> d
     lab_root = Path(lab_root)
     out = lab_root / "data" / "beats.jsonl"
     out.parent.mkdir(parents=True, exist_ok=True)
-    written = 0
+    records: list[dict] = []
     skipped = 0
-    with out.open("w", encoding="utf-8") as f:
-        for r in rows:
-            if album and (r.get("album") or "") != album:
-                continue
-            fp = r.get("flac_path") or r.get("flac")
-            flac = Path(fp) if fp else None
-            if not flac or not flac.exists():
-                skipped += 1
-                print("SKIP beats", r.get("track"), "no flac")
-                continue
-            beats, downbeats, source = track_beats(
-                flac, cache_dir=lab_root / "work" / "allin1"
-            )
-            if source == "none":
-                skipped += 1
-                print("SKIP beats", r.get("track"), "no beat tracker installed")
-                continue
-            rec = {"album": r.get("album"), "track": r.get("track"),
-                   "beats": beats, "downbeats": downbeats, "source": source}
-            f.write(json.dumps(rec) + "\n")
-            written += 1
-            print("BEATS", r.get("track"), source, len(beats))
-    return {"written": written, "skipped": skipped, "out": str(out)}
+    for r in rows:
+        if album and (r.get("album") or "") != album:
+            continue
+        fp = r.get("flac_path") or r.get("flac")
+        flac = Path(fp) if fp else None
+        if not flac or not flac.exists():
+            skipped += 1
+            print("SKIP beats", r.get("track"), "no flac")
+            continue
+        beats, downbeats, source = track_beats(
+            flac, cache_dir=lab_root / "work" / "allin1"
+        )
+        if source == "none":
+            skipped += 1
+            print("SKIP beats", r.get("track"), "no beat tracker installed")
+            continue
+        records.append({"album": r.get("album"), "track": r.get("track"),
+                        "beats": beats, "downbeats": downbeats, "source": source})
+        print("BEATS", r.get("track"), source, len(beats))
+    # Non-destructive on a zero-row run: a `--album` that matches nothing, or
+    # a batch where every track is skipped, must not blank a good
+    # `data/beats.jsonl`. Write via a temp file and replace only on success.
+    if records:
+        tmp = out.with_name(out.name + ".tmp")
+        with tmp.open("w", encoding="utf-8") as f:
+            for rec in records:
+                f.write(json.dumps(rec) + "\n")
+        tmp.replace(out)
+    else:
+        print("beats: 0 rows written; leaving existing", out.name, "untouched")
+    return {"written": len(records), "skipped": skipped, "out": str(out)}

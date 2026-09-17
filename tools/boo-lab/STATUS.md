@@ -19,7 +19,7 @@ Canonical detail: **CURRENT.md**.
 - RAR not ingested. Unzip first.
 - `BOO_FLAC_ROOT=...\born_of_osiris` nests new bands inside BoO. Use `audio-corpus`.
 - Disk folder names for some BoO rips are wrong — see `data/CATALOG.md`.
-- AlphaTab is not the point; tabs are not read. GP is for notes at Pack time and Guess markers.
+- AlphaTab is not the point; tabs are not a product surface. GP is for notes at Pack time and Guess markers.
 
 ## Roles (how to mark)
 

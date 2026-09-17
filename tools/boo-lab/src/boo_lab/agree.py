@@ -66,10 +66,9 @@ def snapshot(lab_root: Path, album: str, track: str, boxes: list[dict] | None = 
         if not ((r.get("album") or "") == album and (r.get("track") or "") == track
                 and r.get("pass") == this_pass)
     ]
-    with path.open("w", encoding="utf-8") as f:
-        for r in kept:
-            f.write(json.dumps(r) + "\n")
-        f.write(json.dumps(rec) + "\n")
+    from .schema import write_jsonl_atomic
+
+    write_jsonl_atomic(path, kept + [rec])
     return rec
 
 

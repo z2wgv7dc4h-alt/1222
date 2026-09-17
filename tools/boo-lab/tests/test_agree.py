@@ -5,6 +5,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from boo_lab import agree
 
 
@@ -34,6 +36,27 @@ def test_snapshot_pass1_then_pass2(tmp_path):
     second = agree.snapshot(lab, "A", "T")
     assert second["pass"] == 2 and len(second["boxes"]) == 2
     assert sorted(p["pass"] for p in agree.load_passes(lab, "A", "T")) == [1, 2]
+
+
+def test_snapshot_write_failure_leaves_prior_agree_file(tmp_path, monkeypatch):
+    from boo_lab import schema
+
+    lab = _lab(tmp_path, [_box(0, 4, "riff")])
+    path = lab / "data" / "agree.jsonl"
+    path.write_text(
+        json.dumps({"album": "B", "track": "Other", "pass": 1, "boxes": []}) + "\n",
+        encoding="utf-8",
+    )
+    before = path.read_text(encoding="utf-8")
+
+    def _boom(*a, **k):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(schema, "write_jsonl_atomic", _boom)
+    with pytest.raises(OSError):
+        agree.snapshot(lab, "A", "T")
+
+    assert path.read_text(encoding="utf-8") == before  # atomic write failed safely
 
 
 def test_snapshot_never_invents_third_pass(tmp_path):

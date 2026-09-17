@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import sys
 from pathlib import Path
 
@@ -128,54 +127,57 @@ def build_drum_patterns(lab_root: Path, rows: list[dict], cache: Path) -> dict:
     no_stem = 0
     low_confidence = 0
     analyzed: dict[str, list[dict]] = {}
+    out_rows: list[dict] = []
 
-    with out_path.open("w", encoding="utf-8") as f:
-        for (album, track), segs in sorted(by_song.items()):
-            r = row_by.get((album, track))
-            if not r:
-                hits = [row for (a, t), row in row_by.items() if t == track]
-                r = hits[0] if len(hits) == 1 else None
-            flac = None
-            if r:
-                fp = r.get("flac_path") or r.get("flac") or ""
-                flac = Path(fp) if fp else None
-            drums = find_drums(flac, cache) if flac else None
+    for (album, track), segs in sorted(by_song.items()):
+        r = row_by.get((album, track))
+        if not r:
+            hits = [row for (a, t), row in row_by.items() if t == track]
+            r = hits[0] if len(hits) == 1 else None
+        flac = None
+        if r:
+            fp = r.get("flac_path") or r.get("flac") or ""
+            flac = Path(fp) if fp else None
+        drums = find_drums(flac, cache) if flac else None
+        if not drums:
+            print("SKIP drums", track, "no cached drum stem")
+        elif str(drums) not in analyzed:
+            analyzed[str(drums)] = classify_drums(drums)
+
+        all_onsets = analyzed.get(str(drums), []) if drums else []
+        for seg in segs:
+            start, end = float(seg["start"]), float(seg["end"])
+            onsets = [o for o in all_onsets if start <= o["time"] < end]
+            confidence = _drum_confidence(onsets)
+            rec = {
+                "album": album,
+                "track": track,
+                "role": seg.get("role"),
+                "start": start,
+                "end": end,
+                "split": split_for(album, track, holdout),
+                **confidence,
+                "onsets": onsets,
+            }
+            out_rows.append(rec)
+            n_sections += 1
             if not drums:
-                print("SKIP drums", track, "no cached drum stem")
-            elif str(drums) not in analyzed:
-                analyzed[str(drums)] = classify_drums(drums)
+                no_stem += 1
+                empty += 1
+            elif onsets:
+                with_onsets += 1
+            else:
+                empty += 1
+            if confidence["low_confidence"]:
+                low_confidence += 1
+            print(
+                "DRUMS", track, seg.get("role"), len(onsets),
+                "LOW-CONF" if confidence["low_confidence"] else "",
+            )
 
-            all_onsets = analyzed.get(str(drums), []) if drums else []
-            for seg in segs:
-                start, end = float(seg["start"]), float(seg["end"])
-                onsets = [o for o in all_onsets if start <= o["time"] < end]
-                confidence = _drum_confidence(onsets)
-                rec = {
-                    "album": album,
-                    "track": track,
-                    "role": seg.get("role"),
-                    "start": start,
-                    "end": end,
-                    "split": split_for(album, track, holdout),
-                    **confidence,
-                    "onsets": onsets,
-                }
-                f.write(json.dumps(rec) + "\n")
-                n_sections += 1
-                if not drums:
-                    no_stem += 1
-                    empty += 1
-                elif onsets:
-                    with_onsets += 1
-                else:
-                    empty += 1
-                if confidence["low_confidence"]:
-                    low_confidence += 1
-                print(
-                    "DRUMS", track, seg.get("role"), len(onsets),
-                    "LOW-CONF" if confidence["low_confidence"] else "",
-                )
+    from .schema import write_jsonl_atomic
 
+    write_jsonl_atomic(out_path, out_rows)
     return {
         "sections": n_sections,
         "with_onsets": with_onsets,

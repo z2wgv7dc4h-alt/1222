@@ -332,10 +332,9 @@ def _write_sync(lab_root: Path, rec: dict) -> None:
         r for r in _read_jsonl(path)
         if not ((r.get("album") or "") == rec["album"] and (r.get("track") or "") == rec["track"])
     ]
-    with path.open("w", encoding="utf-8") as f:
-        for r in kept:
-            f.write(json.dumps(r, ensure_ascii=False) + "\n")
-        f.write(json.dumps(rec, ensure_ascii=False) + "\n")
+    from .schema import write_jsonl_atomic
+
+    write_jsonl_atomic(path, kept + [rec], ensure_ascii=False)
 
 
 def _evaluate_source(src: Path, gp: Path, onsets: list[float]) -> dict:

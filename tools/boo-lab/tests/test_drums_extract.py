@@ -5,7 +5,28 @@ from __future__ import annotations
 
 import json
 
+import pytest
+
 from boo_lab import drums_extract as de
+
+
+def test_build_drum_patterns_write_failure_leaves_prior_file(tmp_path, monkeypatch):
+    from boo_lab import schema
+
+    lab = tmp_path / "lab"
+    (lab / "data").mkdir(parents=True)
+    out = lab / "data" / "drum_patterns.jsonl"
+    out.write_text(json.dumps({"album": "A", "track": "T", "role": "riff", "onsets": []}) + "\n", encoding="utf-8")
+    before = out.read_text(encoding="utf-8")
+
+    def _boom(*a, **k):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(schema, "write_jsonl_atomic", _boom)
+    with pytest.raises(OSError):
+        de.build_drum_patterns(lab, [], lab / "work" / "stems")
+
+    assert out.read_text(encoding="utf-8") == before  # atomic write failed safely
 
 
 def test_build_drum_patterns_ignores_non_keeper_rows(tmp_path):

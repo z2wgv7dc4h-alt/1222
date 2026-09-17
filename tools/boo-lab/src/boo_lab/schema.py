@@ -91,7 +91,9 @@ def load_section_rows(path: str | Path, *, keepers_only: bool = True) -> list[di
     return out
 
 
-def write_jsonl_atomic(path: str | Path, rows: list[dict]) -> None:
+def write_jsonl_atomic(
+    path: str | Path, rows: list[dict], *, ensure_ascii: bool = True
+) -> None:
     """Atomically replace `path` with `rows` (one JSON object per line): a temp
     file in the same directory, flush + fsync, then `os.replace` (atomic on
     Windows and POSIX). A crash, full disk, or power loss mid-write leaves the
@@ -104,7 +106,7 @@ def write_jsonl_atomic(path: str | Path, rows: list[dict]) -> None:
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as f:
             for rec in rows:
-                f.write(json.dumps(rec) + "\n")
+                f.write(json.dumps(rec, ensure_ascii=ensure_ascii) + "\n")
             f.flush()
             os.fsync(f.fileno())
         os.replace(tmp, path)

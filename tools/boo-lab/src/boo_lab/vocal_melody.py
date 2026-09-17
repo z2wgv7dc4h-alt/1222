@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
 import librosa
@@ -205,45 +204,48 @@ def build_vocal_melody(lab_root: Path, rows: list[dict], cache: Path) -> dict:
     empty = 0
     no_stem = 0
     analyzed: dict[str, list[dict]] = {}
+    out_rows: list[dict] = []
 
-    with out_path.open("w", encoding="utf-8") as f:
-        for (album, track), segs in sorted(by_song.items()):
-            r = row_by.get((album, track))
-            if not r:
-                hits = [row for (a, t), row in row_by.items() if t == track]
-                r = hits[0] if len(hits) == 1 else None
-            flac = None
-            if r:
-                fp = r.get("flac_path") or r.get("flac") or ""
-                flac = Path(fp) if fp else None
-            vocals = _find_vocals(flac, cache) if flac else None
+    for (album, track), segs in sorted(by_song.items()):
+        r = row_by.get((album, track))
+        if not r:
+            hits = [row for (a, t), row in row_by.items() if t == track]
+            r = hits[0] if len(hits) == 1 else None
+        flac = None
+        if r:
+            fp = r.get("flac_path") or r.get("flac") or ""
+            flac = Path(fp) if fp else None
+        vocals = _find_vocals(flac, cache) if flac else None
+        if not vocals:
+            print("SKIP vocals", track, "no cached vocals stem")
+        elif str(vocals) not in analyzed:
+            analyzed[str(vocals)] = extract_vocal_melody(flac, cache)
+
+        all_notes = analyzed.get(str(vocals), []) if vocals else []
+        for seg in segs:
+            start, end = float(seg["start"]), float(seg["end"])
+            notes = [n for n in all_notes if start <= n["time"] < end]
+            rec = {
+                "album": album,
+                "track": track,
+                "role": seg.get("role"),
+                "split": split_for(album, track, holdout),
+                "notes": notes,
+            }
+            out_rows.append(rec)
+            n_sections += 1
             if not vocals:
-                print("SKIP vocals", track, "no cached vocals stem")
-            elif str(vocals) not in analyzed:
-                analyzed[str(vocals)] = extract_vocal_melody(flac, cache)
+                no_stem += 1
+                empty += 1
+            elif notes:
+                with_notes += 1
+            else:
+                empty += 1
+            print("VOCALS", track, seg.get("role"), len(notes))
 
-            all_notes = analyzed.get(str(vocals), []) if vocals else []
-            for seg in segs:
-                start, end = float(seg["start"]), float(seg["end"])
-                notes = [n for n in all_notes if start <= n["time"] < end]
-                rec = {
-                    "album": album,
-                    "track": track,
-                    "role": seg.get("role"),
-                    "split": split_for(album, track, holdout),
-                    "notes": notes,
-                }
-                f.write(json.dumps(rec) + "\n")
-                n_sections += 1
-                if not vocals:
-                    no_stem += 1
-                    empty += 1
-                elif notes:
-                    with_notes += 1
-                else:
-                    empty += 1
-                print("VOCALS", track, seg.get("role"), len(notes))
+    from .schema import write_jsonl_atomic
 
+    write_jsonl_atomic(out_path, out_rows)
     return {
         "sections": n_sections,
         "with_notes": with_notes,

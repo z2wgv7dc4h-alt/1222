@@ -17,6 +17,8 @@ pitch = ["torchcrepe"]
 # Plain-lyric timing via WhisperX forced alignment (lyrics.align_whisperx);
 # Lyrics still works without it, showing plain lyrics untimed.
 align = ["whisperx"]
+# JAMS 0.3 validation (jams_export writes the shape itself; this is optional).
+jams = ["jams"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

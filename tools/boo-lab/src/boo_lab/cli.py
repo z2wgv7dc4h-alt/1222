@@ -70,6 +70,15 @@ def main(argv: list[str] | None = None) -> int:
     s = sub.add_parser("export-bank")
     s.add_argument("--out", type=Path, required=True)
 
+    s = sub.add_parser("agree", help="two-pass keeper-pin agreement snapshot/diff")
+    s.add_argument("--album")
+    s.add_argument("--track")
+    s.add_argument("--write", action="store_true")
+    s.add_argument("--diff", action="store_true")
+
+    s = sub.add_parser("export-jams", help="export keeper pins as JAMS 0.3 (figure/function layers)")
+    s.add_argument("--out", type=Path, required=True)
+
     s = sub.add_parser("annotate", help="local UI: listen to FLAC, click section bounds")
     s.add_argument("--port", type=int, default=8765)
 
@@ -132,6 +141,38 @@ def main(argv: list[str] | None = None) -> int:
         print("holdout", len(holdout), "song(s) reserved for validation:")
         for album, track in sorted(holdout):
             print(f"  {album} :: {track}")
+        return 0
+
+    if args.cmd == "agree":
+        from .agree import format_diff, load_passes, snapshot
+
+        album = getattr(args, "album", None)
+        track = getattr(args, "track", None)
+        if not (album and track):
+            print("need --album and --track")
+            return 1
+        if args.write:
+            rec = snapshot(root(), album, track)
+            print("agree pass %d written for %s / %s (%d boxes)"
+                  % (rec["pass"], album, track, len(rec["boxes"])))
+        if args.diff:
+            passes = load_passes(root(), album, track)
+            p1 = next((p for p in passes if p.get("pass") == 1), None)
+            p2 = next((p for p in passes if p.get("pass") == 2), None)
+            if not p1 or not p2:
+                print("need pass 1 and pass 2 for %s / %s" % (album, track))
+                return 1
+            print(format_diff(album, track, p1.get("boxes") or [], p2.get("boxes") or []))
+        if not (args.write or args.diff):
+            passes = load_passes(root(), album, track)
+            print("agree passes for %s / %s: %s" % (album, track, [p.get("pass") for p in passes]))
+        return 0
+
+    if args.cmd == "export-jams":
+        from .jams_export import export_jams
+
+        report = export_jams(root(), args.out, rows)
+        print("export-jams", report)
         return 0
 
     if args.cmd == "stems":

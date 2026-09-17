@@ -4,11 +4,20 @@ Canonical detail: **CURRENT.md**; commands in **README.md**.
 
 Works: studio keeps pins (`human`/`guess-accepted` + `heard`) in `sections.jsonl`; mel
 spectrogram under the WaveSurfer waveform; 6-stem picker; drafts; `hear`/`sync`/`hash`;
-`agree`/`compare`/`export-jams`/`beats`/`audit`/`report`; **177 tests pass**.
+`agree`/`compare`/`export-jams`/`beats`/`audit`/`report`; **199 tests pass**.
 Interns (allin1 structure, beat_this, torchcrepe) run on **CUDA** when present
 (RTX 5080, `torch 2.8.0+cu128`); `boo-lab doctor` reports the build. allin1 works
 without an old natten build via `_natten_compat` (legacy NATTEN API + madmom
-py2/numpy-2 shims). Generated outputs are gitignored; the tracked asset is keeper pins.
+py2/numpy-2/`collections` shims). Generated outputs are gitignored; the tracked asset is
+keeper pins. Engine: **820 passed, 1 skipped** (`labyrinth` hard-fails on bank-uncovered
+roles; the tests encode that).
+
+Hardening (2026-09-18): the keeper law fails closed (`is_keeper` missing-source = not a
+keeper; `canonical_role` → `None`; `stamp_box` rejects unknown role/source;
+`schema.load_section_rows` is the one reader and requires `role` + keeper `source` +
+`heard is True`). Every `sections.jsonl` write is atomic (`schema.write_jsonl_atomic`);
+Save also keeps `data/sections.jsonl.bak` and reports `dropped_unheard`; `beats`/`structure`/
+`sync`/`agree`/`drums`/`vocal_melody` no longer blank their output on a zero-row run.
 
 On disk now:
 - `data/sections.jsonl` — 6 rows, 1 track (Rebirth), all `heard=true`. The whole keeper set.

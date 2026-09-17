@@ -52,3 +52,22 @@ Pytest proves wiring. User ear proves a riff. STATUS may not tick “sounds like
   users should prefer `sync_ok`.
 - **The studio spectrogram is a second view** of the already-decoded buffer; it does not change
   Save rules, and its failure never blocks pin/save.
+
+## 2026-09-18 — lab hardening (facts)
+
+- **One reader.** `schema.load_section_rows(path, keepers_only=True)` is the only reader of
+  `sections.jsonl` (used by `pack`/`drums_extract`/`vocal_melody`/`holdout`). Keepers = truthy
+  `role` + keeper `source` + `heard is True`. No twin readers.
+- **Fail closed.** `is_keeper` treats a missing/empty source as not-a-keeper; `canonical_role`
+  returns `None` for unmappable input; `stamp_box` rejects an unknown role/source. Unknown is never
+  coerced to `human`/`riff`.
+- **Atomic writes.** `schema.write_jsonl_atomic` (temp + fsync + `os.replace`) is the one writer.
+  Every `sections.jsonl` write — Save, `hear`, album-remove — uses it; Save keeps
+  `data/sections.jsonl.bak` (one-step undo) and reports `dropped_unheard`. A zero-row/failed run must
+  never blank a prior file.
+- **GPU by default.** `device.torch_device()` is the only switch; interns never hardcode `"cpu"`.
+- **allin1 compat lives in `_natten_compat`, applied at `import boo_lab`.** Do not "fix" by pinning
+  an old natten (no Windows/py3.12 wheel); the shim restores the pre-0.17 API, madmom's py2 builtins
+  and `np.int`, NumPy-2 ragged `asarray`, and the `collections` ABCs.
+- **Labyrinth hard-fail stays.** A bank-uncovered role raises `RiffBankCoverageError` (never silent
+  Markov); the engine tests assert that rather than demanding the preset compose.

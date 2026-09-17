@@ -1,7 +1,7 @@
 # CURRENT
 
 updated: 2026-09-18
-pytest: engine riff_bank tests pass; boo-lab **177 passed**
+pytest: engine **820 passed, 1 skipped**; boo-lab **199 passed**
 
 ## Now
 
@@ -11,12 +11,15 @@ drafts machine output (`data/drafts.jsonl`), and ships a full studio + CLI
 (spectrogram, draft/keeper schema, witnesses, agreement/JAMS exports).
 Engine work below is paused; nothing here consumes the lab yet.
 
-Lab pass (lab commit `69288bd`): interns now run on **GPU by default**
-(`boo_lab/device.py`; the venv had been `torch+cpu` and allin1 defaults to CPU). allin1 is
-repaired for modern natten + madmom on py3.12/numpy2 by `boo_lab/_natten_compat.py`;
-`setup.bat` + `constraints.txt` + `boo-lab doctor` make a fresh machine reproducible.
-`structure` wrote **125 drafts** (13 BoO tracks); `compare` on Rebirth (holdout):
-**F0.5=0.737 F3=0.800 role3=0.250**. 177 boo-lab tests pass.
+Lab pass (latest commit `9bac8fb`): interns run on **GPU by default** (`boo_lab/device.py`); allin1 is
+repaired for modern natten + madmom on py3.12/numpy2 by `boo_lab/_natten_compat.py` (also aliases the
+`collections` ABCs and runs at `import boo_lab`); `setup.bat` + `constraints.txt` + `boo-lab doctor`
+make a fresh machine reproducible. **Hardening**: the keeper law fails closed (one
+`schema.load_section_rows` reader; `is_keeper`/`canonical_role`/`stamp_box` reject unknowns), every
+`sections.jsonl` write is atomic with a `sections.jsonl.bak` one-step undo, and `beats`/`structure`/
+`sync`/`agree`/`drums`/`vocal_melody` no longer blank their output on a zero-row run. `structure` wrote
+**125 drafts** (13 BoO tracks); `compare` on Rebirth (holdout): **F0.5=0.737 F3=0.800 role3=0.250**;
+`sync` **7/13**; engine **820 passed, 1 skipped**; boo-lab **199 passed**.
 
 Real, done, verified, pushed this pass (tools/boo-lab/ + engine/riff_bank.py):
 - Labyrinth bank redesigned: ONE real song, ONE 2-4 bar contiguous riff,

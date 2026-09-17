@@ -52,8 +52,9 @@ python -m venv .venv
 ```
 
 Optional extras (never default): `-e ".[dev]"` pytest; `-e ".[pitch]"` torchcrepe;
-`-e ".[align]"` whisperx; `-e ".[intern]"` allin1 + beat-this + natten + jams + mir_eval.
-None is required to pin and Save; missing interns just print a skip.
+`-e ".[align]"` whisperx; `-e ".[intern]"` allin1 + beat-this + natten + jams + mir_eval + madmom.
+None is required to pin and Save; missing interns just print a skip. (`madmom` is listed explicitly
+because allin1 imports it but its package metadata omits it.)
 
 ## GPU
 
@@ -77,13 +78,17 @@ The intern stack is a minefield; each fix is now code or a hard pin, not a sessi
 |---|---|
 | GPU present but everything on CPU | `boo_lab/device.py` `torch_device()`; allin1/beat_this/torchcrepe read it |
 | allin1 needs NATTEN API removed in 0.17 | `boo_lab/_natten_compat.py` reimplements `natten1dqkrpb/1dav/2dqkrpb/2dav` (exact `get_window_start`/`get_pb_start` ports) and registers them |
-| madmom py2 builtins + `np.int` + NumPy-2 ragged `asarray` | same module's `install()` |
+| madmom py2 builtins + `np.int` + NumPy-2 ragged `asarray` + `collections` ABCs | `_natten_compat.install()`, now run at `import boo_lab` so `doctor`/CLI get it first |
 | a fresh machine drifts to incompatible versions | `constraints.txt` + `setup.bat` |
 | "is my box set up?" guessing | `boo-lab doctor` |
+| a failed/zero-row run blanking a derived file | `beats`/`structure`/`sync`/`agree`/`drums`/`vocals` write atomically and only replace on a real result |
+| a crash mid-Save destroying every label | every `sections.jsonl` write is atomic (`schema.write_jsonl_atomic`); Save keeps `data/sections.jsonl.bak` |
+| a machine draft / unknown role-sourced as human | fail-closed schema: `is_keeper`, `canonical_role`, `stamp_box`, and the one `load_section_rows` reader |
 
-Behavior is pinned by `tests/test_natten_compat.py`, `test_device.py`, `test_doctor.py`.
-Generated outputs (`data/{drafts,beats,compare,sync,agree}.*`) and `*.egg-info/` are
-gitignored; the tracked asset stays `data/sections.jsonl` (human pins).
+Behavior is pinned by `tests/test_natten_compat.py`, `test_device.py`, `test_doctor.py`, plus bad-input
+tests for the keeper law and Save path. Lab: **199 tests**; engine: **820 passed, 1 skipped**. Generated
+outputs (`data/{drafts,beats,compare,sync,agree}.*`, `data/sections.jsonl.bak`, `*.tmp`) and
+`*.egg-info/` are gitignored; the tracked asset stays `data/sections.jsonl` (human pins).
 
 ## Daily loop
 
@@ -94,7 +99,9 @@ One album side per session.
 2. Give each box a `form` (large letter), a `figure_id` (small, e.g. `riff-A`), and a `role`;
    mark `unique` for single-use figures, `instrument` when two guitars differ. Tick **heard**
    when you have actually listened.
-3. **Save** (unheard boxes are dropped). Confirm table seconds look like music (not `0.00–0.25`).
+3. **Save.** Unheard boxes are dropped — the status line says how many, and the previous file is kept
+   as `data/sections.jsonl.bak` (one-step undo; there is no in-app undo). A box with `end <= start`
+   is refused, never repaired. Confirm table seconds look like music (not `0.00–0.25`).
 4. **Pack** once labels are good.
 5. Old pins without `heard`: `boo-lab hear --album X --track Y` (that track only).
 6. If the interns are installed: `boo-lab structure --album X`, then `boo-lab compare --album X`.

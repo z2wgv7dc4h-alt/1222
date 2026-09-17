@@ -2,6 +2,35 @@
 
 ## 2026-09-18
 
+### Hardening pass
+
+- **Fail-closed keeper law, one reader.** `schema.is_keeper` is true only for `human`/`guess-accepted`
+  (a missing/empty source is NOT a keeper); `canonical_role` returns `None` for unmappable input;
+  `stamp_box` rejects an unknown role/source instead of defaulting to `human`. New
+  `schema.load_section_rows(path, keepers_only=True)` is the single reader (used by
+  `pack`/`drums_extract`/`vocal_melody`/`holdout`) and enforces the full law — `role` + keeper
+  `source` + `heard is True`. Deleted the four twin readers, including the
+  `source == "human" or role` precedence bug that accepted machine drafts as human labels.
+- **Atomic, non-destructive files.** `schema.write_jsonl_atomic` (temp + fsync + `os.replace`) is the
+  one writer. Every `sections.jsonl` write — Save, `hear`, album-remove — uses it; album-remove
+  parses (and aborts on a malformed line, nothing deleted) before touching files, and `hear` refuses
+  rather than drop a malformed line. `beats`, `structure.build_drafts`, `sync`, `agree`,
+  `drums_extract` and `vocal_melody` no longer blank their output on a zero-row/failed run.
+- **Save is transparent + undoable.** The response carries `dropped_unheard` and
+  `malformed_lines_skipped`; the previous file is kept as `data/sections.jsonl.bak` before each Save;
+  the studio refuses a box with `end <= start` instead of the old auto-repair to `0.25s`; the source
+  dropdown includes `songformer-draft` and Load-drafts preserves the real source.
+- **allin1/madmom importability.** `madmom` added to the `intern` extra (allin1 imports it but its
+  metadata omits it); `_natten_compat` also aliases the `collections` ABCs and now runs at
+  `import boo_lab`, so `doctor`/CLI/structure apply the shims before madmom/allin1 load.
+- **Engine tests encode the labyrinth hard-fail.** `tests/test_song.py` / `test_legato.py` no longer
+  demand that a bank-uncovered role compose (a bank-tolerant seed helper), and a new test asserts
+  `RiffBankCoverageError` for `chill`/`outro`. Engine: **820 passed, 1 skipped**.
+- **Local data rebuilt:** `drafts.jsonl` 125 rows (reconstructed from `work/msa` without re-running
+  allin1), `beats.jsonl` 13 tracks, `sync.jsonl` 7/13 `sync_ok`.
+
+### Earlier this date
+
 - **Perfect tabs + faithful sync clock.** Official 02–13 A Higher Place GP5s placed in
   `gp5/A Higher Place/` (old Songsterr/musicnotes duplicates moved to `reference/gp-tabs-superseded/`).
   `sync.gp_onset_times` now: reads `song.tempo` (defaulting to 120 stretched every tab ~1.6×),

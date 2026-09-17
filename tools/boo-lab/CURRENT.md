@@ -9,6 +9,7 @@ Single source of truth for humans and later bots. If README/STATUS/LAW disagree 
 > Studio table columns match those; waveform is WaveSurfer, with a real mel spectrogram below it (Wave / Spec / Both).
 > `structure` writes `drafts.jsonl` only. `hear` and `sync` require **both** `--album` and `--track`.
 > `hash` fills `flac_sha256`; `sync` writes `data/sync.jsonl` (`sync_ok`/`lag_sec`); `beats` → `data/beats.jsonl`.
+> Every `sections.jsonl` write is atomic; Save keeps `data/sections.jsonl.bak`, reports `dropped_unheard`, and rejects bad boxes/roles/sources (fail closed).
 > Holdout songs stay unpinned. GP5 for extract; GP7 is eyes / export-to-GP5.
 > One album side per session. Default install is thin; interns (allin1 / beat-this / SongFormer) are optional.
 > Machines may draft. They never label.
@@ -20,7 +21,7 @@ Single source of truth for humans and later bots. If README/STATUS/LAW disagree 
 A **section lab** for metal FLACs (Born of Osiris first, other bands via ingest). Human output is `data/sections.jsonl` — **keeper pins only** (`source=human`/`guess-accepted`, `heard=true`), each with a figure/function `layer` and a `figure_id` — plus optional Pack clips under `work/` (gitignored). Machines write `data/drafts.jsonl` (MSA/SongFormer/Guess) and never keepers. It is not God Tier Metal, not a DAW, not a tab reader, not an auto-songwriter.
 
 GitHub: `https://github.com/z2wgv7dc4h-alt/1222` path `tools/boo-lab`.  
-Newest lab commit: `26b4d8d` (`START.bat`; `INSTALL.bat` no longer clobbers `.env`); before it `50f0eb6` (audio lead-ins: prominent, corroborated offset), `fab89f5` (stems `--album`, guitar-stem-preferred sync + mix fallback).
+Newest lab commit: `9bac8fb` (Save transparency + one-step undo; studio stops auto-repairing bad boxes); before it `e674c09` (engine tests encode the labyrinth hard-fail), `06aceee` (atomic derived JSONL writers), `1bb360f` (atomic `sections.jsonl` writes; album-remove/`hear` fail closed).
 
 ## Paths
 
@@ -58,7 +59,7 @@ Interns (allin1 / beat_this / torchcrepe) read `boo_lab/device.py`; they never h
 | path | what |
 |---|---|
 | `data/map.csv` | scan result: album, track, flac path, gp path, match, `flac_sha256` |
-| `data/sections.jsonl` | **keeper** boxes only. Save **replaces** that track’s rows, keeps other tracks |
+| `data/sections.jsonl` | **keeper** boxes only. Save **replaces** that track’s rows, keeps other tracks; one-step undo copy at `data/sections.jsonl.bak` |
 | `data/drafts.jsonl` | machine drafts (`msa-draft`, `songformer-draft`, `guess`). Never keepers |
 | `data/holdout.csv` | fixed whole-song train/val reservation (`ensure_holdout`) |
 | `data/agree.jsonl` | two-pass keeper snapshots (`boo-lab agree --write`), pass 1/2 |
@@ -107,7 +108,7 @@ outro  69.50–86.63
 
 Leave 28–33, 51–53, 66.5–69.5 empty. No Breakdown. No Guess after these are saved.
 
-If Save wrote six `0.00–0.25` rows, the pins fired before duration loaded. Paste the lines above into `sections.jsonl` and reload.
+If Save ever wrote six `0.00–0.25` rows, the pins fired before duration loaded — only possible on an old build, since the current Save **refuses** `end <= start`. Recover via `data/sections.jsonl.bak`, or paste the lines above into `sections.jsonl` and reload.
 
 ## UI contract
 
@@ -234,11 +235,13 @@ them; `compare` scores drafts vs keepers per source; `export-jams` writes JAMS 0
 layers; `beats` writes `beat_this`/allin1 beat grids; `hear` flips `heard` on one song's keepers.
 None of them writes `sections.jsonl` except the studio Save.
 
-Optional interns: `pip install -e ".[intern]"` (allin1, beat-this, natten, jams, mir_eval);
+Optional interns: `pip install -e ".[intern]"` (allin1, beat-this, natten, jams, mir_eval, madmom);
 `.[pitch]` torchcrepe; `.[align]` whisperx. Never default dependencies. Pins: `constraints.txt`.
+`madmom` is listed explicitly because allin1 imports it but its own metadata omits it.
 GPU torch must be installed from the CUDA index (`setup.bat` does it); a plain `pip install torch`
-on Windows is CPU-only. allin1's removed NATTEN API and madmom's py2/numpy-2 breakage are repaired
-at runtime by `boo_lab/_natten_compat.py`, so no old natten build is needed.
+on Windows is CPU-only. allin1's removed NATTEN API, madmom's py2/numpy-2 breakage, and the
+`collections` ABC aliases are repaired at runtime by `boo_lab/_natten_compat.install()` — which runs
+at `import boo_lab` (so `doctor`/CLI/structure get it first). No old natten build is needed.
 
 ## Research outputs (machines may draft, not label)
 
@@ -247,7 +250,7 @@ at runtime by `boo_lab/_natten_compat.py`, so no old natten build is needed.
 - `boo-lab compare [--album X]` — drafts vs keepers per song **and per source**: precision/recall/F @0.5/@3 plus role agreement; marks `split=holdout` (never skipped). Writes `data/compare.json`.
 - `boo-lab export-jams --out DIR` — one `.jams` per keeper song, `segment_lab_figure` + `segment_lab_function`; holdout skipped.
 - `boo-lab beats [--album X]` — `data/beats.jsonl` (`beat_this` preferred, allin1 fallback).
-- `boo-lab sync --album X --track Y` — GP onset clock vs the audio envelope (guitar stem else mix); `sync_ok` iff `|lag| < 0.35 s` and score ≥ 0.15. Writes `data/sync.jsonl`.
+- `boo-lab sync --album X --track Y` — GP clock vs the audio through **two** co-witnesses: a blurred (~120 ms) onset correlation and a chroma correlation (tab pitches held over each beat vs `chroma_cqt`), preferring the cached guitar stem with a per-witness mix fallback. `sync_ok` if either is within 350 ms at score ≥ 0.15, or an **aligned-with-offset** lead-in (within 5 s, peak prominence ≥ 0.05, other witness agreeing ≤ 0.25 s). Records `used_stem`/`lag_sec`/`score`/`clock_ratio`/`chroma_lag`/`chroma_score`/`offset_sec`. `|lag|` alone is not the rule.
 - `boo-lab hash [--album X]` — fills empty `flac_sha256` cells in `map.csv` (scan hashes on rewrite).
 - `boo-lab audit` — sources/overlaps/heard/short-box hygiene.
 
@@ -269,6 +272,10 @@ Reading: **F3 high + role agreement low = the intern finds the edges but names t
 - allin1 / SongFormer / beat_this / jams / mir_eval are optional **intern** extras, never default deps.
 - 6-stem Demucs (`htdemucs_6s`) is the default; old 4-stem caches stay valid.
 - `boo-lab hear` is per-track only; never blanket `heard=true` over the catalog.
+- **One reader for `sections.jsonl`**: `schema.load_section_rows` (keepers = truthy `role` + keeper `source` + `heard is True`). No twin readers.
+- **Every write is atomic** (`schema.write_jsonl_atomic`); a zero-row/failed run must never blank a prior file.
+- **Fail closed**: a missing/unknown source is never a keeper; an unmappable role is rejected at Save, never defaulted to `riff`.
+- **Labyrinth hard-fails on an uncovered bank role** (`RiffBankCoverageError`); tests encode that, not a silent Markov fallback.
 
 ## Bugs that already bit us (regressions to refuse)
 
@@ -288,6 +295,11 @@ Reading: **F3 high + role agreement low = the intern finds the edges but names t
 14. GP clock ignored `song.tempo` and defaulted to 120 BPM, stretching every tab ~1.6× — `sync` could never match. Read `song.tempo` (per-measure `header.tempo` only when set).
 15. Repeat unroll reset a group's pass count on re-entry (`isRepeatOpen`) → infinite loop (2M onsets) on 02/04/06. Use `setdefault`; the unroll is now unit-tested.
 16. Scan GP keys didn't strip a space-form track number, so `07 Exist.gp5` keyed as `07exist` and silently never matched `07 - Exist.flac` (read as "no tab"). Space-numbered keys are added; both the match and the no-overmatch case are tested.
+17. `drums_extract`/`vocal_melody` read `sections.jsonl` with `if rec.get("source") == "human" or rec.get("role")` — precedence made the source test dead, so every row (including machine drafts) counted as human. One shared `schema.load_section_rows` now enforces the keeper law.
+18. `beats`/`structure.build_drafts`/`drums_extract`/`vocal_melody` opened their output with mode `"w"` and truncated it before writing — a failed/zero-row run blanked the whole file (this actually wiped `drafts.jsonl` once). All buffer + `write_jsonl_atomic`, and only replace when a row was produced.
+19. `sections.jsonl` was also rewritten non-atomically by `hear` and album-remove; a crash mid-write destroyed every label. Both now use `write_jsonl_atomic`; album-remove parses (and aborts on a malformed line, deleting nothing) first.
+20. `is_keeper(None)`/missing source returned `True` and `canonical_role` defaulted to `"riff"` — fail-open, so unstamped/unmappable rows became trusted human truth. Both fail closed now (`None` role rejects the Save).
+21. madmom does `from collections import MutableSequence`; on some py3.12 builds that name is gone. `_natten_compat.install()` aliases the `collections` ABCs and now runs at `import boo_lab`.
 
 ## What to do next (human)
 

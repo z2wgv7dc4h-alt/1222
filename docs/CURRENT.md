@@ -1,17 +1,46 @@
 # CURRENT
 
-updated: 2026-09-12
-pytest: engine 803 passed, 1 skipped; editor/backend 34 passed (bank wire 1988d22)
+updated: 2026-09-17
+pytest: engine riff_bank 46 passed; boo-lab 51 passed (commit 2e6875c, pushed)
 
 ## Now
 
-Labyrinth bank is wired (`song._try_riff_bank_motif`, `ThemeRegistry.seed`).
-Demo `phase2_riffbank_demo.mp3` (labyrinth seed 1) **user: sounds like shit.**
+Session paused here — user is out of budget, work continues via DeepSeek
+("flash") prompts drafted by Claude, applied by the user, spot-verified by
+Claude with real corpus numbers before commit. That loop worked well; keep
+using it.
 
-Instrumented: bank ran for intro/build/solo/breakdown/verse; `build` reused once.
-The medley is the **selector** (role-bag of 1-bar fragments from many songs), not "bank never ran."
+Real, done, verified, pushed this pass (all in tools/boo-lab/ + engine/riff_bank.py):
+- Labyrinth bank redesigned: ONE real song, ONE 2-4 bar contiguous riff,
+  tiled (the "role-bag medley" approach was heard, killed — see
+  docs/DECISIONS.md). `RiffBankCoverageError` hard-fails a labyrinth role
+  with no bank coverage instead of silently falling back to Markov.
+- `RiffFragment` gained `chord_notes`/`chord_frets` — real chords were
+  being collapsed to their top note only; now 35.6% of hits (real 2-note
+  chords) and 2.5% (3-note) are preserved, not discarded.
+- Real bass/lead-guitar/drum-onset/vocal-melody(pitch only, no lyrics)/
+  audio-fallback extraction, all built and wired.
+- boo-lab: real pytest suite (was zero), content-based mislabeled-.gpx
+  detection (a real corpus scan found 53 `.gp3/4/5`-extensioned files were
+  actually zip-based .gpx content), 6-stem demucs default (guitar now
+  separable from "other"), corpus-health report, train/val holdout,
+  human-role vocab bug fixed (boo-lab's own roles riff/hook/pulse were
+  never translated to the engine's verse/chorus/[none] before being
+  written to RiffFragment.role — dead code path so far, nothing corrupted
+  yet, but was live wrong).
+- Gitignored `tools/boo-lab/data/{riffs,vocal_melody,drum_patterns,
+  section_tempo}.jsonl` — real extracted note/pitch content, same
+  local-only posture as `engine/data/riff_bank.json`, this repo is public.
 
-Do not write more X devices. Do not train. Do not `/next` the old queue.
+Not yet done (queued, prompts already drafted, not yet run):
+`pack.py` still doesn't pack the new guitar/piano 6-stem output; drum-
+classifier confidence flags; vocal pyin→crepe upgrade; per-section tempo/
+time-signature. Engine-side integration (bass/lead/drums generation
+actually consuming this data) explicitly deferred — user: "stop thinking
+about the main project... BOO LAB flawless" is the current priority.
+
+Do not write more X devices. Do not train. Do not import riff_model.py.
+Do not `/next` the old queue.
 
 1. `tools/boo-lab` — pin riffs on FLACs you own (`START.bat`).
 2. Engine — one `source_song`, 2-4 bar riff, tile. Hard-fail empty labyrinth roles (no silent Markov).

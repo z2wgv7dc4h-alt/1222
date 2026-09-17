@@ -36,6 +36,8 @@ engine/models/
 # least the same local-only posture. The raw source tab files themselves
 # already fall under the blanket reference/ ignore above.
 engine/data/riff_bank.json
+engine/data/bass_riff_bank.json
+engine/data/lead_riff_bank.json
 
 # Real, permanent local copies of third-party render tools (fluidsynth,
 # ffmpeg, the GeneralUser GS soundfont) -- large binaries, not source,

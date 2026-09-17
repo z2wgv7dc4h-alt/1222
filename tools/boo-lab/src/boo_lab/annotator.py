@@ -407,6 +407,7 @@ def create_app(lab_root: Path, flac_root: Path | None, gp_root: Path | None) -> 
         known = {"start", "end", "role", "layer", "form", "figure_id", "unique",
                  "instrument", "start_bar", "end_bar", "source", "heard", "album", "track"}
         keepers: list[dict] = []
+        dropped_unheard = 0
         for idx, s in enumerate(sections):
             # Bad input rejects the WHOLE save (same contract as the same-role
             # overlap check below): a box with end <= start is exactly the
@@ -438,7 +439,8 @@ def create_app(lab_root: Path, flac_root: Path | None, gp_root: Path | None) -> 
                 )
 
             if not s.get("heard"):
-                continue  # unheard boxes are dropped, never pinned
+                dropped_unheard += 1  # dropped, but counted so the UI can warn
+                continue
             raw_source = s.get("source")
             if raw_source not in SOURCES:
                 # Fail closed: an unknown/missing source is never a human pin.
@@ -522,6 +524,17 @@ def create_app(lab_root: Path, flac_root: Path | None, gp_root: Path | None) -> 
                     continue
                 old.append(rec)
 
+        # One-step undo: keep the previous file as `sections.jsonl.bak` before
+        # replacing it (best-effort; never blocks a save).
+        backup_path = sec_path.with_name(sec_path.name + ".bak")
+        if sec_path.exists():
+            try:
+                bak_tmp = backup_path.with_name(backup_path.name + ".tmp")
+                bak_tmp.write_bytes(sec_path.read_bytes())
+                bak_tmp.replace(backup_path)
+            except OSError:
+                pass
+
         # Atomic replace: a failure here leaves the original untouched.
         try:
             _atomic_write_jsonl(sec_path, old + keepers)
@@ -537,7 +550,9 @@ def create_app(lab_root: Path, flac_root: Path | None, gp_root: Path | None) -> 
             record(lab_root, meta["album"], meta["track"], keepers)
         except Exception:
             pass
-        body: dict = {"saved": len(keepers), "path": str(sec_path)}
+        body: dict = {"saved": len(keepers), "path": str(sec_path),
+                      "dropped_unheard": dropped_unheard,
+                      "backup": str(backup_path)}
         if malformed_lines:
             body["malformed_lines_skipped"] = len(malformed_lines)
             body["malformed_line_numbers"] = malformed_lines

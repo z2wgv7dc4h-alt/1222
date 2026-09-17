@@ -791,7 +791,7 @@ function add(role){
 document.querySelectorAll(".pins button").forEach(b=>b.onclick=()=>add(b.dataset.role));
 document.getElementById("btnPlay").onclick=toggle;
 
-const SOURCE_OPTS=["human","guess-accepted","guess","msa-draft"];
+const SOURCE_OPTS=["human","guess-accepted","guess","msa-draft","songformer-draft"];
 const INSTRUMENTS=["","rhythm","lead","bass","drums","synth","vocal","mix"];
 function instSelect(cur){
   return "<select data-f='instrument'>"+INSTRUMENTS.map(o=>"<option value='"+o+"'"+(o===cur?" selected":"")+">"+(o||"—")+"</option>").join("")+"</select>";
@@ -914,11 +914,9 @@ function save(){
   harvestTable();
   const dur=ws? (ws.getDuration()||0):0;
   if(dur<2){ showErr("wave not ready — wait until the clock shows the full length", true); return; }
-  regs.forEach(p=>{
-    p.start=+p.start||0;
-    p.end=+p.end||0;
-    if(p.end<=p.start) p.end=p.start+0.25;
-  });
+  regs.forEach(p=>{ p.start=+p.start||0; p.end=+p.end||0; });
+  const bad=regs.findIndex(p=>!(p.end>p.start));
+  if(bad>=0){ showErr("box "+(bad+1)+" has end <= start — fix it (never auto-repaired)", true); return; }
   if(regs.every(p=>p.end-p.start<1)){
     showErr("refusing save — boxes are empty. type times, click off a field, then Save", true);
     return;
@@ -933,7 +931,11 @@ function save(){
     const txt=await r.text();
     let x; try{ x=JSON.parse(txt); }catch(e){ throw txt.slice(0,200); }
     if(!r.ok) throw (typeof x.detail==="string"?x.detail:JSON.stringify(x.detail||x)).slice(0,240);
-    showErr("saved "+x.saved+" → data/sections.jsonl");
+    let msg="saved "+x.saved+" → data/sections.jsonl";
+    if(x.dropped_unheard) msg+=" · "+x.dropped_unheard+" unheard box(es) dropped";
+    if(x.malformed_lines_skipped) msg+=" · "+x.malformed_lines_skipped+" malformed line(s) skipped";
+    msg+=" · backup: sections.jsonl.bak";
+    showErr(msg);
     document.getElementById("sub").textContent="saved "+x.saved;
   }).catch(e=>showErr("save failed: "+e, true));
 }
@@ -951,7 +953,7 @@ function loadDrafts(){
       const role=canonRole(d.role);
       regs.push({role,start:+d.start,end:+d.end,figure_id:d.figure_id|| (role+"-A"),
                  form:"A",unique:false,instrument:"",start_bar:null,end_bar:null,
-                 source:(d.source==="guess"?"guess":"msa-draft"),heard:false});
+                 source:(SOURCE_OPTS.includes(d.source)?d.source:"msa-draft"),heard:false});
     });
     table(); paintRegions();
     showErr("loaded "+ds.length+" draft(s) as unheard — tick heard to accept");

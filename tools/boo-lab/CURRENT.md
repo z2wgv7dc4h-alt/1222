@@ -122,6 +122,8 @@ If Save wrote six `0.00–0.25` rows, the pins fired before duration loaded. Pas
 - **A bad box rejects the whole save** with 400: `end <= start`, non-numeric/non-finite `start`/`end`, a non-object row, a box whose role maps to none, or an unknown/missing `source`. Never repaired into a `0.25s` box (Bugs #2), never defaulted to a human keeper.
 - **Fail closed**: `schema.is_keeper` is true only for `human`/`guess-accepted` (missing/empty source is NOT a keeper); `schema.canonical_role` returns `None` for unmappable input; and `schema.load_section_rows` (the one reader for pack/drums/vocals/holdout) keeps a row only when `role` + keeper `source` + `heard is True` — the full keeper law. Every non-keeper source promotes to `guess-accepted` once Heard (derived from `SOURCES - KEEPER_SOURCES`).
 - A **malformed line already in `sections.jsonl`** is skipped and counted, not fatal: the response carries `malformed_lines_skipped` and `malformed_line_numbers`.
+- Save is **not silent about drops**: the response carries `dropped_unheard` (unheard boxes discarded) and `malformed_lines_skipped`, and the studio shows both.
+- **One-step undo**: before each Save the previous file is kept as `data/sections.jsonl.bak` (`*.bak` is gitignored). The studio refuses a box with `end <= start` (never auto-repairs it to `0.25s`).
 - **Load drafts** appends `data/drafts.jsonl` rows unheard; **VAL** badge marks holdout songs.
 - Play = whole track. Play box = selected region only.
 - Guess merges drafts if boxes already exist; do not Guess a finished song.

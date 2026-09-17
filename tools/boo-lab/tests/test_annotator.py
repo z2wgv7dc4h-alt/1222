@@ -246,6 +246,25 @@ def test_save_promotes_a_heard_songformer_draft_to_keeper(tmp_path):
     assert row["source"] == "guess-accepted"  # promotable set derived from schema
 
 
+def test_save_reports_dropped_unheard_and_writes_a_backup(tmp_path):
+    lab = _lab(tmp_path)
+    path = lab / "data" / "sections.jsonl"
+    before = path.read_text(encoding="utf-8")
+    client = TestClient(ann.create_app(lab, None, None))
+    tid = client.get("/api/tracks").json()["tracks"][0]["id"]
+
+    resp = client.post("/api/sections/%d" % tid, json={"sections": [
+        {"role": "riff", "start": 0, "end": 2, "source": "human", "heard": True},
+        {"role": "hook", "start": 3, "end": 5, "source": "human", "heard": False},
+    ]})
+
+    assert resp.status_code == 200 and resp.json()["saved"] == 1
+    assert resp.json()["dropped_unheard"] == 1
+    backup = lab / "data" / "sections.jsonl.bak"
+    assert backup.read_text(encoding="utf-8") == before  # one-step undo available
+    assert not list((lab / "data").glob("*.tmp"))  # no temp left behind
+
+
 def test_save_rejects_unknown_or_missing_source(tmp_path):
     lab = _lab(tmp_path)
     client = TestClient(ann.create_app(lab, None, None))

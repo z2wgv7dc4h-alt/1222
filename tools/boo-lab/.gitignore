@@ -15,6 +15,10 @@ data/beats.jsonl
 data/compare.json
 data/sync.jsonl
 data/agree.jsonl
+# Save's one-step-undo backup of the tracked keeper file, plus any transient
+# file left by the atomic writer (schema.write_jsonl_atomic).
+data/sections.jsonl.bak
+data/*.tmp
 *.flac
 *.wav
 *.gp3

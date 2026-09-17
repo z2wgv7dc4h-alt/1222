@@ -16,7 +16,9 @@ def _load_sections(path: Path) -> list[dict]:
         if not line.strip():
             continue
         rec = json.loads(line)
-        if rec.get("source") == "human" or rec.get("role"):
+        from .schema import is_keeper
+
+        if rec.get("role") and is_keeper(rec.get("source")):
             out.append(rec)
     return out
 
@@ -182,6 +184,8 @@ def build_pack(lab_root: Path, rows: list[dict], cache: Path) -> dict:
                 "album": album,
                 "track": track,
                 "role": seg.get("role"),
+                "figure_id": seg.get("figure_id") or "",
+                "source": seg.get("source") or "human",
                 "start": start,
                 "end": end,
                 "split": split_for(album, track, holdout),

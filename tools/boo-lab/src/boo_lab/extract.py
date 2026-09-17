@@ -74,6 +74,10 @@ def load_human_sections(data_dir: Path) -> dict[tuple[str, str], list[tuple[floa
             # never allowed to abort the whole read.
             try:
                 rec = json.loads(line)
+                from .schema import is_keeper
+
+                if not is_keeper(rec.get("source")):
+                    continue
                 engine_role = _BOO_LAB_TO_ENGINE_ROLE.get(rec["role"])
                 if engine_role is None:
                     continue

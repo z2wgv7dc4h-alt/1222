@@ -51,8 +51,12 @@ def main(argv: list[str] | None = None) -> int:
     s = sub.add_parser("lyrics", help="fetch LRC / optional whisperx on vocals stem")
     s.add_argument("--album")
 
-    s = sub.add_parser("structure")
+    s = sub.add_parser(
+        "structure",
+        help="MSA draft overlay → data/drafts.jsonl (does NOT touch sections.jsonl)",
+    )
     s.add_argument("--album")
+    sub.add_parser("audit", help="pin hygiene: sources, overlaps, heard, short boxes")
 
     s = sub.add_parser("extract")
     s.add_argument("--album")
@@ -180,30 +184,57 @@ def main(argv: list[str] | None = None) -> int:
         print("lyrics", n)
         return 0
 
+    if args.cmd == "audit":
+        from .audit import audit_lab, print_audit
+
+        print_audit(audit_lab(root()))
+        return 0
+
     if args.cmd == "structure":
+        from .schema import stamp_box
         from .structure import run_allin1, segments_from_allin1
 
-        out_dir = root() / "work" / "allin1"
+        out_dir = root() / "work" / "msa"
         out_dir.mkdir(parents=True, exist_ok=True)
-        sec_path = data_dir() / "sections.jsonl"
-        with sec_path.open("w", encoding="utf-8") as f:
+        draft_path = data_dir() / "drafts.jsonl"
+        keep = []
+        if draft_path.exists():
+            for line in draft_path.read_text(encoding="utf-8").splitlines():
+                if not line.strip():
+                    continue
+                rec = json.loads(line)
+                key = (rec.get("album"), rec.get("track"))
+                if any((r.get("album"), r.get("track")) == key for r in rows):
+                    continue
+                keep.append(rec)
+        written = 0
+        with draft_path.open("w", encoding="utf-8") as f:
+            for rec in keep:
+                f.write(json.dumps(rec) + "\n")
             for r in rows:
                 fp = r.get("flac_path")
                 if not fp or not Path(fp).exists():
                     print("SKIP structure", r.get("track"), "no flac")
                     continue
-                payload = run_allin1(Path(fp))
+                try:
+                    payload = run_allin1(Path(fp))
+                except Exception as exc:
+                    print("SKIP structure", r.get("track"), exc)
+                    continue
                 (out_dir / f"{r.get('track')}.json").write_text(
-                    json.dumps(payload, indent=2), encoding="utf-8"
+                    json.dumps(payload, indent=2, default=str), encoding="utf-8"
                 )
                 for seg in segments_from_allin1(payload):
-                    rec = {
-                        "album": r.get("album"),
-                        "track": r.get("track"),
-                        **seg,
-                    }
+                    rec = stamp_box(
+                        seg["start"], seg["end"], seg.get("role") or seg.get("label"),
+                        source="msa-draft",
+                        extra={"album": r.get("album"), "track": r.get("track"),
+                               "msa_label": seg.get("label") or ""},
+                    )
                     f.write(json.dumps(rec) + "\n")
-                print("STRUCT", r.get("track"), payload.get("bpm"))
+                    written += 1
+                print("DRAFT", r.get("track"), payload.get("bpm"), "→ data/drafts.jsonl")
+        print("wrote", written, "drafts (sections.jsonl untouched)")
         return 0
 
     if args.cmd == "extract":

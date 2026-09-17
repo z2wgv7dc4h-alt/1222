@@ -30,18 +30,9 @@ def relabel_breakdown(seg: dict) -> dict:
     if label in {"chorus", "verse"} and out.get("energy") == "low":
         out["role"] = "chill"
         return out
-    role_map = {
-        "intro": "intro",
-        "verse": "verse",
-        "pre-chorus": "build",
-        "chorus": "chorus",
-        "bridge": "interlude",
-        "inst": "solo",
-        "instrumental": "solo",
-        "outro": "outro",
-        "silence": "chill",
-    }
-    out["role"] = role_map.get(label, label or "verse")
+    from .schema import msa_label_to_lab
+
+    out["role"] = msa_label_to_lab(label)
     return out
 
 

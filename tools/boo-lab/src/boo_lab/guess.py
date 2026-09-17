@@ -1,13 +1,31 @@
 from __future__ import annotations
 
+import os
 import re
 from pathlib import Path
 
-GP5_ROOTS = [
-    Path(r"C:\Users\RIGGUSPIG\Desktop\god-tier-metal\reference\gp-tabs\gp5"),
-    Path(r"C:\Users\RIGGUSPIG\Desktop\god-tier-metal\reference\gp-tabs"),
-    Path(r"C:\Users\RIGGUSPIG\Desktop\god-tier-metal\reference"),
-]
+
+def _gp5_roots() -> list[Path]:
+    roots: list[Path] = []
+    env = os.environ.get("BOO_GP_ROOT")
+    if env:
+        p = Path(env)
+        roots.extend([p / "gp5", p])
+    roots.extend(
+        [
+            Path(r"C:\Users\RIGGUSPIG\Desktop\god-tier-metal\reference\gp-tabs\gp5"),
+            Path(r"C:\Users\RIGGUSPIG\Desktop\god-tier-metal\reference\gp-tabs"),
+            Path(r"C:\Users\RIGGUSPIG\Desktop\god-tier-metal\reference"),
+        ]
+    )
+    seen: list[Path] = []
+    for r in roots:
+        if r not in seen:
+            seen.append(r)
+    return seen
+
+
+GP5_ROOTS = _gp5_roots()
 
 
 def _norm(s: str) -> str:
@@ -35,7 +53,7 @@ def _prefer_gp5(gp: Path | None, track: str) -> Path | None:
         raw = re.sub(r"s\d+$", "", raw)
         key = raw
     if key:
-        for root in GP5_ROOTS:
+        for root in _gp5_roots():
             if not root.exists():
                 continue
             try:
@@ -66,7 +84,7 @@ def estimate_hybrid(
     gp_use = _prefer_gp5(gp, track)
     key = _norm(track) or _norm(gp.stem if gp else "")
     seen = 0
-    root0 = GP5_ROOTS[0]
+    root0 = _gp5_roots()[0]
     if root0.exists():
         seen = sum(1 for _ in root0.rglob("*.gp5"))
     notes.append("key=%s gp5=%s files=%s" % (key or "?", root0, seen))

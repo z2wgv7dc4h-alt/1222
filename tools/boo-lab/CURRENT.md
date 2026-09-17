@@ -1,4 +1,4 @@
-# CURRENT — read this first (2026-09-17)
+# CURRENT — read this first (2026-09-18)
 
 Single source of truth for humans and later bots. If README/STATUS/LAW disagree with this file, this file wins. Then fix the others.
 
@@ -12,13 +12,15 @@ Single source of truth for humans and later bots. If README/STATUS/LAW disagree 
 > Holdout songs stay unpinned. GP5 for extract; GP7 is eyes / export-to-GP5.
 > One album side per session. Default install is thin; interns (allin1 / beat-this / SongFormer) are optional.
 > Machines may draft. They never label.
+> Interns run on **GPU when present** (`boo_lab/device.py`); `boo-lab doctor` must print `cuda=True`.
+> New machine: `setup.bat --flac <CORPUS> --gp <GP_ROOT>` then `boo-lab doctor` (green).
 
 ## What this is
 
 A **section lab** for metal FLACs (Born of Osiris first, other bands via ingest). Human output is `data/sections.jsonl` — **keeper pins only** (`source=human`/`guess-accepted`, `heard=true`), each with a figure/function `layer` and a `figure_id` — plus optional Pack clips under `work/` (gitignored). Machines write `data/drafts.jsonl` (MSA/SongFormer/Guess) and never keepers. It is not God Tier Metal, not a DAW, not a tab reader, not an auto-songwriter.
 
 GitHub: `https://github.com/z2wgv7dc4h-alt/1222` path `tools/boo-lab`.  
-Newest lab commit: `aa48bc4` (studio spectrogram); before it `03199c1` (map witnesses), `02cbb72` (box identity fields).
+Newest lab commit: `69288bd` (GPU-by-default interns + durable allin1/NATTEN compat); before it `a224a61` (docs reality pass), `aa48bc4` (studio spectrogram).
 
 ## Paths
 
@@ -46,6 +48,10 @@ python -m boo_lab.cli studio --port 8765
 ```
 
 http://127.0.0.1:8765 — Ctrl+Shift+R after HTML. Restart the process after `.py` changes. One server.
+
+GPU check (do this before trusting any intern): `python -m boo_lab.cli doctor` — it must print
+`cuda=True` + the GPU name. `doctor` also names any missing intern/extra and the exact install.
+Interns (allin1 / beat_this / torchcrepe) read `boo_lab/device.py`; they never hardcode CPU.
 
 ## Data written
 
@@ -214,7 +220,7 @@ album+track so “Rebirth” cannot stream “Machine.”
 
 `init-map` `scan` `hash` `studio`/`annotate` `ingest` `stems` `pack` `drums` `vocals` `holdout`
 `lyrics` `structure` `beats` `audit` `extract` `gate` `report` `export-bank` `agree` `compare`
-`hear` `sync` `export-jams`
+`hear` `sync` `export-jams` `doctor`
 
 `structure` writes `data/drafts.jsonl` only (allin1 → `msa-draft`; SongFormer when
 `SONGFORMER_HOME`/import → `songformer-draft`). `agree` snapshots keeper pins (pass 1/2) and diffs
@@ -222,8 +228,11 @@ them; `compare` scores drafts vs keepers per source; `export-jams` writes JAMS 0
 layers; `beats` writes `beat_this`/allin1 beat grids; `hear` flips `heard` on one song's keepers.
 None of them writes `sections.jsonl` except the studio Save.
 
-Optional interns: `pip install -e ".[intern]"` (allin1, beat-this, jams, mir_eval); `.[pitch]`
-torchcrepe; `.[align]` whisperx. Never default dependencies.
+Optional interns: `pip install -e ".[intern]"` (allin1, beat-this, natten, jams, mir_eval);
+`.[pitch]` torchcrepe; `.[align]` whisperx. Never default dependencies. Pins: `constraints.txt`.
+GPU torch must be installed from the CUDA index (`setup.bat` does it); a plain `pip install torch`
+on Windows is CPU-only. allin1's removed NATTEN API and madmom's py2/numpy-2 breakage are repaired
+at runtime by `boo_lab/_natten_compat.py`, so no old natten build is needed.
 
 ## Research outputs (machines may draft, not label)
 
@@ -243,7 +252,9 @@ Reading: **F3 high + role agreement low = the intern finds the edges but names t
 - Sparse human structure + stems pack beats “learn 10k FLACs end-to-end” for form.
 - No DAW, no RoFormer tonight, no AlphaTab as a product (tabs are not a product surface).
 - No madmom as a hard dependency (Python 3.12 / numpy war). Librosa + Demucs only.
-- allin1 optional and often broken in this venv; Guess must work without it.
+- allin1 optional; now works via `_natten_compat` (legacy NATTEN API + madmom py2 / numpy-2 shim). Guess must still work without it.
+- GPU when present: `boo_lab/device.py` `torch_device()` is the only switch; interns never hardcode `"cpu"`.
+- Fragile pins live in `constraints.txt`; `setup.bat` + `doctor` are the onboarding path.
 - No tab scraping.
 - Overlaps are layered roles, not two riffs of the same name.
 - Guess never overwrites a careful Save if the user does not press Guess.
@@ -265,6 +276,9 @@ Reading: **F3 high + role agreement low = the intern finds the edges but names t
 8. Play box calling `play()` with no end.
 9. Audio id = list index without album+track resolve.
 10. One GP file matching every similarly named track.
+11. `torch+cpu` venv + allin1's `device='cpu'` default → every intern ran on CPU with a GPU idle. Use `device.py`; check `doctor`.
+12. natten ≥0.17 dropped the pre-0.17 API allin1 imports (`natten1dav`/`1dqkrpb`/`2dav`/`2dqkrpb`) → `ImportError`. Fixed by `_natten_compat` (exact `get_window_start`/`get_pb_start` ports). Do not "fix" by pinning old natten — no Windows/py3.12 wheel exists.
+13. madmom on py3.12 + numpy2: `NameError: integer`, `np.int`, and ragged `asarray` in downbeat tracking. All repaired by `_natten_compat.install()`.
 
 ## What to do next (human)
 

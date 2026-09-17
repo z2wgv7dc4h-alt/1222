@@ -1,7 +1,7 @@
 # CURRENT
 
-updated: 2026-09-17
-pytest: engine riff_bank tests pass; boo-lab **153 passed**
+updated: 2026-09-18
+pytest: engine riff_bank tests pass; boo-lab **165 passed**
 
 ## Now
 
@@ -10,6 +10,13 @@ The lab (`tools/boo-lab`) is the active work and its own source of truth:
 drafts machine output (`data/drafts.jsonl`), and ships a full studio + CLI
 (spectrogram, draft/keeper schema, witnesses, agreement/JAMS exports).
 Engine work below is paused; nothing here consumes the lab yet.
+
+Lab pass (lab commit `69288bd`): interns now run on **GPU by default**
+(`boo_lab/device.py`; the venv had been `torch+cpu` and allin1 defaults to CPU). allin1 is
+repaired for modern natten + madmom on py3.12/numpy2 by `boo_lab/_natten_compat.py`;
+`setup.bat` + `constraints.txt` + `boo-lab doctor` make a fresh machine reproducible.
+`structure` wrote **125 drafts** (13 BoO tracks); `compare` on Rebirth (holdout):
+**F0.5=0.737 F3=0.800 role3=0.250**. 165 boo-lab tests pass.
 
 Real, done, verified, pushed this pass (tools/boo-lab/ + engine/riff_bank.py):
 - Labyrinth bank redesigned: ONE real song, ONE 2-4 bar contiguous riff,

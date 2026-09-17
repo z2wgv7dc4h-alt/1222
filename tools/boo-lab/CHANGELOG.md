@@ -1,5 +1,24 @@
 # Changelog
 
+## 2026-09-18
+
+- **GPU by default.** Root cause of slow runs: the venv had `torch 2.8.0+cpu` and allin1 defaults
+  to `device='cpu'`. `device.py` (`torch_device()`/`gpu_name()`) is the single switch; allin1,
+  beat_this and torchcrepe read it. Verified on the RTX 5080 (`torch 2.8.0+cu128`); allin1 Rebirth
+  now ~23s with `bpm=72`, 6 labeled segments, 85 beats instead of a degenerate single-label result.
+- **Durable allin1.** `_natten_compat.py` reimplements NATTEN's pre-0.17 API
+  (`natten1dqkrpb`/`natten1dav`/`natten2dqkrpb`/`natten2dav`) with exact `get_window_start` /
+  `get_pb_start` ports and registers it before `allin1` imports; also restores madmom's Python-2
+  builtins, the removed `np.int` aliases, and a NumPy-2-safe ragged `asarray`. No old natten build
+  needed.
+- **Onboarding + safety net.** `setup.bat` (venv, cu128-or-CPU torch, core + intern + pitch +
+  align, then doctor), `constraints.txt` hard pins, `boo-lab doctor` (torch/CUDA/GPU + core deps +
+  interns + extras with install hints). `structure` caches allin1 demix/spec under `work/allin1`.
+- **Real drafts.** `structure --album "2009 - A Higher Place"` wrote 125 `msa-draft` rows,
+  `sections.jsonl` untouched; `compare` reports F0.5=0.737 F3=0.800 role3=0.250 on Rebirth.
+- **Repo hygiene.** `data/{drafts,beats,compare,sync,agree}.*` and `*.egg-info/` gitignored;
+  `boo_lab.egg-info` untracked. Tests: `test_natten_compat`, `test_device`, `test_doctor` → 165.
+
 ## 2026-09-17
 
 - **Keeper schema.** `schema.py` is the single source of truth (roles, figure/function layers, `SOURCES`, `is_keeper`, `stamp_box`, `same_role_overlaps`). Studio Save writes keepers only (`human`/`guess-accepted` + `heard`), drops unheard/`guess`/`msa-draft`, stamps a heard draft `guess-accepted`, rejects same-role overlap >50 ms, preserves extras; `GET /api/drafts`; tables carry role/figure/start/end/source/heard; **Load drafts** appends `msa-draft`/`guess` unheard.

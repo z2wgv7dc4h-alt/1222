@@ -377,6 +377,20 @@ def test_remove_album_requires_confirm_and_does_not_touch_files(tmp_path):
     assert flac.exists() and gp.exists()
 
 
+def test_remove_album_aborts_on_malformed_sections_without_deleting(tmp_path):
+    lab, flac_root, gp_root, flac, gp = _removable_lab(tmp_path)
+    path = lab / "data" / "sections.jsonl"
+    path.write_text(path.read_text(encoding="utf-8") + "{ not json\n", encoding="utf-8")
+    before = path.read_text(encoding="utf-8")
+    client = TestClient(ann.create_app(lab, flac_root, gp_root))
+
+    resp = client.post("/api/album/remove", json={"album": "Band", "confirm": True})
+
+    assert resp.status_code == 400 and "malformed" in resp.json()["detail"]
+    assert flac.exists() and gp.exists()  # parsed before deleting: nothing removed
+    assert path.read_text(encoding="utf-8") == before
+
+
 def test_remove_album_unknown_is_404(tmp_path):
     lab, flac_root, gp_root, _, _ = _removable_lab(tmp_path)
     client = TestClient(ann.create_app(lab, flac_root, gp_root))

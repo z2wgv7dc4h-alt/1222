@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import json
+import os
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -87,6 +89,31 @@ def load_section_rows(path: str | Path, *, keepers_only: bool = True) -> list[di
                 continue
         out.append(rec)
     return out
+
+
+def write_jsonl_atomic(path: str | Path, rows: list[dict]) -> None:
+    """Atomically replace `path` with `rows` (one JSON object per line): a temp
+    file in the same directory, flush + fsync, then `os.replace` (atomic on
+    Windows and POSIX). A crash, full disk, or power loss mid-write leaves the
+    original file intact. The one writer for the human/derived JSONL stores."""
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(
+        prefix=path.name + ".", suffix=".tmp", dir=str(path.parent)
+    )
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            for rec in rows:
+                f.write(json.dumps(rec) + "\n")
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp, path)
+    except BaseException:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
 
 
 def same_role_overlaps(boxes: list[dict[str, Any]]) -> list[tuple[int, int, str]]:

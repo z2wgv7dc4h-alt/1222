@@ -12,31 +12,45 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from .schema import is_keeper
+from .schema import is_keeper, write_jsonl_atomic
 
 
-def _read_jsonl(path: Path) -> list[dict]:
+def _read_jsonl(path: Path) -> tuple[list[dict], list[int]]:
+    """`(rows, malformed_line_numbers)`. Malformed lines are reported, never
+    silently dropped -- the caller decides, because rewriting the file would
+    otherwise destroy them."""
     if not path.exists():
-        return []
+        return [], []
     rows: list[dict] = []
-    for line in path.read_text(encoding="utf-8").splitlines():
+    malformed: list[int] = []
+    for lineno, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
         if not line.strip():
             continue
         try:
-            rows.append(json.loads(line))
+            rec = json.loads(line)
         except json.JSONDecodeError:
+            malformed.append(lineno)
             continue
-    return rows
+        if not isinstance(rec, dict):
+            malformed.append(lineno)
+            continue
+        rows.append(rec)
+    return rows, malformed
 
 
 def mark_heard(lab_root: Path, album: str | None, track: str | None) -> dict:
     """Flip `heard=true` on already-keeper rows for `album` + `track` only.
-    Raises `ValueError` when either is missing."""
+    Raises `ValueError` when either is missing, or when `sections.jsonl`
+    contains a malformed line (fail closed -- never drop it on rewrite)."""
     if not album or not track:
         raise ValueError("need both --album and --track (never the whole catalog)")
 
     path = Path(lab_root) / "data" / "sections.jsonl"
-    rows = _read_jsonl(path)
+    rows, malformed = _read_jsonl(path)
+    if malformed:
+        raise ValueError(
+            "sections.jsonl has malformed line(s) %s; fix them before `hear`" % malformed
+        )
     flipped = 0
     for rec in rows:
         if (rec.get("album") or "") != album or (rec.get("track") or "") != track:
@@ -45,8 +59,6 @@ def mark_heard(lab_root: Path, album: str | None, track: str | None) -> dict:
             rec["heard"] = True
             flipped += 1
 
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w", encoding="utf-8") as f:
-        for rec in rows:
-            f.write(json.dumps(rec) + "\n")
+    if path.exists() or rows:
+        write_jsonl_atomic(path, rows)  # atomic: a failure leaves the file intact
     return {"album": album, "track": track, "flipped": flipped, "rows": len(rows)}

@@ -632,6 +632,36 @@ def create_app(lab_root: Path, flac_root: Path | None, gp_root: Path | None) -> 
             return JSONResponse({"detail": "album not found in map.csv"}, status_code=404)
 
         tracks = {(r.get("track") or "") for r in targets}
+
+        # Parse sections.jsonl BEFORE deleting anything: a malformed line
+        # aborts the whole removal (fail closed) instead of crashing after
+        # files are already gone, and the rewrite below is atomic.
+        kept: list[dict] = []
+        malformed: list[int] = []
+        if sec_path.exists():
+            for lineno, line in enumerate(
+                sec_path.read_text(encoding="utf-8").splitlines(), start=1
+            ):
+                if not line.strip():
+                    continue
+                try:
+                    rec = json.loads(line)
+                except json.JSONDecodeError:
+                    malformed.append(lineno)
+                    continue
+                if not isinstance(rec, dict):
+                    malformed.append(lineno)
+                    continue
+                if rec.get("album") == album and (rec.get("track") or "") in tracks:
+                    continue
+                kept.append(rec)
+        if malformed:
+            return JSONResponse(
+                {"detail": "sections.jsonl has malformed line(s) %s; fix before "
+                           "removing an album (nothing deleted)" % malformed},
+                status_code=400,
+            )
+
         deleted: list[str] = []
         skipped: list[str] = []
         file_dirs: set[Path] = set()
@@ -668,17 +698,7 @@ def create_app(lab_root: Path, flac_root: Path | None, gp_root: Path | None) -> 
         removed_dirs = _prune_empty(file_dirs, flac_root) + _prune_empty(gp_dirs, gp_root)
 
         if sec_path.exists():
-            kept = []
-            for line in sec_path.read_text(encoding="utf-8").splitlines():
-                if not line.strip():
-                    continue
-                rec = json.loads(line)
-                if rec.get("album") == album and (rec.get("track") or "") in tracks:
-                    continue
-                kept.append(rec)
-            with sec_path.open("w", encoding="utf-8") as f:
-                for rec in kept:
-                    f.write(json.dumps(rec) + "\n")
+            write_jsonl_atomic(sec_path, kept)  # atomic: failure leaves it intact
 
         from .holdout import load_holdout, write_holdout
 

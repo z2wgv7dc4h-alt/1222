@@ -80,6 +80,33 @@ def test_refuses_without_album(tmp_path):
         hear.mark_heard(lab, None, "T")
 
 
+def test_hear_refuses_malformed_sections_and_leaves_it(tmp_path):
+    lab = _lab(tmp_path, [_row("A", "T", "riff")])
+    path = lab / "data" / "sections.jsonl"
+    path.write_text(path.read_text(encoding="utf-8") + "{ not json\n", encoding="utf-8")
+    before = path.read_text(encoding="utf-8")
+
+    with pytest.raises(ValueError):
+        hear.mark_heard(lab, "A", "T")
+
+    assert path.read_text(encoding="utf-8") == before  # malformed line never dropped
+
+
+def test_hear_write_failure_leaves_file_untouched(tmp_path, monkeypatch):
+    lab = _lab(tmp_path, [_row("A", "T", "riff")])
+    path = lab / "data" / "sections.jsonl"
+    before = path.read_text(encoding="utf-8")
+
+    def _boom(p, rows):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(hear, "write_jsonl_atomic", _boom)
+    with pytest.raises(OSError):
+        hear.mark_heard(lab, "A", "T")
+
+    assert path.read_text(encoding="utf-8") == before  # atomic write failed safely
+
+
 def test_cli_hear_refuses_without_track(tmp_path, monkeypatch):
     from boo_lab import cli
 

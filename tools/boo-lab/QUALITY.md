@@ -49,6 +49,10 @@ through-composed figure, `instrument` when two guitars differ, and `start_bar`/`
 the GP5 is the same cut. One album side per sitting; stop when you cannot name the figure in five
 words.
 
+Cut on the spectrogram when a breakdown is a dark band, not only on the waveform: the studio draws
+a mel spectrogram under the mix (toggle **Wave / Spec / Both**; click the spec to seek). It is a
+second view of the same buffer — if it fails, the waveform and pins still work.
+
 A week later, re-pin one track without looking, then snapshot it with
 `boo-lab agree --album X --track Y --write` (first snapshot = pass 1, the re-pin = pass 2) and read
 `boo-lab agree --album X --track Y --diff` for boundary hit-rate @0.5 s / @3 s and role/figure

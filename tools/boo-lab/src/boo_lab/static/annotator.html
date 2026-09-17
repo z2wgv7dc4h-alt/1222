@@ -99,6 +99,12 @@
     .vizdock:before { content:""; position:absolute; inset:0; pointer-events:none; box-shadow:inset 0 20px 40px #000a; }
     .vizdock canvas { width:100%; height:100%; display:block; }
     .vizdock label { position:absolute; left:18px; top:10px; font-size:10px; letter-spacing:.2em; text-transform:uppercase; color:#7a6a4a; pointer-events:none; z-index:1; }
+    .vizdock.hidden { display:none; }
+    .app.noviz { grid-template-rows:1fr 0; }
+    .viewbtns { position:absolute; right:16px; top:8px; display:inline-flex; gap:4px; z-index:2; }
+    .viewbtns button { padding:1px 8px; font-size:10px; letter-spacing:.04em; border-radius:999px; color:var(--mute); }
+    .viewbtns button.on { border-color:var(--gold); color:var(--gold); }
+    .lane.hidden { display:none; }
     .badge { display:none; margin-left:auto; font-size:11px; letter-spacing:.08em; text-transform:uppercase; padding:3px 9px; border:1px solid var(--line); border-radius:999px; color:var(--mute); }
     .badge.on { display:inline-block; }
     .badge.val { color:var(--gold); border-color:#6a5a3a; }
@@ -204,7 +210,7 @@
       </div>
       <div class="err" id="err">Space play · 1 riff 2 hook 3 slam · I intro B build C chill P pulse · S save J/K songs</div>
     </div>
-    <div class="lane">
+    <div class="lane" id="wavelane">
       <div class="lane-lab">mix — drag boxes, click empty to seek</div>
       <div id="wave"></div>
     </div>
@@ -231,8 +237,13 @@
     </table>
     <p class="foot">Drag a box. Click empty wave to seek. Different roles may overlap. S save · N next</p>
   </main>
-  <div class="vizdock">
-    <label>scope</label>
+  <div class="vizdock" id="vizdock">
+    <label>spectrogram — click to seek</label>
+    <span class="viewbtns" id="viewbtns">
+      <button type="button" data-v="wave">Wave</button>
+      <button type="button" data-v="spec">Spec</button>
+      <button type="button" data-v="both" class="on">Both</button>
+    </span>
     <canvas id="viz"></canvas>
   </div>
 </div>
@@ -275,85 +286,169 @@ function RegionsApi(){
   return window.RegionsPlugin || (window.WaveSurfer && WaveSurfer.Regions);
 }
 
-let vizHist=[];
-function hookViz(){
-  if(vizRAF) cancelAnimationFrame(vizRAF);
+// Real spectrogram of the already-decoded buffer (no second FLAC fetch, no
+// new deps). Mel-ish log bands over ~40-8000 Hz, drawn on #viz, with the
+// existing section boxes overlaid and a playhead synced to the waveform.
+let spec=null, specMode="both";
+const SPEC_BANDS=96, SPEC_FMIN=40, SPEC_FMAX=8000;
+
+function _fft(re, im){
+  const n=re.length;
+  for(let i=1,j=0;i<n;i++){
+    let bit=n>>1;
+    for(;j&bit;bit>>=1) j^=bit;
+    j^=bit;
+    if(i<j){ let t=re[i];re[i]=re[j];re[j]=t; t=im[i];im[i]=im[j];im[j]=t; }
+  }
+  for(let len=2;len<=n;len<<=1){
+    const ang=-2*Math.PI/len, wr=Math.cos(ang), wi=Math.sin(ang);
+    for(let i=0;i<n;i+=len){
+      let cr=1, ci=0;
+      for(let k=0;k<len/2;k++){
+        const ur=re[i+k], ui=im[i+k];
+        const vr=re[i+k+len/2]*cr - im[i+k+len/2]*ci;
+        const vi=re[i+k+len/2]*ci + im[i+k+len/2]*cr;
+        re[i+k]=ur+vr; im[i+k]=ui+vi;
+        re[i+k+len/2]=ur-vr; im[i+k+len/2]=ui-vi;
+        const ncr=cr*wr-ci*wi; ci=cr*wi+ci*wr; cr=ncr;
+      }
+    }
+  }
+}
+function _mel(f){ return 2595*Math.log10(1+f/700); }
+function _melInv(m){ return 700*(Math.pow(10,m/2595)-1); }
+function _melFilters(bands, fftBins, sr){
+  const fmin=Math.max(20, SPEC_FMIN), fmax=Math.min(SPEC_FMAX, sr/2);
+  const m0=_mel(fmin), m1=_mel(fmax);
+  const edges=[];
+  for(let i=0;i<=bands+1;i++) edges.push(_melInv(m0+(m1-m0)*i/(bands+1)));
+  const binHz=(sr/2)/(fftBins-1);
+  const out=[];
+  for(let b=0;b<bands;b++){
+    const lo=edges[b], ce=edges[b+1], hi=edges[b+2];
+    const kLo=Math.max(0, Math.floor(lo/binHz));
+    const kHi=Math.min(fftBins-1, Math.ceil(hi/binHz));
+    const w=new Float32Array(Math.max(0,kHi-kLo+1));
+    let sum=0;
+    for(let k=kLo;k<=kHi;k++){
+      const hz=k*binHz; let v=0;
+      if(hz>=lo&&hz<=ce&&ce>lo) v=(hz-lo)/(ce-lo);
+      else if(hz>ce&&hz<=hi&&hi>ce) v=(hi-hz)/(hi-ce);
+      w[k-kLo]=v; sum+=v;
+    }
+    if(sum>0) for(let k=0;k<w.length;k++) w[k]/=sum;
+    out.push({lo:kLo, w:w});
+  }
+  return out;
+}
+function computeSpec(buf){
+  const sr=buf.sampleRate, n=buf.length;
+  const nch=Math.min(2, buf.numberOfChannels||1);
+  const mono=new Float32Array(n);
+  for(let c=0;c<nch;c++){ const d=buf.getChannelData(c); for(let i=0;i<n;i++) mono[i]+=d[i]/nch; }
+  const win=2048, fftBins=win/2+1;
+  const hop=Math.max(win/2, Math.floor(n/1400)||win/2);
+  const cols=Math.max(1, Math.floor((n-win)/hop)+1);
+  const bands=SPEC_BANDS;
+  const filters=_melFilters(bands, fftBins, sr);
+  const hann=new Float32Array(win);
+  for(let i=0;i<win;i++) hann[i]=0.5-0.5*Math.cos(2*Math.PI*i/(win-1));
+  const re=new Float32Array(win), im=new Float32Array(win), mag=new Float32Array(fftBins);
+  const data=new Float32Array(cols*bands);
+  let minDb=1e9, maxDb=-1e9;
+  for(let c=0;c<cols;c++){
+    const off=c*hop;
+    for(let i=0;i<win;i++){ re[i]=(mono[off+i]||0)*hann[i]; im[i]=0; }
+    _fft(re, im);
+    for(let k=0;k<fftBins;k++) mag[k]=re[k]*re[k]+im[k]*im[k];
+    for(let b=0;b<bands;b++){
+      const f=filters[b]; let acc=0;
+      for(let k=0;k<f.w.length;k++) acc+=mag[f.lo+k]*f.w[k];
+      const db=10*Math.log10(acc+1e-9);
+      data[c*bands+b]=db;
+      if(db<minDb)minDb=db; if(db>maxDb)maxDb=db;
+    }
+  }
+  const lo=minDb, hi=(maxDb>minDb?maxDb:minDb+1);
+  const off=document.createElement("canvas");
+  off.width=cols; off.height=bands;
+  const octx=off.getContext("2d");
+  const id=octx.createImageData(cols, bands);
+  for(let c=0;c<cols;c++){
+    for(let b=0;b<bands;b++){
+      let v=(data[c*bands+b]-lo)/(hi-lo); if(v<0)v=0; if(v>1)v=1;
+      let r,g,bb;
+      if(v<0.5){ const u=v/0.5; r=20+u*180; g=10+u*60; bb=10+u*10; }
+      else { const u=(v-0.5)/0.5; r=200+u*55; g=70+u*150; bb=20+u*180; }
+      const dst=((bands-1-b)*cols+c)*4;
+      id.data[dst]=r; id.data[dst+1]=g; id.data[dst+2]=bb; id.data[dst+3]=255;
+    }
+  }
+  octx.putImageData(id,0,0);
+  return {off:off, dur:(buf.duration||n/sr)};
+}
+function buildSpec(){
+  try{
+    const buf=ws&&ws.getDecodedData&&ws.getDecodedData();
+    if(!buf){ spec=null; return; }
+    spec=computeSpec(buf);
+  }catch(e){ spec=null; showErr("spectrogram failed: "+e, true); }
+}
+function drawSpec(){
   const c=document.getElementById("viz");
   if(!c) return;
+  const dpr=window.devicePixelRatio||1;
+  const w=c.width=Math.max(1,Math.floor(c.clientWidth*dpr));
+  const h=c.height=Math.max(1,Math.floor(c.clientHeight*dpr));
   const ctx=c.getContext("2d");
-  function sliceAt(ch, sr, t, n){
-    const i0=Math.floor(t*sr);
-    const span=Math.max(64, Math.floor(sr*0.04));
-    const out=new Float32Array(n);
-    for(let x=0;x<n;x++){
-      const i=Math.max(0, Math.min(ch.length-1, i0+Math.floor(x/n*span)));
-      out[x]=ch[i]||0;
-    }
-    return out;
-  }
-  function frame(){
-    vizRAF=requestAnimationFrame(frame);
-    const dpr=window.devicePixelRatio||1;
-    const w=c.width=Math.max(1,c.clientWidth*dpr);
-    const h=c.height=Math.max(1,c.clientHeight*dpr);
-    ctx.fillStyle="rgba(5,6,10,0.35)";
-    ctx.fillRect(0,0,w,h);
-    let buf=null;
-    try{ buf=ws&&ws.getDecodedData(); }catch(e){}
-    const t=ws&&ws.getCurrentTime?ws.getCurrentTime():0;
-    const playing=ws&&ws.isPlaying&&ws.isPlaying();
-    const n=Math.min(220, Math.floor(w/2));
-    if(buf){
-      const ch=buf.getChannelData(0);
-      const sr=buf.sampleRate||44100;
-      if(playing || !vizHist.length){
-        vizHist.unshift(sliceAt(ch,sr,t,n));
-        if(vizHist.length>18) vizHist.pop();
-      }
-    }
-    const layers=vizHist.length||1;
-    for(let L=layers-1;L>=0;L--){
-      const line=vizHist[L];
-      if(!line) continue;
-      const y0=h*0.18+L*(h*0.038);
-      const amp=(h*0.22)*(1-L/22);
-      const a=playing? (0.95-L*0.045) : (0.4-L*0.02);
-      ctx.beginPath();
-      ctx.strokeStyle="rgba(232,206,150,"+Math.max(0.05,a)+")";
-      ctx.lineWidth=(L===0?1.8:1)*dpr;
-      ctx.shadowColor=L===0?"rgba(212,160,80,0.55)":"transparent";
-      ctx.shadowBlur=L===0?12*dpr:0;
-      for(let x=0;x<n;x++){
-        const px=x/(n-1)*w;
-        const v=line[x]||0;
-        const y=y0-v*amp;
-        if(x===0) ctx.moveTo(px,y); else ctx.lineTo(px,y);
-      }
-      ctx.stroke();
-    }
-    ctx.shadowBlur=0;
-    if(buf){
-      const ch=buf.getChannelData(0);
-      const sr=buf.sampleRate||44100;
-      const i0=Math.floor(t*sr);
-      const bars=48;
-      const bw=w/bars;
-      for(let i=0;i<bars;i++){
-        let acc=0, cnt=0;
-        const a=i0+Math.floor(i/bars*sr*0.03);
-        const b=a+Math.floor(sr*0.03/bars);
-        for(let k=a;k<b;k+=8){
-          if(k>=0&&k<ch.length){ acc+=Math.abs(ch[k]); cnt++; }
-        }
-        const v=cnt?acc/cnt:0;
-        const bh=v*h*1.8;
-        ctx.fillStyle="rgba(180,80,50,"+(0.08+v*0.5)+")";
-        ctx.fillRect(i*bw, h-bh, Math.max(1,bw-2*dpr), bh);
-      }
-    }
-  }
+  ctx.clearRect(0,0,w,h);
+  if(specMode==="wave"||!spec) return;
+  ctx.imageSmoothingEnabled=false;
+  try{ ctx.drawImage(spec.off, 0,0,spec.off.width,spec.off.height, 0,0,w,h); }catch(e){ return; }
+  const dur=spec.dur||(ws?ws.getDuration():0)||1;
+  regs.forEach(p=>{
+    const x0=Math.max(0,Math.min(1,p.start/dur))*w;
+    const x1=Math.max(0,Math.min(1,p.end/dur))*w;
+    if(x1<=x0) return;
+    ctx.fillStyle=COLOR[p.role]||"rgba(136,136,136,0.35)";
+    ctx.fillRect(x0,0,Math.max(1,x1-x0),h);
+    ctx.strokeStyle="rgba(255,255,255,0.25)";
+    ctx.strokeRect(x0+0.5,0.5,Math.max(1,x1-x0)-1,h-1);
+  });
+  const t=ws&&ws.getCurrentTime?ws.getCurrentTime():0;
+  ctx.strokeStyle="#f4ead8";
+  ctx.lineWidth=2*dpr;
+  ctx.beginPath();
+  const x=Math.max(0,Math.min(1,t/dur))*w;
+  ctx.moveTo(x,0); ctx.lineTo(x,h); ctx.stroke();
+}
+function startSpecLoop(){
+  if(vizRAF) cancelAnimationFrame(vizRAF);
+  const frame=()=>{ vizRAF=requestAnimationFrame(frame); drawSpec(); };
   frame();
 }
+function setSpecMode(m){
+  specMode=m;
+  document.querySelectorAll("#viewbtns button").forEach(b=>b.classList.toggle("on", b.dataset.v===m));
+  const dock=document.getElementById("vizdock");
+  const waveLane=document.getElementById("wavelane");
+  const app=document.querySelector(".app");
+  if(dock) dock.classList.toggle("hidden", m==="wave");
+  if(app) app.classList.toggle("noviz", m==="wave");
+  if(waveLane) waveLane.classList.toggle("hidden", m==="spec");
+  drawSpec();
+}
+(function(){
+  document.querySelectorAll("#viewbtns button").forEach(b=>b.onclick=()=>setSpecMode(b.dataset.v));
+  const c=document.getElementById("viz");
+  if(c) c.addEventListener("pointerdown", ev=>{
+    if(!ws) return;
+    const rect=c.getBoundingClientRect(), dur=ws.getDuration()||0;
+    if(!dur||!rect.width) return;
+    const x=Math.max(0,Math.min(rect.width, ev.clientX-rect.left));
+    ws.setTime(x/rect.width*dur);
+  });
+})();
 function destroyWave(){
   if(ws){ try{ ws.destroy(); }catch(e){} ws=null; regionsPlug=null; }
   if(drumsWs){ try{ drumsWs.destroy(); }catch(e){} drumsWs=null; }
@@ -409,7 +504,7 @@ function makeWave(url){
   ws.on("ready",()=>{
     document.getElementById("clock").textContent=fmt(0)+" / "+fmt(ws.getDuration()||0);
     paintRegions();
-    hookViz();
+    buildSpec();
   });
   ws.on("play",()=>{ try{ if(audioCtx&&audioCtx.state==="suspended") audioCtx.resume(); }catch(e){} });
   ws.on("timeupdate", t=>{
@@ -575,7 +670,8 @@ function loadLyrics(id){
 }
 function toggle(){ window._playUntil=null; if(!ws) return; ws.playPause(); }
 
-hookViz();
+setSpecMode("both");
+startSpecLoop();
 fetch("/api/tracks").then(r=>r.json()).then(d=>{
   tracks=d.tracks||[];
   renderList();
@@ -662,7 +758,7 @@ function select(i){
     badge.className="badge on"+(split==="val"?" val":"");
     badge.title=(split==="val"?"whole-song validation (holdout)":"training")+" split";
   }
-  renderList(); showErr(""); regs=[]; sel=-1; window._lyricLines=null; vizHist=[];
+  renderList(); showErr(""); regs=[]; sel=-1; window._lyricLines=null; spec=null;
   const stems=t.stems||[];
   curStem = stems.includes("drums") ? "drums" : (stems[0]||"drums");
   renderStemButtons(t);

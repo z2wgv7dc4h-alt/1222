@@ -48,6 +48,44 @@ def canonical_role(role: str | None) -> str:
     return text if text in ROLES else "riff"
 
 
+def _within(path: Path, root: Path | None) -> bool:
+    """True only when `path` really resolves inside `root`. Guards every
+    destructive action -- a corpus file outside the configured roots is
+    never deleted."""
+    if root is None:
+        return False
+    try:
+        Path(path).resolve().relative_to(Path(root).resolve())
+        return True
+    except Exception:
+        return False
+
+
+def _prune_empty(dirs, root: Path | None) -> list[str]:
+    """Remove now-empty directories, walking upward but never past `root`
+    itself (and never deleting a non-empty dir)."""
+    removed: list[str] = []
+    if root is None:
+        return removed
+    rootr = Path(root).resolve()
+    for d in sorted(set(dirs), key=lambda x: len(str(x)), reverse=True):
+        cur = Path(d)
+        while True:
+            try:
+                if not cur.exists() or not cur.is_dir():
+                    break
+                if cur.resolve() == rootr or not _within(cur, root):
+                    break
+                if any(cur.iterdir()):
+                    break
+                cur.rmdir()
+                removed.append(str(cur))
+                cur = cur.parent
+            except Exception:
+                break
+    return removed
+
+
 def create_app(lab_root: Path, flac_root: Path | None, gp_root: Path | None) -> FastAPI:
     app = FastAPI(title="boo-lab annotator")
     static = Path(__file__).parent / "static"
@@ -428,7 +466,7 @@ def create_app(lab_root: Path, flac_root: Path | None, gp_root: Path | None) -> 
 
         track = row.get("track") or ""
         cached = load_lyrics(lab_root, track)
-        if cached.get("lines"):
+        if cached.get("lines") or cached.get("plain_lines"):
             return cached
         return {"lines": [], "note": cached.get("note") or "press Lyrics to fetch"}
 
@@ -461,6 +499,98 @@ def create_app(lab_root: Path, flac_root: Path | None, gp_root: Path | None) -> 
         from .lyrics import save_lyrics
 
         return save_lyrics(lab_root, row.get("track") or "", body.get("lines") or [])
+
+    @app.post("/api/album/remove")
+    async def api_album_remove(request: Request):
+        """Real, guarded album removal. Deletes the album's FLAC/GP files
+        (ONLY under BOO_FLAC_ROOT / BOO_GP_ROOT), drops its sections and
+        holdout rows, then rescans map.csv. Requires explicit `confirm`."""
+        try:
+            body = await request.json()
+        except Exception:
+            return JSONResponse({"detail": "body not json"}, status_code=400)
+        album = (body or {}).get("album")
+        if not album:
+            return JSONResponse({"detail": "need album"}, status_code=400)
+        if not (body or {}).get("confirm"):
+            return JSONResponse({"detail": "missing confirm"}, status_code=400)
+        if flac_root is None:
+            return JSONResponse({"detail": "BOO_FLAC_ROOT not set"}, status_code=400)
+
+        rows = [resolve(r, flac_root, gp_root) for r in load_map(map_path)] if map_path.exists() else []
+        targets = [r for r in rows if (r.get("album") or "") == album]
+        if not targets:
+            return JSONResponse({"detail": "album not found in map.csv"}, status_code=404)
+
+        tracks = {(r.get("track") or "") for r in targets}
+        deleted: list[str] = []
+        skipped: list[str] = []
+        file_dirs: set[Path] = set()
+        gp_dirs: set[Path] = set()
+        for r in targets:
+            for value, root, dirs in (
+                (r.get("flac_path") or r.get("flac"), flac_root, file_dirs),
+                (r.get("gp_path") or r.get("gp"), gp_root, gp_dirs),
+            ):
+                if not value:
+                    continue
+                p = Path(value)
+                if not p.exists():
+                    continue
+                if not _within(p, root):
+                    skipped.append(str(p))
+                    continue
+                try:
+                    p.unlink()
+                    deleted.append(str(p))
+                    dirs.add(p.parent)
+                except Exception as e:
+                    skipped.append(f"{p}: {e}")
+            flac = r.get("flac_path") or r.get("flac")
+            if flac:
+                cover = _cover_near(flac)
+                if cover and _within(cover, flac_root):
+                    try:
+                        cover.unlink()
+                        deleted.append(str(cover))
+                    except Exception:
+                        pass
+
+        removed_dirs = _prune_empty(file_dirs, flac_root) + _prune_empty(gp_dirs, gp_root)
+
+        if sec_path.exists():
+            kept = []
+            for line in sec_path.read_text(encoding="utf-8").splitlines():
+                if not line.strip():
+                    continue
+                rec = json.loads(line)
+                if rec.get("album") == album and (rec.get("track") or "") in tracks:
+                    continue
+                kept.append(rec)
+            with sec_path.open("w", encoding="utf-8") as f:
+                for rec in kept:
+                    f.write(json.dumps(rec) + "\n")
+
+        from .holdout import load_holdout, write_holdout
+
+        holdout = load_holdout(lab_root)
+        trimmed = {(a, t) for (a, t) in holdout if not (a == album and t in tracks)}
+        if trimmed != holdout:
+            write_holdout(lab_root, trimmed)
+
+        from .catalogue import save_map, scan_roots
+
+        drafted = scan_roots(flac_root, gp_root)
+        save_map(map_path, drafted)
+
+        return {
+            "album": album,
+            "tracks": len(tracks),
+            "files": len(deleted),
+            "dirs": len(removed_dirs),
+            "skipped": skipped,
+            "map_rows": len(drafted),
+        }
 
     @app.post("/api/git/push")
     def api_git_push(body: dict | None = None):

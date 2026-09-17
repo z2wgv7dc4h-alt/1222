@@ -63,35 +63,69 @@ def fetch_lrclib(track: str, artist: str = "Born of Osiris", duration: float | N
 
 
 def align_whisperx(vocals: Path, plain: str) -> list[dict] | None:
+    """Force-align the PROVIDED plain lyrics to the vocals stem using
+    WhisperX's wav2vec2 aligner -- places the REAL words in time, rather
+    than running ASR and returning whatever Whisper hallucinated (which is
+    gibberish on screamed vocals). Returns timed lines, or `None` when
+    whisperx isn't installed, nothing aligned, or there is no plain text.
+    """
     try:
         import whisperx
     except Exception:
         return None
     if not vocals.exists() or not (plain or "").strip():
         return None
-    try:
-        device = "cuda"
-        model = whisperx.load_model("small", device, compute_type="float16")
-    except Exception:
-        device = "cpu"
-        model = whisperx.load_model("small", device, compute_type="int8")
+
     audio = whisperx.load_audio(str(vocals))
-    result = model.transcribe(audio, batch_size=8)
+    sample_rate = float(getattr(whisperx.audio, "SAMPLE_RATE", 16000))
+    duration = len(audio) / sample_rate
+
+    align_model = meta = None
+    for device in ("cuda", "cpu"):
+        try:
+            align_model, meta = whisperx.load_align_model(language_code="en", device=device)
+            break
+        except Exception:
+            continue
+    if align_model is None:
+        return None
+
     try:
-        align_model, meta = whisperx.load_align_model(language_code=result.get("language") or "en", device=device)
-        result = whisperx.align(result["segments"], align_model, meta, audio, device)
-    except Exception:
-        pass
-    lines = []
-    for seg in result.get("segments") or []:
-        lines.append(
-            {
-                "start": round(float(seg.get("start") or 0), 3),
-                "end": round(float(seg.get("end") or 0), 3),
-                "text": (seg.get("text") or "").strip(),
-            }
+        result = whisperx.align(
+            [{"text": " ".join(plain.split()), "start": 0.0, "end": float(duration)}],
+            align_model, meta, audio, device, return_char_alignments=False,
         )
-    return lines
+    except Exception:
+        return None
+
+    words: list[tuple[float, float]] = []
+    for seg in result.get("segments") or []:
+        for w in seg.get("words") or []:
+            if w.get("start") is not None:
+                start = float(w["start"])
+                end = float(w.get("end") or start)
+                words.append((start, max(end, start)))
+    if not words:
+        return None
+
+    line_texts = [ln.strip() for ln in plain.splitlines() if ln.strip()]
+    counts = [len(ln.split()) for ln in line_texts]
+    total = sum(counts)
+    if total != len(words):
+        # aligner merged/dropped tokens -- rescale line boundaries.
+        counts = [max(1, round(c * len(words) / total)) for c in counts]
+
+    lines: list[dict] = []
+    i = 0
+    for text, count in zip(line_texts, counts):
+        chunk = words[i:i + count]
+        i += count
+        if not chunk:
+            continue
+        start = chunk[0][0]
+        end = max(chunk[-1][1], start + 0.4)
+        lines.append({"start": round(start, 3), "end": round(end, 3), "text": text})
+    return lines or None
 
 
 def to_lrc(lines: list[dict]) -> str:
@@ -117,14 +151,22 @@ def build_lyrics(lab_root: Path, track: str, flac: Path | None, vocals: Path | N
             dur = None
     hit = fetch_lrclib(track, duration=dur)
     lines = list(hit.get("lines") or [])
-    note = "lrclib synced" if lines else "lrclib plain" if hit.get("plain") else hit.get("error") or "no lyrics"
-    if (not lines) and vocals and vocals.exists() and hit.get("plain"):
-        aligned = align_whisperx(vocals, hit["plain"])
+    plain = hit.get("plain") or ""
+    plain_lines = [ln.strip() for ln in plain.splitlines() if ln.strip()]
+    note = (
+        "lrclib synced"
+        if lines
+        else "lrclib plain — untimed, no synced version at LRCLIB"
+        if plain_lines
+        else (hit.get("error") or "no lyrics")
+    )
+    if (not lines) and vocals and vocals.exists() and plain:
+        aligned = align_whisperx(vocals, plain)
         if aligned:
             lines = aligned
-            note = "whisperx on vocals stem"
+            note = "whisperx force-aligned plain lyrics"
     key = _key(track)
-    payload = {**hit, "lines": lines, "note": note, "track": track}
+    payload = {**hit, "lines": lines, "plain_lines": plain_lines, "note": note, "track": track}
     (out_dir / f"{key}.json").write_text(json.dumps(payload, indent=2), encoding="utf-8")
     if lines:
         (out_dir / f"{key}.lrc").write_text(to_lrc(lines), encoding="utf-8")
@@ -159,5 +201,11 @@ def save_lyrics(lab_root: Path, track: str, lines: list[dict]) -> dict:
 def load_lyrics(lab_root: Path, track: str) -> dict:
     p = lab_root / "work" / "lyrics" / f"{_key(track)}.json"
     if p.exists():
-        return json.loads(p.read_text(encoding="utf-8"))
+        data = json.loads(p.read_text(encoding="utf-8"))
+        # Normalize caches written before `plain_lines` existed.
+        if "plain_lines" not in data:
+            data["plain_lines"] = [
+                ln.strip() for ln in (data.get("plain") or "").splitlines() if ln.strip()
+            ]
+        return data
     return {"lines": [], "note": "press Lyrics to fetch"}

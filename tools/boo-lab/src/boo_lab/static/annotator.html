@@ -108,6 +108,8 @@
     .stembtns button.on { border-color:var(--riff); color:var(--riff); }
     .conf { margin-left:8px; text-transform:none; letter-spacing:0; font-size:11px; color:#c4a35a; }
     .conf.bad { color:var(--break); }
+    button.danger { color:var(--break); border-color:#5a2a26; }
+    button.danger:hover { border-color:var(--break); color:#ffb0a6; }
   </style>
 </head>
 <body>
@@ -141,6 +143,7 @@
   <p><b>Lyrics</b> — fetch timed lines. Click a line to seek. − / + moves that line 0.2s. all −/+ shifts the whole song. Save lyrics writes work/lyrics.</p>
   <p><b>Push git</b> — commits src + data + lyrics in the god-tier-metal repo and pushes. Needs git remotes already set on your machine.</p>
   <p><b>Pack</b> — after Save, cut mix/drums/bass/other/guitar/piano/vocals/no-vox for every box on this song into work/pack (plus a train/val tag).</p>
+  <p><b>Remove album</b> — deletes the selected song's whole album (FLACs + GP) from the corpus, drops its labels and holdout rows, then rescans. Only touches files under the configured FLAC/GP roots, and asks for confirmation.</p>
   <p><b>Drop</b> (sidebar) — type band name, drop zip/FLAC/GP. Copies into the corpus. Does not rename your rips.</p>
 </aside>
 <div class="app">
@@ -180,6 +183,7 @@
         <button type="button" id="btnDump">JSON</button>
         <button type="button" id="btnNext">Next GP</button>
         <button type="button" id="btnGit">Push git</button>
+        <button type="button" id="btnRemoveAlbum" class="danger">Remove album</button>
         <button type="button" id="btnHow">How</button>
       </div>
       <div class="pins">
@@ -523,22 +527,45 @@ function paintLyrics(){
     box.appendChild(d);
   });
 }
+function paintPlain(lines, note){
+  const box=document.getElementById("lyricbox");
+  if(!box) return;
+  box.innerHTML="";
+  if(note){
+    const n=document.createElement("div");
+    n.style.color="#8b8680"; n.style.fontSize="12px"; n.style.marginBottom="4px";
+    n.textContent=note;
+    box.appendChild(n);
+  }
+  lines.forEach((text)=>{
+    const d=document.createElement("div"); d.className="ly";
+    const span=document.createElement("span"); span.className="txt";
+    span.textContent=text;
+    d.appendChild(span); box.appendChild(d);
+  });
+}
 function loadLyrics(id){
   const box=document.getElementById("lyricbox");
   if(!box) return;
   box.textContent="…";
   fetch("/api/lyrics/"+id).then(r=>r.json()).then(x=>{
     const lines=x.lines||[];
+    const plain=x.plain_lines||[];
     const lane=document.getElementById("lyriclane");
-    if(!lines.length){
-      box.textContent=x.note||"press Lyrics to fetch";
-      if(lane) lane.classList.add("idle");
-      window._lyricLines=[];
+    window._lyricLines=[];
+    if(lines.length){
+      if(lane) lane.classList.remove("idle");
+      window._lyricLines=lines;
+      paintLyrics();
       return;
     }
-    if(lane) lane.classList.remove("idle");
-    window._lyricLines=lines;
-    paintLyrics();
+    if(plain.length){
+      if(lane) lane.classList.remove("idle");
+      paintPlain(plain, x.note||"plain lyrics (untimed)");
+      return;
+    }
+    box.textContent=x.note||"press Lyrics to fetch";
+    if(lane) lane.classList.add("idle");
   }).catch(()=>{ box.textContent="lyrics failed"; });
 }
 function toggle(){ window._playUntil=null; if(!ws) return; ws.playPause(); }
@@ -791,6 +818,20 @@ document.getElementById("btnGit").onclick=()=>{
     const x=await r.json();
     showErr(x.ok?("pushed "+(x.root||"")):("git: "+(x.error||x.log||"failed")), !x.ok);
   }).catch(e=>showErr("git: "+e,true));
+};
+document.getElementById("btnRemoveAlbum").onclick=()=>{
+  const t=tracks[trackId]; if(!t) return;
+  const n=tracks.filter(x=>x.album===t.album).length;
+  if(!confirm('Remove album "'+t.album+'"?\n\nDeletes its '+n+' track(s) and GP files from the corpus, drops its labels + holdout rows, then rescans map.csv.\n\nCannot be undone.')) return;
+  showErr("removing album…");
+  fetch("/api/album/remove",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({album:t.album,confirm:true})})
+    .then(async r=>{
+      const x=await r.json().catch(()=>({}));
+      if(!r.ok) throw (x.detail||JSON.stringify(x));
+      showErr("removed "+x.tracks+" track(s), "+x.files+" file(s)"+(x.skipped&&x.skipped.length?(" · skipped "+x.skipped.length):""));
+      setTimeout(()=>location.reload(),900);
+    })
+    .catch(e=>showErr("remove: "+e,true));
 };
 document.getElementById("btnPack").onclick=()=>{
   const t=tracks[trackId]; if(!t) return;

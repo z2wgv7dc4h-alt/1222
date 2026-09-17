@@ -14,6 +14,9 @@ dev = ["pytest>=7.0"]
 # Default vocal-melody pitch tracker (CREPE via torchcrepe); vocal_melody
 # falls back to librosa.pyin when this isn't installed.
 pitch = ["torchcrepe"]
+# Plain-lyric timing via WhisperX forced alignment (lyrics.align_whisperx);
+# Lyrics still works without it, showing plain lyrics untimed.
+align = ["whisperx"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

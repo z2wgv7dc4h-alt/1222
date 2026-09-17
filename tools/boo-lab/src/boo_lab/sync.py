@@ -322,6 +322,28 @@ def _write_sync(lab_root: Path, rec: dict) -> None:
         f.write(json.dumps(rec, ensure_ascii=False) + "\n")
 
 
+def _evaluate_source(src: Path, gp: Path, onsets: list[float]) -> dict:
+    """Run both witnesses (onset + chroma) on one audio source."""
+    env_audio, hop_s = audio_envelope(Path(src))
+    env_gp = envelope_from_times(onsets, len(env_audio), hop_s)
+    lag, score = best_lag_and_score(env_gp, env_audio, hop_s)
+    ratio, _rlag, rscore = best_clock_fit(env_gp, env_audio, hop_s, span=0.08)
+    clag = cscore = None
+    try:
+        audio_c, chop = audio_chroma(Path(src))
+        gp_c = gp_chroma(gp, chop, audio_c.shape[1])
+        if gp_c is not None:
+            clag, cscore = chroma_lag_and_score(gp_c, audio_c, chop)
+    except Exception:
+        pass
+    return {
+        "lag": lag, "score": score, "ratio": ratio, "rscore": rscore,
+        "clag": clag, "cscore": cscore,
+        "onset_ok": decide(lag, score),
+        "chroma_ok": clag is not None and decide(clag, cscore),
+    }
+
+
 def sync_track(lab_root: Path, album: str | None, track: str | None) -> dict:
     """Score one song's tab clock against its audio. `ValueError` when either
     `album` or `track` is missing (never the whole catalog)."""
@@ -357,52 +379,36 @@ def sync_track(lab_root: Path, album: str | None, track: str | None) -> dict:
         _write_sync(lab_root, rec)
         return rec
 
-    src = flac if flac.exists() else None
-    used = "mix"
-    if src is not None:
-        from .stems import find_stem
-
-        stem = find_stem(flac, lab_root / "work" / "stems", "guitar")
-        if stem:
-            src, used = stem, "guitar"
-    rec["used_stem"] = used
-    if src is None or not Path(src).exists():
+    if not flac.exists():
         rec["note"] = "no-audio"
         _write_sync(lab_root, rec)
         return rec
 
-    env_audio, hop_s = audio_envelope(Path(src))
-    env_gp = envelope_from_times(onsets, len(env_audio), hop_s)
-    lag, score = best_lag_and_score(env_gp, env_audio, hop_s)
-    # Diagnostic only: a rate that fits better than the raw peak can mean a
-    # notated tempo difference, but on a tab that's short because a section is
-    # missing it also finds bogus peaks -- so it never overrides the raw lag.
-    ratio, _rlag, rscore = best_clock_fit(env_gp, env_audio, hop_s, span=0.08)
-    rec["clock_ratio"] = round(ratio, 4)
-    rec["lag_sec"] = round(lag, 4)
-    rec["score"] = round(score, 4)
-    onset_ok = decide(lag, score)
-    # Co-witness: harmonic (chroma) alignment is indifferent to the drums that
-    # dominate onset strength, so it catches tabs the onset comb mis-peaks on.
-    chroma_ok = False
-    try:
-        audio_c, chop = audio_chroma(Path(src))
-        gp_c = gp_chroma(gp, chop, audio_c.shape[1])
-        if gp_c is not None:
-            clag, cscore = chroma_lag_and_score(gp_c, audio_c, chop)
-            rec["chroma_lag"] = round(clag, 4)
-            rec["chroma_score"] = round(cscore, 4)
-            chroma_ok = decide(clag, cscore)
-    except Exception:
-        pass
-    rec["sync_ok"] = onset_ok or chroma_ok
+    from .stems import find_stem
+
+    guitar = find_stem(flac, lab_root / "work" / "stems", "guitar")
+    # Prefer the guitar stem (drums gone), but fall back to the mix when that
+    # yields no passing witness -- isolated guitar can mis-peak where the full
+    # mix does not, and vice versa.
+    used, ev = "guitar", _evaluate_source(guitar, gp, onsets) if guitar else None
+    if guitar is None or not (ev["onset_ok"] or ev["chroma_ok"]):
+        alt = _evaluate_source(flac, gp, onsets)
+        if ev is None or alt["onset_ok"] or alt["chroma_ok"]:
+            used, ev = "mix", alt
+    rec["used_stem"] = used
+    rec["clock_ratio"] = round(ev["ratio"], 4)
+    rec["lag_sec"] = round(ev["lag"], 4)
+    rec["score"] = round(ev["score"], 4)
+    rec["chroma_lag"] = round(ev["clag"], 4) if ev["clag"] is not None else None
+    rec["chroma_score"] = round(ev["cscore"], 4) if ev["cscore"] is not None else None
+    rec["sync_ok"] = ev["onset_ok"] or ev["chroma_ok"]
     if rec["sync_ok"]:
-        rec["note"] = "ok" if onset_ok else "ok (chroma)"
-    elif abs(ratio - 1.0) > RATE_TOLERANCE and rscore > score + 0.03:
-        rec["note"] = "clock x%.3f (notated tempo differs)" % ratio
-    elif abs(lag) >= LAG_TOLERANCE:
-        rec["note"] = "lag %.3fs > %.3fs" % (abs(lag), LAG_TOLERANCE)
+        rec["note"] = "ok" if ev["onset_ok"] else "ok (chroma)"
+    elif abs(ev["ratio"] - 1.0) > RATE_TOLERANCE and ev["rscore"] > ev["score"] + 0.03:
+        rec["note"] = "clock x%.3f (notated tempo differs)" % ev["ratio"]
+    elif abs(ev["lag"]) >= LAG_TOLERANCE:
+        rec["note"] = "lag %.3fs > %.3fs" % (abs(ev["lag"]), LAG_TOLERANCE)
     else:
-        rec["note"] = "low score %.3f < %.3f" % (score, SCORE_THRESHOLD)
+        rec["note"] = "low score %.3f < %.3f" % (ev["score"], SCORE_THRESHOLD)
     _write_sync(lab_root, rec)
     return rec

@@ -241,13 +241,20 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     if args.cmd == "stems":
-        from .stems import run_demucs
+        from .stems import run_demucs, stem_dir
 
         out = root() / "work" / "stems"
+        album = getattr(args, "album", None)
         for r in rows:
+            if album and (r.get("album") or "") != album:
+                continue
             fp = r.get("flac_path")
             if not fp or not Path(fp).exists():
                 print("SKIP stems", r.get("track"), "no flac")
+                continue
+            cached = stem_dir(Path(fp), out, args.model)
+            if cached.exists() and any(cached.iterdir()):
+                print("STEMS", r.get("track"), "cached", cached)
                 continue
             dest = run_demucs(Path(fp), out, model=args.model, two_stems=None)
             print("STEMS", r.get("track"), dest)

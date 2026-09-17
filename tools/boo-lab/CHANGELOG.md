@@ -9,6 +9,10 @@
   alternative endings — and advances by the same beat arithmetic as the onsets. GP clock matches
   audio length within ~2% for 10 of 13 (was 0.85–1.76×). `catalogue._key`/scan now matches
   space-numbered `NN Title.gp5` (`07 Exist` had silently unmatched). `sync_ok`: 02/06/10 (was 0).
+- **Guitar-stem sync.** `sync` now prefers the cached 6-stem `guitar.wav` and falls back to the mix
+  per witness (guitar-only broke `02`, which the mix gets right). `stems` now actually honors its
+  long-parsed-but-ignored `--album` flag and skips already-cached tracks; ran it to cache guitar for
+  all 13 A Higher Place tracks.
 - **Sync chroma co-witness.** Added `gp_chroma` (tab pitches held over each beat) + `audio_chroma`
   (`chroma_cqt`) + `chroma_lag_and_score`; `sync.jsonl` records `chroma_lag`/`chroma_score` and
   `sync_ok` passes if **either** the onset or chroma witness aligns. Rescued `03` (onset 1.21 s vs

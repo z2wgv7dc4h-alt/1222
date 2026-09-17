@@ -171,3 +171,37 @@ def test_scan_roots_excludes_disc_images(tmp_path):
 def test_scan_roots_bad_input_is_empty(tmp_path):
     assert cat.scan_roots(None, None) == []
     assert cat.scan_roots(tmp_path / "nope", tmp_path / "nope2") == []
+
+
+def test_scan_roots_matches_space_numbered_gp(tmp_path):
+    # Regression: "07 Exist.gp5" keyed as "07exist" and silently never matched
+    # "07 - Exist.flac" (looked like the song simply had no tab).
+    flac_root = tmp_path / "corpus"
+    album = flac_root / "Album"
+    (album / "tracks").mkdir(parents=True)
+    (album / "tracks" / "07 - Exist.flac").write_bytes(b"x")
+
+    gp_root = tmp_path / "gp"
+    gp_root.mkdir()
+    gp = gp_root / "07 Exist.gp5"
+    gp.write_bytes(b"x")
+
+    rows = cat.scan_roots(flac_root, gp_root)
+
+    assert rows[0]["match"] == "yes"
+    assert rows[0]["gp"] == str(gp)
+
+
+def test_scan_roots_space_numbered_gp_does_not_overmatch(tmp_path):
+    flac_root = tmp_path / "corpus"
+    album = flac_root / "Album"
+    (album / "tracks").mkdir(parents=True)
+    (album / "tracks" / "07 - Exist.flac").write_bytes(b"x")
+
+    gp_root = tmp_path / "gp"
+    gp_root.mkdir()
+    (gp_root / "07 Something Else.gp5").write_bytes(b"x")
+
+    rows = cat.scan_roots(flac_root, gp_root)
+
+    assert rows[0]["match"] == "unknown" and rows[0]["gp"] == ""

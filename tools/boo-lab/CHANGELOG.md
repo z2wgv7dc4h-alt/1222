@@ -28,7 +28,7 @@
 - **Real drafts.** `structure --album "2009 - A Higher Place"` wrote 125 `msa-draft` rows,
   `sections.jsonl` untouched; `compare` reports F0.5=0.737 F3=0.800 role3=0.250 on Rebirth.
 - **Repo hygiene.** `data/{drafts,beats,compare,sync,agree}.*` and `*.egg-info/` gitignored;
-  `boo_lab.egg-info` untracked. Tests: `test_natten_compat`, `test_device`, `test_doctor` → 169.
+  `boo_lab.egg-info` untracked. Tests: `test_natten_compat`, `test_device`, `test_doctor` → 171.
 
 ## 2026-09-17
 

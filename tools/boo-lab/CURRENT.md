@@ -279,6 +279,9 @@ Reading: **F3 high + role agreement low = the intern finds the edges but names t
 11. `torch+cpu` venv + allin1's `device='cpu'` default → every intern ran on CPU with a GPU idle. Use `device.py`; check `doctor`.
 12. natten ≥0.17 dropped the pre-0.17 API allin1 imports (`natten1dav`/`1dqkrpb`/`2dav`/`2dqkrpb`) → `ImportError`. Fixed by `_natten_compat` (exact `get_window_start`/`get_pb_start` ports). Do not "fix" by pinning old natten — no Windows/py3.12 wheel exists.
 13. madmom on py3.12 + numpy2: `NameError: integer`, `np.int`, and ragged `asarray` in downbeat tracking. All repaired by `_natten_compat.install()`.
+14. GP clock ignored `song.tempo` and defaulted to 120 BPM, stretching every tab ~1.6× — `sync` could never match. Read `song.tempo` (per-measure `header.tempo` only when set).
+15. Repeat unroll reset a group's pass count on re-entry (`isRepeatOpen`) → infinite loop (2M onsets) on 02/04/06. Use `setdefault`; the unroll is now unit-tested.
+16. Scan GP keys didn't strip a space-form track number, so `07 Exist.gp5` keyed as `07exist` and silently never matched `07 - Exist.flac` (read as "no tab"). Space-numbered keys are added; both the match and the no-overmatch case are tested.
 
 ## What to do next (human)
 

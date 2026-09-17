@@ -2,6 +2,10 @@
 
 ## 2026-09-18
 
+### Guess reads the tab's section structure
+
+- `extract.estimate_from_gp` now walks the tab in **playback order** (repeats expanded) instead of once, and carries the marker's **section identity**: `form` = the letter (`A`/`B`/`C1`), `figure_id` = `role-token` (`riff-B`), and `unique` when the letter occurs once. A repeated letter (`02`'s `B`, `10`'s `A/B/F`, `12`'s `A/C/D`) now shows up as the *same returning section* rather than a fresh riff. The last box reaches the repeat-aware tab length (`_playback_duration`). The studio's Guess now uses those `form`/`figure_id`/`unique` fields instead of hardcoding `A`/`<role>-A`. Roles still come from `infer_role` (letters aren't roles; `C1 - Solo` → solo).
+
 ### Hardening pass
 
 - **Fail-closed keeper law, one reader.** `schema.is_keeper` is true only for `human`/`guess-accepted`

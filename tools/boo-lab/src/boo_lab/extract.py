@@ -283,41 +283,103 @@ def _marker_text(measure) -> str | None:
 
 
 
-def estimate_from_gp(gp_path: Path) -> dict:
-    """Turn GP measure markers + tempo map into second-based sections."""
-    import guitarpro as gp
+def _playback_duration(track, song_bpm: float) -> float:
+    """Real tab LENGTH in seconds with repeats expanded (`sync._playback_order`),
+    applying each measure's own tempo/time-signature. The once-through sum a
+    naive walk produces is short for any tab with repeat signs, which made the
+    last marker section (and Guess's coverage) stop early."""
+    from .sync import _playback_order
 
-    song = gp.parse(str(gp_path))
-    bpm = float(getattr(getattr(song, "tempo", None), "value", None) or getattr(song, "tempo", 120) or 120)
-    track = _rhythm_track(song) or (song.tracks[0] if song.tracks else None)
-    if track is None:
-        return {"bpm": bpm, "sections": [], "reason": "no track"}
     t = 0.0
-    cuts = []  # (time, role, raw)
-    for measure in track.measures:
+    bpm = float(song_bpm or 120.0)
+    for idx in _playback_order(track.measures):
+        measure = track.measures[idx]
         header = getattr(measure, "header", None)
-        if header is not None:
-            tempo = getattr(header, "tempo", None)
-            val = getattr(tempo, "value", None) if tempo is not None else None
-            if val:
-                bpm = float(val)
-        marker = _marker_text(measure)
-        role = infer_role(marker)
-        if marker:
-            cuts.append((t, role or "verse", marker))
+        tempo = getattr(header, "tempo", None)
+        val = getattr(tempo, "value", None) if tempo is not None else None
+        if val:
+            bpm = float(val)
         ts = getattr(measure, "timeSignature", None) or getattr(header, "timeSignature", None)
         num = getattr(ts, "numerator", 4) if ts else 4
         den_obj = getattr(ts, "denominator", 4) if ts else 4
         den = getattr(den_obj, "value", den_obj) or 4
-        beats = float(num) * 4.0 / float(den)
-        t += beats * 60.0 / max(bpm, 1.0)
-    duration = t
+        t += (float(num) * 4.0 / float(den)) * 60.0 / max(bpm, 1.0)
+    return t
+
+
+def _section_letter(marker_text: str) -> tuple[str | None, str | None]:
+    """Structural-letter token for a marker: `'A (0:00)' → ('A','A')`,
+    `'C1 - Solo' → ('C','C1')`; `(None, None)` for a semantic marker like
+    `'Pre-Chorus'` (that carries a role, not a section letter). Lets Guess
+    carry the tab's own section identity so repeat letters are visible."""
+    import re
+
+    head = re.split(r"\s*[-(]", (marker_text or "").strip(), maxsplit=1)[0].strip()
+    m = re.fullmatch(r"([A-Z])([0-9]*)", head)
+    if not m:
+        return None, None
+    return m.group(1), head
+
+
+def estimate_from_gp(gp_path: Path) -> dict:
+    """Turn GP measure markers + tempo map into second-based sections.
+
+    Walks the tab in **playback order** (repeats expanded via
+    `sync._playback_order`), so a repeated section appears at each play; and
+    carries the marker's own section identity (`form` = the letter, `figure_id`
+    = `role-token`, `unique` when the token occurs once). A repeated letter is
+    therefore the *same returning section*, not a fresh riff."""
+    import guitarpro as gp
+
+    from .sync import _playback_order
+
+    song = gp.parse(str(gp_path))
+    bpm = float(getattr(getattr(song, "tempo", None), "value", None) or getattr(song, "tempo", 120) or 120)
+    song_bpm = bpm
+    track = _rhythm_track(song) or (song.tracks[0] if song.tracks else None)
+    if track is None:
+        return {"bpm": bpm, "sections": [], "reason": "no track"}
+    t = 0.0
+    bpm = song_bpm
+    cuts = []  # (start, role, raw, form, token)
+    for idx in _playback_order(track.measures):
+        measure = track.measures[idx]
+        header = getattr(measure, "header", None)
+        tempo = getattr(header, "tempo", None)
+        val = getattr(tempo, "value", None) if tempo is not None else None
+        if val:
+            bpm = float(val)
+        marker = _marker_text(measure)
+        if marker:
+            role = infer_role(marker) or "riff"
+            form, token = _section_letter(marker)
+            cuts.append((round(t, 3), role, marker, form, token))
+        ts = getattr(measure, "timeSignature", None) or getattr(header, "timeSignature", None)
+        num = getattr(ts, "numerator", 4) if ts else 4
+        den_obj = getattr(ts, "denominator", 4) if ts else 4
+        den = getattr(den_obj, "value", den_obj) or 4
+        t += (float(num) * 4.0 / float(den)) * 60.0 / max(bpm, 1.0)
+    # Repeat-aware length (same walk), so the last section reaches the tab end.
+    duration = _playback_duration(track, song_bpm)
     if not cuts:
         return {"bpm": bpm, "sections": [], "reason": "no markers in tab", "duration": duration}
+
+    from collections import Counter
+
+    token_counts = Counter(c[4] for c in cuts if c[4])
     sections = []
-    for i, (start, role, raw) in enumerate(cuts):
+    for i, (start, role, raw, form, token) in enumerate(cuts):
         end = cuts[i + 1][0] if i + 1 < len(cuts) else duration
         if end <= start:
             end = start + 0.5
-        sections.append({"role": role, "start": round(start, 3), "end": round(end, 3), "source": "gp-marker", "raw": raw})
+        sections.append({
+            "role": role,
+            "start": start,
+            "end": round(end, 3),
+            "source": "gp-marker",
+            "raw": raw,
+            "form": form or "A",
+            "figure_id": "%s-%s" % (role, token or "A"),
+            "unique": bool(token) and token_counts[token] == 1,
+        })
     return {"bpm": bpm, "sections": sections, "duration": duration}

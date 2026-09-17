@@ -123,19 +123,35 @@
 <aside class="drawer" id="howto">
   <button type="button" class="close" id="btnCloseHow">Close</button>
   <h3>How to mark a song</h3>
-  <p>Boxes are wavesurfer regions. Drag the body, drag an edge, click empty wave to seek. Overlaps are allowed when the roles differ. Each row also carries a <b>figure</b> id, a <b>source</b>, and an <b>heard</b> checkbox.</p>
-  <p><b>Heard</b> — a box is only saved when you tick heard (you actually listened to it). Unheard boxes and raw drafts are dropped on Save. A heard draft becomes <code>guess-accepted</code>; a heard human box stays <code>human</code>.</p>
-  <p><b>Same-role overlap</b> — two boxes of the same role overlapping by more than 50&nbsp;ms is rejected with the pair shown. Different roles (a figure over a function) may overlap freely.</p>
-  <p><b>Identity</b> — each box carries form (large letter, default A) + figure id (small, e.g. riff-A) + role, plus unique (single-use / through-composed figure), instrument (when two guitars differ), and start/end bars (1-based GP measures; filled on Save only when the tab matches).</p>
-  <h4>Buttons</h4>
+  <p><b>Quick start:</b> (1) pick a song on the left and wait until the clock shows its full length. (2) Drag a box on the waveform for a section, then set its <b>role</b> in the table. (3) Tick <b>heard</b> on every box you actually listened to. (4) Press <b>Save</b>.</p>
+  <p>Drag a box to move it, drag its edge to resize, click empty sound to jump there. Boxes may overlap <i>only</i> when their roles differ (e.g. a Breakdown sitting on a Riff).</p>
+  <h4>What each table column means</h4>
   <ul>
-    <li><b>Intro</b> — pads, swell, count-in</li>
-    <li><b>Build</b> — rising into a drop</li>
-    <li><b>Riff</b> — the repeating guitar idea</li>
-    <li><b>Hook</b> — the bit you hum</li>
-    <li><b>Breakdown</b> — half-time slam. Layer on a Riff if the guitar does not change</li>
-    <li><b>Solo</b> / <b>Chill</b> / <b>Pulse</b> / <b>Outro</b></li>
+    <li><b>role</b> — what the section is (pick from the list below). The only required label.</li>
+    <li><b>figure</b> — a name for the musical idea, e.g. <code>riff-A</code>. Same idea coming back? Keep the same name. New idea? New letter.</li>
+    <li><b>form</b> — big-picture letter for the song part (A, B, C…). Usually leave it <code>A</code>.</li>
+    <li><b>uniq</b> — tick if this idea happens only once (nothing repeats it).</li>
+    <li><b>inst</b> — which instrument leads here (rhythm / lead / bass / synth…). Blank is fine.</li>
+    <li><b>bar0 / bar1</b> — the tab's measure numbers; filled in automatically on Save when a Guitar Pro tab matches, otherwise blank.</li>
+    <li><b>start / end</b> — seconds in the audio; set by the box you drew.</li>
+    <li><b>source</b> — where the row came from (<code>human</code>, or a draft like Guess / msa-draft). Leave it — Save handles it.</li>
+    <li><b>heard</b> — tick once you've truly listened. Unticked boxes are thrown away on Save.</li>
   </ul>
+  <p><b>heard is the gate.</b> Only ticked boxes are saved (as <code>human</code>, or <code>guess-accepted</code> if the row started as a draft). Nothing unticked survives. There is no in-app undo, but each Save keeps the previous file as <code>data/sections.jsonl.bak</code>.</p>
+  <p><b>Same-role overlap</b> — two boxes of the <i>same</i> role overlapping by more than 50&nbsp;ms refuses the whole Save and names the pair. Different roles may overlap freely.</p>
+  <h4>Roles (pick the plainest one)</h4>
+  <ul>
+    <li><b>Intro</b> — the opening (pads, swell, count-in).</li>
+    <li><b>Riff</b> — the repeating guitar idea.</li>
+    <li><b>Hook</b> — the bit you hum / the chorus.</li>
+    <li><b>Breakdown</b> — the half-time slam. Can sit <i>on top of</i> a Riff if the guitar doesn't change.</li>
+    <li><b>Build</b> — a rise that isn't the hook itself.</li>
+    <li><b>Solo</b> — a lead / melodic excursion.</li>
+    <li><b>Chill</b> — the energy sits down (a real breather, not just a quiet intro).</li>
+    <li><b>Pulse</b> — a named synth / keyboard loop you can hum.</li>
+    <li><b>Outro</b> — the ending.</li>
+  </ul>
+  <p>Rule of thumb: Riff/Hook/Solo/Pulse describe a <i>figure</i>; Intro/Build/Breakdown/Chill/Outro describe a <i>function</i>. Figure and function boxes can overlap.</p>
   <h4>Keys</h4>
   <ul>
     <li>Space — play / pause</li>
@@ -144,22 +160,21 @@
     <li>S save · N next with tab · J / K next / previous song</li>
     <li>Delete — remove selected box · Ctrl+Z undo · ? this panel</li>
   </ul>
-  <h4>Guess / Lyrics / Pack</h4>
-  <p><b>Guess</b> — GP markers + Demucs drums + librosa half-time. Adds <code>source=guess</code> draft boxes (unheard). The status line also reports how much of the track Guess actually reached.</p>
-  <p><b>Load drafts</b> — pull MSA <code>source=msa-draft</code> boxes from <code>data/drafts.jsonl</code> for this song, appended into the table as unheard. Tick heard to accept one as <code>guess-accepted</code>. Drafts are never auto-saved and Save never rewrites <code>drafts.jsonl</code>.</p>
-  <p><b>Stem picker</b> — under the drums lane, switch between any cached demucs stem: drums / bass / guitar / piano / other / vocals (6-stem). Playhead stays linked to the mix.</p>
-  <p><b>Drum confidence</b> — if the per-section classifier flags snare-undercount on a dense mix, the lane says so; hover for the reason. Treat those boxes as “verify by ear”, not ground truth.</p>
-  <p><b>VAL badge</b> — songs reserved for the whole-song validation split are tagged VAL in the header; everything else is training.</p>
-  <p><b>Lyrics</b> — fetch timed lines. Click a line to seek. − / + moves that line 0.2s. all −/+ shifts the whole song. Save lyrics writes work/lyrics.</p>
-  <p><b>Push git</b> — commits src + data + lyrics in the god-tier-metal repo and pushes. Needs git remotes already set on your machine.</p>
-  <p><b>Pack</b> — after Save, cut mix/drums/bass/other/guitar/piano/vocals/no-vox for every box on this song into work/pack (plus a train/val tag).</p>
-  <p><b>Remove album</b> — deletes the selected song's whole album (FLACs + GP) from the corpus, drops its labels and holdout rows, then rescans. Only touches files under the configured FLAC/GP roots, and asks for confirmation.</p>
-  <p><b>Drop</b> (sidebar) — type band name, drop zip/FLAC/GP. Copies into the corpus. Does not rename your rips.</p>
+  <h4>Guess, drafts and the rest</h4>
+  <p><b>Guess</b> — proposes boxes from the Guitar Pro tab's markers plus simple audio cues (half-time / kick) on the isolated drums. They arrive as unheard <code>source=guess</code> rows. It labels only what it can justify; the status line tells you how far it got — paint the rest by hand.</p>
+  <p><b>Load drafts</b> — pulls machine drafts (allin1 <code>msa-draft</code>, etc.) for this song and appends them unheard. Tick heard to keep one. Drafts are never saved by themselves, and Save never rewrites them.</p>
+  <p><b>Stem picker</b> — listen to any cached demucs stem (drums / bass / guitar / piano / other / vocals); the playhead stays linked to the mix.</p>
+  <p><b>Drum confidence</b> — if the classifier suspects it undercounted snares on a dense mix, it says so; treat those as "verify by ear".</p>
+  <p><b>VAL badge</b> — this song is held out for validation; leave it unpinned.</p>
+  <p><b>Lyrics</b> — fetch timed lines; click a line to seek; ± moves it 0.2&nbsp;s; Save writes under work/lyrics.</p>
+  <p><b>Pack</b> — after Save, cut per-box audio clips (mix + stems) into work/pack, tagged train/val.</p>
+  <p><b>Push git / Remove album / Drop</b> — commit and push the repo; delete a whole album from the corpus (asks first, only touches files under the configured roots); or add a band by dropping a zip/FLAC/GP.</p>
 </aside>
 <div class="app">
   <aside>
-    <h1>boo-lab</h1>
-    <p>Born of Osiris desk · green GP5 · grey none</p>
+  <h1>boo-lab</h1>
+  <p>Pick a song → drag boxes → set role → tick heard → Save. <b>How</b> explains every column.
+  Green GP5 = a tab matched; grey = none.</p>
     <div id="dropzone">Drop FLAC / GP / zip here
       <input id="bandName" placeholder="band name e.g. veil of maya" />
     </div>
@@ -232,7 +247,20 @@
       <div id="lyricbox" class="lyrics"></div>
     </div>
     <table>
-      <thead><tr><th>role</th><th>figure</th><th>form</th><th>uniq</th><th>inst</th><th>bar0</th><th>bar1</th><th>start</th><th>end</th><th>source</th><th>heard</th><th></th></tr></thead>
+      <thead><tr>
+<th title="What the section is: intro, riff, hook, breakdown, solo, chill, pulse, build, outro">role</th>
+<th title="Name of the musical idea, e.g. riff-A. Same idea returning = same name">figure</th>
+<th title="Big-picture song-part letter: A, B, C… (usually A)">form</th>
+<th title="Tick if this idea happens only once">uniq</th>
+<th title="Which instrument leads here: rhythm / lead / bass / synth…">inst</th>
+<th title="Tab measure where the box starts (auto-filled on Save when a tab matches)">bar0</th>
+<th title="Tab measure where the box ends">bar1</th>
+<th title="Start time in the audio (seconds)">start</th>
+<th title="End time in the audio (seconds)">end</th>
+<th title="Where the row came from: human, or a draft (guess / msa-draft)">source</th>
+<th title="Tick only if you actually listened — unticked boxes are dropped on Save">heard</th>
+<th></th>
+</tr></thead>
       <tbody id="rows"></tbody>
     </table>
     <p class="foot">Drag a box. Click empty wave to seek. Different roles may overlap. S save · N next</p>
@@ -876,9 +904,10 @@ function estimate(){
     snap();
     const draft=(x.sections||[]).map(s=>{
       const role=canonRole(s.role);
-      return {role,start:+s.start,end:+s.end,figure_id:role+"-A",
-              form:"A",unique:false,instrument:"",start_bar:null,end_bar:null,
-              source:"guess",heard:false};
+      return {role,start:+s.start,end:+s.end,
+              figure_id:s.figure_id|| (role+"-A"),
+              form:s.form|| "A",unique:!!s.unique,instrument:"",start_bar:null,end_bar:null,
+              source:(SOURCE_OPTS.includes(s.source)?s.source:"guess"),heard:false};
     });
     if(merge){
       draft.forEach(d=>{

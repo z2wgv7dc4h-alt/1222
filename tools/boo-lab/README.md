@@ -106,6 +106,23 @@ One album side per session.
 5. Old pins without `heard`: `boo-lab hear --album X --track Y` (that track only).
 6. If the interns are installed: `boo-lab structure --album X`, then `boo-lab compare --album X`.
 
+## The table columns
+
+Header: `role figure form uniq inst bar0 bar1 start end source heard` (hover any header in the UI).
+
+- **role** — what the section is (`intro riff hook breakdown solo chill pulse build outro`). The only required label.
+- **figure** — a name for the musical idea (`riff-A`); the same idea returning keeps the same name.
+- **form** — big-picture song-part letter (A/B/C…; usually `A`).
+- **uniq** — tick if the idea happens only once.
+- **inst** — which instrument leads (`rhythm`/`lead`/`bass`/`drums`/`synth`/`vocal`/`mix`); blank is fine.
+- **bar0 / bar1** — the tab's measures (1-based); auto-filled on Save **only** when a GP tab matches, else blank.
+- **start / end** — seconds in the audio.
+- **source** — `human`, or a draft (`guess` / `msa-draft` / `songformer-draft`).
+- **heard** — the save gate; unticked boxes are dropped.
+
+Figure roles (`riff`/`hook`/`solo`/`pulse`) may overlap function roles (`intro`/`build`/`breakdown`/`chill`/`outro`);
+two boxes of the *same* role overlapping >50 ms refuses the whole Save.
+
 ## Ingest a new band
 
 Type the band name. Drop a **zip or folder** (not RAR). FLACs + `cover.jpg` + `.gp5` can arrive together or tabs-only.

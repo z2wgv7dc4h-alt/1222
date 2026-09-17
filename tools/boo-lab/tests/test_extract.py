@@ -115,6 +115,31 @@ def test_load_human_sections_skips_malformed_and_incomplete_lines(tmp_path):
     assert ex.load_human_sections(tmp_path) == {("A", "T"): [(0.0, 1.0, "intro")]}
 
 
+def test_playback_duration_expands_repeats():
+    from types import SimpleNamespace
+
+    def meas(open_=False, close=-1):
+        ts = SimpleNamespace(numerator=4, denominator=SimpleNamespace(value=4))
+        header = SimpleNamespace(timeSignature=ts, tempo=None,
+                                 isRepeatOpen=open_, repeatClose=close)
+        return SimpleNamespace(header=header, timeSignature=ts)
+
+    # measure 1 opens, measure 2 closes once -> order [0,1,2,1,2,3]
+    track = SimpleNamespace(measures=[meas(), meas(open_=True), meas(close=1), meas()])
+    assert ex._playback_duration(track, 120.0) == 12.0  # 6 measures * 4 beats * 0.5s
+
+    plain = SimpleNamespace(measures=[meas(), meas(), meas(), meas()])
+    assert ex._playback_duration(plain, 120.0) == 8.0  # once-through, no repeats
+
+
+def test_section_letter_parses_structural_markers():
+    assert ex._section_letter("A (0:00)") == ("A", "A")
+    assert ex._section_letter("C1 - Solo") == ("C", "C1")
+    assert ex._section_letter("B - Solo") == ("B", "B")
+    assert ex._section_letter("Pre-Chorus") == (None, None)  # semantic, not a letter
+    assert ex._section_letter("") == (None, None)
+
+
 # --- gp_track_names / bad input ---------------------------------------------
 
 

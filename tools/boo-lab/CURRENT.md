@@ -138,17 +138,19 @@ Shortcuts that exist in the page (also shown under How): pins I/R/H/B/S/C etc. a
 ## Guess pipeline (order)
 
 1. Prefer GP5 on disk (`gp-tabs/gp5`, name match).
-2. Parse rehearsal markers → roles if the marker text maps (`break` → breakdown). Most BoO GP5s have **no markers** → all cuts become riff/verse.
-3. Demucs drums stem into `work/stems/` (first time slow).
-4. librosa beat_track on that stem. Tempo must go through `_scalar` (numpy 2 `float(array)` crash used to abort here).
-5. Half-time IOI (~1.65× median, ≥6s) → breakdown drafts.
-6. Kick band <140 Hz IOI ≥5s → breakdown drafts.
-7. `_clean` short/overlap junk.
+2. `extract.estimate_from_gp` walks the tab in **playback order** (repeats expanded): one box per marker, and it carries the tab's own **section identity** — `form` = the marker letter (`A`/`B`/`C1`), `figure_id` = `role-token` (`riff-B`), `unique` when that letter occurs once. A repeated letter (e.g. `02`'s `B`, `10`'s `A/B/F`) is therefore the **same returning section**, not a new riff. The last box reaches the tab's repeat-aware length (`_playback_duration`).
+3. Markers name a section letter, not a semantic role, so the role comes from `infer_role(marker)` and otherwise stays `riff` (`C1 - Solo` → solo). The human still picks hooks/breakdowns/etc.
+4. Demucs drums stem into `work/stems/` (first time slow).
+5. librosa beat_track on that stem. Tempo must go through `_scalar` (numpy 2 `float(array)` crash used to abort here).
+6. Half-time IOI (~1.65× median, ≥6s) → breakdown drafts.
+7. Kick band <140 Hz IOI ≥5s → breakdown drafts.
+8. `_clean` short/overlap junk.
 
-If the blue bar says `only 0-dimensional arrays can be converted to Python scalars`, the server is still on old `guess.py`.  
+Audio can only ever propose **breakdowns** (half-time/kick); everything else is tab-marker or the human.
+
 If it says `librosa beats, no half-time`, drums ran and found no slam — correct on Rebirth, common on mid-tempo grooves.
 
-Guess is **not** a BoO brain. Elimination GP markers = riff slices that stop mid-song. Human paints Breakdown and the tail.
+Guess is **not** a BoO brain. It carries the tab's section letters and repeats, but a letter is not a role — the human paints hooks/breakdowns and the tail the tab doesn't notate.
 
 ## Ingest
 

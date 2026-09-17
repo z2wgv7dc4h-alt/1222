@@ -1,7 +1,7 @@
 # CURRENT
 
 updated: 2026-09-18
-pytest: engine **820 passed, 1 skipped**; boo-lab **199 passed**
+pytest: engine **820 passed, 1 skipped**; boo-lab **207 passed**
 
 ## Now
 
@@ -19,7 +19,7 @@ make a fresh machine reproducible. **Hardening**: the keeper law fails closed (o
 `sections.jsonl` write is atomic with a `sections.jsonl.bak` one-step undo, and `beats`/`structure`/
 `sync`/`agree`/`drums`/`vocal_melody` no longer blank their output on a zero-row run. `structure` wrote
 **125 drafts** (13 BoO tracks); `compare` on Rebirth (holdout): **F0.5=0.737 F3=0.800 role3=0.250**;
-`sync` **7/13**; engine **820 passed, 1 skipped**; boo-lab **199 passed**.
+`sync` **7/13**; engine **820 passed, 1 skipped**; boo-lab **207 passed**. Studio now draws beat/downbeat ticks and snaps box edges; Guess carries the tab's section letters/repeats, gates on `sync_ok`, and snaps its audio spans to the beat grid.
 
 Real, done, verified, pushed this pass (tools/boo-lab/ + engine/riff_bank.py):
 - Labyrinth bank redesigned: ONE real song, ONE 2-4 bar contiguous riff,

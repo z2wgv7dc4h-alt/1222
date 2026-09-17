@@ -4,7 +4,7 @@ Canonical detail: **CURRENT.md**; commands in **README.md**.
 
 Works: studio keeps pins (`human`/`guess-accepted` + `heard`) in `sections.jsonl`; mel
 spectrogram under the WaveSurfer waveform; 6-stem picker; drafts; `hear`/`sync`/`hash`;
-`agree`/`compare`/`export-jams`/`beats`/`audit`/`report`; **199 tests pass**.
+`agree`/`compare`/`export-jams`/`beats`/`audit`/`report`; **207 tests pass**.
 Interns (allin1 structure, beat_this, torchcrepe) run on **CUDA** when present
 (RTX 5080, `torch 2.8.0+cu128`); `boo-lab doctor` reports the build. allin1 works
 without an old natten build via `_natten_compat` (legacy NATTEN API + madmom
@@ -18,6 +18,14 @@ keeper; `canonical_role` → `None`; `stamp_box` rejects unknown role/source;
 `heard is True`). Every `sections.jsonl` write is atomic (`schema.write_jsonl_atomic`);
 Save also keeps `data/sections.jsonl.bak` and reports `dropped_unheard`; `beats`/`structure`/
 `sync`/`agree`/`drums`/`vocal_melody` no longer blank their output on a zero-row run.
+
+Studio/Guess (2026-09-18): the studio draws **beat/downbeat ticks** from `data/beats.jsonl` and, with
+**Snap beats**, snaps a dragged box edge to the nearest downbeat (≤250 ms) else beat (≤120 ms). Guess
+now carries the tab's **section identity** (marker letter → `form`/`figure_id`/`unique`, repeats
+expanded in playback order), **gates** its marker sections on `sync_ok` (drops them when the tab was
+measured as misaligned), and **snaps** its own half-time/kick spans to the beat grid. Raw-note content
+segmentation was prototyped and **rejected** (795–1057 sections vs 143 markers, precision 0.15) — the
+tabs' marker letters plus the allin1 drafts are the real riff signal.
 
 On disk now:
 - `data/sections.jsonl` — 6 rows, 1 track (Rebirth), all `heard=true`. The whole keeper set.

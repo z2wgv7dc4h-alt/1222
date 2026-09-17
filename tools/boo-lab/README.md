@@ -86,7 +86,7 @@ The intern stack is a minefield; each fix is now code or a hard pin, not a sessi
 | a machine draft / unknown role-sourced as human | fail-closed schema: `is_keeper`, `canonical_role`, `stamp_box`, and the one `load_section_rows` reader |
 
 Behavior is pinned by `tests/test_natten_compat.py`, `test_device.py`, `test_doctor.py`, plus bad-input
-tests for the keeper law and Save path. Lab: **199 tests**; engine: **820 passed, 1 skipped**. Generated
+tests for the keeper law and Save path. Lab: **207 tests**; engine: **820 passed, 1 skipped**. Generated
 outputs (`data/{drafts,beats,compare,sync,agree}.*`, `data/sections.jsonl.bak`, `*.tmp`) and
 `*.egg-info/` are gitignored; the tracked asset stays `data/sections.jsonl` (human pins).
 
@@ -98,7 +98,8 @@ One album side per session.
    spectrogram (Wave / Spec / Both) to find edges.
 2. Give each box a `form` (large letter), a `figure_id` (small, e.g. `riff-A`), and a `role`;
    mark `unique` for single-use figures, `instrument` when two guitars differ. Tick **heard**
-   when you have actually listened.
+   when you have actually listened. With **Snap beats** on, a dragged edge snaps to the nearest
+   downbeat/beat (from `data/beats.jsonl`; run `boo-lab beats` once).
 3. **Save.** Unheard boxes are dropped — the status line says how many, and the previous file is kept
    as `data/sections.jsonl.bak` (one-step undo; there is no in-app undo). A box with `end <= start`
    is refused, never repaired. Confirm table seconds look like music (not `0.00–0.25`).

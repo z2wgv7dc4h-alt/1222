@@ -21,7 +21,7 @@ Single source of truth for humans and later bots. If README/STATUS/LAW disagree 
 A **section lab** for metal FLACs (Born of Osiris first, other bands via ingest). Human output is `data/sections.jsonl` — **keeper pins only** (`source=human`/`guess-accepted`, `heard=true`), each with a figure/function `layer` and a `figure_id` — plus optional Pack clips under `work/` (gitignored). Machines write `data/drafts.jsonl` (MSA/SongFormer/Guess) and never keepers. It is not God Tier Metal, not a DAW, not a tab reader, not an auto-songwriter.
 
 GitHub: `https://github.com/z2wgv7dc4h-alt/1222` path `tools/boo-lab`.  
-Newest lab commit: `9bac8fb` (Save transparency + one-step undo; studio stops auto-repairing bad boxes); before it `e674c09` (engine tests encode the labyrinth hard-fail), `06aceee` (atomic derived JSONL writers), `1bb360f` (atomic `sections.jsonl` writes; album-remove/`hear` fail closed).
+Newest lab commit: `d22a5b8` (Guess snaps its audio spans to the beat grid); before it `90f041c` (studio beat/downbeat ticks + Snap; Guess gates markers on `sync_ok`), `5b1669a` (Guess carries the tab's section letters/repeats; simpler studio How), `9bac8fb` (Save transparency + one-step undo).
 
 ## Paths
 

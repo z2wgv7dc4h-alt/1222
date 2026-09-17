@@ -71,3 +71,15 @@ Pytest proves wiring. User ear proves a riff. STATUS may not tick “sounds like
   and `np.int`, NumPy-2 ragged `asarray`, and the `collections` ABCs.
 - **Labyrinth hard-fail stays.** A bank-uncovered role raises `RiffBankCoverageError` (never silent
   Markov); the engine tests assert that rather than demanding the preset compose.
+- **The beat grid is used, not write-only.** The studio draws beat/downbeat ticks and snaps dragged
+  edges; Guess snaps its half-time/kick spans. `beats.jsonl` had been written and never read.
+- **Guess uses the tab's own section identity.** Marker letters become `form`/`figure_id`, repeats are
+  expanded (a returning letter is the same section), and it walks the tab's playback order. Sections
+  carry `unique` when their letter occurs once.
+- **Guess gates on sync.** A tab measured as not `sync_ok` has its marker sections dropped (not
+  silently trusted); `sync_ok` keeps them. Calibration (shifting by the measured lag) waits until the
+  lag sign is trusted.
+- **Measure-content riff segmentation is rejected.** Comparing measures by note/rhythm pattern
+  over-segments (795–1057 sections vs 143 markers; precision 0.15). Do not ship it; the tabs' marker
+  letters and the allin1 `msa-draft` audio segmentation are the riff signal. Audio-based
+  non-breakdown segmentation and an audio solo detector (0% hit rate) are likewise not shipped.

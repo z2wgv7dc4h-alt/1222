@@ -13,7 +13,7 @@ def test_build_vocal_melody_ignores_non_keeper_rows(tmp_path):
     lab = tmp_path / "lab"
     (lab / "data").mkdir(parents=True)
     (lab / "data" / "sections.jsonl").write_text(
-        json.dumps({"album": "A", "track": "T", "start": 0.0, "end": 5.0, "role": "riff", "source": "human"}) + "\n"
+        json.dumps({"album": "A", "track": "T", "start": 0.0, "end": 5.0, "role": "riff", "source": "human", "heard": True}) + "\n"
         + json.dumps({"album": "A", "track": "T", "start": 6.0, "end": 9.0, "role": "intro", "source": "msa-draft"}) + "\n",
         encoding="utf-8",
     )

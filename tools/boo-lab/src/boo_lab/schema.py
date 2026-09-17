@@ -63,11 +63,11 @@ def is_keeper(source: str | None) -> bool:
 def load_section_rows(path: str | Path, *, keepers_only: bool = True) -> list[dict]:
     """The ONE reader for `data/sections.jsonl`.
 
-    `keepers_only` (default) keeps only real labeled rows -- a truthy `role`
-    AND `is_keeper(source)` (the project law; matches pack.py's original
-    check). Malformed lines are skipped. Every consumer that reads labeled
-    boxes (pack/drums/vocal/holdout) goes through this, so the "source ==
-    human" precedence bug cannot reappear in a copy."""
+    `keepers_only` (default) keeps only real labeled rows -- the full keeper
+    law: a truthy `role`, `is_keeper(source)`, AND `heard is True`. Malformed
+    lines are skipped. Every consumer that reads labeled boxes
+    (pack/drums/vocal/holdout) goes through this, so the "source == human"
+    precedence bug cannot reappear in a copy."""
     path = Path(path)
     if not path.exists():
         return []
@@ -81,8 +81,10 @@ def load_section_rows(path: str | Path, *, keepers_only: bool = True) -> list[di
             continue
         if not isinstance(rec, dict):
             continue
-        if keepers_only and not (rec.get("role") and is_keeper(rec.get("source"))):
-            continue
+        if keepers_only:
+            if not (rec.get("role") and is_keeper(rec.get("source"))
+                    and rec.get("heard") is True):
+                continue
         out.append(rec)
     return out
 

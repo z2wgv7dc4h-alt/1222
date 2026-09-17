@@ -54,15 +54,16 @@ def test_stamp_box_rejects_unknown_role_and_source():
 def test_load_section_rows_keeps_keepers_drops_drafts_and_malformed(tmp_path):
     p = tmp_path / "sections.jsonl"
     p.write_text(
-        json.dumps({"album": "A", "track": "T", "role": "riff", "source": "human"}) + "\n"
-        + json.dumps({"album": "A", "track": "T", "role": "riff", "source": "msa-draft"}) + "\n"
-        + json.dumps({"album": "A", "track": "U", "role": "intro"}) + "\n"  # no source: not keeper
+        json.dumps({"album": "A", "track": "T", "role": "riff", "source": "human", "heard": True}) + "\n"
+        + json.dumps({"album": "A", "track": "T", "role": "riff", "source": "human", "heard": False}) + "\n"  # unheard human: not a keeper
+        + json.dumps({"album": "A", "track": "T", "role": "riff", "source": "msa-draft", "heard": True}) + "\n"
+        + json.dumps({"album": "A", "track": "U", "role": "intro", "heard": True}) + "\n"  # no source: not keeper
         + "{ not json\n",
         encoding="utf-8",
     )
     rows = load_section_rows(p)
     assert len(rows) == 1
-    assert rows[0]["source"] == "human" and rows[0]["track"] == "T"
+    assert rows[0]["source"] == "human" and rows[0]["track"] == "T" and rows[0]["heard"] is True
 
 
 def test_same_role_overlap_detected():

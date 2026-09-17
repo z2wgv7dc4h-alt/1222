@@ -28,7 +28,7 @@ def _write_audio(path, seconds=_SECONDS, sr=_SR, fmt=None):
 
 def _lab_with_one_section(tmp_path, role="intro", start=0.0, end=1.0):
     (tmp_path / "data").mkdir(parents=True, exist_ok=True)
-    rec = {"album": "A", "track": "T", "start": start, "end": end, "role": role, "source": "human"}
+    rec = {"album": "A", "track": "T", "start": start, "end": end, "role": role, "source": "human", "heard": True}
     (tmp_path / "data" / "sections.jsonl").write_text(json.dumps(rec) + "\n", encoding="utf-8")
     return _write_audio(tmp_path / "T.flac", fmt="FLAC")
 

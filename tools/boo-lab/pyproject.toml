@@ -26,8 +26,13 @@ align = ["whisperx"]
 jams = ["jams"]
 # Optional research "interns" -- never default dependencies. `natten` is
 # required by allin1's Dinat model; `_natten_compat` restores the pre-0.17 API
-# it expects so the new natten works on CPU/Windows.
-intern = ["allin1", "beat-this", "natten", "jams", "mir_eval"]
+# it expects so the new natten works on CPU/Windows. `madmom` is a real runtime
+# import of allin1 (`allin1/spectrogram.py`) that allin1's own package metadata
+# does NOT declare -- without it here a fresh `.[intern]` install leaves
+# `import allin1` failing with ModuleNotFoundError: madmom. (Its sdist builds
+# fine under pip's default build isolation on py3.12 -- verified -- so no
+# --no-build-isolation is needed.)
+intern = ["allin1", "beat-this", "natten", "jams", "mir_eval", "madmom"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

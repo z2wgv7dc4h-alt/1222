@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import json
+import math
+import os
+import tempfile
 from pathlib import Path
 
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
@@ -9,6 +12,7 @@ from fastapi.staticfiles import StaticFiles
 
 from .catalogue import load_map, resolve
 from .schema import (
+    KEEPER_SOURCES,
     SOURCES,
     ROLES as _SCHEMA_ROLES,
     canonical_role,
@@ -19,8 +23,38 @@ from .schema import (
 # Lab role vocabulary + pin schema live in schema.py (single source of truth).
 ROLES = list(_SCHEMA_ROLES)
 
+# Every non-keeper source promotes to `guess-accepted` once heard. Derived from
+# schema (not a hardcoded literal) so a newly added draft source can't be
+# silently rejected by `is_keeper` after a human listened to it.
+_PROMOTABLE_SOURCES = SOURCES - KEEPER_SOURCES
+
 # Real demucs stems boo-lab can cache and the annotator can serve.
 STEM_NAMES = ("drums", "bass", "guitar", "piano", "other", "vocals")
+
+
+def _atomic_write_jsonl(path: Path, rows: list[dict]) -> None:
+    """Write `rows` to `path` atomically: a temp file in the same directory,
+    flush + fsync, then `os.replace` (atomic on Windows and POSIX). A crash,
+    full disk, or power loss mid-write leaves the original file intact --
+    `sections.jsonl` is the one artifact here that cannot be regenerated."""
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp_name = tempfile.mkstemp(
+        prefix=path.name + ".", suffix=".tmp", dir=str(path.parent)
+    )
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            for rec in rows:
+                f.write(json.dumps(rec) + "\n")
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp_name, path)
+    except BaseException:
+        try:
+            os.unlink(tmp_name)
+        except OSError:
+            pass
+        raise
 
 
 def _within(path: Path, root: Path | None) -> bool:
@@ -395,32 +429,62 @@ def create_app(lab_root: Path, flac_root: Path | None, gp_root: Path | None) -> 
         known = {"start", "end", "role", "layer", "form", "figure_id", "unique",
                  "instrument", "start_bar", "end_bar", "source", "heard", "album", "track"}
         keepers: list[dict] = []
-        for s in sections:
+        for idx, s in enumerate(sections):
+            # Bad input rejects the WHOLE save (same contract as the same-role
+            # overlap check below): a box with end <= start is exactly the
+            # all-tiny-save bug CURRENT.md says to refuse, never repair.
             if not isinstance(s, dict):
-                continue
+                return JSONResponse(
+                    {"detail": "bad box %d: not an object" % idx, "saved": 0},
+                    status_code=400,
+                )
             try:
                 start = float(s.get("start"))
                 end = float(s.get("end"))
             except (TypeError, ValueError):
-                continue
+                return JSONResponse(
+                    {"detail": "bad box %d: start/end must be numbers" % idx, "saved": 0},
+                    status_code=400,
+                )
+            if not (math.isfinite(start) and math.isfinite(end)):
+                return JSONResponse(
+                    {"detail": "bad box %d: start/end must be finite" % idx, "saved": 0},
+                    status_code=400,
+                )
             if end <= start:
-                end = start + 0.25
+                return JSONResponse(
+                    {"detail": "bad box %d: end (%.3f) must be after start (%.3f)"
+                               % (idx, end, start),
+                     "saved": 0},
+                    status_code=400,
+                )
 
-            raw_source = s.get("source")
-            source = raw_source if raw_source in SOURCES else "human"
             if not s.get("heard"):
                 continue  # unheard boxes are dropped, never pinned
-            if source in {"guess", "msa-draft"}:
-                source = "guess-accepted"  # a heard/checked draft is accepted
+            raw_source = s.get("source")
+            if raw_source not in SOURCES:
+                # Fail closed: an unknown/missing source is never a human pin.
+                return JSONResponse(
+                    {"detail": "bad box %d: unknown source %r" % (idx, raw_source),
+                     "saved": 0},
+                    status_code=400,
+                )
+            source = "guess-accepted" if raw_source in _PROMOTABLE_SOURCES else raw_source
 
-            rec = stamp_box(
-                start, end, s.get("role"),
-                source=source, figure_id=s.get("figure_id"), heard=True,
-                form=s.get("form"), unique=bool(s.get("unique")),
-                instrument=s.get("instrument"),
-                start_bar=s.get("start_bar"), end_bar=s.get("end_bar"),
-                extra={k: v for k, v in s.items() if k not in known},
-            )
+            try:
+                rec = stamp_box(
+                    start, end, s.get("role"),
+                    source=source, figure_id=s.get("figure_id"), heard=True,
+                    form=s.get("form"), unique=bool(s.get("unique")),
+                    instrument=s.get("instrument"),
+                    start_bar=s.get("start_bar"), end_bar=s.get("end_bar"),
+                    extra={k: v for k, v in s.items() if k not in known},
+                )
+            except ValueError as exc:
+                return JSONResponse(
+                    {"detail": "bad box %d: %s" % (idx, exc), "saved": 0},
+                    status_code=400,
+                )
             rec["album"] = meta["album"]
             rec["track"] = meta["track"]
             keepers.append(rec)
@@ -457,26 +521,49 @@ def create_app(lab_root: Path, flac_root: Path | None, gp_root: Path | None) -> 
                 status_code=400,
             )
 
-        old = []
+        # Read every OTHER track's rows. A malformed existing line is skipped
+        # and COUNTED (reported back), never a silent drop -- one bad line must
+        # not permanently block saves for every track.
+        old: list[dict] = []
+        malformed_lines: list[int] = []
         if sec_path.exists():
-            for line in sec_path.read_text(encoding="utf-8").splitlines():
+            for lineno, line in enumerate(
+                sec_path.read_text(encoding="utf-8").splitlines(), start=1
+            ):
                 if not line.strip():
                     continue
-                rec = json.loads(line)
+                try:
+                    rec = json.loads(line)
+                except json.JSONDecodeError:
+                    malformed_lines.append(lineno)
+                    continue
+                if not isinstance(rec, dict):
+                    malformed_lines.append(lineno)
+                    continue
                 if rec.get("album") == meta["album"] and rec.get("track") == meta["track"]:
                     continue
                 old.append(rec)
-        sec_path.parent.mkdir(parents=True, exist_ok=True)
-        with sec_path.open("w", encoding="utf-8") as f:
-            for rec in old + keepers:
-                f.write(json.dumps(rec) + "\n")
+
+        # Atomic replace: a failure here leaves the original untouched.
+        try:
+            _atomic_write_jsonl(sec_path, old + keepers)
+        except OSError as exc:
+            return JSONResponse(
+                {"detail": "save failed, sections.jsonl left unchanged: %s" % exc,
+                 "saved": 0},
+                status_code=500,
+            )
         try:
             from .learn import record
 
             record(lab_root, meta["album"], meta["track"], keepers)
         except Exception:
             pass
-        return {"saved": len(keepers), "path": str(sec_path)}
+        body: dict = {"saved": len(keepers), "path": str(sec_path)}
+        if malformed_lines:
+            body["malformed_lines_skipped"] = len(malformed_lines)
+            body["malformed_line_numbers"] = malformed_lines
+        return body
 
     @app.post("/api/ingest")
     async def api_ingest(band: str = Form("new_band"), files: list[UploadFile] = File(...)):

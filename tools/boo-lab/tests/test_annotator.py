@@ -17,13 +17,14 @@ from boo_lab import annotator as ann  # noqa: E402
 from boo_lab.catalogue import save_map  # noqa: E402
 
 
-def test_canonical_role_maps_legacy_and_defaults():
+def test_canonical_role_maps_known_and_fails_closed():
     assert ann.canonical_role("verse") == "riff"
     assert ann.canonical_role("Chorus") == "hook"
     assert ann.canonical_role("interlude") == "chill"
     assert ann.canonical_role("riff") == "riff"
-    assert ann.canonical_role(None) == "riff"
-    assert ann.canonical_role("bogus") == "riff"
+    assert ann.canonical_role(None) is None
+    assert ann.canonical_role("") is None
+    assert ann.canonical_role("bogus") is None
 
 
 def test_every_canonical_role_maps_to_itself():
@@ -165,6 +166,109 @@ def test_save_rejects_same_role_overlap_and_writes_nothing(tmp_path):
     assert resp.status_code == 400
     assert "overlap" in resp.json()["detail"]
     assert (lab / "data" / "sections.jsonl").read_text(encoding="utf-8") == before
+
+
+def test_save_rejects_end_not_after_start_and_writes_nothing(tmp_path):
+    lab = _lab(tmp_path)
+    path = lab / "data" / "sections.jsonl"
+    other = {"album": "A", "track": "Other", "start": 0.0, "end": 1.0, "role": "riff", "source": "human"}
+    path.write_text(json.dumps(other) + "\n", encoding="utf-8")
+    before = path.read_text(encoding="utf-8")
+    client = TestClient(ann.create_app(lab, None, None))
+    tid = client.get("/api/tracks").json()["tracks"][0]["id"]
+
+    resp = client.post("/api/sections/%d" % tid, json={"sections": [
+        {"role": "riff", "start": 5.0, "end": 5.0, "source": "human", "heard": True}]})
+
+    assert resp.status_code == 400 and "bad box 0" in resp.json()["detail"]
+    assert path.read_text(encoding="utf-8") == before  # other-track row untouched
+
+
+def test_save_rejects_non_numeric_start_end(tmp_path):
+    lab = _lab(tmp_path)
+    client = TestClient(ann.create_app(lab, None, None))
+    tid = client.get("/api/tracks").json()["tracks"][0]["id"]
+    resp = client.post("/api/sections/%d" % tid, json={"sections": [
+        {"role": "riff", "start": "abc", "end": 5, "source": "human", "heard": True}]})
+    assert resp.status_code == 400 and "numbers" in resp.json()["detail"]
+
+
+def test_save_skips_and_counts_a_malformed_existing_line(tmp_path):
+    lab = _lab(tmp_path)
+    path = lab / "data" / "sections.jsonl"
+    other = {"album": "A", "track": "Other", "start": 0.0, "end": 1.0, "role": "riff", "source": "human"}
+    path.write_text(json.dumps(other) + "\n{ this is not json\n", encoding="utf-8")
+    client = TestClient(ann.create_app(lab, None, None))
+    tid = client.get("/api/tracks").json()["tracks"][0]["id"]
+
+    resp = client.post("/api/sections/%d" % tid, json={"sections": [
+        {"role": "riff", "start": 0.0, "end": 2.0, "source": "human", "heard": True}]})
+
+    assert resp.status_code == 200 and resp.json()["saved"] == 1
+    assert resp.json()["malformed_lines_skipped"] == 1
+    assert resp.json()["malformed_line_numbers"] == [2]
+    rows = _sections_rows(lab)  # file parses cleanly again
+    assert any(r.get("track") == "Other" for r in rows)  # other-track row preserved
+    assert any(r.get("track") == "T" for r in rows)
+
+
+def test_save_write_failure_leaves_file_untouched(tmp_path, monkeypatch):
+    lab = _lab(tmp_path)
+    path = lab / "data" / "sections.jsonl"
+    other = {"album": "A", "track": "Other", "start": 0.0, "end": 1.0, "role": "riff", "source": "human"}
+    path.write_text(json.dumps(other) + "\n", encoding="utf-8")
+    before = path.read_text(encoding="utf-8")
+
+    def _boom(p, rows):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(ann, "_atomic_write_jsonl", _boom)
+    client = TestClient(ann.create_app(lab, None, None))
+    tid = client.get("/api/tracks").json()["tracks"][0]["id"]
+
+    resp = client.post("/api/sections/%d" % tid, json={"sections": [
+        {"role": "riff", "start": 0.0, "end": 2.0, "source": "human", "heard": True}]})
+
+    assert resp.status_code == 500 and "unchanged" in resp.json()["detail"]
+    assert path.read_text(encoding="utf-8") == before  # aborted save destroyed nothing
+
+
+def test_save_promotes_a_heard_songformer_draft_to_keeper(tmp_path):
+    lab = _lab(tmp_path)
+    client = TestClient(ann.create_app(lab, None, None))
+    tid = client.get("/api/tracks").json()["tracks"][0]["id"]
+
+    resp = client.post("/api/sections/%d" % tid, json={"sections": [
+        {"role": "riff", "start": 0, "end": 2, "source": "songformer-draft", "heard": True}]})
+
+    assert resp.status_code == 200 and resp.json()["saved"] == 1
+    row = _sections_rows(lab)[0]
+    assert row["source"] == "guess-accepted"  # promotable set derived from schema
+
+
+def test_save_rejects_unknown_or_missing_source(tmp_path):
+    lab = _lab(tmp_path)
+    client = TestClient(ann.create_app(lab, None, None))
+    tid = client.get("/api/tracks").json()["tracks"][0]["id"]
+
+    bad = client.post("/api/sections/%d" % tid, json={"sections": [
+        {"role": "riff", "start": 0, "end": 2, "source": "not-a-real-source", "heard": True}]})
+    assert bad.status_code == 400 and "unknown source" in bad.json()["detail"]
+
+    missing = client.post("/api/sections/%d" % tid, json={"sections": [
+        {"role": "riff", "start": 0, "end": 2, "heard": True}]})
+    assert missing.status_code == 400 and "unknown source" in missing.json()["detail"]
+
+
+def test_save_rejects_a_box_with_no_resolvable_role(tmp_path):
+    lab = _lab(tmp_path)
+    client = TestClient(ann.create_app(lab, None, None))
+    tid = client.get("/api/tracks").json()["tracks"][0]["id"]
+
+    resp = client.post("/api/sections/%d" % tid, json={"sections": [
+        {"role": "bogus", "start": 0, "end": 2, "source": "human", "heard": True}]})
+
+    assert resp.status_code == 400 and "unknown role" in resp.json()["detail"]
 
 
 def test_save_allows_figure_over_function_overlap(tmp_path):

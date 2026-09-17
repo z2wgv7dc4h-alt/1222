@@ -118,6 +118,10 @@ If Save wrote six `0.00–0.25` rows, the pins fired before duration loaded. Pas
 - Stem lane: pick any cached Demucs stem (drums/bass/guitar/piano/other/vocals); the drum-confidence note flags sections the classifier is unsure about.
 - Table is source of truth on Save (`harvestTable`); columns role / figure / form / uniq / inst / bar0 / bar1 / start / end / source / heard. Blur number fields before Save.
 - **Heard** gates the save: untick it and the box is dropped. A heard draft saves as `guess-accepted`.
+- **Save is atomic**: temp file in the same dir, `fsync`, then `os.replace`. A crash, full disk, or aborted write leaves `sections.jsonl` (the one unrecoverable artifact) untouched and returns a real error.
+- **A bad box rejects the whole save** with 400: `end <= start`, non-numeric/non-finite `start`/`end`, a non-object row, a box whose role maps to none, or an unknown/missing `source`. Never repaired into a `0.25s` box (Bugs #2), never defaulted to a human keeper.
+- **Fail closed**: `schema.is_keeper` is true only for `human`/`guess-accepted` (missing/empty source is NOT a keeper); `schema.canonical_role` returns `None` for unmappable input. Every non-keeper source promotes to `guess-accepted` once Heard (derived from `SOURCES - KEEPER_SOURCES`).
+- A **malformed line already in `sections.jsonl`** is skipped and counted, not fatal: the response carries `malformed_lines_skipped` and `malformed_line_numbers`.
 - **Load drafts** appends `data/drafts.jsonl` rows unheard; **VAL** badge marks holdout songs.
 - Play = whole track. Play box = selected region only.
 - Guess merges drafts if boxes already exist; do not Guess a finished song.

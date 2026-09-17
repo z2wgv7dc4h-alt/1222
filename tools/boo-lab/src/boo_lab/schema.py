@@ -12,6 +12,9 @@ FUNCTION_ROLES = frozenset({"intro", "build", "breakdown", "chill", "outro"})
 SOURCES = frozenset({"human", "guess-accepted", "guess", "msa-draft", "songformer-draft"})
 KEEPER_SOURCES = frozenset({"human", "guess-accepted"})
 
+# Real instrument vocabulary for a box. Empty string is allowed (unknown/mixed).
+INSTRUMENTS = ("", "rhythm", "lead", "bass", "drums", "synth", "vocal", "mix")
+
 MSA_TO_LAB = {
     "intro": "intro", "start": "intro",
     "verse": "riff",
@@ -63,14 +66,34 @@ def same_role_overlaps(boxes: list[dict[str, Any]]) -> list[tuple[int, int, str]
     return hits
 
 
+def _bars(value: Any) -> int | None:
+    """1-based GP measure, or None. Never guesses a bar from seconds."""
+    if value is None or value == "":
+        return None
+    try:
+        bar = int(value)
+    except (TypeError, ValueError):
+        return None
+    return bar if bar > 0 else None
+
+
 def stamp_box(start: float, end: float, role: str | None, *, source: str = "human",
               figure_id: str | None = None, heard: bool = False,
+              form: str | None = None, unique: bool = False,
+              instrument: str | None = None,
+              start_bar: Any = None, end_bar: Any = None,
               extra: dict[str, Any] | None = None) -> dict[str, Any]:
     role = canonical_role(role)
+    inst = (instrument or "").strip().lower()
     rec: dict[str, Any] = {
         "start": float(start), "end": float(end), "role": role,
         "layer": layer_for(role),
+        "form": (form or "A").strip().upper() or "A",
         "figure_id": (figure_id or "").strip() or f"{role}-A",
+        "unique": bool(unique),
+        "instrument": inst if inst in INSTRUMENTS else "",
+        "start_bar": _bars(start_bar),
+        "end_bar": _bars(end_bar),
         "source": source if source in SOURCES else "human",
         "heard": bool(heard),
     }

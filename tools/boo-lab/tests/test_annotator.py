@@ -94,6 +94,30 @@ def _sections_rows(lab):
     return [json.loads(l) for l in path.read_text(encoding="utf-8").splitlines() if l.strip()]
 
 
+def test_save_keeps_identity_fields_on_heard_box(tmp_path):
+    lab = _lab(tmp_path)
+    client = TestClient(ann.create_app(lab, None, None))
+    tid = client.get("/api/tracks").json()["tracks"][0]["id"]
+    resp = client.post("/api/sections/%d" % tid, json={"sections": [
+        {"role": "solo", "start": 1, "end": 3, "source": "human", "heard": True,
+         "form": "b", "unique": True, "instrument": "lead", "start_bar": 17, "end_bar": 20},
+    ]})
+    assert resp.status_code == 200 and resp.json()["saved"] == 1
+    row = _sections_rows(lab)[0]
+    assert row["form"] == "B" and row["unique"] is True and row["instrument"] == "lead"
+    assert row["start_bar"] == 17 and row["end_bar"] == 20
+
+
+def test_save_does_not_invent_bars_without_matching_gp(tmp_path):
+    lab = _lab(tmp_path)  # map row is match=unknown with no gp path
+    client = TestClient(ann.create_app(lab, None, None))
+    tid = client.get("/api/tracks").json()["tracks"][0]["id"]
+    client.post("/api/sections/%d" % tid, json={"sections": [
+        {"role": "riff", "start": 0, "end": 2, "source": "human", "heard": True}]})
+    row = _sections_rows(lab)[0]
+    assert row["start_bar"] is None and row["end_bar"] is None
+
+
 def test_save_drops_unheard_and_unaccepted_drafts(tmp_path):
     lab = _lab(tmp_path)
     client = TestClient(ann.create_app(lab, None, None))

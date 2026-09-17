@@ -392,7 +392,8 @@ def create_app(lab_root: Path, flac_root: Path | None, gp_root: Path | None) -> 
         if not isinstance(sections, list):
             return JSONResponse({"detail": "need sections list", "saved": 0}, status_code=400)
 
-        known = {"start", "end", "role", "layer", "figure_id", "source", "heard", "album", "track"}
+        known = {"start", "end", "role", "layer", "form", "figure_id", "unique",
+                 "instrument", "start_bar", "end_bar", "source", "heard", "album", "track"}
         keepers: list[dict] = []
         for s in sections:
             if not isinstance(s, dict):
@@ -415,11 +416,32 @@ def create_app(lab_root: Path, flac_root: Path | None, gp_root: Path | None) -> 
             rec = stamp_box(
                 start, end, s.get("role"),
                 source=source, figure_id=s.get("figure_id"), heard=True,
+                form=s.get("form"), unique=bool(s.get("unique")),
+                instrument=s.get("instrument"),
+                start_bar=s.get("start_bar"), end_bar=s.get("end_bar"),
                 extra={k: v for k, v in s.items() if k not in known},
             )
             rec["album"] = meta["album"]
             rec["track"] = meta["track"]
             keepers.append(rec)
+
+        # Fill GP bars only when the map row is a real match and the box has
+        # none. A GP parse failure just leaves them null -- never blocks Save.
+        row = _resolved(track_id) or {}
+        gp = row.get("gp_path") or row.get("gp")
+        if gp and Path(gp).exists() and (row.get("match") or "").lower() in {"yes", "y", "1", "true"}:
+            from .extract import bars_for_times
+
+            for rec in keepers:
+                if rec.get("start_bar") is None or rec.get("end_bar") is None:
+                    try:
+                        start_bar, end_bar = bars_for_times(Path(gp), rec["start"], rec["end"])
+                    except Exception:
+                        start_bar = end_bar = None
+                    if start_bar is not None and rec.get("start_bar") is None:
+                        rec["start_bar"] = start_bar
+                    if end_bar is not None and rec.get("end_bar") is None:
+                        rec["end_bar"] = end_bar
 
         overlaps = same_role_overlaps(keepers)
         if overlaps:

@@ -43,6 +43,12 @@ Pin in this order, one album at a time:
 6. Hook only if something is singable or is the chorus guitar hook. Loud ≠ hook.
 7. Save. Run `audit`. Fix overlaps. Pack. Listen to 3 random clips cold.
 
+Identity on each box (all three): `form` = large-scale unit letter (`A`, `B`, `A'`); `figure_id`
+= the small figure (`riff-A`); `role` = function. Add `unique=true` for a single-use /
+through-composed figure, `instrument` when two guitars differ, and `start_bar`/`end_bar` only when
+the GP5 is the same cut. One album side per sitting; stop when you cannot name the figure in five
+words.
+
 A week later, re-pin one track without looking, then snapshot it with
 `boo-lab agree --album X --track Y --write` (first snapshot = pass 1, the re-pin = pass 2) and read
 `boo-lab agree --album X --track Y --diff` for boundary hit-rate @0.5 s / @3 s and role/figure

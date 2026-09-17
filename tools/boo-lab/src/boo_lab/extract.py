@@ -128,6 +128,43 @@ def _measure_start_times(track) -> list[float]:
     return times
 
 
+def bars_for_times(gp_path: Path, start: float, end: float) -> tuple[int | None, int | None]:
+    """Real 1-based GP measure numbers covering `[start, end]` seconds, via
+    the same tempo-map walk as `_measure_start_times`. Returns
+    `(None, None)` whenever the tab cannot be opened or has no measures --
+    never invents a bar from seconds, and never raises (Save must not be
+    blocked by a GP error)."""
+    try:
+        import guitarpro
+
+        start = float(start)
+        end = float(end)
+    except Exception:
+        return None, None
+    try:
+        song = guitarpro.parse(str(gp_path))
+    except Exception:
+        return None, None
+    track = _rhythm_track(song) or (song.tracks[0] if song.tracks else None)
+    if track is None:
+        return None, None
+    times = _measure_start_times(track)
+    if not times:
+        return None, None
+
+    def _bar_at(t: float) -> int:
+        idx = 0
+        for i, ts in enumerate(times):
+            if ts <= t + 1e-9:
+                idx = i
+            else:
+                break
+        return idx + 1
+
+    n = len(times)
+    return min(max(_bar_at(start), 1), n), min(max(_bar_at(end), 1), n)
+
+
 # Marker words copied from 1222 riff_bank intent — keep in sync later.
 ROLE_WORDS = {
     "intro": "intro",

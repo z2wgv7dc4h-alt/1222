@@ -35,6 +35,20 @@ def test_measure_start_times_empty_track_is_empty():
     assert ex._measure_start_times(track) == []
 
 
+def test_bars_for_times_missing_file_is_null(tmp_path):
+    assert ex.bars_for_times(tmp_path / "nope.gp5", 0.0, 2.0) == (None, None)
+
+
+def test_bars_for_times_maps_seconds_to_measures(tmp_path):
+    song = make_song(3, title="Bar Song")
+    track = make_track(song, 1, {0: [40], 1: [40], 2: [40]}, instrument=30)
+    song.tracks = [track]
+    path = _write(song, tmp_path)
+    assert ex.bars_for_times(path, 0.0, 2.0) == (1, 2)
+    assert ex.bars_for_times(path, 0.0, 4.0) == (1, 3)
+    assert ex.bars_for_times(path, 100.0, 200.0) == (3, 3)
+
+
 # --- infer_role --------------------------------------------------------------
 
 

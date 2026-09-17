@@ -120,6 +120,7 @@
   <p>Boxes are wavesurfer regions. Drag the body, drag an edge, click empty wave to seek. Overlaps are allowed when the roles differ. Each row also carries a <b>figure</b> id, a <b>source</b>, and an <b>heard</b> checkbox.</p>
   <p><b>Heard</b> — a box is only saved when you tick heard (you actually listened to it). Unheard boxes and raw drafts are dropped on Save. A heard draft becomes <code>guess-accepted</code>; a heard human box stays <code>human</code>.</p>
   <p><b>Same-role overlap</b> — two boxes of the same role overlapping by more than 50&nbsp;ms is rejected with the pair shown. Different roles (a figure over a function) may overlap freely.</p>
+  <p><b>Identity</b> — each box carries form (large letter, default A) + figure id (small, e.g. riff-A) + role, plus unique (single-use / through-composed figure), instrument (when two guitars differ), and start/end bars (1-based GP measures; filled on Save only when the tab matches).</p>
   <h4>Buttons</h4>
   <ul>
     <li><b>Intro</b> — pads, swell, count-in</li>
@@ -225,7 +226,7 @@
       <div id="lyricbox" class="lyrics"></div>
     </div>
     <table>
-      <thead><tr><th>role</th><th>figure</th><th>start</th><th>end</th><th>source</th><th>heard</th><th></th></tr></thead>
+      <thead><tr><th>role</th><th>figure</th><th>form</th><th>uniq</th><th>inst</th><th>bar0</th><th>bar1</th><th>start</th><th>end</th><th>source</th><th>heard</th><th></th></tr></thead>
       <tbody id="rows"></tbody>
     </table>
     <p class="foot">Drag a box. Click empty wave to seek. Different roles may overlap. S save · N next</p>
@@ -673,6 +674,9 @@ function select(i){
     regs=secs.map(s=>{
       const role=canonRole(s.role);
       return {role,start:+s.start,end:+s.end,figure_id:s.figure_id|| (role+"-A"),
+              form:s.form||"A",unique:!!s.unique,instrument:s.instrument||"",
+              start_bar:(s.start_bar==null?null:s.start_bar),
+              end_bar:(s.end_bar==null?null:s.end_bar),
               source:s.source||"human",heard:!!s.heard};
     });
     table();
@@ -684,13 +688,18 @@ function snap(){ undo.push(JSON.stringify(regs)); if(undo.length>40) undo.shift(
 function add(role){
   const t=ws?ws.getCurrentTime():0;
   const dur=ws?ws.getDuration():30;
-  snap(); regs.push({role,start:t,end:Math.min(dur, t+8),figure_id:role+"-A",source:"human",heard:false}); sel=regs.length-1;
+  snap(); regs.push({role,start:t,end:Math.min(dur, t+8),figure_id:role+"-A",
+    form:"A",unique:false,instrument:"",start_bar:null,end_bar:null,source:"human",heard:false}); sel=regs.length-1;
   table(); paintRegions();
 }
 document.querySelectorAll(".pins button").forEach(b=>b.onclick=()=>add(b.dataset.role));
 document.getElementById("btnPlay").onclick=toggle;
 
 const SOURCE_OPTS=["human","guess-accepted","guess","msa-draft"];
+const INSTRUMENTS=["","rhythm","lead","bass","drums","synth","vocal","mix"];
+function instSelect(cur){
+  return "<select data-f='instrument'>"+INSTRUMENTS.map(o=>"<option value='"+o+"'"+(o===cur?" selected":"")+">"+(o||"—")+"</option>").join("")+"</select>";
+}
 function roleSelect(cur){
   return "<select data-f='role'>"+ROLES.map(r=>"<option value='"+r+"'"+(r===cur?" selected":"")+">"+(LABEL[r]||r)+"</option>").join("")+"</select>";
 }
@@ -705,6 +714,11 @@ function table(){
     if(i===sel) tr.className="on";
     const cRole=document.createElement("td"); cRole.innerHTML=roleSelect(p.role);
     const cFig=document.createElement("td"); cFig.innerHTML="<input type='text' data-f='figure_id' value='"+escAttr(p.figure_id|| (p.role+"-A"))+"'>";
+    const cForm=document.createElement("td"); cForm.innerHTML="<input type='text' size='2' data-f='form' value='"+escAttr(p.form||"A")+"'>";
+    const cUniq=document.createElement("td"); cUniq.innerHTML="<input type='checkbox' data-f='unique'"+(p.unique?" checked":"")+">";
+    const cInst=document.createElement("td"); cInst.innerHTML=instSelect(p.instrument||"");
+    const cB0=document.createElement("td"); cB0.innerHTML="<input type='number' data-f='start_bar' value='"+(p.start_bar==null?"":p.start_bar)+"'>";
+    const cB1=document.createElement("td"); cB1.innerHTML="<input type='number' data-f='end_bar' value='"+(p.end_bar==null?"":p.end_bar)+"'>";
     const cS=document.createElement("td"); cS.innerHTML="<input type='number' step='0.05' value='"+Number(p.start).toFixed(2)+"' data-f='start'>";
     const cE=document.createElement("td"); cE.innerHTML="<input type='number' step='0.05' value='"+Number(p.end).toFixed(2)+"' data-f='end'>";
     const cSrc=document.createElement("td"); cSrc.innerHTML=sourceSelect(p.source||"human");
@@ -713,7 +727,9 @@ function table(){
     const x=document.createElement("button"); x.type="button"; x.textContent="remove";
     x.onclick=ev=>{ ev.stopPropagation(); snap(); regs.splice(i,1); if(sel>=regs.length) sel=regs.length-1; table(); paintRegions(); };
     cX.appendChild(x);
-    tr.appendChild(cRole); tr.appendChild(cFig); tr.appendChild(cS); tr.appendChild(cE);
+    tr.appendChild(cRole); tr.appendChild(cFig); tr.appendChild(cForm); tr.appendChild(cUniq);
+    tr.appendChild(cInst); tr.appendChild(cB0); tr.appendChild(cB1);
+    tr.appendChild(cS); tr.appendChild(cE);
     tr.appendChild(cSrc); tr.appendChild(cH); tr.appendChild(cX);
     tr.onclick=ev=>{
       const tag=ev.target.tagName;
@@ -730,7 +746,10 @@ function table(){
       inp.onchange=()=>{
         const f=inp.dataset.f;
         if(f==="heard"){ p.heard=!!inp.checked; return; }
+        if(f==="unique"){ p.unique=!!inp.checked; return; }
         if(f==="figure_id"){ p.figure_id=inp.value.trim(); return; }
+        if(f==="form"){ p.form=(inp.value||"A").trim().toUpperCase()||"A"; inp.value=p.form; return; }
+        if(f==="start_bar"||f==="end_bar"){ p[f]=inp.value===""?null:parseInt(inp.value,10); return; }
         const v=parseFloat(inp.value);
         if(!isNaN(v)) p[f]=v;
         if(p.end<p.start) p.end=p.start+0.25;
@@ -761,7 +780,9 @@ function estimate(){
     snap();
     const draft=(x.sections||[]).map(s=>{
       const role=canonRole(s.role);
-      return {role,start:+s.start,end:+s.end,figure_id:role+"-A",source:"guess",heard:false};
+      return {role,start:+s.start,end:+s.end,figure_id:role+"-A",
+              form:"A",unique:false,instrument:"",start_bar:null,end_bar:null,
+              source:"guess",heard:false};
     });
     if(merge){
       draft.forEach(d=>{
@@ -781,6 +802,11 @@ function harvestTable(){
     if(!regs[i]) return;
     const role=tr.querySelector("select[data-f='role']"); if(role) regs[i].role=role.value;
     const fig=tr.querySelector("input[data-f='figure_id']"); if(fig) regs[i].figure_id=fig.value.trim();
+    const form=tr.querySelector("input[data-f='form']"); if(form) regs[i].form=(form.value||"A").trim().toUpperCase()||"A";
+    const uq=tr.querySelector("input[data-f='unique']"); if(uq) regs[i].unique=!!uq.checked;
+    const inst=tr.querySelector("select[data-f='instrument']"); if(inst) regs[i].instrument=inst.value;
+    const b0=tr.querySelector("input[data-f='start_bar']"); if(b0) regs[i].start_bar=b0.value===""?null:parseInt(b0.value,10);
+    const b1=tr.querySelector("input[data-f='end_bar']"); if(b1) regs[i].end_bar=b1.value===""?null:parseInt(b1.value,10);
     const s=tr.querySelector("input[data-f='start']"); if(s){ const v=parseFloat(s.value); if(!isNaN(v)) regs[i].start=v; }
     const e=tr.querySelector("input[data-f='end']"); if(e){ const v=parseFloat(e.value); if(!isNaN(v)) regs[i].end=v; }
     const src=tr.querySelector("select[data-f='source']"); if(src) regs[i].source=src.value;
@@ -804,7 +830,9 @@ function save(){
   fetch("/api/sections/"+tracks[trackId].id,{
     method:"POST", headers:{"Content-Type":"application/json"},
     body:JSON.stringify({sections:regs.map(p=>({role:p.role,start:+p.start,end:+p.end,
-      figure_id:p.figure_id,source:p.source,heard:!!p.heard}))})
+      figure_id:p.figure_id,form:p.form||"A",unique:!!p.unique,instrument:p.instrument||"",
+      start_bar:(p.start_bar==null?null:p.start_bar),end_bar:(p.end_bar==null?null:p.end_bar),
+      source:p.source,heard:!!p.heard}))})
   }).then(async r=>{
     const txt=await r.text();
     let x; try{ x=JSON.parse(txt); }catch(e){ throw txt.slice(0,200); }
@@ -826,6 +854,7 @@ function loadDrafts(){
     ds.forEach(d=>{
       const role=canonRole(d.role);
       regs.push({role,start:+d.start,end:+d.end,figure_id:d.figure_id|| (role+"-A"),
+                 form:"A",unique:false,instrument:"",start_bar:null,end_bar:null,
                  source:(d.source==="guess"?"guess":"msa-draft"),heard:false});
     });
     table(); paintRegions();

@@ -21,14 +21,14 @@ def _rows(lab):
     return [json.loads(l) for l in path.read_text(encoding="utf-8").splitlines() if l.strip()]
 
 
-def _raise_ie(_p):
+def _raise_ie(_p, **_k):
     raise ImportError("not installed")
 
 
 def test_prefers_beats_this(tmp_path, monkeypatch):
     lab, flac = _lab(tmp_path)
     monkeypatch.setattr(beats, "_beat_this", lambda p: ([0.5, 1.0], [0.0], "beat_this"))
-    monkeypatch.setattr(beats, "_allin1", lambda p: ([9.0], [9.0], "allin1"))
+    monkeypatch.setattr(beats, "_allin1", lambda p, cache_dir=None: ([9.0], [9.0], "allin1"))
 
     report = beats.build_beats(lab, [{"album": "A", "track": "T", "flac_path": str(flac)}])
 
@@ -40,7 +40,7 @@ def test_prefers_beats_this(tmp_path, monkeypatch):
 def test_falls_back_to_allin1(tmp_path, monkeypatch):
     lab, flac = _lab(tmp_path)
     monkeypatch.setattr(beats, "_beat_this", _raise_ie)
-    monkeypatch.setattr(beats, "_allin1", lambda p: ([1.0, 2.0], [0.0], "allin1"))
+    monkeypatch.setattr(beats, "_allin1", lambda p, cache_dir=None: ([1.0, 2.0], [0.0], "allin1"))
 
     beats.build_beats(lab, [{"album": "A", "track": "T", "flac_path": str(flac)}])
 

@@ -44,8 +44,13 @@ def run_demucs(
     model: str = "htdemucs_6s",
     two_stems: str | None = None,
 ) -> Path:
+    from .device import torch_device
+
     out_dir.mkdir(parents=True, exist_ok=True)
-    cmd = [sys.executable, "-m", "demucs", "-n", model, "-o", str(out_dir)]
+    cmd = [
+        sys.executable, "-m", "demucs", "-n", model,
+        "--device", torch_device(), "-o", str(out_dir),
+    ]
     if two_stems:
         cmd += ["--two-stems", two_stems]
     cmd.append(str(flac))

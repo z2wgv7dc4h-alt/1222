@@ -66,7 +66,9 @@ def main(argv: list[str] | None = None) -> int:
     s = sub.add_parser("gate")
     s.add_argument("--threshold", type=float, default=0.55)
 
-    sub.add_parser("doctor", help="check torch/GPU + optional interns; print install hints")
+    s = sub.add_parser("doctor", help="check torch/GPU + optional interns; print install hints")
+    s.add_argument("--require-interns", action="store_true",
+                   help="exit non-zero if any intern is missing (used by setup.bat)")
 
     s = sub.add_parser("report", help="print real current state of the whole data pipeline")
     s.add_argument("--gp-root", type=Path, default=None, help="GP corpus for the failure breakdown (default: BOO_GP_ROOT)")
@@ -146,7 +148,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "doctor":
         from .doctor import run_doctor
 
-        return run_doctor(root())
+        return run_doctor(root(), require_interns=getattr(args, "require_interns", False))
 
     if args.cmd == "hash":
         from .catalogue import fill_hashes

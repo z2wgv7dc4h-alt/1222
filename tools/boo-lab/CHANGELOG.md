@@ -2,6 +2,10 @@
 
 ## 2026-09-18
 
+- **Refinements.** Demucs subprocess gets an explicit `--device` from `device.py` (was implicitly
+  choosing); `beats` allin1 fallback caches under `work/allin1`; `doctor --require-interns` exits
+  non-zero when an intern is missing and `setup.bat` aborts on it, so a broken install fails at
+  setup instead of at first analyze.
 - **GPU by default.** Root cause of slow runs: the venv had `torch 2.8.0+cpu` and allin1 defaults
   to `device='cpu'`. `device.py` (`torch_device()`/`gpu_name()`) is the single switch; allin1,
   beat_this and torchcrepe read it. Verified on the RTX 5080 (`torch 2.8.0+cu128`); allin1 Rebirth
@@ -17,7 +21,7 @@
 - **Real drafts.** `structure --album "2009 - A Higher Place"` wrote 125 `msa-draft` rows,
   `sections.jsonl` untouched; `compare` reports F0.5=0.737 F3=0.800 role3=0.250 on Rebirth.
 - **Repo hygiene.** `data/{drafts,beats,compare,sync,agree}.*` and `*.egg-info/` gitignored;
-  `boo_lab.egg-info` untracked. Tests: `test_natten_compat`, `test_device`, `test_doctor` → 165.
+  `boo_lab.egg-info` untracked. Tests: `test_natten_compat`, `test_device`, `test_doctor` → 166.
 
 ## 2026-09-17
 

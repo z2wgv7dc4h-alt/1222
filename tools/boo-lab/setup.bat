@@ -50,7 +50,15 @@ if not "%FLAC%"=="" (
 )
 
 echo.
-python -m boo_lab.cli doctor
+python -m boo_lab.cli doctor --require-interns
+if errorlevel 1 (
+  echo.
+  echo SETUP FAILED: an intern or core dependency is missing (see the hints above).
+  echo Fix the install, then re-run doctor:
+  echo   .venv\Scripts\python -m boo_lab.cli doctor --require-interns
+  pause
+  exit /b 1
+)
 echo.
 echo Done. Set BOO_FLAC_ROOT / BOO_GP_ROOT in .env, then:
 echo   .venv\Scripts\python -m boo_lab.cli scan

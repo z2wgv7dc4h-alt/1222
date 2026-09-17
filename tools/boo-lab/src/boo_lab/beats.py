@@ -22,10 +22,12 @@ def _beat_this(flac: Path) -> tuple[list[float], list[float], str]:
     return [float(x) for x in beats], [float(x) for x in downbeats], "beat_this"
 
 
-def _allin1(flac: Path) -> tuple[list[float], list[float], str]:
+def _allin1(
+    flac: Path, cache_dir: Path | None = None
+) -> tuple[list[float], list[float], str]:
     from .structure import run_allin1
 
-    payload = run_allin1(flac)
+    payload = run_allin1(flac, cache_dir=cache_dir)
     return (
         [float(x) for x in (payload.get("beats") or [])],
         [float(x) for x in (payload.get("downbeats") or [])],
@@ -33,14 +35,16 @@ def _allin1(flac: Path) -> tuple[list[float], list[float], str]:
     )
 
 
-def track_beats(flac: Path) -> tuple[list[float], list[float], str]:
+def track_beats(
+    flac: Path, cache_dir: Path | None = None
+) -> tuple[list[float], list[float], str]:
     """beat_this if installed, else allin1; `("none", ...)` when neither."""
     try:
         return _beat_this(flac)
     except ImportError:
         pass
     try:
-        return _allin1(flac)
+        return _allin1(flac, cache_dir=cache_dir)
     except ImportError:
         return [], [], "none"
 
@@ -61,7 +65,9 @@ def build_beats(lab_root: Path, rows: list[dict], album: str | None = None) -> d
                 skipped += 1
                 print("SKIP beats", r.get("track"), "no flac")
                 continue
-            beats, downbeats, source = track_beats(flac)
+            beats, downbeats, source = track_beats(
+                flac, cache_dir=lab_root / "work" / "allin1"
+            )
             if source == "none":
                 skipped += 1
                 print("SKIP beats", r.get("track"), "no beat tracker installed")

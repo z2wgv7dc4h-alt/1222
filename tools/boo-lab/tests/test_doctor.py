@@ -19,3 +19,9 @@ def test_doctor_checks_all_known_interns():
     assert set(doctor.INTERNS) == {"beat_this", "allin1", "jams", "mir_eval"}
     assert "torchcrepe" in doctor.EXTRAS
     assert "whisperx" in doctor.EXTRAS
+
+
+def test_require_interns_fails_when_missing(monkeypatch):
+    monkeypatch.setattr(doctor, "_has", lambda m: m in doctor.CORE)
+    assert doctor.run_doctor() == 0
+    assert doctor.run_doctor(require_interns=True) == 1

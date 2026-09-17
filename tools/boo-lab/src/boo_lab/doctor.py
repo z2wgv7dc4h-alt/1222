@@ -31,7 +31,7 @@ def _line(name: str, ok: bool, note: str = "") -> bool:
     return ok
 
 
-def run_doctor(lab_root: Path | None = None) -> int:
+def run_doctor(lab_root: Path | None = None, require_interns: bool = False) -> int:
     print("boo-lab doctor")
     print(f"  python {sys.version.split()[0]}")
 
@@ -52,15 +52,17 @@ def run_doctor(lab_root: Path | None = None) -> int:
         core_ok &= _line(mod, _has(mod))
 
     print(" interns (structure/beats research):")
+    intern_ok = True
     for mod in INTERNS:
         if mod == "allin1":
             from ._natten_compat import install
 
             install()
-            _line("allin1", _has("allin1"), "natten legacy-API shim installed")
+            intern_ok &= _line("allin1", _has("allin1"),
+                               "natten legacy-API shim installed")
         else:
-            _line(mod, _has(mod))
-    _line("natten", _has("natten"))
+            intern_ok &= _line(mod, _has(mod))
+    intern_ok &= _line("natten", _has("natten"))
 
     print(" extras:")
     for mod, extra in EXTRAS.items():
@@ -73,4 +75,9 @@ def run_doctor(lab_root: Path | None = None) -> int:
         print('  interns: pip install -e ".[intern]"')
     print("  pitch:   pip install -e \".[pitch]\"")
     print("  align:   pip install -e \".[align]\"")
-    return 0 if core_ok else 1
+    if not core_ok:
+        return 1
+    if require_interns and not intern_ok:
+        print("FAIL: --require-interns and an intern is missing (see hints above)")
+        return 1
+    return 0

@@ -34,3 +34,21 @@ Labyrinth bank **is** pre-made GP bars. That is the product for BoO. Other prese
 ## Listen vs tests
 
 Pytest proves wiring. User ear proves a riff. STATUS may not tick “sounds like BoO.”
+
+## 2026-09-17 — boo-lab lab rules
+
+- **A keeper is heard.** `data/sections.jsonl` holds keepers only (`source=human`/`guess-accepted`
+  **and** `heard=true`). Machines write `data/drafts.jsonl` (`msa-draft`/`songformer-draft`/`guess`);
+  they never label.
+- **`structure` never writes `sections.jsonl`.** Drafts only. The studio Save is the one writer.
+- **Box identity is form + figure_id + role:** `form` = large-scale letter, `figure_id` = the small
+  figure (`riff-A`), `role` = function; `unique` / `instrument` / `start_bar` / `end_bar` optional.
+- **Interns are extras.** allin1 / beat-this / SongFormer / jams / mir_eval stay optional; the
+  default install is thin. The suite runs without them (mocked).
+- **6-stem Demucs (`htdemucs_6s`) is the default** so guitar/piano separate from “other”; old
+  4-stem caches stay valid.
+- **Witnesses are map-level:** `flac_sha256` pins a row to the exact file; `sync_ok` means the tab
+  clock is within 350 ms of the audio. Pins without `sync_ok` are still valid if heard; extract
+  users should prefer `sync_ok`.
+- **The studio spectrogram is a second view** of the already-decoded buffer; it does not change
+  Save rules, and its failure never blocks pin/save.

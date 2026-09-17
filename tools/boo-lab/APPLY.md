@@ -1,3 +1,5 @@
+# applied; do not re-run on current tree
+
 # Apply on the desktop repo (I cannot git push from this sandbox)
 
 Copy into `tools/boo-lab/`:

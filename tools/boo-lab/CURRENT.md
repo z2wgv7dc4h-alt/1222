@@ -1,13 +1,24 @@
-# CURRENT — read this first (2026-09-14)
+# CURRENT — read this first (2026-09-17)
 
 Single source of truth for humans and later bots. If README/STATUS/LAW disagree with this file, this file wins. Then fix the others.
+
+> **Read this first.**
+> Keepers = `data/sections.jsonl` (`source=human`/`guess-accepted` **and** `heard=true`).
+> Drafts = `data/drafts.jsonl` (`msa-draft` / `songformer-draft` / `guess`) — **never keepers**.
+> Box fields: `start end role layer form figure_id unique instrument start_bar end_bar source heard`.
+> Studio table columns match those; waveform is WaveSurfer, with a real mel spectrogram below it (Wave / Spec / Both).
+> `structure` writes `drafts.jsonl` only. `hear` and `sync` require **both** `--album` and `--track`.
+> `hash` fills `flac_sha256`; `sync` writes `data/sync.jsonl` (`sync_ok`/`lag_sec`); `beats` → `data/beats.jsonl`.
+> Holdout songs stay unpinned. GP5 for extract; GP7 is eyes / export-to-GP5.
+> One album side per session. Default install is thin; interns (allin1 / beat-this / SongFormer) are optional.
+> Machines may draft. They never label.
 
 ## What this is
 
 A **section lab** for metal FLACs (Born of Osiris first, other bands via ingest). Human output is `data/sections.jsonl` — **keeper pins only** (`source=human`/`guess-accepted`, `heard=true`), each with a figure/function `layer` and a `figure_id` — plus optional Pack clips under `work/` (gitignored). Machines write `data/drafts.jsonl` (MSA/SongFormer/Guess) and never keepers. It is not God Tier Metal, not a DAW, not a tab reader, not an auto-songwriter.
 
 GitHub: `https://github.com/z2wgv7dc4h-alt/1222` path `tools/boo-lab`.  
-Tip that first shipped the night’s UI/guess work: `6482c30` `guess bpm fix, save harvest, riff colors`. Later local files (ingest hoist, catalogue unique match, gitutil ignore `work/`, docs) may still need a separate commit.
+Newest lab commit: `aa48bc4` (studio spectrogram); before it `03199c1` (map witnesses), `02cbb72` (box identity fields).
 
 ## Paths
 
@@ -40,13 +51,14 @@ http://127.0.0.1:8765 — Ctrl+Shift+R after HTML. Restart the process after `.p
 
 | path | what |
 |---|---|
-| `data/map.csv` | scan result: album, track, flac path, gp path, match |
+| `data/map.csv` | scan result: album, track, flac path, gp path, match, `flac_sha256` |
 | `data/sections.jsonl` | **keeper** boxes only. Save **replaces** that track’s rows, keeps other tracks |
 | `data/drafts.jsonl` | machine drafts (`msa-draft`, `songformer-draft`, `guess`). Never keepers |
 | `data/holdout.csv` | fixed whole-song train/val reservation (`ensure_holdout`) |
 | `data/agree.jsonl` | two-pass keeper snapshots (`boo-lab agree --write`), pass 1/2 |
 | `data/compare.json` | drafts-vs-keepers report (`boo-lab compare`) |
 | `data/beats.jsonl` | beat/downbeat grid (`boo-lab beats`) |
+| `data/sync.jsonl` | tab-vs-audio witness (`boo-lab sync`): `sync_ok`, `lag_sec`, `score` |
 | `data/corpus_health.json` | pipeline state (`boo-lab report`) |
 | `data/rebirth-sections.jsonl` | reference labels for Rebirth |
 | `work/stems/` | Demucs cache, 6-stem `htdemucs_6s` preferred (gitignored) |
@@ -96,8 +108,9 @@ If Save wrote six `0.00–0.25` rows, the pins fired before duration loaded. Pas
 - Left: albums collapse, cover thumb if `cover.jpg` / `folder.jpg` / `Cover/` / Cyrillic `Сover.jpg` sits next to FLACs.
 - Green GP5 = matched tab. Partial only if notes/name say stub/fragment/bass-only.
 - Mix lane: drag boxes. Click empty wave to seek. Clicking a box edge should not steal the next pin — leave a gap or seek first.
+- Spectrogram: real mel spectrogram of the already-decoded buffer under the mix; **Wave / Spec / Both** toggle (default Both), click to seek, current boxes overlaid. Waveform stays WaveSurfer.
 - Stem lane: pick any cached Demucs stem (drums/bass/guitar/piano/other/vocals); the drum-confidence note flags sections the classifier is unsure about.
-- Table is source of truth on Save (`harvestTable`); columns role / figure / start / end / source / heard. Blur number fields before Save.
+- Table is source of truth on Save (`harvestTable`); columns role / figure / form / uniq / inst / bar0 / bar1 / start / end / source / heard. Blur number fields before Save.
 - **Heard** gates the save: untick it and the box is dropped. A heard draft saves as `guess-accepted`.
 - **Load drafts** appends `data/drafts.jsonl` rows unheard; **VAL** badge marks holdout songs.
 - Play = whole track. Play box = selected region only.
@@ -199,9 +212,9 @@ album+track so “Rebirth” cannot stream “Machine.”
 
 ## CLI
 
-`init-map` `scan` `studio`/`annotate` `ingest` `stems` `pack` `drums` `vocals` `holdout` `lyrics`
-`structure` `beats` `audit` `extract` `gate` `report` `export-bank` `agree` `compare` `hear`
-`export-jams`
+`init-map` `scan` `hash` `studio`/`annotate` `ingest` `stems` `pack` `drums` `vocals` `holdout`
+`lyrics` `structure` `beats` `audit` `extract` `gate` `report` `export-bank` `agree` `compare`
+`hear` `sync` `export-jams`
 
 `structure` writes `data/drafts.jsonl` only (allin1 → `msa-draft`; SongFormer when
 `SONGFORMER_HOME`/import → `songformer-draft`). `agree` snapshots keeper pins (pass 1/2) and diffs
@@ -219,6 +232,8 @@ torchcrepe; `.[align]` whisperx. Never default dependencies.
 - `boo-lab compare [--album X]` — drafts vs keepers per song **and per source**: precision/recall/F @0.5/@3 plus role agreement; marks `split=holdout` (never skipped). Writes `data/compare.json`.
 - `boo-lab export-jams --out DIR` — one `.jams` per keeper song, `segment_lab_figure` + `segment_lab_function`; holdout skipped.
 - `boo-lab beats [--album X]` — `data/beats.jsonl` (`beat_this` preferred, allin1 fallback).
+- `boo-lab sync --album X --track Y` — GP onset clock vs the audio envelope (guitar stem else mix); `sync_ok` iff `|lag| < 0.35 s` and score ≥ 0.15. Writes `data/sync.jsonl`.
+- `boo-lab hash [--album X]` — fills empty `flac_sha256` cells in `map.csv` (scan hashes on rewrite).
 - `boo-lab audit` — sources/overlaps/heard/short-box hygiene.
 
 Reading: **F3 high + role agreement low = the intern finds the edges but names them wrong.**

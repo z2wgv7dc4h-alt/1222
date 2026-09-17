@@ -1,3 +1,5 @@
+# applied; do not re-run on current tree
+
 # Hand patches on origin files
 
 ## 1. `src/boo_lab/cli.py`

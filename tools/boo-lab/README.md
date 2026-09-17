@@ -29,13 +29,33 @@ python -m boo_lab.cli studio --port 8765
 
 Open http://127.0.0.1:8765 — Ctrl+Shift+R after HTML changes. One server only.
 
+## Install
+
+Thin by default (librosa + soundfile).
+
+```
+cd tools\boo-lab
+python -m venv .venv
+.venv\Scripts\python -m pip install -e .
+```
+
+Optional extras (never default): `-e ".[dev]"` pytest; `-e ".[pitch]"` torchcrepe;
+`-e ".[align]"` whisperx; `-e ".[intern]"` allin1 + beat-this + jams + mir_eval. None is
+required to pin and Save; missing interns just print a skip.
+
 ## Daily loop
 
-1. Pick a track. Clock must show full length before pinning.
-2. Draw roles (overlap figure vs function freely; same role may not overlap). Give each box a `figure_id`, then tick **heard** when you have actually listened. Type times, click off the field, **Save**.
-3. Confirm table seconds look like music (not `0.00–0.25`). **Unheard boxes are dropped on Save.**
-4. **Pack** once labels are good. **Load drafts** pulls machine `msa-draft`/`guess` boxes in unheard for review.
-5. `git add` + `commit` + `push` from `god-tier-metal` when you want a backup. The UI button is best-effort.
+One album side per session.
+
+1. Pick a track. Clock must show full length before pinning. Use the waveform **and** the mel
+   spectrogram (Wave / Spec / Both) to find edges.
+2. Give each box a `form` (large letter), a `figure_id` (small, e.g. `riff-A`), and a `role`;
+   mark `unique` for single-use figures, `instrument` when two guitars differ. Tick **heard**
+   when you have actually listened.
+3. **Save** (unheard boxes are dropped). Confirm table seconds look like music (not `0.00–0.25`).
+4. **Pack** once labels are good.
+5. Old pins without `heard`: `boo-lab hear --album X --track Y` (that track only).
+6. If the interns are installed: `boo-lab structure --album X`, then `boo-lab compare --album X`.
 
 ## Ingest a new band
 
@@ -62,7 +82,9 @@ Then `python -m boo_lab.cli scan` and reload. Green GP5 = matched tab.
 | `gate` / `export-bank` | gated riff export |
 | `report` | pipeline state → `data/corpus_health.json` |
 | `holdout` | fixed whole-song train/val split → `data/holdout.csv` |
-| `hear --album X --track Y` | flip `heard=true` on one song's keepers |
+| `hear --album X --track Y` | flip `heard=true` on one song's keepers (needs both flags) |
+| `sync --album X --track Y` | tab-vs-audio witness → `data/sync.jsonl` (needs both flags) |
+| `hash [--album X]` | fill empty `flac_sha256` cells in `map.csv` |
 | `agree --album X --track Y [--write\|--diff]` | two-pass keeper agreement |
 | `compare [--album X]` | machine drafts vs human keepers |
 | `export-jams --out DIR` | JAMS 0.3 (figure/function layers) |
@@ -71,9 +93,10 @@ Then `python -m boo_lab.cli scan` and reload. Green GP5 = matched tab.
 
 `data/sections.jsonl` is **keepers only** (`human`/`guess-accepted`, `heard=true`). Machines
 write `data/drafts.jsonl` (never `sections.jsonl`). Research side-outputs: `data/agree.jsonl`,
-`data/compare.json`, `data/beats.jsonl`, `data/holdout.csv`, `data/corpus_health.json`; JAMS
-under `--out`. `work/` is gitignored.
+`data/compare.json`, `data/beats.jsonl`, `data/sync.jsonl`, `data/holdout.csv`,
+`data/corpus_health.json`; JAMS under `--out`. `work/` is gitignored.
 
+`structure` writes drafts only. `hear` and `sync` require `--album` **and** `--track`.
 Optional extras: `pip install -e ".[intern]"` adds allin1, beat-this, jams, mir_eval;
 `.[pitch]` torchcrepe, `.[align]` whisperx. Never default dependencies.
 

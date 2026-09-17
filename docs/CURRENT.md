@@ -1,16 +1,17 @@
 # CURRENT
 
 updated: 2026-09-17
-pytest: engine riff_bank 46 passed; boo-lab 51 passed (commit 2e6875c, pushed)
+pytest: engine riff_bank tests pass; boo-lab **153 passed**
 
 ## Now
 
-Session paused here — user is out of budget, work continues via DeepSeek
-("flash") prompts drafted by Claude, applied by the user, spot-verified by
-Claude with real corpus numbers before commit. That loop worked well; keep
-using it.
+The lab (`tools/boo-lab`) is the active work and its own source of truth:
+**`tools/boo-lab/CURRENT.md`**. It pins human keepers (`data/sections.jsonl`),
+drafts machine output (`data/drafts.jsonl`), and ships a full studio + CLI
+(spectrogram, draft/keeper schema, witnesses, agreement/JAMS exports).
+Engine work below is paused; nothing here consumes the lab yet.
 
-Real, done, verified, pushed this pass (all in tools/boo-lab/ + engine/riff_bank.py):
+Real, done, verified, pushed this pass (tools/boo-lab/ + engine/riff_bank.py):
 - Labyrinth bank redesigned: ONE real song, ONE 2-4 bar contiguous riff,
   tiled (the "role-bag medley" approach was heard, killed — see
   docs/DECISIONS.md). `RiffBankCoverageError` hard-fails a labyrinth role
@@ -32,12 +33,12 @@ Real, done, verified, pushed this pass (all in tools/boo-lab/ + engine/riff_bank
   section_tempo}.jsonl` — real extracted note/pitch content, same
   local-only posture as `engine/data/riff_bank.json`, this repo is public.
 
-Not yet done (queued, prompts already drafted, not yet run):
-`pack.py` still doesn't pack the new guitar/piano 6-stem output; drum-
-classifier confidence flags; vocal pyin→crepe upgrade; per-section tempo/
-time-signature. Engine-side integration (bass/lead/drums generation
-actually consuming this data) explicitly deferred — user: "stop thinking
-about the main project... BOO LAB flawless" is the current priority.
+Not yet done: engine-side integration (bass/lead/drums/vocal-melody actually
+consumed by generation) and per-section tempo/time-signature. Everything the
+lab shipped this session is done: pack slices the 6-stem guitar/piano output,
+drum `low_confidence`, CREPE vocal melody, `flac_sha256`/`sync_ok` witnesses,
+box identity fields (`form`/`unique`/`instrument`/bars), and the studio
+spectrogram. Source of truth for all of it: `tools/boo-lab/CURRENT.md`.
 
 Do not write more X devices. Do not train. Do not import riff_model.py.
 Do not `/next` the old queue.

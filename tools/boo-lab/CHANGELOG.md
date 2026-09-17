@@ -10,6 +10,9 @@
 - **Riffs.** `RiffFragment` gains `instrument`, `source_type`, `chord_notes`, `chord_frets`; cell hits carry real `palm_mute/harmonic/slide/tremolo/vibrato/accent`; categorized riff-bank failure reasons.
 - **Vocals/lyrics.** Vocal melody via CREPE (pyin fallback); plain LRCLIB lyrics display + WhisperX **force-alignment of the provided words**; LRCLIB lookup fixes (space-numbered tracks, retries, no-duration fallback).
 - **Studio.** Canonical roles, guarded Remove-album, 6-stem picker (`GET /api/stem`), per-song VAL badge, drum-confidence note (`GET /api/analysis`), flac fallback, safe album+track id resolution; `test_*` suite (136 tests) + `pyproject.toml` pytest config.
+- **Box identity.** `stamp_box` gains `form` / `unique` / `instrument` / `start_bar` / `end_bar`; Save passes them through and fills GP bars only when `match=yes` (`extract.bars_for_times`, never blocks); studio columns `form / uniq / inst / bar0 / bar1`.
+- **Map witnesses.** `map.csv` gains `flac_sha256` (`scan` hashes on rewrite, `boo-lab hash` fills empties; unknown columns preserved); `boo-lab sync --album --track` scores the GP onset clock vs the audio envelope and writes `data/sync.jsonl` (`sync_ok` iff `|lag| < 0.35 s` and score ≥ 0.15).
+- **Studio spectrogram.** Real JS mel spectrogram drawn from the already-decoded WaveSurfer buffer (no second fetch, no deps): synced playhead, click-to-seek, section-box overlays, Wave/Spec/Both toggle. Tests: 153.
 
 ## 2026-09-14
 

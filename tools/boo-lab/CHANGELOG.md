@@ -9,6 +9,10 @@
   alternative endings — and advances by the same beat arithmetic as the onsets. GP clock matches
   audio length within ~2% for 10 of 13 (was 0.85–1.76×). `catalogue._key`/scan now matches
   space-numbered `NN Title.gp5` (`07 Exist` had silently unmatched). `sync_ok`: 02/06/10 (was 0).
+- **Sync chroma co-witness.** Added `gp_chroma` (tab pitches held over each beat) + `audio_chroma`
+  (`chroma_cqt`) + `chroma_lag_and_score`; `sync.jsonl` records `chroma_lag`/`chroma_score` and
+  `sync_ok` passes if **either** the onset or chroma witness aligns. Rescued `03` (onset 1.21 s vs
+  chroma 0.16 s) — `sync_ok` 5 → **6**. `07/09/11` still fail (chroma lag 1.9–2.5 s / low score).
 - **Sync metric.** `best_lag_and_score` now blurs both envelopes (~120 ms) before correlating, so an
   onset only has to land near a tab note instead of exactly on it. Wrong-peak lags collapsed
   (13: 64 s→1.0 s, 11: 116 s→4.5 s, 05: 6.1 s→1.0 s). Added `best_clock_fit` (clock-rate search) as
@@ -33,7 +37,7 @@
 - **Real drafts.** `structure --album "2009 - A Higher Place"` wrote 125 `msa-draft` rows,
   `sections.jsonl` untouched; `compare` reports F0.5=0.737 F3=0.800 role3=0.250 on Rebirth.
 - **Repo hygiene.** `data/{drafts,beats,compare,sync,agree}.*` and `*.egg-info/` gitignored;
-  `boo_lab.egg-info` untracked. Tests: `test_natten_compat`, `test_device`, `test_doctor` → 172.
+  `boo_lab.egg-info` untracked. Tests: `test_natten_compat`, `test_device`, `test_doctor` → 174.
 
 ## 2026-09-17
 

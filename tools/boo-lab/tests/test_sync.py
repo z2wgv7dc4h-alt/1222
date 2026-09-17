@@ -168,6 +168,36 @@ def test_sync_ok_with_mocked_envelopes(tmp_path, monkeypatch):
     assert rec["lag_sec"] == 0.0
 
 
+def test_chroma_lag_and_score_identical_matrices():
+    import numpy as np
+
+    c = np.random.default_rng(0).random((12, 300))
+    lag, score = sync.chroma_lag_and_score(c, c, 0.01)
+    assert abs(lag) < 1e-9 and score > 0.9
+
+
+def test_chroma_co_witness_can_bless(tmp_path, monkeypatch):
+    import numpy as np
+
+    gp = tmp_path / "x.gp5"
+    gp.write_bytes(b"x")
+    flac = tmp_path / "x.flac"
+    flac.write_bytes(b"x")
+    lab = _lab(tmp_path, gp=gp, flac=flac)
+    # onset witness fails (impulse beyond the envelope)...
+    monkeypatch.setattr(sync, "gp_onset_times", lambda p: [10.0])
+    monkeypatch.setattr(
+        sync, "audio_envelope",
+        lambda p: (sync.envelope_from_times([0.0], 400, 0.01), 0.01))
+    # ...but the chroma witness matches perfectly.
+    monkeypatch.setattr(sync, "audio_chroma", lambda p: (np.ones((12, 400)), 0.01))
+    monkeypatch.setattr(sync, "gp_chroma", lambda p, h, n: np.ones((12, n)))
+
+    rec = sync.sync_track(lab, "A", "T")
+
+    assert rec["sync_ok"] is True and rec["note"] == "ok (chroma)"
+
+
 def test_sync_uses_cached_guitar_stem(tmp_path, monkeypatch):
     gp = tmp_path / "x.gp5"
     gp.write_bytes(b"x")

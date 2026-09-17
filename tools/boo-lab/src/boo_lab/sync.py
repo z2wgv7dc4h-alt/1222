@@ -5,9 +5,10 @@ tab's own tempo/measure clock) and one from the audio (librosa onset
 strength, guitar stem if cached else the mix), then scores their normalized
 cross-correlation. Both sides are blurred (~120 ms) first, so an onset only
 has to land *near* a tab note -- a raw impulse comb against a broad envelope
-is too spiky and latches wrong peaks on repeated riffs. `sync_ok` means the
-tab clock is within 350 ms of the audio at the same rate. No new dependencies
-(numpy + librosa only).
+is too spiky and latches wrong peaks on repeated riffs. A second witness
+aligns tab pitches against audio chroma (harmonic content, drums matter far
+less); `sync_ok` passes if either witness is within 350 ms. No new
+dependencies (numpy + librosa only).
 """
 from __future__ import annotations
 
@@ -80,12 +81,14 @@ def _playback_order(measures: list) -> list[int]:
 
 
 
-def gp_onset_times(gp_path: Path) -> list[float] | None:
-    """Real note-start times (seconds) on the tab's own tempo/measure clock,
-    in playback order (repeats expanded). `None` when the GP cannot be parsed.
+def _tab_notes(gp_path: Path):
+    """Generator of `(seconds, [midi pitches])` for each notated beat, on the
+    tab's own tempo/measure clock, in playback order (repeats expanded).
+    `None` when the GP cannot be parsed.
 
     Faithful where it matters: `song.tempo` (per-measure `header.tempo` only
-    when set), time signatures, repeat/unroll, dotted and tuplet beats.
+    when set), repeat/unroll, dotted beats; onset time and the measure advance
+    share the same beat-duration arithmetic so the clock stays self-consistent.
     """
     try:
         import guitarpro
@@ -99,29 +102,41 @@ def gp_onset_times(gp_path: Path) -> list[float] | None:
     if track is None:
         return None
 
-    onsets: list[float] = []
-    t = 0.0
-    # `song.tempo` is the file's tempo; defaulting to 120 stretched every tab
-    # (a 195 BPM song walked 1.6x too long, so the clock never lined up).
-    # Onsets and the measure advance share the same beat-duration arithmetic so
-    # the clock stays self-consistent; repeats are expanded via `_playback_order`.
-    bpm = float(getattr(song, "tempo", None) or 120.0)
-    for idx in _playback_order(track.measures):
-        measure = track.measures[idx]
-        val = getattr(getattr(measure.header, "tempo", None), "value", None)
-        if val:
-            bpm = float(val)
-        beat_seconds = 60.0 / max(bpm, 1.0)
-        for voice in measure.voices:
-            for beat in voice.beats:
-                if beat.notes:
-                    onsets.append(round(t, 4))
-                quarters = 4.0 / beat.duration.value
-                if beat.duration.isDotted:
-                    quarters *= 1.5
-                t += quarters * beat_seconds
-            break
-    return onsets
+    def walk():
+        t = 0.0
+        bpm = float(getattr(song, "tempo", None) or 120.0)
+        for idx in _playback_order(track.measures):
+            measure = track.measures[idx]
+            val = getattr(getattr(measure.header, "tempo", None), "value", None)
+            if val:
+                bpm = float(val)
+            beat_seconds = 60.0 / max(bpm, 1.0)
+            for voice in measure.voices:
+                for beat in voice.beats:
+                    quarters = 4.0 / beat.duration.value
+                    if beat.duration.isDotted:
+                        quarters *= 1.5
+                    dur = quarters * beat_seconds
+                    if beat.notes:
+                        pitches = []
+                        for note in beat.notes:
+                            try:
+                                pitches.append(int(note.realValue))
+                            except Exception:
+                                pass
+                        yield t, pitches, dur
+                    t += dur
+                break
+
+    return walk()
+
+
+def gp_onset_times(gp_path: Path) -> list[float] | None:
+    """Real note-start times (seconds) in playback order; `None` if unparseable."""
+    events = _tab_notes(gp_path)
+    if events is None:
+        return None
+    return [round(t, 4) for t, _pitches, _dur in events]
 
 
 def envelope_from_times(times: list[float], n_frames: int, hop_s: float):
@@ -145,6 +160,39 @@ def audio_envelope(path: Path):
     hop = 512
     env = librosa.onset.onset_strength(y=y, sr=sr, hop_length=hop)
     return env, hop / float(sr)
+
+
+def gp_chroma(gp_path: Path, hop_s: float, n_frames: int):
+    """`(12, n_frames)` pitch-class activity from the tab's note starts, in
+    playback order. `None` when the GP cannot be parsed."""
+    import numpy as np
+
+    events = _tab_notes(gp_path)
+    if events is None:
+        return None
+    chroma = np.zeros((12, max(0, n_frames)), dtype=float)
+    if hop_s <= 0:
+        return chroma
+    for t, pitches, dur in events:
+        # Hold each note over its beat: audio chroma is sustained, so an
+        # onset-only comb correlates poorly even when the pitches are right.
+        start = int(round(t / hop_s))
+        stop = max(start + 1, int(round((t + dur) / hop_s)))
+        for frame in range(start, min(stop, chroma.shape[1])):
+            for pitch in pitches:
+                chroma[pitch % 12, frame] += 1.0
+    return chroma
+
+
+def audio_chroma(path: Path):
+    """`(12, T) chroma_cqt, hop seconds` -- harmonic content, which is driven by
+    the guitars rather than the drums that dominate onset strength."""
+    import librosa
+
+    y, sr = librosa.load(str(path), sr=22050, mono=True)
+    hop = 512
+    chroma = librosa.feature.chroma_cqt(y=y, sr=sr, hop_length=hop)
+    return chroma, hop / float(sr)
 
 
 def _smooth(env, window_frames: int):
@@ -182,6 +230,52 @@ def best_lag_and_score(
     if denom <= 0:
         return 0.0, 0.0
     corr = np.correlate(a, b, mode="full") / denom
+    k = int(np.argmax(corr))
+    return (k - (n - 1)) * hop_s, float(corr[k])
+
+
+def _smooth_rows(matrix, window_frames: int):
+    import numpy as np
+
+    if window_frames <= 1:
+        return matrix
+    kernel = np.ones(window_frames, dtype=float) / window_frames
+    out = np.empty_like(matrix)
+    for row in range(matrix.shape[0]):
+        out[row] = np.convolve(matrix[row], kernel, mode="same")
+    return out
+
+
+def chroma_lag_and_score(
+    gp_chroma, audio_chroma, hop_s: float, smooth_s: float = SMOOTH_SECONDS
+) -> tuple[float, float]:
+    """Normalized cross-correlation of two chroma matrices along time.
+    Returns `(lag_seconds, score)`. Harmonic content, so drums matter less
+    than they do for the onset-strength envelope."""
+    import numpy as np
+
+    a = np.asarray(gp_chroma, dtype=float)
+    b = np.asarray(audio_chroma, dtype=float)
+    if a.size == 0 or b.size == 0:
+        return 0.0, 0.0
+    n = max(a.shape[1], b.shape[1])
+    A = np.zeros((12, n))
+    B = np.zeros((12, n))
+    A[:, : a.shape[1]] = a[:12]
+    B[:, : b.shape[1]] = b[:12]
+    if hop_s > 0 and smooth_s > 0:
+        w = max(1, int(round(smooth_s / hop_s)))
+        A = _smooth_rows(A, w)
+        B = _smooth_rows(B, w)
+    A = A - A.mean(axis=1, keepdims=True)
+    B = B - B.mean(axis=1, keepdims=True)
+    num = np.zeros(2 * n - 1)
+    for pc in range(12):
+        num += np.correlate(A[pc], B[pc], mode="full")
+    denom = float(np.linalg.norm(A) * np.linalg.norm(B))
+    if denom <= 0:
+        return 0.0, 0.0
+    corr = num / denom
     k = int(np.argmax(corr))
     return (k - (n - 1)) * hop_s, float(corr[k])
 
@@ -246,7 +340,8 @@ def sync_track(lab_root: Path, album: str | None, track: str | None) -> dict:
     flac = Path(row.get("flac") or "")
     rec = {
         "album": album, "track": track, "sync_ok": False, "lag_sec": None,
-        "score": None, "used_stem": "", "gp": row.get("gp") or "",
+        "score": None, "clock_ratio": None, "chroma_lag": None,
+        "chroma_score": None, "used_stem": "", "gp": row.get("gp") or "",
         "flac": row.get("flac") or "", "flac_sha256": row.get("flac_sha256") or "",
         "note": "",
     }
@@ -286,9 +381,23 @@ def sync_track(lab_root: Path, album: str | None, track: str | None) -> dict:
     rec["clock_ratio"] = round(ratio, 4)
     rec["lag_sec"] = round(lag, 4)
     rec["score"] = round(score, 4)
-    rec["sync_ok"] = decide(lag, score)
+    onset_ok = decide(lag, score)
+    # Co-witness: harmonic (chroma) alignment is indifferent to the drums that
+    # dominate onset strength, so it catches tabs the onset comb mis-peaks on.
+    chroma_ok = False
+    try:
+        audio_c, chop = audio_chroma(Path(src))
+        gp_c = gp_chroma(gp, chop, audio_c.shape[1])
+        if gp_c is not None:
+            clag, cscore = chroma_lag_and_score(gp_c, audio_c, chop)
+            rec["chroma_lag"] = round(clag, 4)
+            rec["chroma_score"] = round(cscore, 4)
+            chroma_ok = decide(clag, cscore)
+    except Exception:
+        pass
+    rec["sync_ok"] = onset_ok or chroma_ok
     if rec["sync_ok"]:
-        rec["note"] = "ok"
+        rec["note"] = "ok" if onset_ok else "ok (chroma)"
     elif abs(ratio - 1.0) > RATE_TOLERANCE and rscore > score + 0.03:
         rec["note"] = "clock x%.3f (notated tempo differs)" % ratio
     elif abs(lag) >= LAG_TOLERANCE:

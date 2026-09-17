@@ -4,7 +4,7 @@ Canonical detail: **CURRENT.md**; commands in **README.md**.
 
 Works: studio keeps pins (`human`/`guess-accepted` + `heard`) in `sections.jsonl`; mel
 spectrogram under the WaveSurfer waveform; 6-stem picker; drafts; `hear`/`sync`/`hash`;
-`agree`/`compare`/`export-jams`/`beats`/`audit`/`report`; **174 tests pass**.
+`agree`/`compare`/`export-jams`/`beats`/`audit`/`report`; **177 tests pass**.
 Interns (allin1 structure, beat_this, torchcrepe) run on **CUDA** when present
 (RTX 5080, `torch 2.8.0+cu128`); `boo-lab doctor` reports the build. allin1 works
 without an old natten build via `_natten_compat` (legacy NATTEN API + madmom
@@ -20,10 +20,14 @@ On disk now:
   where the mix doesn't and vice versa). Two witnesses score alignment: a blurred (~120 ms) **onset**
   correlation, and **chroma** (tab pitches sustained vs `chroma_cqt`). `sync_ok` passes if either
   witness on either source is within 350 ms at score ≥0.15; `used_stem`, `clock_ratio`,
-  `chroma_lag`, `chroma_score` are recorded. **6 `sync_ok`**: `02`/`04`/`06`/`08`/`10` on onsets,
-  `03` on chroma (onset said 3.4 s, chroma 0.07 s). `05/07/09/11/12/13` still fail (residual
-  0.4–1.0 s lead-ins, or chroma lags 2.0–2.5 s / low score). `01 - Rebirth` `no-gp`. Perfect tabs in
-  `gp5/A Higher Place/`.
+  `chroma_lag`, `chroma_score`, `offset_sec` are recorded. An **aligned-with-offset** outcome also
+  passes: a peak outside the 0.35 s zero window but within 5 s, with score ≥0.15, **peak prominence**
+  ≥0.05, and the other witness agreeing on the offset within 0.25 s. **7 `sync_ok`**: `02`/`04`/
+  `06`/`08`/`10` on onsets, `03` on chroma, `13` as a lead-in (`ok (lead-in -1.00s)`, both witnesses
+  at −1.00 s). Not passed: `05` and `12` agree on ~0.4–1.0 s but the peak isn't prominent enough;
+  `07` drifts 2.7 % (needs the rate fit, not an offset); `11` is 14 % short (missing section — a data
+  gap); `09`'s chroma alone suggests a ~0.67 s offset but the onset witness doesn't corroborate, so
+  it isn't trusted. `01 - Rebirth` `no-gp`.
 - `data/agree.jsonl` — Rebirth pass 1 (6 boxes). Pass 2 needs a human re-pin, then
   `boo-lab agree --album X --track Y --diff`.
 - `data/map.csv` — 71 rows, 55 `match=yes`; `flac_sha256` only once `scan`/`hash` runs.

@@ -9,6 +9,11 @@
   alternative endings — and advances by the same beat arithmetic as the onsets. GP clock matches
   audio length within ~2% for 10 of 13 (was 0.85–1.76×). `catalogue._key`/scan now matches
   space-numbered `NN Title.gp5` (`07 Exist` had silently unmatched). `sync_ok`: 02/06/10 (was 0).
+- **Lead-in outcome.** `best_alignment` now also returns peak **prominence**; sync passes an
+  "aligned with offset" case when a peak is outside the 0.35 s zero window but within 5 s, scores
+  ≥0.15, has prominence ≥0.05, and the other witness agrees on the offset (≤0.25 s). Recorded as
+  `offset_sec` / `ok (lead-in X.XXs)`. `13 - Faces Of Death` passes this way (both witnesses at
+  −1.00 s); `05/12` don't (peak not prominent); `07/09/11` still fail as misalignment/data. `sync_ok`: 6 → **7**.
 - **Guitar-stem sync.** `sync` now prefers the cached 6-stem `guitar.wav` and falls back to the mix
   per witness (guitar-only broke `02`, which the mix gets right). `stems` now actually honors its
   long-parsed-but-ignored `--album` flag and skips already-cached tracks; ran it to cache guitar for
@@ -41,7 +46,7 @@
 - **Real drafts.** `structure --album "2009 - A Higher Place"` wrote 125 `msa-draft` rows,
   `sections.jsonl` untouched; `compare` reports F0.5=0.737 F3=0.800 role3=0.250 on Rebirth.
 - **Repo hygiene.** `data/{drafts,beats,compare,sync,agree}.*` and `*.egg-info/` gitignored;
-  `boo_lab.egg-info` untracked. Tests: `test_natten_compat`, `test_device`, `test_doctor` → 174.
+  `boo_lab.egg-info` untracked. Tests: `test_natten_compat`, `test_device`, `test_doctor` → 177.
 
 ## 2026-09-17
 

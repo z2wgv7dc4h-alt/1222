@@ -19,6 +19,8 @@ LAG_TOLERANCE = 0.35  # seconds -- sync_ok requires |lag| below this
 SCORE_THRESHOLD = 0.15  # normalized cross-correlation peak
 SMOOTH_SECONDS = 0.12  # blur before correlating: onsets need only land near each other
 RATE_TOLERANCE = 0.015  # sync_ok requires the tab clock rate within 1.5% of the audio
+LEADIN_MAX = 5.0  # an "aligned with offset" pass must be within this many seconds
+PROMINENCE_MIN = 0.05  # ... and the correlation peak must stand out this much
 
 
 def _read_jsonl(path: Path) -> list[dict]:
@@ -204,20 +206,22 @@ def _smooth(env, window_frames: int):
     return np.convolve(env, kernel, mode="same")
 
 
-def best_lag_and_score(
+def best_alignment(
     env_gp, env_audio, hop_s: float, smooth_s: float = SMOOTH_SECONDS
-) -> tuple[float, float]:
+) -> tuple[float, float, float]:
     """Normalized cross-correlation peak of two 1-D envelopes, after blurring
     both so an onset only has to land *near* a tab note (a raw impulse comb vs
     a broad envelope is too spiky and picks wrong peaks on repeated riffs).
-    Returns `(lag_seconds, score)`; sign of lag is not meaningful."""
+    Returns `(lag_seconds, score, prominence)`. Prominence is the peak minus
+    the best score outside a +/-0.5 s neighborhood -- a genuine offset is one
+    sharp peak, a wrong peak on a repeated riff is one of several near-ties."""
     import numpy as np
 
     a = np.asarray(env_gp, dtype=float)
     b = np.asarray(env_audio, dtype=float)
     n = max(a.size, b.size)
     if n == 0:
-        return 0.0, 0.0
+        return 0.0, 0.0, 0.0
     a = np.pad(a, (0, n - a.size))
     b = np.pad(b, (0, n - b.size))
     if hop_s > 0 and smooth_s > 0:
@@ -228,10 +232,22 @@ def best_lag_and_score(
     b = b - b.mean()
     denom = float(np.linalg.norm(a) * np.linalg.norm(b))
     if denom <= 0:
-        return 0.0, 0.0
+        return 0.0, 0.0, 0.0
     corr = np.correlate(a, b, mode="full") / denom
     k = int(np.argmax(corr))
-    return (k - (n - 1)) * hop_s, float(corr[k])
+    peak = float(corr[k])
+    w = max(1, int(round(0.5 / hop_s))) if hop_s > 0 else 1
+    lo, hi = max(0, k - w), min(corr.size, k + w + 1)
+    rest = np.concatenate([corr[:lo], corr[hi:]])
+    nxt = float(rest.max()) if rest.size else 0.0
+    return (k - (n - 1)) * hop_s, peak, peak - nxt
+
+
+def best_lag_and_score(
+    env_gp, env_audio, hop_s: float, smooth_s: float = SMOOTH_SECONDS
+) -> tuple[float, float]:
+    lag, score, _prom = best_alignment(env_gp, env_audio, hop_s, smooth_s)
+    return lag, score
 
 
 def _smooth_rows(matrix, window_frames: int):
@@ -326,7 +342,7 @@ def _evaluate_source(src: Path, gp: Path, onsets: list[float]) -> dict:
     """Run both witnesses (onset + chroma) on one audio source."""
     env_audio, hop_s = audio_envelope(Path(src))
     env_gp = envelope_from_times(onsets, len(env_audio), hop_s)
-    lag, score = best_lag_and_score(env_gp, env_audio, hop_s)
+    lag, score, prom = best_alignment(env_gp, env_audio, hop_s)
     ratio, _rlag, rscore = best_clock_fit(env_gp, env_audio, hop_s, span=0.08)
     clag = cscore = None
     try:
@@ -336,12 +352,36 @@ def _evaluate_source(src: Path, gp: Path, onsets: list[float]) -> dict:
             clag, cscore = chroma_lag_and_score(gp_c, audio_c, chop)
     except Exception:
         pass
+    onset_ok = decide(lag, score)
     return {
-        "lag": lag, "score": score, "ratio": ratio, "rscore": rscore,
+        "lag": lag, "score": score, "prom": prom, "ratio": ratio, "rscore": rscore,
         "clag": clag, "cscore": cscore,
-        "onset_ok": decide(lag, score),
+        "onset_ok": onset_ok,
         "chroma_ok": clag is not None and decide(clag, cscore),
+        # "aligned with offset": a bounded, prominent peak the other witness sees too
+        "onset_leadin": (
+            not onset_ok
+            and score >= SCORE_THRESHOLD
+            and LAG_TOLERANCE <= abs(lag) <= LEADIN_MAX
+            and prom >= PROMINENCE_MIN
+        ),
     }
+
+
+_OUTCOME_RANK = {"fail": 0, "lead-in": 1, "aligned": 2}
+
+
+def _outcome(ev: dict) -> tuple[str, float | None]:
+    """Classify one source's witnesses as `aligned`, `lead-in`, or `fail`."""
+    if ev["onset_ok"]:
+        return "aligned", ev["lag"]
+    if ev["chroma_ok"]:
+        return "aligned", ev["clag"]
+    if ev["onset_leadin"]:
+        clag = ev["clag"]
+        if clag is not None and abs(clag) <= LEADIN_MAX and abs(clag - ev["lag"]) < 0.25:
+            return "lead-in", ev["lag"]
+    return "fail", ev["lag"]
 
 
 def sync_track(lab_root: Path, album: str | None, track: str | None) -> dict:
@@ -363,7 +403,7 @@ def sync_track(lab_root: Path, album: str | None, track: str | None) -> dict:
     rec = {
         "album": album, "track": track, "sync_ok": False, "lag_sec": None,
         "score": None, "clock_ratio": None, "chroma_lag": None,
-        "chroma_score": None, "used_stem": "", "gp": row.get("gp") or "",
+        "chroma_score": None, "offset_sec": None, "used_stem": "", "gp": row.get("gp") or "",
         "flac": row.get("flac") or "", "flac_sha256": row.get("flac_sha256") or "",
         "note": "",
     }
@@ -387,23 +427,30 @@ def sync_track(lab_root: Path, album: str | None, track: str | None) -> dict:
     from .stems import find_stem
 
     guitar = find_stem(flac, lab_root / "work" / "stems", "guitar")
-    # Prefer the guitar stem (drums gone), but fall back to the mix when that
-    # yields no passing witness -- isolated guitar can mis-peak where the full
-    # mix does not, and vice versa.
-    used, ev = "guitar", _evaluate_source(guitar, gp, onsets) if guitar else None
-    if guitar is None or not (ev["onset_ok"] or ev["chroma_ok"]):
-        alt = _evaluate_source(flac, gp, onsets)
-        if ev is None or alt["onset_ok"] or alt["chroma_ok"]:
-            used, ev = "mix", alt
+    # Prefer the guitar stem (drums gone), fall back to the mix: isolated
+    # guitar can mis-peak where the mix does not, and vice versa. Stop as soon
+    # as a source yields an `aligned` outcome.
+    candidates = ([("guitar", guitar)] if guitar else []) + [("mix", flac)]
+    used, ev, kind, offset = None, None, "fail", None
+    for label, path in candidates:
+        cand = _evaluate_source(path, gp, onsets)
+        ckind, coffset = _outcome(cand)
+        if ev is None or _OUTCOME_RANK[ckind] > _OUTCOME_RANK[kind]:
+            used, ev, kind, offset = label, cand, ckind, coffset
+        if kind == "aligned":
+            break
     rec["used_stem"] = used
     rec["clock_ratio"] = round(ev["ratio"], 4)
     rec["lag_sec"] = round(ev["lag"], 4)
     rec["score"] = round(ev["score"], 4)
     rec["chroma_lag"] = round(ev["clag"], 4) if ev["clag"] is not None else None
     rec["chroma_score"] = round(ev["cscore"], 4) if ev["cscore"] is not None else None
-    rec["sync_ok"] = ev["onset_ok"] or ev["chroma_ok"]
-    if rec["sync_ok"]:
+    rec["sync_ok"] = kind != "fail"
+    rec["offset_sec"] = round(offset, 4) if kind == "lead-in" else None
+    if kind == "aligned":
         rec["note"] = "ok" if ev["onset_ok"] else "ok (chroma)"
+    elif kind == "lead-in":
+        rec["note"] = "ok (lead-in %.2fs)" % offset
     elif abs(ev["ratio"] - 1.0) > RATE_TOLERANCE and ev["rscore"] > ev["score"] + 0.03:
         rec["note"] = "clock x%.3f (notated tempo differs)" % ev["ratio"]
     elif abs(ev["lag"]) >= LAG_TOLERANCE:

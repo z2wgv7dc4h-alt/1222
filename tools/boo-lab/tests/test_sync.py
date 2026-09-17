@@ -198,6 +198,40 @@ def test_chroma_co_witness_can_bless(tmp_path, monkeypatch):
     assert rec["sync_ok"] is True and rec["note"] == "ok (chroma)"
 
 
+def test_best_alignment_reports_prominence_on_an_offset():
+    env = _env([i * 0.5 for i in range(1, 12)], n=800)
+    shifted = sync.envelope_from_times([0.5 + i * 0.5 for i in range(1, 12)], 800, 0.01)
+    lag, score, prom = sync.best_alignment(env, shifted, 0.01)
+    assert abs(abs(lag) - 0.5) < 0.05
+    assert score > 0.3 and prom > sync.PROMINENCE_MIN
+
+
+def test_outcome_lead_in_requires_corroboration():
+    ev = {"onset_ok": False, "chroma_ok": False, "onset_leadin": True,
+          "lag": 1.0, "clag": 1.05}
+    assert sync._outcome(ev) == ("lead-in", 1.0)
+    ev["clag"] = 3.0  # the other witness disagrees -> not a lead-in
+    assert sync._outcome(ev)[0] == "fail"
+
+
+def test_sync_track_marks_a_lead_in(tmp_path, monkeypatch):
+    gp = tmp_path / "x.gp5"
+    gp.write_bytes(b"x")
+    flac = tmp_path / "x.flac"
+    flac.write_bytes(b"x")
+    lab = _lab(tmp_path, gp=gp, flac=flac)
+    monkeypatch.setattr(sync, "gp_onset_times", lambda p: [0.0, 1.0])
+    monkeypatch.setattr(sync, "_evaluate_source", lambda src, g, o: {
+        "lag": 0.8, "score": 0.2, "prom": 0.1, "ratio": 1.0, "rscore": 0.2,
+        "clag": 0.82, "cscore": 0.2, "onset_ok": False, "chroma_ok": False,
+        "onset_leadin": True})
+
+    rec = sync.sync_track(lab, "A", "T")
+
+    assert rec["sync_ok"] is True and rec["offset_sec"] == 0.8
+    assert rec["note"] == "ok (lead-in 0.80s)"
+
+
 def test_sync_uses_cached_guitar_stem(tmp_path, monkeypatch):
     gp = tmp_path / "x.gp5"
     gp.write_bytes(b"x")

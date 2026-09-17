@@ -55,11 +55,23 @@ def _pyin_contour(y: np.ndarray, sr: int) -> tuple[np.ndarray, np.ndarray]:
     return f0, librosa.times_like(f0, sr=sr)
 
 
-def _crepe_contour(y: np.ndarray, sr: int) -> tuple[np.ndarray, np.ndarray]:
-    """Real per-frame f0 (NaN when periodicity is below
-    `_CREPE_CONFIDENCE`) + frame times via `torchcrepe`'s CREPE 'full'
-    model on GPU when CUDA is available, else CPU. Raises `ImportError` when
-    torchcrepe isn't installed."""
+def crepe_contour(
+    y: np.ndarray,
+    sr: int,
+    *,
+    fmin: float = _FMIN_HZ,
+    fmax: float = _FMAX_HZ,
+    confidence: float = _CREPE_CONFIDENCE,
+    hop_length: int = _CREPE_HOP,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Real per-frame f0 (NaN when periodicity is below `confidence`) + frame
+    times via `torchcrepe`'s CREPE 'full' model on GPU when CUDA is available,
+    else CPU. Raises `ImportError` when torchcrepe isn't installed.
+
+    The single device/predict codepath for CREPE in this package; callers
+    pass their own pitch range/confidence/hop rather than a second copy.
+    `_crepe_contour` is the voice-range wrapper.
+    """
     import torch
     import torchcrepe
 
@@ -67,15 +79,21 @@ def _crepe_contour(y: np.ndarray, sr: int) -> tuple[np.ndarray, np.ndarray]:
 
     audio = torch.from_numpy(np.ascontiguousarray(y, dtype=np.float32)).unsqueeze(0)
     pitch, periodicity = torchcrepe.predict(
-        audio, sr, hop_length=_CREPE_HOP, fmin=_FMIN_HZ, fmax=_FMAX_HZ,
+        audio, sr, hop_length=hop_length, fmin=fmin, fmax=fmax,
         model="full", batch_size=1024, device=torch_device(),
         return_periodicity=True,
     )
     pitch = pitch.squeeze(0).detach().cpu().numpy().astype(float)
     periodicity = periodicity.squeeze(0).detach().cpu().numpy()
-    f0 = np.where(periodicity >= _CREPE_CONFIDENCE, pitch, np.nan)
-    times = np.arange(f0.size) * (_CREPE_HOP / sr)
+    f0 = np.where(periodicity >= confidence, pitch, np.nan)
+    times = np.arange(f0.size) * (hop_length / sr)
     return f0, times
+
+
+def _crepe_contour(y: np.ndarray, sr: int) -> tuple[np.ndarray, np.ndarray]:
+    """Vocal-range f0 contour -- thin wrapper over `crepe_contour` with this
+    module's own voice defaults, kept under its original name."""
+    return crepe_contour(y, sr)
 
 
 def extract_vocal_melody(

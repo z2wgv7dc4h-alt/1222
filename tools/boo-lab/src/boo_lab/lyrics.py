@@ -2,13 +2,15 @@ from __future__ import annotations
 
 import json
 import re
+import time
 import urllib.parse
 import urllib.request
 from pathlib import Path
 
 
 def _key(track: str) -> str:
-    s = re.sub(r"^\d+\s*[-_.]\s*", "", track or "")
+    # Strip a leading track number whether it's "01 - Song" or "01 Song".
+    s = re.sub(r"^\d+[\s._-]+", "", track or "")
     return re.sub(r"[^a-z0-9]+", "", s.lower()) or "track"
 
 
@@ -28,37 +30,73 @@ def parse_lrc(text: str) -> list[dict]:
     return lines
 
 
-def fetch_lrclib(track: str, artist: str = "Born of Osiris", duration: float | None = None) -> dict:
-    title = re.sub(r"^\d+\s*[-_.]\s*", "", track or "")
-    q = {"track_name": title, "artist_name": artist}
-    if duration:
-        q["duration"] = str(int(duration))
-    url = "https://lrclib.net/api/get?" + urllib.parse.urlencode(q)
+def _http_json(url: str, timeout: int = 20):
     req = urllib.request.Request(url, headers={"User-Agent": "boo-lab/1.0"})
-    try:
-        with urllib.request.urlopen(req, timeout=20) as r:
-            data = json.loads(r.read().decode("utf-8"))
-    except Exception:
-        url = "https://lrclib.net/api/search?" + urllib.parse.urlencode(
-            {"q": artist + " " + title}
-        )
-        req = urllib.request.Request(url, headers={"User-Agent": "boo-lab/1.0"})
+    with urllib.request.urlopen(req, timeout=timeout) as r:
+        return json.loads(r.read().decode("utf-8"))
+
+
+def _fetch_with_retry(url: str, attempts: int = 3):
+    last = None
+    for i in range(attempts):
         try:
-            with urllib.request.urlopen(req, timeout=20) as r:
-                hits = json.loads(r.read().decode("utf-8"))
-            data = hits[0] if hits else {}
+            return _http_json(url)
+        except Exception as e:  # transient 503s happen
+            last = e
+            time.sleep(0.5 * (i + 1))
+    raise last
+
+
+def fetch_lrclib(track: str, artist: str = "Born of Osiris", duration: float | None = None) -> dict:
+    """Real LRCLIB lookup, preferring synced lyrics without trusting the
+    local rip's duration: `/api/get` with duration, then without, then a
+    search that picks the best lyric-bearing hit. Retries transient 503s."""
+    title = re.sub(r"^\d+[\s._-]+", "", track or "")
+    base = {"track_name": title, "artist_name": artist}
+
+    data = None
+    last_err: Exception | None = None
+    queries = []
+    if duration:
+        queries.append({**base, "duration": str(int(duration))})
+    queries.append(dict(base))
+    for q in queries:
+        try:
+            hit = _fetch_with_retry("https://lrclib.net/api/get?" + urllib.parse.urlencode(q))
+            if isinstance(hit, dict) and hit.get("trackName"):
+                data = hit
+                break
         except Exception as e:
-            return {"ok": False, "error": str(e), "lines": []}
+            last_err = e
+
+    if data is None:
+        try:
+            hits = _fetch_with_retry(
+                "https://lrclib.net/api/search?" + urllib.parse.urlencode({"q": artist + " " + title})
+            )
+            if isinstance(hits, list) and hits:
+                def _score(h: dict):
+                    has_synced = 1 if h.get("syncedLyrics") else 0
+                    has_plain = 1 if h.get("plainLyrics") else 0
+                    delta = abs((h.get("duration") or 0) - duration) if duration else 0.0
+                    return (has_synced, has_plain, -delta)
+
+                data = sorted(hits, key=_score, reverse=True)[0]
+        except Exception as e:
+            last_err = e
+
+    if data is None:
+        return {"ok": False, "error": str(last_err) if last_err else "not found", "lines": []}
+
     synced = data.get("syncedLyrics") or ""
     plain = data.get("plainLyrics") or ""
-    lines = parse_lrc(synced)
     return {
         "ok": True,
         "source": "lrclib",
         "instrumental": bool(data.get("instrumental")),
         "plain": plain,
         "synced": synced,
-        "lines": lines,
+        "lines": parse_lrc(synced),
     }
 
 

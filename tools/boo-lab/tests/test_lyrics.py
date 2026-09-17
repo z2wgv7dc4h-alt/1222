@@ -13,6 +13,12 @@ def _plain_only(track, artist="Born of Osiris", duration=None):
             "plain": "line one\n\nline two\n", "synced": "", "lines": []}
 
 
+def test_key_strips_track_numbers_with_or_without_separator():
+    assert ly._key("01 - Rebirth") == "rebirth"
+    assert ly._key("01 Follow the Signs") == "followthesigns"
+    assert ly._key("14 XIV") == "xiv"
+
+
 def test_parse_lrc_gives_start_and_end():
     lines = ly.parse_lrc("[00:01.00] hello\n[00:03.50] world\n")
     assert lines[0]["start"] == 1.0
@@ -66,3 +72,36 @@ def test_load_lyrics_missing_is_empty(tmp_path):
     got = ly.load_lyrics(tmp_path, "nope")
     assert got["lines"] == []
     assert "plain_lines" not in got
+
+
+def test_fetch_lrclib_falls_back_without_duration(monkeypatch):
+    monkeypatch.setattr("time.sleep", lambda s: None)
+
+    def fake(url, timeout=20):
+        if "duration=" in url:
+            raise RuntimeError("503")
+        if "/api/get" in url:
+            return {"trackName": "Follow the Signs", "syncedLyrics": "[00:01.00] hi",
+                    "plainLyrics": "hi", "instrumental": False}
+        return []
+
+    monkeypatch.setattr(ly, "_http_json", fake)
+    hit = ly.fetch_lrclib("01 Follow the Signs", duration=231.0)
+    assert hit["ok"] is True
+    assert [ln["text"] for ln in hit["lines"]] == ["hi"]
+
+
+def test_fetch_lrclib_search_prefers_a_lyric_bearing_hit(monkeypatch):
+    monkeypatch.setattr("time.sleep", lambda s: None)
+
+    def fake(url, timeout=20):
+        if "/api/get" in url:
+            raise RuntimeError("404")
+        return [
+            {"trackName": "T", "syncedLyrics": "", "plainLyrics": "", "duration": 100},
+            {"trackName": "T", "syncedLyrics": "[00:02.00] real", "plainLyrics": "real", "duration": 231},
+        ]
+
+    monkeypatch.setattr(ly, "_http_json", fake)
+    hit = ly.fetch_lrclib("T", duration=231.0)
+    assert [ln["text"] for ln in hit["lines"]] == ["real"]

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -48,7 +49,12 @@ def run_demucs(
     if two_stems:
         cmd += ["--two-stems", two_stems]
     cmd.append(str(flac))
-    subprocess.run(cmd, check=True, timeout=900)
+    # Real corpus paths contain non-cp1252 characters ("∆"); without a UTF-8
+    # IO env the demucs subprocess crashes printing the track path.
+    env = dict(os.environ)
+    env.setdefault("PYTHONUTF8", "1")
+    env.setdefault("PYTHONIOENCODING", "utf-8")
+    subprocess.run(cmd, check=True, timeout=900, env=env)
     return out_dir / model / flac.stem
 
 

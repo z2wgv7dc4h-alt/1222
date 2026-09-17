@@ -20,7 +20,7 @@ Single source of truth for humans and later bots. If README/STATUS/LAW disagree 
 A **section lab** for metal FLACs (Born of Osiris first, other bands via ingest). Human output is `data/sections.jsonl` — **keeper pins only** (`source=human`/`guess-accepted`, `heard=true`), each with a figure/function `layer` and a `figure_id` — plus optional Pack clips under `work/` (gitignored). Machines write `data/drafts.jsonl` (MSA/SongFormer/Guess) and never keepers. It is not God Tier Metal, not a DAW, not a tab reader, not an auto-songwriter.
 
 GitHub: `https://github.com/z2wgv7dc4h-alt/1222` path `tools/boo-lab`.  
-Newest lab commit: `50f0eb6` (audio lead-ins: prominent, corroborated offset); before it `fab89f5` (stems `--album`, guitar-stem-preferred sync + mix fallback), `862b1e9` (chroma co-witness).
+Newest lab commit: `26b4d8d` (`START.bat`; `INSTALL.bat` no longer clobbers `.env`); before it `50f0eb6` (audio lead-ins: prominent, corroborated offset), `fab89f5` (stems `--album`, guitar-stem-preferred sync + mix fallback).
 
 ## Paths
 

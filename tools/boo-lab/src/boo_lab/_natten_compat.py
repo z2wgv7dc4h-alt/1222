@@ -137,13 +137,36 @@ def _arange(kernel_size, like):
 
 def install(force: bool = False) -> None:
     """Make `allin1` importable/runnable: restore the Python-2 builtins and
-    NumPy aliases madmom still reads, make NumPy 2 tolerate madmom's ragged
-    arrays, then register the legacy NATTEN names on `natten.functional`."""
+    NumPy aliases madmom still reads, alias the `collections` ABCs it imports
+    from the top-level module, make NumPy 2 tolerate madmom's ragged arrays,
+    then register the legacy NATTEN names on `natten.functional`.
+
+    Idempotent and cheap (no torch): safe to call from `boo_lab/__init__` so
+    any `import boo_lab...` applies it before madmom/allin1 are imported."""
     import builtins
 
     for name, value in (("basestring", str), ("long", int), ("integer", int)):
         if not hasattr(builtins, name):
             setattr(builtins, name, value)
+
+    # Python 3.10+ moved the ABCs to `collections.abc`; madmom/processors.py
+    # still does `from collections import MutableSequence`. On some 3.12 builds
+    # those aliases are gone, so restore them on `collections` itself (a no-op
+    # where they already exist). Only `MutableSequence` is actually imported by
+    # madmom; the rest are aliased defensively for the same py2-era pattern.
+    try:
+        import collections
+        import collections.abc
+        import warnings
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            for name in ("MutableSequence", "MutableMapping", "Mapping",
+                         "Sequence", "Iterable", "Callable"):
+                if not hasattr(collections, name):
+                    setattr(collections, name, getattr(collections.abc, name))
+    except Exception:
+        pass
 
     try:
         import numpy as np

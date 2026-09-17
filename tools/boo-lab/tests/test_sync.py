@@ -3,11 +3,12 @@ envelopes and tiny files under tmp_path; no real audio/torch."""
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 
 import pytest
 
-from boo_lab import sync
+from boo_lab import extract, sync
 from boo_lab.catalogue import save_map
 
 
@@ -43,6 +44,49 @@ def test_low_score_is_not_ok():
 def test_sync_refuses_without_track(tmp_path):
     with pytest.raises(ValueError):
         sync.sync_track(tmp_path, "A", None)
+
+
+def test_gp_onset_times_uses_song_tempo(monkeypatch):
+    class _Dur:
+        value = 4
+        isDotted = False
+
+    class _Beat:
+        notes = [1]
+        duration = _Dur()
+
+    class _Voice:
+        beats = [_Beat(), _Beat(), _Beat(), _Beat()]
+
+    class _Header:
+        tempo = None
+
+    class _Measure:
+        header = _Header()
+        voices = [_Voice()]
+
+    class _Track:
+        name = "Guitar"
+        measures = [_Measure(), _Measure()]
+
+    class _Song:
+        tempo = 195
+        tracks = [_Track()]
+
+    class _FakeGP:
+        @staticmethod
+        def parse(_p):
+            return _Song()
+
+    monkeypatch.setitem(sys.modules, "guitarpro", _FakeGP)
+    monkeypatch.setattr(extract, "_rhythm_track", lambda song: song.tracks[0])
+
+    onsets = sync.gp_onset_times(Path("x.gp5"))
+
+    beat = 60.0 / 195  # song.tempo, NOT the old 120 default
+    assert len(onsets) == 8
+    assert onsets[0] == 0.0
+    assert onsets[4] == pytest.approx(4 * beat, abs=1e-4)
 
 
 def _lab(tmp_path, gp=None, flac=None):

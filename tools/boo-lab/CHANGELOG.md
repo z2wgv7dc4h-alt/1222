@@ -2,6 +2,11 @@
 
 ## 2026-09-18
 
+- **Perfect tabs + sync clock.** Official 02–13 A Higher Place GP5s placed in `gp5/A Higher Place/`
+  (old Songsterr/musicnotes duplicates moved to `reference/gp-tabs-superseded/`). Fixed
+  `sync.gp_onset_times` to read `song.tempo` (defaulting to 120 stretched every tab ~1.6×) and
+  `catalogue._key`/scan to match space-numbered `NN Title.gp5` (`07 Exist` had silently unmatched).
+  `10 - A Higher Place` now `sync_ok` (lag 0.023 s, score 0.52); scores 0.02–0.09 → 0.08–0.52.
 - **Refinements.** Demucs subprocess gets an explicit `--device` from `device.py` (was implicitly
   choosing); `beats` allin1 fallback caches under `work/allin1`; `doctor --require-interns` exits
   non-zero when an intern is missing and `setup.bat` aborts on it, so a broken install fails at
@@ -21,7 +26,7 @@
 - **Real drafts.** `structure --album "2009 - A Higher Place"` wrote 125 `msa-draft` rows,
   `sections.jsonl` untouched; `compare` reports F0.5=0.737 F3=0.800 role3=0.250 on Rebirth.
 - **Repo hygiene.** `data/{drafts,beats,compare,sync,agree}.*` and `*.egg-info/` gitignored;
-  `boo_lab.egg-info` untracked. Tests: `test_natten_compat`, `test_device`, `test_doctor` → 166.
+  `boo_lab.egg-info` untracked. Tests: `test_natten_compat`, `test_device`, `test_doctor` → 167.
 
 ## 2026-09-17
 

@@ -138,6 +138,10 @@ def scan_roots(flac_root: Path | None, gp_root: Path | None) -> list[dict]:
             if p.suffix.lower() not in GP_EXT:
                 continue
             keys = {_key(p.stem), _key(_stem(p))}
+            # "07 Exist" (track number + space, no separator) -> also key "exist"
+            import re
+
+            keys.add(_key(re.sub(r"^\d+\s+", "", p.stem)))
             # Born_Of_Osiris-Elimination -> elimination
             if "-" in p.stem:
                 keys.add(_key(p.stem.split("-")[-1]))

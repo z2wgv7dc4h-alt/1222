@@ -4,7 +4,7 @@ Canonical detail: **CURRENT.md**; commands in **README.md**.
 
 Works: studio keeps pins (`human`/`guess-accepted` + `heard`) in `sections.jsonl`; mel
 spectrogram under the WaveSurfer waveform; 6-stem picker; drafts; `hear`/`sync`/`hash`;
-`agree`/`compare`/`export-jams`/`beats`/`audit`/`report`; **166 tests pass**.
+`agree`/`compare`/`export-jams`/`beats`/`audit`/`report`; **167 tests pass**.
 Interns (allin1 structure, beat_this, torchcrepe) run on **CUDA** when present
 (RTX 5080, `torch 2.8.0+cu128`); `boo-lab doctor` reports the build. allin1 works
 without an old natten build via `_natten_compat` (legacy NATTEN API + madmom
@@ -15,10 +15,12 @@ On disk now:
 - `data/drafts.jsonl` — 125 `msa-draft` rows across the 13 A Higher Place tracks (allin1, GPU).
 - `data/beats.jsonl` — 13 tracks (`beat_this` preferred).
 - `data/compare.json` — drafts vs keepers. Rebirth (holdout): **F0.5=0.737 F3=0.800 role3=0.250**.
-- `data/sync.jsonl` — all 13 A Higher Place tracks witnessed. **None `sync_ok`**: Rebirth `no-gp`,
-  04/07/09 `unreadable-gp`, the rest lag 1.7–101 s at score 0.02–0.09. The tabs are partial clocks
-  (Songsterr/musicnotes exports) or wrong-tempo — treat `sync_ok` as the gate before trusting a tab
-  clock, and fix the onset walk only if a known-good tab also fails.
+- `data/sync.jsonl` — 13 A Higher Place tracks. `gp_onset_times` now reads `song.tempo` (it had
+  defaulted to 120 BPM, stretching every tab ~1.6×); scores rose 0.02–0.09 → **0.08–0.52**.
+  With the perfect 02–13 tabs, `10 - A Higher Place` is `sync_ok` (lag 0.023 s, score 0.52); `04`
+  aligns (lag 0.12 s) but scores low; `03/11/13` still lag 20–116 s where the tab's repeat/tempo
+  map isn't in the walk. `01 - Rebirth` has no tab (`no-gp`). Perfect tabs are in
+  `gp5/A Higher Place/`; old Songsterr/musicnotes duplicates moved to `reference/gp-tabs-superseded/`.
 - `data/agree.jsonl` — Rebirth pass 1 (6 boxes). Pass 2 needs a human re-pin, then
   `boo-lab agree --album X --track Y --diff`.
 - `data/map.csv` — 71 rows, 55 `match=yes`; `flac_sha256` only once `scan`/`hash` runs.

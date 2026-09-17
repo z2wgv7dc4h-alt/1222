@@ -47,7 +47,10 @@ def gp_onset_times(gp_path: Path) -> list[float] | None:
 
     onsets: list[float] = []
     t = 0.0
-    bpm = 120.0
+    # `song.tempo` is the file's tempo; per-measure `header.tempo` is only set
+    # on change. Defaulting to 120 stretched every tab (a 195 BPM song walked
+    # 1.6x too long, so the clock never lined up with the audio).
+    bpm = float(getattr(song, "tempo", None) or 120.0)
     for measure in track.measures:
         header = getattr(measure, "header", None)
         if header is not None:

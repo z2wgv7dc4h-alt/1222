@@ -95,6 +95,46 @@ def _sync_for(lab_root: Path | None, album: str, track: str) -> dict | None:
     return None
 
 
+def _beats_for(lab_root: Path | None, album: str, track: str) -> dict | None:
+    """The recorded beat/downbeat grid for one song (`data/beats.jsonl`)."""
+    if lab_root is None:
+        return None
+    path = Path(lab_root) / "data" / "beats.jsonl"
+    if not path.exists():
+        return None
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        try:
+            rec = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if (rec.get("track") or "") != track:
+            continue
+        if album and (rec.get("album") or "") != album:
+            continue
+        return rec
+    return None
+
+
+def _snap_to_grid(t: float, downbeats, beats) -> float:
+    """Nearest downbeat within 250 ms, else nearest beat within 120 ms, else `t`.
+    Audio-derived spans are already in audio time, so the beat grid applies."""
+    best = None
+    bd = 1e9
+    for c in downbeats or []:
+        d = abs(c - t)
+        if d < bd:
+            bd, best = d, c
+    if best is not None and bd <= 0.25:
+        return best
+    for c in beats or []:
+        d = abs(c - t)
+        if d < bd:
+            bd, best = d, c
+    return best if (best is not None and bd <= 0.12) else t
+
+
 def estimate_hybrid(
     flac: Path | None,
     gp: Path | None,
@@ -197,6 +237,20 @@ def estimate_hybrid(
             notes.append(learn_note(cache.parent.parent))
         except Exception:
             pass
+
+    # Snap the audio-derived spans (halftime/kick) to the recorded beat grid.
+    grid = _beats_for(lab_root, album, track)
+    if grid and grid.get("beats"):
+        snapped = 0
+        for s in sections:
+            if s.get("source") in {"halftime", "kick"}:
+                for key in ("start", "end"):
+                    nt = _snap_to_grid(float(s[key]), grid.get("downbeats"), grid.get("beats"))
+                    if abs(nt - s[key]) > 1e-6:
+                        s[key] = round(nt, 3)
+                        snapped += 1
+        if snapped:
+            notes.append("snapped %d audio boundary/ies to the beat grid" % snapped)
 
     sections = _clean(sections)
 

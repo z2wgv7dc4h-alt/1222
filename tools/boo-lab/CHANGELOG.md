@@ -5,6 +5,7 @@
 ### Beat grid in the studio + Guess sync gate
 
 - **Beat grid used.** New `GET /api/beats/{id}` serves `data/beats.jsonl`; the studio draws beat/downbeat ticks over the waveform and, with **Snap beats** (default on), snaps a dragged box edge to the nearest downbeat (≤250 ms) else nearest beat (≤120 ms). Previously `beats.jsonl` was written and never read.
+- **Guess snaps to the grid.** Its audio-derived spans (half-time / kick breakdowns) are snapped to the nearest downbeat (≤250 ms), else beat (≤120 ms), from `data/beats.jsonl`.
 - **Guess gates on sync.** `estimate_hybrid` now reads `data/sync.jsonl` for the song: if the tab was measured as **not** `sync_ok`, its marker sections are dropped with a note ("tab markers dropped: sync not ok … paint by hand"); if `sync_ok`, they're kept and the note says so. A tab known to misalign no longer silently supplies wrong times.
 
 ### Guess reads the tab's section structure

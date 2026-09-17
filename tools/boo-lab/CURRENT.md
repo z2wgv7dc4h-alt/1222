@@ -145,7 +145,8 @@ Shortcuts that exist in the page (also shown under How): pins I/R/H/B/S/C etc. a
 5. librosa beat_track on that stem. Tempo must go through `_scalar` (numpy 2 `float(array)` crash used to abort here).
 6. Half-time IOI (~1.65× median, ≥6s) → breakdown drafts.
 7. Kick band <140 Hz IOI ≥5s → breakdown drafts.
-8. `_clean` short/overlap junk.
+8. Audio-derived spans snap to the beat grid (nearest downbeat ≤250 ms else beat ≤120 ms) when `data/beats.jsonl` has the song.
+9. `_clean` short/overlap junk.
 
 Audio can only ever propose **breakdowns** (half-time/kick); everything else is tab-marker or the human.
 

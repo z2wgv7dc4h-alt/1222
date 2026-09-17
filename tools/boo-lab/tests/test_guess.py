@@ -137,6 +137,44 @@ def test_coverage_note_suppressed_within_five_seconds_of_end(tmp_path, monkeypat
     assert not any(n.startswith("Guess reached") for n in result["notes"])
 
 
+# --- beat-grid snapping of audio spans ---------------------------------------
+
+
+def test_snap_to_grid_prefers_downbeat_then_beat():
+    assert g._snap_to_grid(1.92, [0.0, 2.0], [1.9, 1.95]) == 2.0   # 80ms -> downbeat
+    assert g._snap_to_grid(1.02, [0.0], [1.0, 1.05]) == 1.0       # no nearby downbeat -> beat
+    assert g._snap_to_grid(5.0, [0.0, 2.0], [1.9, 1.95]) == 5.0   # too far -> unchanged
+
+
+def test_guess_snaps_audio_breakdown_spans_to_the_grid(tmp_path, monkeypatch):
+    lab = tmp_path / "lab"
+    (lab / "data").mkdir(parents=True)
+    (lab / "data" / "beats.jsonl").write_text(
+        json.dumps({"album": "A", "track": "Fixture", "beats": [1.0, 2.0, 3.0, 4.0],
+                    "downbeats": [2.0], "source": "beat_this"}) + "\n",
+        encoding="utf-8",
+    )
+    flac = tmp_path / "song.flac"
+    flac.write_bytes(b"x")
+    monkeypatch.setattr(soundfile, "info",
+                        lambda *a, **k: types.SimpleNamespace(frames=int(22050 * 100), samplerate=22050))
+    monkeypatch.setattr(g, "GP5_ROOTS", [tmp_path / "no_gp5"])
+    monkeypatch.setattr(g, "_prefer_gp5", lambda gp, track: None)
+    import boo_lab.stems as st
+    monkeypatch.setattr(st, "ensure_drums", lambda f, c: (None, "none"))
+    monkeypatch.setattr(g, "_librosa_beats", lambda wav: {"beats": [], "bpm": None})
+    monkeypatch.setattr(g, "_half_time_spans",
+                        lambda beats, min_len=6.0: [{"role": "breakdown", "start": 1.93,
+                                                     "end": 3.9, "source": "halftime"}])
+    monkeypatch.setattr(g, "_kick_spans", lambda wav: [])
+
+    res = g.estimate_hybrid(flac, None, track="Fixture", cache=lab / "work" / "stems", album="A")
+
+    bd = res["sections"][0]
+    assert bd["start"] == 2.0 and bd["end"] == 4.0  # snapped to downbeat/beat
+    assert any("snapped" in n for n in res["notes"])
+
+
 # --- tab-marker sync gate ----------------------------------------------------
 
 

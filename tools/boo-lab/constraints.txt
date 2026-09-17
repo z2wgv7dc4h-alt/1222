@@ -1,0 +1,22 @@
+# Hard pins for the fragile optional-intern stack. Pass to pip with
+#   python -m pip install -c constraints.txt -e ".[intern,pitch,align]"
+# Each line is here because a different version broke a real run:
+#   torch 2.8.0+cu128 : whisperx requires torch~=2.8.0; cu128 is the
+#                       Blackwell/RTX-50xx-capable build (and 2.11 breaks
+#                       whisperx, 2.8.0+cpu silently runs everything on CPU).
+#   numpy 2.x         : whisperx/pyannote require >=2.1, while madmom needs
+#                       the removed np.int / ragged-asarray behaviour -- both
+#                       are reconciled at runtime by boo_lab._natten_compat.
+#   NATTEN 0.21.x     : allin1 calls the pre-0.17 API; _natten_compat restores it.
+#   allin1 1.1.0 / madmom 0.16.1 : the structure backend.
+torch==2.8.0
+torchaudio==2.8.0
+torchvision==0.23.0
+numpy>=2.1,<3
+allin1==1.1.0
+NATTEN>=0.21,<0.22
+madmom==0.16.1
+beat-this==1.1.0
+whisperx==3.8.6
+torchcrepe==0.0.24
+librosa==0.11.0

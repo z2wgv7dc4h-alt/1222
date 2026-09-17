@@ -1,0 +1,76 @@
+"""`boo-lab doctor`: report what is installed, whether the GPU is visible, and
+the exact command to fix anything missing.
+
+This is the durable answer to "why did the intern fail on the new machine":
+run it after setup and it names the gap instead of failing deep inside a model.
+"""
+from __future__ import annotations
+
+import importlib
+import sys
+from pathlib import Path
+
+CORE = ("librosa", "soundfile", "guitarpro", "demucs")
+INTERNS = ("beat_this", "allin1", "jams", "mir_eval")
+EXTRAS = {"torchcrepe": "pitch", "whisperx": "align"}
+
+GPU_HINT = ('pip install torch torchaudio --index-url '
+            'https://download.pytorch.org/whl/cu128')
+
+
+def _has(module: str) -> bool:
+    try:
+        importlib.import_module(module)
+        return True
+    except Exception:
+        return False
+
+
+def _line(name: str, ok: bool, note: str = "") -> bool:
+    print(f"  [{'OK' if ok else '--'}] {name}" + (f"  {note}" if note else ""))
+    return ok
+
+
+def run_doctor(lab_root: Path | None = None) -> int:
+    print("boo-lab doctor")
+    print(f"  python {sys.version.split()[0]}")
+
+    cuda = False
+    try:
+        import torch
+
+        cuda = bool(torch.cuda.is_available())
+        gpu = torch.cuda.get_device_name(0) if cuda else ""
+        _line("torch", True, f"{torch.__version__}"
+              + (f"  cuda=True  gpu={gpu}" if cuda else "  cuda=False"))
+    except Exception as exc:  # noqa: BLE001
+        _line("torch", False, repr(exc))
+
+    print(" core:")
+    core_ok = True
+    for mod in CORE:
+        core_ok &= _line(mod, _has(mod))
+
+    print(" interns (structure/beats research):")
+    for mod in INTERNS:
+        if mod == "allin1":
+            from ._natten_compat import install
+
+            install()
+            _line("allin1", _has("allin1"), "natten legacy-API shim installed")
+        else:
+            _line(mod, _has(mod))
+    _line("natten", _has("natten"))
+
+    print(" extras:")
+    for mod, extra in EXTRAS.items():
+        _line(f"{mod}  (pip install -e \".[{extra}]\")", _has(mod))
+
+    print(" hints:")
+    if not cuda:
+        print(f"  gpu: {GPU_HINT}")
+    if not all(_has(m) for m in INTERNS):
+        print('  interns: pip install -e ".[intern]"')
+    print("  pitch:   pip install -e \".[pitch]\"")
+    print("  align:   pip install -e \".[align]\"")
+    return 0 if core_ok else 1

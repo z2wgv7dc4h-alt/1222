@@ -3,6 +3,18 @@ __pycache__/
 *.pyc
 .venv/
 .env
+
+# `pip install -e .` build metadata -- regenerated on every install.
+*.egg-info/
+
+# Machine/derived outputs: regenerable from the human keeper pins plus the
+# optional interns (`structure`/`beats`/`compare`/`sync`/`agree`). The tracked
+# asset is data/sections.jsonl (human pins); these are its echoes.
+data/drafts.jsonl
+data/beats.jsonl
+data/compare.json
+data/sync.jsonl
+data/agree.jsonl
 *.flac
 *.wav
 *.gp3

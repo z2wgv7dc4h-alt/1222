@@ -23,7 +23,7 @@ def _drafts(lab):
 
 def test_writes_msa_and_songformer_sources(tmp_path, monkeypatch):
     lab, flac = _lab(tmp_path)
-    monkeypatch.setattr(structure, "run_allin1", lambda p: {
+    monkeypatch.setattr(structure, "run_allin1", lambda p, **k: {
         "bpm": 120,
         "segments": [{"start": 0, "end": 4, "label": "verse"},
                      {"start": 4, "end": 8, "label": "chorus"}],
@@ -64,7 +64,7 @@ def test_allin1_failure_still_writes_songformer(tmp_path, monkeypatch):
 
 def test_no_songformer_only_msa(tmp_path, monkeypatch):
     lab, flac = _lab(tmp_path)
-    monkeypatch.setattr(structure, "run_allin1", lambda p: {"segments": [{"start": 0, "end": 4, "label": "verse"}]})
+    monkeypatch.setattr(structure, "run_allin1", lambda p, **k: {"segments": [{"start": 0, "end": 4, "label": "verse"}]})
     monkeypatch.setattr(structure, "songformer_available", lambda: False)
 
     report = structure.build_drafts(lab, [{"album": "A", "track": "T", "flac_path": str(flac)}])
@@ -79,7 +79,7 @@ def test_preserves_other_album_drafts(tmp_path, monkeypatch):
         json.dumps({"album": "Other", "track": "X", "role": "riff", "source": "msa-draft"}) + "\n",
         encoding="utf-8",
     )
-    monkeypatch.setattr(structure, "run_allin1", lambda p: {"segments": [{"start": 0, "end": 4, "label": "verse"}]})
+    monkeypatch.setattr(structure, "run_allin1", lambda p, **k: {"segments": [{"start": 0, "end": 4, "label": "verse"}]})
     monkeypatch.setattr(structure, "songformer_available", lambda: False)
 
     structure.build_drafts(lab, [{"album": "A", "track": "T", "flac_path": str(flac)}])

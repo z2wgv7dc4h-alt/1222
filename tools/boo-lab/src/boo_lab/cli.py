@@ -66,6 +66,8 @@ def main(argv: list[str] | None = None) -> int:
     s = sub.add_parser("gate")
     s.add_argument("--threshold", type=float, default=0.55)
 
+    sub.add_parser("doctor", help="check torch/GPU + optional interns; print install hints")
+
     s = sub.add_parser("report", help="print real current state of the whole data pipeline")
     s.add_argument("--gp-root", type=Path, default=None, help="GP corpus for the failure breakdown (default: BOO_GP_ROOT)")
 
@@ -140,6 +142,11 @@ def main(argv: list[str] | None = None) -> int:
             save_map(map_path, [{k: "" for k in FIELDS}])
         print(map_path)
         return 0
+
+    if args.cmd == "doctor":
+        from .doctor import run_doctor
+
+        return run_doctor(root())
 
     if args.cmd == "hash":
         from .catalogue import fill_hashes

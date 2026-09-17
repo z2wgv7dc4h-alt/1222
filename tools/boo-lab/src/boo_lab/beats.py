@@ -14,7 +14,10 @@ from pathlib import Path
 def _beat_this(flac: Path) -> tuple[list[float], list[float], str]:
     from beat_this.inference import File2Beats
 
-    file2beats = File2Beats()
+    from .device import torch_device
+
+    device = torch_device()
+    file2beats = File2Beats(device=device, float16=device == "cuda")
     beats, downbeats = file2beats(str(flac))
     return [float(x) for x in beats], [float(x) for x in downbeats], "beat_this"
 

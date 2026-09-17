@@ -55,10 +55,18 @@ def segments_from_allin1(result: dict) -> list[dict]:
     return [relabel_breakdown(s) for s in segs]
 
 
-def run_allin1(flac: Path) -> dict:
+def run_allin1(flac: Path, cache_dir: Path | None = None) -> dict:
+    from . import _natten_compat
+    from .device import torch_device
+
+    _natten_compat.install()
     import allin1  # optional extra
 
-    result = allin1.analyze(str(flac))
+    kwargs: dict = {"device": torch_device(), "multiprocess": False}
+    if cache_dir is not None:
+        kwargs["demix_dir"] = str(Path(cache_dir) / "demix")
+        kwargs["spec_dir"] = str(Path(cache_dir) / "spec")
+    result = allin1.analyze(str(flac), **kwargs)
     if hasattr(result, "__dict__"):
         payload = {
             "bpm": getattr(result, "bpm", None),
@@ -161,7 +169,7 @@ def build_drafts(lab_root: Path, rows: list[dict]) -> dict:
                 continue
 
             try:
-                payload = run_allin1(Path(fp))
+                payload = run_allin1(Path(fp), cache_dir=lab_root / "work" / "allin1")
             except Exception as exc:
                 print("SKIP structure", r.get("track"), exc)
                 payload = None

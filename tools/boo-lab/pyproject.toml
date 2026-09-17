@@ -19,8 +19,10 @@ pitch = ["torchcrepe"]
 align = ["whisperx"]
 # JAMS 0.3 validation (jams_export writes the shape itself; this is optional).
 jams = ["jams"]
-# Optional research "interns" -- never default dependencies.
-intern = ["allin1", "beat-this", "jams", "mir_eval"]
+# Optional research "interns" -- never default dependencies. `natten` is
+# required by allin1's Dinat model; `_natten_compat` restores the pre-0.17 API
+# it expects so the new natten works on CPU/Windows.
+intern = ["allin1", "beat-this", "natten", "jams", "mir_eval"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

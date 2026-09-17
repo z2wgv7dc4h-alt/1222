@@ -58,14 +58,18 @@ def _pyin_contour(y: np.ndarray, sr: int) -> tuple[np.ndarray, np.ndarray]:
 def _crepe_contour(y: np.ndarray, sr: int) -> tuple[np.ndarray, np.ndarray]:
     """Real per-frame f0 (NaN when periodicity is below
     `_CREPE_CONFIDENCE`) + frame times via `torchcrepe`'s CREPE 'full'
-    model on CPU. Raises `ImportError` when torchcrepe isn't installed."""
+    model on GPU when CUDA is available, else CPU. Raises `ImportError` when
+    torchcrepe isn't installed."""
     import torch
     import torchcrepe
+
+    from .device import torch_device
 
     audio = torch.from_numpy(np.ascontiguousarray(y, dtype=np.float32)).unsqueeze(0)
     pitch, periodicity = torchcrepe.predict(
         audio, sr, hop_length=_CREPE_HOP, fmin=_FMIN_HZ, fmax=_FMAX_HZ,
-        model="full", batch_size=1024, device="cpu", return_periodicity=True,
+        model="full", batch_size=1024, device=torch_device(),
+        return_periodicity=True,
     )
     pitch = pitch.squeeze(0).detach().cpu().numpy().astype(float)
     periodicity = periodicity.squeeze(0).detach().cpu().numpy()

@@ -31,7 +31,15 @@ Open http://127.0.0.1:8765 — Ctrl+Shift+R after HTML changes. One server only.
 
 ## Install
 
-Thin by default (librosa + soundfile).
+New machine: one shot (creates `.venv`, picks GPU-vs-CPU torch, installs core +
+interns + pitch + align, then verifies).
+
+```
+cd tools\boo-lab
+setup.bat --flac <FLAC_ROOT> --gp <GP_ROOT>
+```
+
+Manual equivalent, thin by default (librosa + soundfile):
 
 ```
 cd tools\boo-lab
@@ -40,8 +48,38 @@ python -m venv .venv
 ```
 
 Optional extras (never default): `-e ".[dev]"` pytest; `-e ".[pitch]"` torchcrepe;
-`-e ".[align]"` whisperx; `-e ".[intern]"` allin1 + beat-this + jams + mir_eval. None is
-required to pin and Save; missing interns just print a skip.
+`-e ".[align]"` whisperx; `-e ".[intern]"` allin1 + beat-this + natten + jams + mir_eval.
+None is required to pin and Save; missing interns just print a skip.
+
+## GPU
+
+The interns (allin1 structure, beat_this, torchcrepe, whisperx) run on CUDA when it
+is available and fall back to CPU otherwise -- `boo_lab.device.torch_device()` is the
+single switch. A fresh `pip install torch` on Windows is CPU-only, which is the usual
+reason a run crawls; install the CUDA wheel explicitly (cu128 covers RTX 50xx):
+
+```
+.venv\Scripts\python -m pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu128
+```
+
+Then confirm with `boo-lab doctor` (prints the torch build, `cuda=True`, GPU name, and
+the exact fix for anything missing).
+
+## Durability (why this cannot silently break again)
+
+The intern stack is a minefield; each fix is now code or a hard pin, not a session note:
+
+| failure | permanent fix |
+|---|---|
+| GPU present but everything on CPU | `boo_lab/device.py` `torch_device()`; allin1/beat_this/torchcrepe read it |
+| allin1 needs NATTEN API removed in 0.17 | `boo_lab/_natten_compat.py` reimplements `natten1dqkrpb/1dav/2dqkrpb/2dav` (exact `get_window_start`/`get_pb_start` ports) and registers them |
+| madmom py2 builtins + `np.int` + NumPy-2 ragged `asarray` | same module's `install()` |
+| a fresh machine drifts to incompatible versions | `constraints.txt` + `setup.bat` |
+| "is my box set up?" guessing | `boo-lab doctor` |
+
+Behavior is pinned by `tests/test_natten_compat.py`, `test_device.py`, `test_doctor.py`.
+Generated outputs (`data/{drafts,beats,compare,sync,agree}.*`) and `*.egg-info/` are
+gitignored; the tracked asset stays `data/sections.jsonl` (human pins).
 
 ## Daily loop
 
@@ -77,6 +115,7 @@ Then `python -m boo_lab.cli scan` and reload. Green GP5 = matched tab.
 | `lyrics` | LRCLIB + WhisperX force-aligned plain lyrics |
 | `structure` | MSA/SongFormer drafts → `data/drafts.jsonl` (allin1 optional) |
 | `beats` | beat/downbeat grid → `data/beats.jsonl` (beat_this → allin1) |
+| `doctor` | torch/GPU + optional-intern check with install hints |
 | `audit` | pin hygiene (sources, overlaps, heard, short boxes) |
 | `extract` | riff bank from GP (tab) or audio fallback → `data/riffs.jsonl` |
 | `gate` / `export-bank` | gated riff export |

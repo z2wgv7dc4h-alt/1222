@@ -7,7 +7,7 @@ from pathlib import Path
 
 def find_drums(flac: Path, cache: Path) -> Path | None:
     name = flac.stem
-    for model in ("htdemucs", "htdemucs_ft", "mdx_extra", "mdx_extra_q"):
+    for model in ("htdemucs_6s", "htdemucs", "htdemucs_ft", "mdx_extra", "mdx_extra_q"):
         p = cache / model / name / "drums.wav"
         if p.exists():
             return p
@@ -22,12 +22,15 @@ def find_drums(flac: Path, cache: Path) -> Path | None:
     return None
 
 
-def stem_dir(flac: Path, cache: Path, model: str = "htdemucs") -> Path:
+def stem_dir(flac: Path, cache: Path, model: str = "htdemucs_6s") -> Path:
     return cache / model / flac.stem
 
 
 def find_stem(flac: Path, cache: Path, name: str) -> Path | None:
-    for model in ("htdemucs", "htdemucs_ft", "mdx_extra"):
+    # htdemucs_6s first: its separate guitar.wav/piano.wav cache layout is
+    # preferred, while any existing 4-stem htdemucs cache stays valid (and
+    # is still found, just not preferred) -- forward-only, never deleted.
+    for model in ("htdemucs_6s", "htdemucs", "htdemucs_ft", "mdx_extra"):
         p = cache / model / flac.stem / f"{name}.wav"
         if p.exists():
             return p
@@ -37,7 +40,7 @@ def find_stem(flac: Path, cache: Path, name: str) -> Path | None:
 def run_demucs(
     flac: Path,
     out_dir: Path,
-    model: str = "htdemucs",
+    model: str = "htdemucs_6s",
     two_stems: str | None = None,
 ) -> Path:
     out_dir.mkdir(parents=True, exist_ok=True)

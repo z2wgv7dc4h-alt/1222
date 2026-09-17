@@ -11,3 +11,11 @@ __pycache__/
 *.gpx
 *.gp
 *.zip
+
+# Real extracted note/pitch/onset content -- same local-only posture as
+# engine/data/riff_bank.json (too close to source songs melodic content
+# for a public repo).
+data/riffs.jsonl
+data/vocal_melody.jsonl
+data/drum_patterns.jsonl
+data/section_tempo.jsonl

@@ -73,6 +73,16 @@ def _load_riff_bank() -> list["riff_bank.RiffFragment"]:
     return _riff_bank_cache
 
 
+class RiffBankCoverageError(RuntimeError):
+    """Real, loud failure for `labyrinth` when the bank has no real 2-4
+    bar contiguous riff for a role -- see docs/DECISIONS.md: 'Silent
+    Markov when a labyrinth role has no fragments -- must become hard-
+    fail or drop the role.' Deliberately NOT caught anywhere upstream
+    (`compose_song_from_preset`'s own retry loop has no try/except around
+    `_generate_attempt`), so this genuinely aborts generation rather than
+    quietly degrading to the killed role-bag/Markov-hide behavior."""
+
+
 def _try_riff_bank_motif(
     preset: Preset, role: str, scale: Scale, base_degree: int,
     total_beats: float, rng: random.Random,
@@ -81,25 +91,33 @@ def _try_riff_bank_motif(
     the Metalerator-style replacement for the earlier trained-model path
     (`riff_model.py`, now unused for `labyrinth`'s main riff; kept in the
     codebase for its own real, still-valid determinism/anti-memorization
-    machinery, just no longer this preset's pitch-content source). `None`
-    (falling back to the existing `theme_source`/Markov path unchanged)
-    for every other preset, and for `labyrinth` itself whenever no local
-    bank file exists or the bank has zero real fragments for `role` --
-    the exact same graceful-degradation contract the model path already
-    established, so a fresh checkout with no bank behaves identically to
-    before this feature existed.
+    machinery, just no longer this preset's pitch-content source; do not
+    import it here, see CLAUDE.md's own law). `None` for every OTHER
+    preset (falling back to the existing `theme_source`/Markov path
+    unchanged).
+
+    For `labyrinth` itself: raises `RiffBankCoverageError` when no local
+    bank file exists, or the bank has no real 2-4 bar contiguous run for
+    `role` -- deliberately NOT a silent `None`-then-Markov fallback (that
+    was this project's own real, demoed, killed failure mode -- see
+    docs/DECISIONS.md's "Kill / ghetto" list). A missing/thin bank for
+    `labyrinth` is a real, loud stop, not a quiet degrade.
 
     Draws from `rng` (via `riff_bank.select_and_resolve_motif`'s own real
-    fragment selection) ONLY inside this branch, same real "zero rng-
-    stream change for anyone not opted in" discipline already proven for
-    the model path.
+    riff selection) ONLY inside this branch, same real "zero rng-stream
+    change for anyone not opted in" discipline already proven for the
+    model path.
     """
     if preset.id != _RIFF_MODEL_PRESET_ID:
         return None
     fragments = _load_riff_bank()
-    if not fragments:
-        return None
-    return riff_bank.select_and_resolve_motif(fragments, role, total_beats, scale, base_degree, rng)
+    motif = riff_bank.select_and_resolve_motif(fragments, role, total_beats, scale, base_degree, rng) if fragments else None
+    if motif is None:
+        raise RiffBankCoverageError(
+            f"labyrinth riff bank has no real 2-4 bar contiguous riff for role {role!r} "
+            "(or no bank file at all) -- no silent Markov fallback, see docs/DECISIONS.md"
+        )
+    return motif
 
 # A section is `preset.bars` bars of 4/4; slots are sixteenth/eighth/quarter
 # notes -- a reasonable default vocabulary for chug-driven metal rhythm.

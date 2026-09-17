@@ -1867,12 +1867,20 @@ def _write_bank(tmp_path, fragments):
     return path
 
 
-_VERSE_FRAGMENT = RiffFragment(
-    source_song="Fixture Song", source_file="fixture.gp5", measure_index=0,
-    cell=[{"duration": 0.5, "is_rest": False} for _ in range(8)],
-    deltas=[0, 2, -2, 0, 3, -3, 0, 1],
-    role="verse", raw_marker="Verse",
-)
+_VERSE_FRAGMENTS = [
+    RiffFragment(
+        source_song="Fixture Song", source_file="fixture.gp5", measure_index=0, track="Guitar",
+        cell=[{"duration": 0.5, "is_rest": False} for _ in range(8)],
+        deltas=[0, 2, -2, 0, 3, -3, 0, 1],
+        role="verse", raw_marker="Verse",
+    ),
+    RiffFragment(
+        source_song="Fixture Song", source_file="fixture.gp5", measure_index=1, track="Guitar",
+        cell=[{"duration": 0.5, "is_rest": False} for _ in range(8)],
+        deltas=[1, -1, 2, -2, 0, 3, -3, 0],
+        role="verse", raw_marker="Verse",
+    ),
+]
 
 
 def test_try_riff_bank_motif_is_none_for_every_non_labyrinth_preset(tmp_path, monkeypatch):
@@ -1880,7 +1888,7 @@ def test_try_riff_bank_motif_is_none_for_every_non_labyrinth_preset(tmp_path, mo
     from song import _try_riff_bank_motif
     from theory import Scale
 
-    monkeypatch.setattr(riff_bank, "DEFAULT_RIFF_BANK_PATH", _write_bank(tmp_path, [_VERSE_FRAGMENT]))
+    monkeypatch.setattr(riff_bank, "DEFAULT_RIFF_BANK_PATH", _write_bank(tmp_path, _VERSE_FRAGMENTS))
     scale = Scale(root=0, name="minor")
     for preset_id in ALL_PRESET_IDS:
         if preset_id == "labyrinth":
@@ -1890,22 +1898,25 @@ def test_try_riff_bank_motif_is_none_for_every_non_labyrinth_preset(tmp_path, mo
         assert result is None
 
 
-def test_try_riff_bank_motif_is_none_without_a_real_bank_file_present(tmp_path, monkeypatch):
+def test_try_riff_bank_motif_hard_fails_without_a_real_bank_file_present(tmp_path, monkeypatch):
+    # DECISIONS.md: no silent Markov hide for labyrinth -- a missing bank
+    # is a real, loud stop, not a quiet degrade.
     import riff_bank
-    from song import _try_riff_bank_motif
+    from song import _try_riff_bank_motif, RiffBankCoverageError
     from theory import Scale
 
     monkeypatch.setattr(riff_bank, "DEFAULT_RIFF_BANK_PATH", tmp_path / "does_not_exist.json")
     preset = load_all_presets()["labyrinth"]
     scale = Scale(root=0, name="minor")
-    result = _try_riff_bank_motif(preset, "verse", scale, 0, 8.0, random.Random(1))
-    assert result is None
+    with pytest.raises(RiffBankCoverageError):
+        _try_riff_bank_motif(preset, "verse", scale, 0, 8.0, random.Random(1))
 
 
 def test_try_riff_bank_motif_is_none_without_consuming_extra_rng_when_unavailable():
     # The real, load-bearing guarantee: a checkout with no local bank file
     # must consume the EXACT SAME rng stream as before this feature
-    # existed -- zero behavior change for anyone not opted in.
+    # existed -- zero behavior change for anyone not opted in (this is
+    # non-labyrinth, so it's a real None, not the hard-fail path above).
     from song import _try_riff_bank_motif
     from theory import Scale
 
@@ -1917,16 +1928,16 @@ def test_try_riff_bank_motif_is_none_without_consuming_extra_rng_when_unavailabl
     assert rng.random() == pytest.approx(expected_next)
 
 
-def test_try_riff_bank_motif_returns_none_when_bank_has_no_fragments_for_role(tmp_path, monkeypatch):
+def test_try_riff_bank_motif_hard_fails_when_bank_has_no_coverage_for_role(tmp_path, monkeypatch):
     import riff_bank
-    from song import _try_riff_bank_motif
+    from song import _try_riff_bank_motif, RiffBankCoverageError
     from theory import Scale
 
-    monkeypatch.setattr(riff_bank, "DEFAULT_RIFF_BANK_PATH", _write_bank(tmp_path, [_VERSE_FRAGMENT]))
+    monkeypatch.setattr(riff_bank, "DEFAULT_RIFF_BANK_PATH", _write_bank(tmp_path, _VERSE_FRAGMENTS))
     preset = load_all_presets()["labyrinth"]
     scale = Scale(root=0, name="minor")
-    result = _try_riff_bank_motif(preset, "breakdown", scale, 0, 8.0, random.Random(1))
-    assert result is None
+    with pytest.raises(RiffBankCoverageError):
+        _try_riff_bank_motif(preset, "breakdown", scale, 0, 8.0, random.Random(1))
 
 
 def test_try_riff_bank_motif_uses_the_real_bank_when_fragments_exist(tmp_path, monkeypatch):
@@ -1934,12 +1945,13 @@ def test_try_riff_bank_motif_uses_the_real_bank_when_fragments_exist(tmp_path, m
     from song import _try_riff_bank_motif
     from theory import Scale
 
-    monkeypatch.setattr(riff_bank, "DEFAULT_RIFF_BANK_PATH", _write_bank(tmp_path, [_VERSE_FRAGMENT]))
+    monkeypatch.setattr(riff_bank, "DEFAULT_RIFF_BANK_PATH", _write_bank(tmp_path, _VERSE_FRAGMENTS))
     preset = load_all_presets()["labyrinth"]
     scale = Scale(root=0, name="minor")
     result = _try_riff_bank_motif(preset, "verse", scale, 0, 4.0, random.Random(1))
     assert result is not None
     assert result.hit_count == len(result.deltas)
+    assert result.source_song == "Fixture Song"
 
 
 def test_generate_one_section_uses_the_real_riff_bank_for_labyrinth_when_available(tmp_path, monkeypatch):
@@ -1953,7 +1965,7 @@ def test_generate_one_section_uses_the_real_riff_bank_for_labyrinth_when_availab
     from bass import build_bass_fretboard
     from presets import get_tuning, load_tunings
 
-    monkeypatch.setattr(riff_bank, "DEFAULT_RIFF_BANK_PATH", _write_bank(tmp_path, [_VERSE_FRAGMENT]))
+    monkeypatch.setattr(riff_bank, "DEFAULT_RIFF_BANK_PATH", _write_bank(tmp_path, _VERSE_FRAGMENTS))
 
     preset = load_all_presets()["labyrinth"]
     tunings = load_tunings()
@@ -1987,7 +1999,7 @@ def test_generate_one_section_seeds_riff_bank_theme_for_real_cross_section_reuse
     from bass import build_bass_fretboard
     from presets import get_tuning, load_tunings
 
-    monkeypatch.setattr(riff_bank, "DEFAULT_RIFF_BANK_PATH", _write_bank(tmp_path, [_VERSE_FRAGMENT]))
+    monkeypatch.setattr(riff_bank, "DEFAULT_RIFF_BANK_PATH", _write_bank(tmp_path, _VERSE_FRAGMENTS))
 
     calls = []
     real_select = riff_bank.select_and_resolve_motif

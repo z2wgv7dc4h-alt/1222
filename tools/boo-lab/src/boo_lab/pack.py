@@ -91,8 +91,10 @@ def _sum_no_vox(parts: list[Path], dest: Path) -> bool:
 
 
 def build_pack(lab_root: Path, rows: list[dict], cache: Path) -> dict:
+    from .holdout import ensure_holdout, split_for
     from .stems import find_stem, run_demucs
 
+    holdout = ensure_holdout(lab_root, rows)
     sec_path = lab_root / "data" / "sections.jsonl"
     sections = _load_sections(sec_path)
     by_song: dict[tuple[str, str], list[dict]] = {}
@@ -121,20 +123,29 @@ def build_pack(lab_root: Path, rows: list[dict], cache: Path) -> dict:
         if not flac.exists():
             skipped += len(segs)
             continue
-        folder = cache / "htdemucs" / flac.stem
+        # Real 4-stem fallback: only the four core stems gate a re-run, so a
+        # track cached solely under the old `htdemucs` model still packs from
+        # that cache (no forced re-separation). guitar/piano are best-effort
+        # additions, present only when the 6-stem cache has them.
         need = any(not find_stem(flac, cache, n) for n in ("drums", "bass", "other", "vocals"))
         if need:
             try:
-                run_demucs(flac, cache, model="htdemucs", two_stems=None)
+                run_demucs(flac, cache, two_stems=None)
             except Exception as e:
                 print("demucs fail", track, e)
         drums = find_stem(flac, cache, "drums")
         bass = find_stem(flac, cache, "bass")
         other = find_stem(flac, cache, "other")
         vocals = find_stem(flac, cache, "vocals")
+        guitar = find_stem(flac, cache, "guitar")
+        piano = find_stem(flac, cache, "piano")
+        # Derived no-vocals lives beside whichever real cache was used.
+        folder = drums.parent if drums else cache / "htdemucs_6s" / flac.stem
         no_vox = folder / "no_vocals.wav"
         if not no_vox.exists():
-            _sum_no_vox([p for p in (drums, bass, other) if p], no_vox)
+            # 6-stem "other" no longer contains guitar/piano, so a real
+            # no-vocals mix must add them back (absent ones are filtered).
+            _sum_no_vox([p for p in (drums, bass, guitar, piano, other) if p], no_vox)
 
         for i, seg in enumerate(segs):
             start, end = float(seg["start"]), float(seg["end"])
@@ -148,6 +159,8 @@ def build_pack(lab_root: Path, rows: list[dict], cache: Path) -> dict:
                 ("drums", drums),
                 ("bass", bass),
                 ("other", other),
+                ("guitar", guitar),
+                ("piano", piano),
                 ("vocals", vocals),
                 ("no_vocals", no_vox if no_vox.exists() else None),
             ):
@@ -171,6 +184,7 @@ def build_pack(lab_root: Path, rows: list[dict], cache: Path) -> dict:
                 "role": seg.get("role"),
                 "start": start,
                 "end": end,
+                "split": split_for(album, track, holdout),
                 "flac": str(flac),
                 "gp": gp_path,
                 "gp_tracks": names,

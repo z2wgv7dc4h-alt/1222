@@ -17,11 +17,11 @@ pytestmark = pytest.mark.skipif(guitarpro is None, reason="pyguitarpro not insta
 # ---------------------------------------------------------------------------
 
 
-def _make_track(song, number, pitches_by_measure, instrument=30, is_percussion=False, name="Guitar"):
+def _make_track(song, number, pitches_by_measure, instrument=30, is_percussion=False, name="Guitar", n_strings=1):
     track = guitarpro.Track(
         song,
         number=number,
-        strings=[guitarpro.GuitarString(1, 0)],
+        strings=[guitarpro.GuitarString(i + 1, 0) for i in range(n_strings)],
         channel=guitarpro.MidiChannel(instrument=instrument),
         isPercussionTrack=is_percussion,
     )
@@ -52,6 +52,32 @@ def _make_track(song, number, pitches_by_measure, instrument=30, is_percussion=F
         measure.voices = [voice, second_voice]
         measures.append(measure)
     track.measures = measures
+    return track
+
+
+def _make_chord_track(song, number, chords_by_measure, instrument=30, name="Guitar", n_strings=6):
+    """`chords_by_measure` maps a 0-based measure index to a list of beats;
+    each beat is either `None` (a rest) or a real list of `(string, fret)`
+    pairs -- a genuine multi-note chord when the list has >1 entry."""
+    track = _make_track(song, number, {}, instrument=instrument, name=name, n_strings=n_strings)
+    for measure in track.measures:
+        chords = chords_by_measure.get(measure.header.number - 1, [])
+        voice = measure.voices[0]
+        beats = []
+        for chord in chords:
+            beat = guitarpro.Beat(voice)
+            if chord is None:
+                beat.status = guitarpro.BeatStatus.rest
+                beat.notes = []
+            else:
+                beat.status = guitarpro.BeatStatus.normal
+                beat.notes = [
+                    guitarpro.Note(beat, value=fret, string=string)
+                    for string, fret in chord
+                ]
+            beat.duration = guitarpro.Duration(value=8)
+            beats.append(beat)
+        voice.beats = beats
     return track
 
 
@@ -169,6 +195,7 @@ def test_extract_fragments_from_file_real_cell_and_delta_shape(tmp_path):
     assert len(fragments) == 2
     first, second = fragments
     assert first.measure_index == 0
+    assert first.track == "Guitar"
     assert [c["is_rest"] for c in first.cell] == [False, True, False]
     assert first.deltas == [0, 4]  # 40->40 (first note, delta 0), 40->44 (+4 semitones)
     assert first.role == "verse"
@@ -216,6 +243,7 @@ def test_save_and_load_riff_bank_round_trips_exactly(tmp_path):
         source_song="Fixture Song",
         source_file="test.gp5",
         measure_index=0,
+        track="Guitar",
         cell=[{"duration": 0.5, "is_rest": False}, {"duration": 0.5, "is_rest": True}],
         deltas=[0],
         role="verse",
@@ -227,7 +255,7 @@ def test_save_and_load_riff_bank_round_trips_exactly(tmp_path):
     assert loaded == [fragment]
 
 
-# --- select_and_resolve_motif -------------------------------------------------
+# --- _candidate_riff_runs / _resolve_run / _tile_cell_and_deltas / select_and_resolve_motif ---
 
 import random
 
@@ -235,67 +263,251 @@ from theory import Scale
 
 _SCALE = Scale(root=40, name="minor")
 
-_ONE_BAR_FRAGMENT = rb.RiffFragment(
-    source_song="Fixture Song", source_file="fixture.gp5", measure_index=0,
-    cell=[{"duration": 1.0, "is_rest": False} for _ in range(4)],
-    deltas=[0, 2, -2, 1],
-    role="verse", raw_marker="Verse",
-)
 
-
-def test_select_and_resolve_motif_returns_none_with_no_matching_role():
-    result = rb.select_and_resolve_motif([_ONE_BAR_FRAGMENT], "breakdown", 4.0, _SCALE, 0, random.Random(1))
-    assert result is None
-
-
-def test_select_and_resolve_motif_chains_fragments_to_fill_total_beats():
-    result = rb.select_and_resolve_motif([_ONE_BAR_FRAGMENT], "verse", 8.0, _SCALE, 0, random.Random(1))
-    assert result is not None
-    assert sum(c["duration"] for c in result.cell) == pytest.approx(8.0)
-    assert result.hit_count == len(result.deltas) == 8  # two real 4-hit bars chained
-
-
-def test_select_and_resolve_motif_trims_the_final_fragment_to_land_exactly_on_total_beats():
-    # 6.0 beats isn't a multiple of the fragment's own 4.0-beat bar --
-    # the second real fragment draw must be trimmed, not overshoot.
-    result = rb.select_and_resolve_motif([_ONE_BAR_FRAGMENT], "verse", 6.0, _SCALE, 0, random.Random(1))
-    assert result is not None
-    assert sum(c["duration"] for c in result.cell) == pytest.approx(6.0)
-
-
-def test_select_and_resolve_motif_stays_within_the_real_register_bound_under_extreme_climb():
-    # An extreme synthetic fragment -- every real hit a large upward leap,
-    # never a downward one -- mirrors the exact real test pattern already
-    # used for motif.generate_pitch_deltas/riff_model.generate_riff_motif
-    # to prove the register-bound reflection actually engages rather than
-    # reproducing the same unbounded-walk bug fixed earlier this session.
-    climbing_fragment = rb.RiffFragment(
-        source_song="Fixture Song", source_file="fixture.gp5", measure_index=0,
+def _bar(role, measure_index, source_song="Song A", source_file="a.gp5", track="Guitar", deltas=None):
+    return rb.RiffFragment(
+        source_song=source_song, source_file=source_file, measure_index=measure_index, track=track,
         cell=[{"duration": 1.0, "is_rest": False} for _ in range(4)],
-        deltas=[0, 11, 11, 11],
-        role="verse", raw_marker="Verse",
+        deltas=deltas if deltas is not None else [0, 2, -2, 1],
+        role=role, raw_marker=role,
     )
-    result = rb.select_and_resolve_motif(
-        [climbing_fragment], "verse", 64.0, _SCALE, 0, random.Random(1),
-    )
-    assert result is not None
+
+
+def test_candidate_riff_runs_finds_every_real_2_to_4_bar_contiguous_same_role_window():
+    bars = [_bar("verse", i) for i in range(5)]  # 5 contiguous real verse bars
+    runs = rb._candidate_riff_runs(bars, "verse")
+    lengths = sorted(len(r) for r in runs)
+    # From 5 contiguous bars: 4 real 2-bar windows, 3 real 3-bar, 2 real 4-bar.
+    assert lengths.count(2) == 4
+    assert lengths.count(3) == 3
+    assert lengths.count(4) == 2
+    assert 5 not in lengths  # never longer than _MAX_RIFF_BARS
+
+
+def test_candidate_riff_runs_never_crosses_a_role_boundary():
+    bars = [_bar("verse", 0), _bar("verse", 1), _bar("chorus", 2), _bar("verse", 3)]
+    runs = rb._candidate_riff_runs(bars, "verse")
+    # measure 3 is isolated (chorus breaks contiguity before it) -- only
+    # the real [0,1] window is a valid verse run, never [1,3] or [0,1,2,3].
+    assert [[f.measure_index for f in r] for r in runs] == [[0, 1]]
+
+
+def test_candidate_riff_runs_never_stitches_across_two_different_songs():
+    bars = [_bar("verse", 0, source_song="Song A"), _bar("verse", 0, source_song="Song B")]
+    runs = rb._candidate_riff_runs(bars, "verse")
+    assert runs == []  # each song only has ONE real verse bar -- below _MIN_RIFF_BARS alone
+
+
+def test_candidate_riff_runs_returns_nothing_for_an_uncovered_role():
+    bars = [_bar("verse", 0), _bar("verse", 1)]
+    assert rb._candidate_riff_runs(bars, "breakdown") == []
+
+
+def test_resolve_run_stays_within_the_real_register_bound_under_extreme_climb():
+    # An extreme synthetic run -- every real hit a large upward leap, never
+    # downward -- mirrors the exact pattern already used for motif.
+    # generate_pitch_deltas/riff_model.generate_riff_motif to prove the
+    # register-bound reflection actually engages.
+    run = [_bar("verse", 0, deltas=[0, 11, 11, 11]), _bar("verse", 1, deltas=[11, 11, 11, 11])]
+    cell, deltas = rb._resolve_run(run, _SCALE, 0)
     pitches = []
     degree_index = 0
-    for d in result.deltas:
+    for d in deltas:
         degree_index += d
         pitches.append(_SCALE.degree(degree_index))
     anchor = _SCALE.degree(0)
-    span = rb._FRAGMENT_REGISTER_SPAN_SEMITONES
+    span = rb._RIFF_REGISTER_SPAN_SEMITONES
     assert all(anchor - span <= p <= anchor + span for p in pitches)
-    # A genuinely unbounded climb would use only one direction -- real
-    # reflection means the register bound was actually hit and turned.
-    assert any(p2 < p1 for p1, p2 in zip(pitches, pitches[1:]))
+    assert any(p2 < p1 for p1, p2 in zip(pitches, pitches[1:]))  # real reflection happened
 
 
-def test_select_and_resolve_motif_draws_with_replacement_when_only_one_fragment_covers_a_role():
-    # A role with exactly one real fragment must still be able to fill a
-    # long section by reusing it -- sparse real coverage is legitimate,
-    # not a hard stop.
-    result = rb.select_and_resolve_motif([_ONE_BAR_FRAGMENT], "verse", 16.0, _SCALE, 0, random.Random(1))
+def test_tile_cell_and_deltas_repeats_verbatim_and_lands_exactly_on_total_beats():
+    cell = [{"duration": 1.0, "is_rest": False} for _ in range(4)]
+    deltas = [0, 2, -2, 1]
+    out_cell, out_deltas = rb._tile_cell_and_deltas(cell, deltas, 10.0)
+    assert sum(c["duration"] for c in out_cell) == pytest.approx(10.0)
+    # 2 full real repeats (8 beats) + a real 2-beat partial third repeat --
+    # deltas repeat verbatim in lockstep with each hit, including the
+    # partial repeat's own first two hits.
+    assert out_deltas == [0, 2, -2, 1, 0, 2, -2, 1, 0, 2]
+
+
+def test_tile_cell_and_deltas_rejects_bad_input():
+    with pytest.raises(ValueError):
+        rb._tile_cell_and_deltas([], [], 4.0)
+    with pytest.raises(ValueError):
+        rb._tile_cell_and_deltas([{"duration": 1.0, "is_rest": False}], [0], 0.0)
+
+
+def test_select_and_resolve_motif_returns_none_with_no_matching_role():
+    bars = [_bar("verse", 0), _bar("verse", 1)]
+    result = rb.select_and_resolve_motif(bars, "breakdown", 4.0, _SCALE, 0, random.Random(1))
+    assert result is None
+
+
+def test_select_and_resolve_motif_returns_none_when_coverage_is_below_min_riff_bars():
+    bars = [_bar("verse", 0)]  # only 1 real bar -- below _MIN_RIFF_BARS
+    result = rb.select_and_resolve_motif(bars, "verse", 4.0, _SCALE, 0, random.Random(1))
+    assert result is None
+
+
+def test_select_and_resolve_motif_tiles_one_real_riff_and_carries_provenance():
+    bars = [_bar("verse", 0), _bar("verse", 1), _bar("verse", 2)]
+    result = rb.select_and_resolve_motif(bars, "verse", 16.0, _SCALE, 0, random.Random(1))
     assert result is not None
-    assert result.hit_count == 16
+    assert sum(c["duration"] for c in result.cell) == pytest.approx(16.0)
+    assert result.source_song == "Song A"
+    assert result.measure_start in (0, 1)  # start of whichever real 2- or 3-bar run was picked
+    assert result.track == "Guitar"
+
+
+def test_select_and_resolve_motif_same_rng_same_pick():
+    bars = [_bar("verse", 0), _bar("verse", 1), _bar("verse", 2), _bar("verse", 3)]
+    a = rb.select_and_resolve_motif(bars, "verse", 8.0, _SCALE, 0, random.Random(7))
+    b = rb.select_and_resolve_motif(bars, "verse", 8.0, _SCALE, 0, random.Random(7))
+    assert a.deltas == b.deltas and a.measure_start == b.measure_start
+
+
+# --- real per-note technique/articulation capture ---------------------------
+
+_TECHNIQUE_KEYS = ("palm_mute", "harmonic", "slide", "tremolo", "vibrato", "accent")
+
+
+def _notes_of(track):
+    return [n for m in track.measures for v in m.voices for b in v.beats for n in b.notes]
+
+
+def test_measure_cell_and_deltas_captures_real_techniques_only_when_true():
+    song = _make_song(1)
+    track = _make_track(song, 1, {0: [40, None, 44]}, instrument=30)
+    notes = _notes_of(track)
+    notes[0].effect = guitarpro.NoteEffect(palmMute=True, vibrato=True, accentuatedNote=True)
+    notes[1].effect = guitarpro.NoteEffect(
+        harmonic=guitarpro.HarmonicEffect(),
+        slides=[guitarpro.SlideType.shiftSlideTo],
+        tremoloPicking=guitarpro.TremoloPickingEffect(),
+    )
+    cell, _, _, _ = rb._measure_cell_and_deltas(track.measures[0])
+
+    assert cell[0]["palm_mute"] is True
+    assert cell[0]["vibrato"] is True
+    assert cell[0]["accent"] is True
+    assert "harmonic" not in cell[0] and "slide" not in cell[0] and "tremolo" not in cell[0]
+
+    assert cell[1]["is_rest"] is True
+    assert not any(k in cell[1] for k in _TECHNIQUE_KEYS)
+
+    assert cell[2]["harmonic"] is True
+    assert cell[2]["slide"] is True
+    assert cell[2]["tremolo"] is True
+    assert "palm_mute" not in cell[2] and "accent" not in cell[2]
+
+
+def test_heavy_accentuated_note_maps_to_accent():
+    song = _make_song(1)
+    track = _make_track(song, 1, {0: [40]}, instrument=30)
+    _notes_of(track)[0].effect = guitarpro.NoteEffect(heavyAccentuatedNote=True)
+    cell, _, _, _ = rb._measure_cell_and_deltas(track.measures[0])
+    assert cell[0]["accent"] is True
+
+
+def test_extract_fragments_from_file_carries_technique_keys(tmp_path):
+    song = _make_song(1)
+    track = _make_track(song, 1, {0: [40, 44]}, instrument=30)
+    _notes_of(track)[0].effect = guitarpro.NoteEffect(palmMute=True)
+    song.tracks = [track]
+    fragments = _write_and_extract(tmp_path, song)
+    assert fragments[0].cell[0]["palm_mute"] is True
+    assert "palm_mute" not in fragments[0].cell[1]
+
+
+def test_extract_bass_fragments_from_file_carries_technique_keys(tmp_path):
+    song = _make_song(1)
+    track = _make_track(song, 1, {0: [33, 36]}, instrument=33, name="Bass")
+    _notes_of(track)[0].effect = guitarpro.NoteEffect(palmMute=True)
+    song.tracks = [track]
+    path = tmp_path / "bass_technique.gp5"
+    guitarpro.write(song, str(path))
+    fragments = rb.extract_bass_fragments_from_file(path)
+    assert fragments[0].cell[0]["palm_mute"] is True
+    assert "palm_mute" not in fragments[0].cell[1]
+
+
+# --- failure-reason classification -------------------------------------------
+
+
+def test_classify_failure_reason_maps_known_and_unknown():
+    assert rb.classify_failure_reason("gpx sub-format not decodable by this pyguitarpro version") == "gpx_unsupported"
+    assert rb.classify_failure_reason("no real guitar-family track found (no GM-program 24-31 track)") == "no_guitar_track"
+    assert rb.classify_failure_reason("no real bass-family track found (no GM-program 32-39 track)") == "no_bass_track"
+    assert rb.classify_failure_reason("no distinct real lead-guitar track found (needs 2+ guitar-family tracks)") == "no_lead_track"
+    assert rb.classify_failure_reason("track has no measures") == "track_has_no_measures"
+    assert rb.classify_failure_reason("unsupported version 'PK...'") == "parse_error"
+
+
+def test_build_riff_bank_records_no_track_reason(tmp_path):
+    song = _make_song(1)
+    bass = _make_track(song, 1, {0: [30]}, instrument=33, name="Bass")
+    song.tracks = [bass]
+    guitarpro.write(song, str(tmp_path / "bass_only.gp5"))
+
+    fragments, failures = rb.build_riff_bank(tmp_path)
+
+    assert fragments == []
+    assert len(failures) == 1
+    assert failures[0][0].endswith("bass_only.gp5")
+    assert failures[0][1] == "no real guitar-family track found (no GM-program 24-31 track)"
+    assert rb.classify_failure_reason(failures[0][1]) == "no_guitar_track"
+
+
+# --- real chord / polyphony capture -----------------------------------------
+
+
+def test_measure_cell_and_deltas_captures_chord_notes_and_frets():
+    song = _make_song(1)
+    track = _make_chord_track(song, 1, {0: [[(1, 3), (2, 2), (3, 0)], None, [(1, 5)]]})
+    cell, deltas, chord_notes, chord_frets = rb._measure_cell_and_deltas(track.measures[0])
+
+    assert [c["is_rest"] for c in cell] == [False, True, False]
+    # only hits, in order; the rest contributes nothing
+    assert chord_notes == [[3, 2, 0], [5]]
+    assert chord_frets == [[(1, 3), (2, 2), (3, 0)], [(1, 5)]]
+    # deltas still comes from the top note only: 3 -> 5
+    assert deltas == [0, 2]
+
+
+def test_extract_fragments_from_file_carries_chord_data(tmp_path):
+    song = _make_song(1, markers={0: "Verse"}, title="Chord Song")
+    track = _make_chord_track(song, 1, {0: [[(1, 3), (2, 2)], [(1, 5)]]})
+    song.tracks = [track]
+    path = tmp_path / "chords.gp5"
+    guitarpro.write(song, str(path))
+
+    fragments = rb.extract_fragments_from_file(path)
+
+    assert fragments[0].chord_notes == [[3, 2], [5]]
+    assert fragments[0].chord_frets == [[(1, 3), (2, 2)], [(1, 5)]]
+    assert fragments[0].deltas == [0, 2]
+
+
+def test_extract_bass_fragments_from_file_carries_chord_data(tmp_path):
+    song = _make_song(1)
+    track = _make_chord_track(song, 1, {0: [[(1, 3), (2, 5)]]}, instrument=33, name="Bass", n_strings=4)
+    song.tracks = [track]
+    path = tmp_path / "bass_chord.gp5"
+    guitarpro.write(song, str(path))
+
+    fragments = rb.extract_bass_fragments_from_file(path)
+
+    assert fragments[0].chord_notes == [[3, 5]]
+    assert fragments[0].chord_frets == [[(1, 3), (2, 5)]]
+
+
+def test_riff_fragment_chord_fields_default_empty_for_backward_compat():
+    fragment = rb.RiffFragment(
+        source_song="S", source_file="f.gp5", measure_index=0, track="Guitar",
+        cell=[{"duration": 1.0, "is_rest": False}], deltas=[0],
+        role=None, raw_marker=None,
+    )
+    assert fragment.chord_notes == []
+    assert fragment.chord_frets == []

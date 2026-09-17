@@ -87,6 +87,16 @@ def estimate_hybrid(
     else:
         notes.append("no tab")
 
+    real_duration = None
+    if flac and Path(flac).exists():
+        try:
+            import soundfile as sf
+
+            info = sf.info(str(flac))
+            real_duration = info.frames / info.samplerate
+        except Exception:
+            pass
+
     if flac and Path(flac).exists():
         src = Path(flac)
         if cache:
@@ -135,7 +145,23 @@ def estimate_hybrid(
             pass
 
     sections = _clean(sections)
-    return {"bpm": bpm, "beats": beats[:400], "sections": sections, "notes": notes}
+
+    # Real, honest coverage report -- librosa's beat/onset detectors can
+    # (and do, confirmed on a real BoO track: a quiet outro with too
+    # little low-frequency onset energy) run out of signal well before
+    # the real audio's own actual end, silently. Never let that look like
+    # "nothing more to label" -- say exactly how much of the real
+    # duration Guess actually reached.
+    if real_duration:
+        covered_end = max([s["end"] for s in sections], default=0.0)
+        if real_duration - covered_end > 5.0:
+            pct = 100.0 * covered_end / real_duration
+            notes.append(
+                "Guess reached %.1fs of %.1fs (%.0f%%) -- %.1fs uncovered at the end, paint it by hand"
+                % (covered_end, real_duration, pct, real_duration - covered_end)
+            )
+
+    return {"bpm": bpm, "beats": beats[:400], "sections": sections, "notes": notes, "duration": real_duration}
 
 
 def _drum_stem(flac: Path) -> Path | None:

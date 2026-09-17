@@ -92,8 +92,17 @@ def scan_roots(flac_root: Path | None, gp_root: Path | None) -> list[dict]:
     gps: dict[str, Path] = {}
     if gp_root and gp_root.exists():
         for p in gp_root.rglob("*"):
-            if p.suffix.lower() in GP_EXT:
-                gps.setdefault(_key(p.stem) or _stem(p).casefold(), p)
+            if p.suffix.lower() not in GP_EXT:
+                continue
+            keys = {_key(p.stem), _key(_stem(p))}
+            # Born_Of_Osiris-Elimination -> elimination
+            if "-" in p.stem:
+                keys.add(_key(p.stem.split("-")[-1]))
+            if "_" in p.stem:
+                keys.add(_key(p.stem.split("_")[-1]))
+            for k in keys:
+                if k:
+                    gps.setdefault(k, p)
     rows = []
     if flac_root and flac_root.exists():
         flacs = sorted(

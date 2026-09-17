@@ -5,8 +5,9 @@ import zipfile
 from pathlib import Path
 
 AUDIO = {".flac", ".wav"}
-GP5 = {".gp5", ".gp4", ".gp3"}
-GP7 = {".gp", ".gpx"}
+GP5_EXT = {".gp5", ".gp4", ".gp3"}
+GP7_EXT = {".gpx"}
+ART = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
 
 
 def _band_slug(name: str) -> str:
@@ -14,9 +15,75 @@ def _band_slug(name: str) -> str:
     return "".join(c if c.isalnum() or c == "_" else "" for c in s) or "unknown"
 
 
+def _infer_band_album(folder: str, typed: str) -> tuple[str, str]:
+    raw = (folder or "").strip()
+    typed = (typed or "").strip()
+    if typed and typed.lower() not in {"new_band", "unknown", "band"}:
+        return _band_slug(typed), raw or "album"
+    parts = [x.strip() for x in raw.replace("—", "-").split(" - ") if x.strip()]
+    if len(parts) >= 3 and parts[-1].isdigit() and len(parts[-1]) == 4:
+        return _band_slug(parts[0]), f"{parts[-1]} - {parts[1]}"
+    if len(parts) >= 2 and not parts[0][:1].isdigit():
+        return _band_slug(parts[0]), " - ".join(parts[1:])
+    return _band_slug(typed or raw or "unknown"), raw or "album"
+
+
+
+def _from_filename(stem: str) -> tuple[str, str] | None:
+    s = (stem or "").replace("_", " ").strip()
+    s = s.split(" - s")[0]
+    import re
+    s = re.sub(r"\s*s\d+$", "", s)
+    if " - " in s:
+        a, b = s.split(" - ", 1)
+        if a and b:
+            return _band_slug(a), b.strip()
+    if "-" in stem and "_" in stem:
+        # Born_Of_Osiris-Elimination
+        left, right = stem.split("-", 1)
+        if left and right:
+            return _band_slug(left.replace("_", " ")), right.replace("_", " ")
+    return None
+
+def _corpus_root(flac_root: Path, band: str) -> Path:
+    if flac_root.name.lower() in {"audio-corpus", "audio", "flacs", "flac"}:
+        return flac_root
+    if band and band != _band_slug(flac_root.name):
+        return flac_root.parent
+    return flac_root
+
+
+def _safe_under(root: Path, rel: Path) -> Path | None:
+    if ".." in rel.parts:
+        return None
+    out = (root / rel).resolve()
+    try:
+        out.relative_to(root.resolve())
+    except ValueError:
+        return None
+    return out
+
+
+def _gp_kind(p: Path) -> str:
+    ext = p.suffix.lower()
+    if ext in GP5_EXT:
+        return "gp5"
+    if ext in GP7_EXT:
+        return "gp7"
+    if ext != ".gp":
+        return ""
+    try:
+        head = p.read_bytes()[:40]
+    except Exception:
+        return "gp7"
+    if head.startswith(b"FICHIER GUITAR") or head.startswith(b"FICHIER GUITARE"):
+        return "gp5"
+    return "gp7"
+
+
 def _unpack_zips(drop: Path, scratch: Path) -> None:
     scratch.mkdir(parents=True, exist_ok=True)
-    for z in drop.rglob("*.zip"):
+    for z in list(drop.rglob("*.zip")):
         dest = scratch / z.stem
         dest.mkdir(parents=True, exist_ok=True)
         try:
@@ -26,50 +93,83 @@ def _unpack_zips(drop: Path, scratch: Path) -> None:
             print("skip zip", z, e)
 
 
+def _album_name(p: Path, drop: Path) -> str:
+    d = p.parent
+    skip = {"tracks", "track", "covers", "cover", "art", "artwork", "_unpacked", drop.name.lower()}
+    if d.name.lower() in skip:
+        d = d.parent
+    if d.name.lower() in skip or d == drop:
+        return "album"
+    return d.name
+
+
 def ingest(drop: Path, flac_root: Path, gp_root: Path, band: str) -> dict:
-    """Copy FLACs + GP into the corpus. Never deletes the drop folder."""
-    band = _band_slug(band)
+    """Copy FLACs, art, and GP into the corpus. Never deletes the drop folder."""
+    typed = band
     scratch = drop / "_unpacked"
     _unpack_zips(drop, scratch)
-    audio_dest = flac_root / band
-    gp5_dest = gp_root / "gp5" / band
-    gp7_dest = gp_root / "gp7" / band
-    audio_dest.mkdir(parents=True, exist_ok=True)
-    gp5_dest.mkdir(parents=True, exist_ok=True)
-    gp7_dest.mkdir(parents=True, exist_ok=True)
-    n_a = n_5 = n_7 = 0
+    audio_dest = gp5_dest = gp7_dest = None
+    n_a = n_5 = n_7 = n_art = 0
     search = [drop, scratch]
-    seen = set()
+    seen: set[tuple] = set()
     for root in search:
         if not root.exists():
             continue
         for p in root.rglob("*"):
-            if not p.is_file() or "_unpacked" in p.parts and root == drop:
+            if not p.is_file():
                 continue
-            key = (p.suffix.lower(), p.stat().st_size, p.name.lower())
-            if key in seen:
+            if root == drop and "_unpacked" in p.parts:
                 continue
             ext = p.suffix.lower()
+            key = (ext, p.stat().st_size, p.name.lower())
+            if key in seen:
+                continue
+            folder = _album_name(p, drop)
+            band, album = _infer_band_album(folder, typed)
+            parsed = _from_filename(p.stem)
+            if parsed and (not typed or typed.lower() in {"new_band","unknown","band"}):
+                band = parsed[0]
+                if folder.lower() in {"album","gp5","gp7","tabs","tab"}:
+                    album = parsed[1]
+            corpus = _corpus_root(flac_root, band)
+            audio_dest = corpus / band
+            gp5_dest = gp_root / "gp5" / band
+            gp7_dest = gp_root / "gp7" / band
             if ext in AUDIO:
-                album = p.parent.name
-                if album.lower() in {"tracks", "track", drop.name.lower(), "_unpacked"}:
-                    album = p.parent.parent.name if p.parent.parent != drop else "album"
                 dest = audio_dest / album / p.name
                 dest.parent.mkdir(parents=True, exist_ok=True)
                 if not dest.exists():
                     shutil.copy2(p, dest)
                     n_a += 1
                 seen.add(key)
-            elif ext in GP5:
-                dest = gp5_dest / p.name
+            elif ext in ART:
+                dest = audio_dest / album / p.name
+                dest.parent.mkdir(parents=True, exist_ok=True)
                 if not dest.exists():
                     shutil.copy2(p, dest)
-                    n_5 += 1
+                    n_art += 1
                 seen.add(key)
-            elif ext in GP7:
-                dest = gp7_dest / p.name
-                if not dest.exists():
-                    shutil.copy2(p, dest)
-                    n_7 += 1
-                seen.add(key)
-    return {"band": band, "flac": n_a, "gp5": n_5, "gp7": n_7, "audio": str(audio_dest)}
+            else:
+                kind = _gp_kind(p)
+                if kind == "gp5":
+                    dest = gp5_dest / album / p.name
+                    dest.parent.mkdir(parents=True, exist_ok=True)
+                    if not dest.exists():
+                        shutil.copy2(p, dest)
+                        n_5 += 1
+                    seen.add(key)
+                elif kind == "gp7":
+                    dest = gp7_dest / album / p.name
+                    dest.parent.mkdir(parents=True, exist_ok=True)
+                    if not dest.exists():
+                        shutil.copy2(p, dest)
+                        n_7 += 1
+                    seen.add(key)
+    return {
+        "band": band if audio_dest else _band_slug(typed),
+        "flac": n_a,
+        "gp5": n_5,
+        "gp7": n_7,
+        "art": n_art,
+        "audio": str(audio_dest),
+    }

@@ -49,8 +49,13 @@ cd C:\Users\RIGGUSPIG\Desktop\god-tier-metal\tools\boo-lab
 set BOO_FLAC_ROOT=C:\Users\RIGGUSPIG\Desktop\god-tier-metal\reference\audio-corpus
 set BOO_GP_ROOT=C:\Users\RIGGUSPIG\Desktop\god-tier-metal\reference\gp-tabs
 python -m boo_lab.cli scan
+python -m boo_lab.cli hash
+python -m boo_lab.cli interns --steps beats,sync
 python -m boo_lab.cli studio --port 8765
 ```
+
+`START.bat` runs those four in order. The `interns --steps beats,sync` pass is
+resumable and skips songs already on disk.
 
 http://127.0.0.1:8765 — Ctrl+Shift+R after HTML. Restart the process after `.py` changes. One server.
 

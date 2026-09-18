@@ -22,7 +22,7 @@ GP     C:\Users\RIGGUSPIG\Desktop\god-tier-metal\reference\gp-tabs
 
 ## Start
 
-New here? Read **USER.md** first. Easiest (scans, then serves): run `START.bat`.
+New here? Read **USER.md** first. Easiest (scans, hashes, runs the resumable beat/sync pass, then serves): run `START.bat`.
 
 Manual equivalent (use the lab root under **This machine** above):
 

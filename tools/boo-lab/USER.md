@@ -22,6 +22,8 @@ Audio and Guitar Pro files stay on this PC. Git only stores code and labels.
 ## Open
 
 Double-click `START.bat` in the `boo-lab` folder.
+It rescans, hashes new FLACs, and runs the beat/sync pass before opening the
+studio. That pass is resumable and safe to re-run; it only fills what is missing.
 
 Browser: http://127.0.0.1:8765
 Old page: Ctrl+Shift+R.

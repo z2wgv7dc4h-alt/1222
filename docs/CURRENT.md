@@ -1,7 +1,7 @@
 # CURRENT
 
 updated: 2026-09-18
-pytest: engine **820 passed, 1 skipped**; boo-lab **322 passed**
+pytest: engine **820 passed, 1 skipped**; boo-lab **342 passed**
 
 ## Now
 
@@ -11,12 +11,13 @@ drafts machine output (`data/drafts.jsonl`), and ships a full studio + CLI
 (spectrogram, draft/keeper schema, witnesses, agreement/JAMS exports).
 Engine work below is paused; nothing here consumes the lab yet.
 
-Lab pass (latest commit `0a98c31`): GP7 is native — `boo_lab/gpif.py` parses a
+Lab pass (latest commit `c851856` + rematch): GP7 is native — `boo_lab/gpif.py` parses a
 `.gp`/`.gpx` `score.gpif` (tracks/tunings/instrument, masterbars/time-sig/repeats/sections,
-beats, notes with computed midi + articulations) and `sync` prefers a matching `.gp`/`.gpx`
-over a `.gp5` sibling, clocking it via `gpif.note_events` (no GP5 conversion). Before it
-`e2a5dee` (GPIF notes), `5df12ab`/`9fca6e6` (`interns` pass; `START.bat` runs hash +
-beats/sync), `a21bc29` (`hash` fills `flac_sha256`). Interns run on
+beats, notes with computed midi + articulations); `sync` prefers a matching `.gp`/`.gpx`
+over a `.gp5` sibling; `tabnotes.py` reads an operator `.zip`/folder pack and `ingest`
+routes it to `data/tabnotes/`. `catalogue` now scores every GP (`exact > substring`,
+lead-number bonus, GP7 bonus) and assigns one GP per FLAC, so the full GP7 packs for
+Discovery / A Higher Place / Eternal Reign (under `gp-tabs/gp7/`, local) win. Interns run on
 **GPU by default** (`boo_lab/device.py`); allin1 is
 repaired for modern natten + madmom on py3.12/numpy2 by `boo_lab/_natten_compat.py` (also aliases the
 `collections` ABCs and runs at `import boo_lab`); `setup.bat` + `constraints.txt` + `boo-lab doctor`
@@ -24,8 +25,8 @@ make a fresh machine reproducible. **Hardening**: the keeper law fails closed (o
 `schema.load_section_rows` reader; `is_keeper`/`canonical_role`/`stamp_box` reject unknowns), every
 `sections.jsonl` write is atomic with a `sections.jsonl.bak` one-step undo, and `beats`/`structure`/
 `sync`/`agree`/`drums`/`vocal_melody` no longer blank their output on a zero-row run. `structure` wrote
-**125 drafts** (13 BoO tracks); `compare` on Rebirth (holdout): **F0.5=0.737 F3=0.800 role3=0.250**;
-`sync` **17/55**; engine **820 passed, 1 skipped**; boo-lab **322 passed**. Studio now draws beat/downbeat ticks and snaps box edges, plus per-role lanes (right-click to edit, layer filter); Guess carries the tab's section letters/repeats, gates on `sync_ok`, and snaps its audio spans to the beat grid. The lab now ships one resumable `boo-lab interns` pass over the whole analysis chain (drafts only), and clocks GP7 `.gp`/`.gpx` natively via the parsed GPIF score.
+**1450 drafts** across all six albums; `compare` on Rebirth (holdout): **F0.5=0.737 F3=0.800 role3=0.250**;
+`sync` **14/52** (GP7 tabs clock differently than the old `.gp5`s); engine **820 passed, 1 skipped**; boo-lab **342 passed**. Studio now draws beat/downbeat ticks and snaps box edges, plus per-role lanes (click selects, double-click seeks + zooms; right-click edits); Guess carries the tab's section letters/repeats, gates on `sync_ok`, and snaps its audio spans to the beat grid. The lab ships one resumable `boo-lab interns` pass, clocks GP7 `.gp`/`.gpx` natively, and ingests tab-notes packs into `data/tabnotes/`.
 
 Real, done, verified, pushed this pass (tools/boo-lab/ + engine/riff_bank.py):
 - Labyrinth bank redesigned: ONE real song, ONE 2-4 bar contiguous riff,

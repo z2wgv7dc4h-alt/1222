@@ -266,7 +266,8 @@ def _map_lab(tmp_path, rows):
     return lab
 
 
-def test_sync_resolves_studio_names(tmp_path):
+def test_sync_resolves_studio_names(tmp_path, monkeypatch):
+    monkeypatch.delenv("BOO_GP_ROOT", raising=False)  # no real GP7 sibling
     gp = tmp_path / "07 Exist.gp5"
     gp.write_bytes(b"x")
     flac = tmp_path / "07 - Exist.flac"

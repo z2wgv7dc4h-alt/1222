@@ -25,7 +25,7 @@ Living docs are `USER.md` / `LAW.md` / `CURRENT.md` / `README.md` / `STATUS.md` 
 A **section lab** for metal FLACs (Born of Osiris first, other bands via ingest). Human output is `data/sections.jsonl` — **keeper pins only** (`source=human`/`guess-accepted`, `heard=true`), each with a figure/function `layer` and a `figure_id` — plus optional Pack clips under `work/` (gitignored). Machines write `data/drafts.jsonl` (MSA/SongFormer/Guess) and never keepers. It is not God Tier Metal, not a DAW, not a tab reader, not an auto-songwriter.
 
 GitHub: `https://github.com/z2wgv7dc4h-alt/1222` path `tools/boo-lab`.  
-Newest lab commit: `0a98c31` (sync clocks GP7 via GPIF, preferring a `.gp/.gpx` over a sibling `.gp5`); before it `e2a5dee` (GPIF notes: midi/voices/articulations/tempo map), `42d47f6` (GPIF→GP5 writer + GPIF sync fallback), `7dfdfe1` (parse `score.gpif`), `9fca6e6` (START.bat runs hash + beats/sync), `5df12ab` (one resumable `interns` pass), `a21bc29` (`hash` fills `flac_sha256`), `21c54ea` (JAMS from studio).
+Newest lab commit: GP rematch — scored unique assignment, GP7 packs win (Discovery/AHP/Eternal Reign now full GP7); before it `c851856` (ingest detects tab-notes zips into `data/tabnotes`), `3449785` (tab-notes pack reader), `ced52ad` (per-track drums/vocals), `0a98c31` (sync clocks GP7 via GPIF), `e2a5dee` (GPIF notes: midi/voices/articulations/tempo map), `42d47f6` (GPIF→GP5 writer + fallback), `7dfdfe1` (parse `score.gpif`), `9fca6e6` (START.bat runs hash + beats/sync), `5df12ab` (one resumable `interns` pass).
 
 ## Paths
 
@@ -217,9 +217,19 @@ Then `scan` rebuilds `map.csv`.
 ## Scan / matching
 
 - Do **not** rename FLACs.
-- Strip track numbers, Songsterr `s12345`, words like official/tab/guitarpro.
+- Strip a leading track number (separator **or** space: `07 - Exist` / `07 Exist`
+  → `exist`), the `Born Of Osiris` band prefix however it is punctuated,
+  Songsterr `s12345`, words like official/tab/guitarpro.
 - Split `Band-Song` / `Band_Song`.
-- Unique assignment: one GP file → one FLAC, best score first.
+- **Scored candidates, unique**: `_gp_candidates` ranks a GP by exact key match
+  (`1000`), else a meaningful substring (both keys ≥5 chars, `500 + overlap`),
+  plus a lead-track-number bonus when the GP filename's number matches the
+  song's, then a small **GP7 `.gp`/`.gpx` bonus** over `.gp5` (GP7-native),
+  then the shorter name. `scan_roots` walks FLACs in order and skips a GP
+  already claimed — **one GP file → one FLAC** (no more one tab matched to
+  four songs).
+- Keep the full GP7 packs for Discovery / A Higher Place / Eternal Reign under
+  `gp-tabs/gp7/<band>/<album>/` (local, gitignored); scan prefers them.
 - Short titles (`XIV`, `Exist`) need a high score.
 - `no tab` = no file, or title is `track02`. Rename the **tab**.
 

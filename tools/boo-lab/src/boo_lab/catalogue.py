@@ -129,10 +129,20 @@ def _stem(p: Path) -> str:
 def _key(s: str) -> str:
     import re
     s = (s or "").replace("∆", "A").replace("Δ", "A").replace("δ", "a").lower()
-    s = re.sub(r"^\d+\s*[-_.]\s*", "", s)
-    s = re.sub(r"^bornofosiris", "", s)
+    # strip a leading track number whether or not a separator follows
+    # ("07 - Exist" and "07 Exist" both -> "exist").
+    s = re.sub(r"^\d+\s*[-_.]\s*|^\d+\s+", "", s)
+    # strip a leading band prefix however it is punctuated
+    s = re.sub(r"^born[\s._-]*of[\s._-]*osiris", "", s)
     s = re.sub(r"s\d+$", "", s)
     return re.sub(r"[^a-z0-9]+", "", s)
+
+
+def _lead_num(s: str) -> str:
+    """The leading track number of a title, if any (`02 Singularity` -> `02`)."""
+    import re
+    m = re.match(r"\s*(\d{1,3})", s or "")
+    return m.group(1) if m else ""
 
 
 def _album_of(p: Path) -> str:
@@ -152,47 +162,79 @@ def _looks_like_disc_image(p: Path) -> bool:
     return False
 
 
-def _find_gp(stem: str, gps: dict[str, Path]) -> Path | None:
+# Aliases shorter than this are too generic to key a GP by (e.g. the last
+# `_` segment of "..._Half_Of_Me-s123" is "me", which is a substring of many
+# unrelated titles) and caused one tab to match several songs.
+_MIN_GP_KEY = 3
+_MIN_SUBSTRING = 5
+
+
+def _gp_candidates(stem: str, gp_files: list[tuple[set, Path]]) -> list[Path]:
+    """GP files that could be `stem`, best first. Exact key match beats a
+    meaningful substring; a filename whose leading track number matches the
+    song's is preferred, then the shorter/more-specific name."""
     k = _key(stem)
     if not k:
-        return None
-    if k in gps:
-        return gps[k]
-    for name, path in gps.items():
-        nk = _key(name)
-        if nk == k or (len(k) > 5 and (k in nk or nk in k)):
-            return path
-    return None
+        return []
+    num = _lead_num(stem)
+    scored: list[tuple[float, Path]] = []
+    for keys, path in gp_files:
+        score = 0.0
+        if k in keys:
+            score = 1000.0
+        else:
+            for nk in keys:
+                if nk and min(len(k), len(nk)) >= _MIN_SUBSTRING and (k in nk or nk in k):
+                    score = max(score, 500.0 + min(len(k), len(nk)) - abs(len(k) - len(nk)))
+        if not score:
+            continue
+        if num and _lead_num(path.stem) == num:
+            score += 100.0
+        # A GP7 `.gp`/`.gpx` beats an equally-scored `.gp5` (GP7-native law).
+        if path.suffix.lower() in (".gp", ".gpx"):
+            score += 1.0
+        score -= len(path.stem) / 1000.0
+        scored.append((score, path))
+    scored.sort(key=lambda x: (-x[0], str(x[1])))
+    return [p for _s, p in scored]
+
+
+def _find_gp(stem: str, gps: dict[str, Path]) -> Path | None:
+    """First (best) candidate from a normalized-key dict -- the single-GP
+    convenience form of `_gp_candidates`."""
+    cands = _gp_candidates(stem, [({k}, p) for k, p in gps.items() if k])
+    return cands[0] if cands else None
 
 
 def scan_roots(flac_root: Path | None, gp_root: Path | None) -> list[dict]:
     """One row per track FLAC. Album = album folder, not 'tracks'."""
-    gps: dict[str, Path] = {}
+    gp_files: list[tuple[set, Path]] = []
     if gp_root and gp_root.exists():
         for p in gp_root.rglob("*"):
             if p.suffix.lower() not in GP_EXT:
                 continue
             keys = {_key(p.stem), _key(_stem(p))}
             # "07 Exist" (track number + space, no separator) -> also key "exist"
-            import re
-
             keys.add(_key(re.sub(r"^\d+\s+", "", p.stem)))
             # Born_Of_Osiris-Elimination -> elimination
             if "-" in p.stem:
                 keys.add(_key(p.stem.split("-")[-1]))
             if "_" in p.stem:
                 keys.add(_key(p.stem.split("_")[-1]))
-            for k in keys:
-                if k:
-                    gps.setdefault(k, p)
+            keys = {k for k in keys if k and len(k) >= _MIN_GP_KEY}
+            gp_files.append((keys, p))
     rows = []
     if flac_root and flac_root.exists():
         flacs = sorted(
             p for p in flac_root.rglob("*")
             if p.suffix.lower() in AUDIO_EXT and not _looks_like_disc_image(p)
         )
+        used_gp: set[Path] = set()
         for fp in flacs:
-            gp = _find_gp(_stem(fp), gps)
+            gp = next((c for c in _gp_candidates(_stem(fp), gp_files)
+                       if c not in used_gp), None)  # one GP file -> one FLAC
+            if gp is not None:
+                used_gp.add(gp)
             rows.append(
                 {
                     "album": _album_of(fp),

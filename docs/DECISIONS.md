@@ -96,3 +96,9 @@ Pytest proves wiring. User ear proves a riff. STATUS may not tick “sounds like
 - **GPIF is a score source, not a labeler.** GP7 supplies markers/notes only via the parsed score —
   never Guess invention; machines never write `sections.jsonl`. `gpif_to_gp5` exists but is unused
   (kept only as a fallback).
+- **Scan prefers the full GP7 pack and assigns one tab per song.** `_key` strips a space-numbered
+  track prefix and the band prefix in any punctuation; `_gp_candidates` scores each GP (exact >
+  meaningful substring ≥5, lead-track-number bonus, `.gp`/`.gpx` over `.gp5`, shorter name) and
+  `scan_roots` skips an already-claimed GP (a tab can no longer match four songs). The full GP7
+  packs for Discovery / A Higher Place / Eternal Reign live under `gp-tabs/gp7/<band>/<album>/`,
+  local and gitignored.

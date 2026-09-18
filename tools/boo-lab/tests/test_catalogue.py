@@ -51,6 +51,32 @@ def test_find_gp_exact_and_substring():
     assert cat._find_gp("unknown", gps) is None
 
 
+def test_find_gp_ignores_a_generic_short_alias():
+    # Regression: the last `_` segment of "..._Of_Me-s123" is "me", a substring
+    # of "throwMEinthejungle", so one tab matched four unrelated songs.
+    assert cat._find_gp("02 - Throw Me in the Jungle", {"me": Path("x.gp")}) is None
+    assert cat._find_gp("11 - River of Time", {"me": Path("x.gp")}) is None
+
+
+def test_scan_roots_assigns_each_gp_once(tmp_path):
+    flac_root = tmp_path / "corpus"
+    album = flac_root / "Album"
+    (album / "tracks").mkdir(parents=True)
+    for name in ("01 - The Other Half of Me.flac", "02 - Throw Me in the Jungle.flac",
+                 "11 - River of Time.flac"):
+        (album / "tracks" / name).write_bytes(b"x")
+    gp_root = tmp_path / "gp"
+    gp_root.mkdir()
+    (gp_root / "Born_Of_Osiris-The_Other_Half_Of_Me-s405302.gp").write_bytes(b"x")
+
+    rows = {r["track"]: r for r in cat.scan_roots(flac_root, gp_root)}
+
+    assert rows["01 - The Other Half of Me"]["match"] == "yes"
+    assert rows["02 - Throw Me in the Jungle"]["match"] == "unknown"
+    assert rows["02 - Throw Me in the Jungle"]["gp"] == ""
+    assert rows["11 - River of Time"]["match"] == "unknown"
+
+
 # --- resolve -----------------------------------------------------------------
 
 
@@ -213,6 +239,24 @@ def test_scan_roots_matches_a_flac_to_a_gp(tmp_path):
     assert rows[0]["album"] == "Album"
     assert rows[0]["match"] == "yes"
     assert rows[0]["gp"] == str(gp)
+
+
+def test_scan_roots_numbered_gp_beats_songsterr_for_the_album_track(tmp_path):
+    flac_root = tmp_path / "corpus"
+    album = flac_root / "Album"
+    (album / "tracks").mkdir(parents=True)
+    (album / "tracks" / "02 Singularity.flac").write_bytes(b"x")
+    (album / "tracks" / "17 Singularity (Demo).flac").write_bytes(b"x")
+
+    gp_root = tmp_path / "gp"
+    (gp_root / "album").mkdir(parents=True)
+    (gp_root / "album" / "02 Singularity.gp5").write_bytes(b"x")
+    (gp_root / "Singularity-s83278.gp").write_bytes(b"x")
+
+    rows = {r["track"]: r for r in cat.scan_roots(flac_root, gp_root)}
+
+    assert Path(rows["02 Singularity"]["gp"]).name == "02 Singularity.gp5"
+    assert Path(rows["17 Singularity (Demo)"]["gp"]).name == "Singularity-s83278.gp"
 
 
 def test_scan_roots_excludes_disc_images(tmp_path):

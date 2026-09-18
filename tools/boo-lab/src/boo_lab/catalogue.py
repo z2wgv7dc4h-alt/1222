@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import csv
 import hashlib
+import re
 from pathlib import Path
 
 FIELDS = [
@@ -180,3 +181,81 @@ def filter_album(rows: list[dict], album: str | None) -> list[dict]:
         return rows
     key = album.casefold()
     return [r for r in rows if (r.get("album") or "").casefold() == key]
+
+
+# --- resolve_row -------------------------------------------------------------
+#
+# Humans type album/track the way the studio shows them ("A Higher Place",
+# "07 - Exist"); `map.csv` often stores the folder name ("2009 - A Higher
+# Place"). Exact `==` therefore reported "no-gp" for tabs that exist. This is
+# the single catalogue-side resolver; never a second map.
+
+_YEAR_PREFIX = re.compile(r"^\d{4}\s*[-._]?\s*")
+_TRACK_NUM_PREFIX = re.compile(r"^\d{1,3}[\s._-]+")
+
+
+def _album_core(s: str | None) -> str:
+    """Album key with a leading `YYYY` / `YYYY - ` / `YYYY.` prefix removed."""
+    return _key(_YEAR_PREFIX.sub("", (s or "").strip()))
+
+
+def _track_key(s: str | None) -> str:
+    """Track key so `07 - Exist` == `07 Exist` == `Exist`."""
+    return _key(_TRACK_NUM_PREFIX.sub("", (s or "").strip()))
+
+
+def _album_tightness(row_album: str | None, query: str, query_cf: str) -> int:
+    raw = (row_album or "").strip()
+    if raw == query:
+        return 3
+    if raw.casefold() == query_cf:
+        return 2
+    if _YEAR_PREFIX.sub("", raw).casefold() == _YEAR_PREFIX.sub("", query).casefold():
+        return 1
+    return 0
+
+
+def resolve_row(rows: list[dict], album: str | None, track: str | None) -> dict | None:
+    """The one map-row resolver: exact → casefold → year-prefix album +
+    normalized track. Returns the real row (or `None`), never a fabricated one.
+
+    A different album title that merely shares a year never matches, because
+    the album core key must be equal. When several rows reduce to the same
+    track (e.g. `07 - Exist` vs `05 - Exist`), the one whose raw track still
+    carries the queried digit token wins; otherwise exact/casefold album wins;
+    ties keep map order."""
+    if not album or not track:
+        return None
+    query = album.strip()
+    track_q = track.strip()
+
+    # (a) exact
+    for r in rows:
+        if (r.get("album") or "") == query and (r.get("track") or "") == track_q:
+            return r
+    # (b) casefold
+    query_cf = query.casefold()
+    track_cf = track_q.casefold()
+    for r in rows:
+        if ((r.get("album") or "").casefold() == query_cf
+                and (r.get("track") or "").casefold() == track_cf):
+            return r
+    # (c) + (d) album core key AND normalized track key
+    a_core = _album_core(query)
+    t_key = _track_key(track_q)
+    if not a_core or not t_key:
+        return None
+    cands = [r for r in rows
+             if _album_core(r.get("album")) == a_core
+             and _track_key(r.get("track")) == t_key]
+    if not cands:
+        return None
+    # Prefer a row whose raw track still carries the queried number.
+    q_digits = re.findall(r"\d+", track_q)
+    if q_digits:
+        digit_hits = [r for r in cands if q_digits[0] in (r.get("track") or "")]
+        if digit_hits:
+            cands = digit_hits
+    cands.sort(key=lambda r: _album_tightness(r.get("album"), query, query_cf),
+               reverse=True)  # stable: ties keep original order
+    return cands[0]

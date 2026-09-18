@@ -203,6 +203,65 @@ def test_sync_missing_gp_is_false(tmp_path):
     assert len(rows) == 1 and rows[0]["track"] == "T"
 
 
+def _map_lab(tmp_path, rows):
+    lab = tmp_path / "lab"
+    (lab / "data").mkdir(parents=True, exist_ok=True)
+    save_map(lab / "data" / "map.csv", rows)
+    return lab
+
+
+def test_sync_resolves_studio_names(tmp_path):
+    gp = tmp_path / "07 Exist.gp5"
+    gp.write_bytes(b"x")
+    flac = tmp_path / "07 - Exist.flac"
+    flac.write_bytes(b"x")
+    lab = _map_lab(tmp_path, [{
+        "album": "2009 - A Higher Place", "track": "07 - Exist",
+        "flac": str(flac), "gp": str(gp),
+    }])
+
+    rec = sync.sync_track(lab, "A Higher Place", "07 - Exist")
+
+    assert rec["note"] == "unreadable-gp"  # resolved the row and read the gp
+    assert rec["album"] == "2009 - A Higher Place"
+    assert rec["track"] == "07 - Exist"
+    assert rec["gp"] == str(gp)
+
+
+def test_sync_no_row_is_distinct_from_no_gp(tmp_path):
+    lab = _map_lab(tmp_path, [{
+        "album": "2009 - A Higher Place", "track": "07 - Exist",
+        "flac": "", "gp": "",
+    }])
+
+    no_gp = sync.sync_track(lab, "A Higher Place", "07 - Exist")
+    assert no_gp["note"] == "no-gp"
+    assert no_gp["album"] == "2009 - A Higher Place"
+
+    no_row = sync.sync_track(lab, "A Higher Place", "99 - Nope")
+    assert no_row["note"] == "no-row"
+
+
+def test_sync_fail_note_carries_durations(tmp_path, monkeypatch):
+    gp = tmp_path / "x.gp5"
+    gp.write_bytes(b"x")
+    flac = tmp_path / "x.flac"
+    flac.write_bytes(b"x")
+    lab = _lab(tmp_path, gp=gp, flac=flac)
+    monkeypatch.setattr(sync, "gp_onset_times", lambda p: [0.0])
+    monkeypatch.setattr(sync, "_evaluate_source", lambda src, g, o: {
+        "lag": 27.0, "score": 0.2, "prom": 0.0, "ratio": 1.0, "rlag": 27.0,
+        "rscore": 0.2, "clag": None, "cscore": None, "onset_ok": False,
+        "chroma_ok": False, "rate_ok": False, "onset_leadin": False})
+    monkeypatch.setattr(sync, "_tab_play_seconds", lambda p: 100.0)
+    monkeypatch.setattr(sync, "_audio_seconds", lambda p: 97.3)
+
+    rec = sync.sync_track(lab, "A", "T")
+
+    assert rec["sync_ok"] is False  # a 27s lag stays a fail
+    assert "tab_play=100.0s flac=97.3s dly=27.00s" in rec["note"]
+
+
 def test_sync_unreadable_gp_is_false(tmp_path):
     gp = tmp_path / "bad.gp5"
     gp.write_bytes(b"not a guitar pro file")

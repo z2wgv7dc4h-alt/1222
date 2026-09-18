@@ -274,6 +274,13 @@ def build_figures(lab_root, rows, *, album=None, track=None) -> dict:
     lab_root = Path(lab_root)
     out = lab_root / "data" / "figures.jsonl"
     out.parent.mkdir(parents=True, exist_ok=True)
+    if album and track:
+        from .catalogue import resolve_row
+
+        target = resolve_row(rows, album, track)
+        if target is not None:
+            album = target.get("album") or album
+            track = target.get("track") or track
     akey = album.casefold() if album else None
     tkey = track.casefold() if track else None
 

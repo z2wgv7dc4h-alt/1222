@@ -81,6 +81,47 @@ def test_filter_album_is_case_insensitive_and_none_passes_all():
     assert cat.filter_album(rows, "missing") == []
 
 
+# --- resolve_row (studio names vs year-prefixed map folders) -----------------
+
+_HP = {"album": "2009 - A Higher Place", "track": "07 - Exist",
+       "gp": r"...\gp5\A Higher Place\07 Exist.gp5"}
+_DISCO = {"album": "2008 - The Discovery", "track": "02 - Exist"}
+
+
+def test_resolve_row_short_album_year_prefix():
+    rows = [_HP, _DISCO]
+    got = cat.resolve_row(rows, "A Higher Place", "07 - Exist")
+    assert got is _HP and got["album"] == "2009 - A Higher Place"
+    assert got["track"] == "07 - Exist"
+
+
+def test_resolve_row_casefold_and_track_number_punctuation():
+    rows = [_HP, _DISCO]
+    assert cat.resolve_row(rows, "a higher place", "exist") is _HP
+    assert cat.resolve_row(rows, "2009 - A Higher Place", "07 Exist") is _HP
+
+
+def test_resolve_row_does_not_steal_another_album_by_year():
+    rows = [_HP, _DISCO]
+    got = cat.resolve_row(rows, "The Discovery", "Exist")
+    assert got is _DISCO
+    assert cat.resolve_row(rows, "A Higher Place", "Exist") is _HP
+
+
+def test_resolve_row_prefers_numbered_track_when_ambiguous():
+    rows = [
+        {"album": "A Higher Place", "track": "05 - Exist"},
+        {"album": "A Higher Place", "track": "07 - Exist"},
+    ]
+    assert cat.resolve_row(rows, "A Higher Place", "07 Exist")["track"] == "07 - Exist"
+
+
+def test_resolve_row_unknown_track_is_none():
+    assert cat.resolve_row([_HP], "A Higher Place", "no such song") is None
+    assert cat.resolve_row([], "A Higher Place", "Exist") is None
+    assert cat.resolve_row([_HP], None, "Exist") is None
+
+
 # --- load_map / save_map -----------------------------------------------------
 
 

@@ -375,6 +375,44 @@ def _write_sync(lab_root: Path, rec: dict) -> None:
     write_jsonl_atomic(path, kept + [rec], ensure_ascii=False)
 
 
+def _tab_play_seconds(gp_path: Path) -> float | None:
+    """Real playback length of the tab (repeats expanded) via extract's own
+    `_playback_duration`. `None` when the GP cannot be parsed -- never a second
+    tempo walker."""
+    try:
+        import guitarpro
+
+        from .extract import _playback_duration, _rhythm_track
+
+        song = guitarpro.parse(str(gp_path))
+        track = _rhythm_track(song) or (song.tracks[0] if song.tracks else None)
+        if track is None:
+            return None
+        bpm = float(getattr(getattr(song, "tempo", None), "value", None) or 120.0)
+        return float(_playback_duration(track, bpm))
+    except Exception:
+        return None
+
+
+def _audio_seconds(flac_path: Path) -> float | None:
+    try:
+        import librosa
+
+        return float(librosa.get_duration(path=str(flac_path)))
+    except Exception:
+        return None
+
+
+def _duration_note(gp_path: Path, flac_path: Path, dly: float | None) -> str:
+    """One-line `tab_play=Xs flac=Ys dly=Zs` for a genuine failed sync (tab and
+    audio both exist). Empty when either length is unavailable."""
+    tab_s = _tab_play_seconds(gp_path)
+    flac_s = _audio_seconds(flac_path)
+    if tab_s is None or flac_s is None:
+        return ""
+    return "tab_play=%.1fs flac=%.1fs dly=%.2fs" % (tab_s, flac_s, dly or 0.0)
+
+
 def _evaluate_source(src: Path, gp: Path, onsets: list[float]) -> dict:
     """Run both witnesses (onset + chroma) on one audio source, at ratio=1 and
     at the best-fit clock rate. The rate is never a pass on its own: the
@@ -445,26 +483,37 @@ def sync_track(lab_root: Path, album: str | None, track: str | None) -> dict:
     `album` or `track` is missing (never the whole catalog)."""
     if not album or not track:
         raise ValueError("need both --album and --track (never the whole catalog)")
-    from .catalogue import load_map
+    from .catalogue import load_map, resolve_row
 
     lab_root = Path(lab_root)
-    rows = [
-        r for r in load_map(lab_root / "data" / "map.csv")
-        if (r.get("album") or "") == album and (r.get("track") or "") == track
-    ] if (lab_root / "data" / "map.csv").exists() else []
-    row = rows[0] if rows else {}
+    map_path = lab_root / "data" / "map.csv"
+    rows = load_map(map_path) if map_path.exists() else []
+    row = resolve_row(rows, album, track)
 
-    gp = Path(row.get("gp") or "")
-    flac = Path(row.get("flac") or "")
     rec = {
         "album": album, "track": track, "sync_ok": False, "lag_sec": None,
         "score": None, "clock_ratio": None, "chroma_lag": None,
-        "chroma_score": None, "offset_sec": None, "used_stem": "", "gp": row.get("gp") or "",
-        "flac": row.get("flac") or "", "flac_sha256": row.get("flac_sha256") or "",
-        "note": "",
+        "chroma_score": None, "offset_sec": None, "used_stem": "", "gp": "",
+        "flac": "", "flac_sha256": "", "note": "",
     }
 
-    if not (row.get("gp") and gp.exists()):
+    if row is None:
+        # Distinct from no-gp: the map itself has no such album/track.
+        rec["note"] = "no-row"
+        _write_sync(lab_root, rec)
+        return rec
+
+    # Report the resolved names so the CLI shows "2009 - A Higher Place" even
+    # when the human typed "A Higher Place"; fill the real paths on the row.
+    rec["album"] = row.get("album") or album
+    rec["track"] = row.get("track") or track
+    rec["gp"] = row.get("gp") or ""
+    rec["flac"] = row.get("flac") or ""
+    rec["flac_sha256"] = row.get("flac_sha256") or ""
+
+    gp = Path(rec["gp"])
+    flac = Path(rec["flac"])
+    if not (rec["gp"] and gp.exists()):
         rec["note"] = "no-gp"
         _write_sync(lab_root, rec)
         return rec
@@ -521,5 +570,9 @@ def sync_track(lab_root: Path, album: str | None, track: str | None) -> dict:
         rec["note"] = "lag %.3fs > %.3fs" % (abs(ev["lag"]), LAG_TOLERANCE)
     else:
         rec["note"] = "low score %.3f < %.3f" % (ev["score"], SCORE_THRESHOLD)
+    if kind == "fail":
+        extra = _duration_note(gp, flac, rec["lag_sec"])
+        if extra:
+            rec["note"] = rec["note"] + " · " + extra
     _write_sync(lab_root, rec)
     return rec

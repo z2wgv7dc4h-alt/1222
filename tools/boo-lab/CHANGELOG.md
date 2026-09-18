@@ -2,6 +2,10 @@
 
 ## 2026-09-18
 
+### Album/track resolve the way the studio names them
+
+- New `catalogue.resolve_row`: exact → casefold → leading `YYYY` / `YYYY - ` album prefix + normalized track key (so `07 - Exist` == `07 Exist` == `Exist`; a different album that merely shares a year never matches; the numbered track wins when several reduce to the same title). Wired into `sync_track`, `hear`, `figures` (`build_figures` + CLI full-map reload), and the `agree`/`compare` CLI. A map miss is now `no-row`, distinct from a matched row whose gp is missing (`no-gp`, which fills the real gp/flac strings so the human sees the path); the returned record carries the resolved album/track. A genuinely failed `sync` note appends `tab_play=Xs flac=Ys dly=Zs`, reusing extract's `_playback_duration` (no second tempo walker). No sync math, thresholds, or keepers changed. Lab tests: **231 passed**.
+
 ### Clock rate-fit wired into sync_ok; untrusted figure times stay bars-only
 
 - **Rate drift is a first-class outcome.** `sync.py` already computed `best_clock_fit` but `decide()` only used the ratio=1 lag; now the rate-adjusted onset lag must pass `decide` (still `|lag| < 0.35 s`, score ≥ 0.15 — no threshold loosened) and the chroma witness must agree at that same ratio within 0.25 s (a lone onset rate-fit may stand when no chroma exists). `clock_ratio` is always recorded (1.0 when no stretch) and a pass notes `ok (rate 1.027)`. The ~2.7% uniform-drift class passes; 20% still fails; a searched ratio with a bad resampled lag is not a pass.

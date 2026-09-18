@@ -247,13 +247,21 @@ album+track so “Rebirth” cannot stream “Machine.”
 
 `init-map` `scan` `hash` `studio`/`annotate` `ingest` `stems` `pack` `drums` `vocals` `holdout`
 `lyrics` `structure` `beats` `audit` `extract` `gate` `report` `export-bank` `agree` `compare`
-`hear` `sync` `export-jams` `doctor`
+`hear` `sync` `figures` `export-jams` `doctor`
 
 `structure` writes `data/drafts.jsonl` only (allin1 → `msa-draft`; SongFormer when
 `SONGFORMER_HOME`/import → `songformer-draft`). `agree` snapshots keeper pins (pass 1/2) and diffs
 them; `compare` scores drafts vs keepers per source; `export-jams` writes JAMS 0.3 figure/function
 layers; `beats` writes `beat_this`/allin1 beat grids; `hear` flips `heard` on one song's keepers.
 None of them writes `sections.jsonl` except the studio Save.
+
+Album/track arguments resolve the way the studio names them: `catalogue.resolve_row` ignores a
+leading `YYYY` / `YYYY - ` album prefix and track-number punctuation, so
+`--album "A Higher Place" --track "07 - Exist"` hits the map row `2009 - A Higher Place` / `07 - Exist`
+(exact → casefold → core-key; a different album sharing only a year never matches). `sync` / `hear` /
+`figures` / `agree` / `compare` use it. A map miss is `no-row`, distinct from a matched row whose gp
+is missing (`no-gp`, which still prints the real path); a genuine failed `sync` appends
+`tab_play=Xs flac=Ys dly=Zs` to its note.
 
 Optional interns: `pip install -e ".[intern]"` (allin1, beat-this, natten, jams, mir_eval, madmom);
 `.[pitch]` torchcrepe; `.[align]` whisperx. Never default dependencies. Pins: `constraints.txt`.

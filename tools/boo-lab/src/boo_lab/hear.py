@@ -51,9 +51,20 @@ def mark_heard(lab_root: Path, album: str | None, track: str | None) -> dict:
         raise ValueError(
             "sections.jsonl has malformed line(s) %s; fix them before `hear`" % malformed
         )
+
+    # Resolve the typed names against map.csv first (year-prefixed album
+    # folders, "07 - Exist" vs "07 Exist"); fall back to the typed strings when
+    # there is no map (a sections-only checkout still works).
+    from .catalogue import load_map, resolve_row
+
+    map_path = Path(lab_root) / "data" / "map.csv"
+    resolved = resolve_row(load_map(map_path), album, track) if map_path.exists() else None
+    r_album = (resolved or {}).get("album") or album
+    r_track = (resolved or {}).get("track") or track
+
     flipped = 0
     for rec in rows:
-        if (rec.get("album") or "") != album or (rec.get("track") or "") != track:
+        if (rec.get("album") or "") != r_album or (rec.get("track") or "") != r_track:
             continue
         if is_keeper(rec.get("source")) and not rec.get("heard"):
             rec["heard"] = True
@@ -61,4 +72,4 @@ def mark_heard(lab_root: Path, album: str | None, track: str | None) -> dict:
 
     if path.exists() or rows:
         write_jsonl_atomic(path, rows)  # atomic: a failure leaves the file intact
-    return {"album": album, "track": track, "flipped": flipped, "rows": len(rows)}
+    return {"album": r_album, "track": r_track, "flipped": flipped, "rows": len(rows)}

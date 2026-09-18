@@ -18,6 +18,20 @@ def data_dir() -> Path:
     return root() / "data"
 
 
+def _resolved_names(album: str | None, track: str | None) -> tuple[str | None, str | None]:
+    """Resolve studio-style album/track against `map.csv` (year-prefixed album
+    folders, "07 - Exist" vs "07 Exist"). Passes the typed pair through when
+    incomplete or unmatched. Never a second map."""
+    from .catalogue import load_map, resolve_row
+
+    map_path = root() / "data" / "map.csv"
+    if album and track and map_path.exists():
+        row = resolve_row(load_map(map_path), album, track)
+        if row is not None:
+            return row.get("album") or album, row.get("track") or track
+    return album, track
+
+
 def main(argv: list[str] | None = None) -> int:
     # Real album/track names in this corpus contain non-cp1252 characters
     # (e.g. "∆"); never let a console-encoding error abort a command.
@@ -188,6 +202,7 @@ def main(argv: list[str] | None = None) -> int:
         if not (album and track):
             print("need --album and --track")
             return 1
+        album, track = _resolved_names(album, track)
         if args.write:
             rec = snapshot(root(), album, track)
             print("agree pass %d written for %s / %s (%d boxes)"
@@ -215,7 +230,8 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "compare":
         from .compare import compare, format_report, write_report
 
-        report = compare(root(), getattr(args, "album", None), getattr(args, "track", None))
+        album, track = _resolved_names(getattr(args, "album", None), getattr(args, "track", None))
+        report = compare(root(), album, track)
         print(format_report(report))
         write_report(report, data_dir() / "compare.json")
         print("wrote", data_dir() / "compare.json")
@@ -252,7 +268,11 @@ def main(argv: list[str] | None = None) -> int:
         if (album is None) != (track is None):
             print("need --album and --track together")
             return 1
-        report = build_figures(root(), rows, album=album, track=track)
+        # `rows` was already filtered by the exact album name; reload the full
+        # map so a year-prefixed folder / track punctuation can still resolve.
+        full = ([resolve(r, flac_root, gp_root) for r in load_map(map_path)]
+                if map_path.exists() else rows)
+        report = build_figures(root(), full, album=album, track=track)
         print("figures: %d song(s) processed, %d repeating cluster(s) -> %s"
               % (report["songs"], report["clusters"], report["out"]))
         return 0

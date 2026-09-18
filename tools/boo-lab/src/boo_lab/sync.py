@@ -13,6 +13,8 @@ dependencies (numpy + librosa only).
 from __future__ import annotations
 
 import json
+import os
+import re
 from pathlib import Path
 
 LAG_TOLERANCE = 0.35  # seconds -- sync_ok requires |lag| below this
@@ -23,6 +25,41 @@ LEADIN_MAX = 5.0  # an "aligned with offset" pass must be within this many secon
 PROMINENCE_MIN = 0.05  # ... and the correlation peak must stand out this much
 CLOCK_SPAN = 0.08  # best_clock_fit search half-width (a searched rate only passes inside this)
 CO_WITNESS_SECONDS = 0.25  # two witnesses "agree" within this; never a pass threshold on its own
+
+
+GP7_EXTS = (".gp", ".gpx")
+
+
+def _norm_stem(name: str) -> str:
+    """A GP stem without its track-number prefix or punctuation, so
+    "07 - Exist" and "07 Exist" compare equal."""
+    s = re.sub(r"^\d+[\s._-]+", "", name or "")
+    return re.sub(r"[^a-z0-9]", "", s.lower())
+
+
+def _prefer_gpif_path(gp_path: Path) -> Path:
+    """Sync-time preference: a `.gp5` clock is replaced by a matching
+    `.gp`/`.gpx` when one exists beside it or under `BOO_GP_ROOT` (same
+    normalized stem). Never deletes or rewrites map.csv; returns the input
+    unchanged when there is no GP7 sibling."""
+    p = Path(gp_path)
+    if p.suffix.lower() != ".gp5":
+        return p
+    key = _norm_stem(p.stem)
+    if not key:
+        return p
+    cands = [c for c in p.parent.glob("*") if c.suffix.lower() in GP7_EXTS]
+    root = os.environ.get("BOO_GP_ROOT")
+    if root:
+        rootp = Path(root)
+        gp7 = rootp / "gp7"
+        search = gp7 if gp7.is_dir() else rootp
+        if search.is_dir():
+            cands += [c for c in search.rglob("*") if c.suffix.lower() in GP7_EXTS]
+    for cand in sorted(cands):
+        if _norm_stem(cand.stem) == key:
+            return cand
+    return p
 
 
 def _read_jsonl(path: Path) -> list[dict]:
@@ -93,15 +130,22 @@ def _tab_notes(gp_path: Path):
     Faithful where it matters: `song.tempo` (per-measure `header.tempo` only
     when set), repeat/unroll, dotted beats; onset time and the measure advance
     share the same beat-duration arithmetic so the clock stays self-consistent.
+
+    A `.gp`/`.gpx` is read via the parsed GPIF score FIRST (never a conversion);
+    `.gp5` (and any other suffix) still goes through `guitarpro.parse`.
     """
+    p = Path(gp_path)
+    if p.suffix.lower() in GP7_EXTS:
+        events = _gpif_events(p)
+        if events is not None:
+            return events
     try:
         import guitarpro
 
         song = guitarpro.parse(str(gp_path))
     except Exception:
-        # A GP7 `.gp`/`.gpx` whose score.gpif parses may still clock the tab,
-        # via the parsed score only (never Guess invention).
-        return _gpif_events(gp_path)
+        # A last-resort GPIF read for a non-GP7 suffix; `None` otherwise.
+        return None if p.suffix.lower() in GP7_EXTS else _gpif_events(p)
     from .extract import _rhythm_track
 
     track = _rhythm_track(song) or (song.tracks[0] if song.tracks else None)
@@ -395,9 +439,17 @@ def _write_sync(lab_root: Path, rec: dict) -> None:
 
 
 def _tab_play_seconds(gp_path: Path) -> float | None:
-    """Real playback length of the tab (repeats expanded) via extract's own
-    `_playback_duration`. `None` when the GP cannot be parsed -- never a second
-    tempo walker."""
+    """Real playback length of the tab (repeats expanded). A `.gp`/`.gpx` uses
+    `gpif.duration_sec`; otherwise extract's `_playback_duration`. `None` when
+    the GP cannot be parsed -- never a second tempo walker."""
+    p = Path(gp_path)
+    if p.suffix.lower() in GP7_EXTS:
+        try:
+            from .gpif import duration_sec, load_score
+
+            return float(duration_sec(load_score(p)))
+        except Exception:
+            return None
     try:
         import guitarpro
 
@@ -410,14 +462,6 @@ def _tab_play_seconds(gp_path: Path) -> float | None:
         bpm = float(getattr(getattr(song, "tempo", None), "value", None) or 120.0)
         return float(_playback_duration(track, bpm))
     except Exception:
-        p = Path(gp_path)
-        if p.suffix.lower() in (".gp", ".gpx"):
-            try:
-                from .gpif import duration_sec, load_score
-
-                return float(duration_sec(load_score(p)))
-            except Exception:
-                return None
         return None
 
 
@@ -538,7 +582,11 @@ def sync_track(lab_root: Path, album: str | None, track: str | None) -> dict:
     rec["flac"] = row.get("flac") or ""
     rec["flac_sha256"] = row.get("flac_sha256") or ""
 
-    gp = Path(rec["gp"])
+    if rec["gp"]:
+        gp = _prefer_gpif_path(Path(rec["gp"]))  # .gp5 -> matching .gp/.gpx
+        rec["gp"] = str(gp)                      # gp field = path actually clocked
+    else:
+        gp = Path(rec["gp"])
     flac = Path(rec["flac"])
     if not (rec["gp"] and gp.exists()):
         rec["note"] = "no-gp"
@@ -601,5 +649,7 @@ def sync_track(lab_root: Path, album: str | None, track: str | None) -> dict:
         extra = _duration_note(gp, flac, rec["lag_sec"])
         if extra:
             rec["note"] = rec["note"] + " · " + extra
+    if gp.suffix.lower() in GP7_EXTS:
+        rec["note"] = rec["note"] + " · gpif"
     _write_sync(lab_root, rec)
     return rec

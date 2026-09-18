@@ -260,17 +260,17 @@ Voice** in a Bar, with string/fret/duration/`voice`, `midi = tuning_midi[string-
 seconds first so `sync`'s GPIF clock keeps working). CLI `gpif` adds
 `n_with_midi`. No `sections.jsonl`; fixture `tiny.gp` is hand-made.
 
-## GPIF to GP5 + sync clock from GP7
+## Sync clocks GP7 (GPIF) first
 
-`gpif_to_gp5(score, out)` builds a real `guitarpro.Song` from a `GpifScore` and
-writes GP5 (`version=(5,1,0)`), returning `(Path, drops)` — a skipped drum track
-or a note on a missing string. Repeats go out as `isRepeatOpen`/`repeatClose`;
-section text becomes a `Marker`. `boo-lab gpif --path F --write-gp5 DIR` writes
-`<stem>.from-gpif.gp5`; `gp-export` converts GPIF-parsable `.gp/.gpx` into
-`work/gp5-from-gpif/` and logs `converted=true`+`drops` (no TuxGuitar). `sync`
-clocks a `.gp/.gpx` pyguitarpro rejects from parsed GPIF onsets
-(`gpif.note_events`); if GPIF also fails it stays `unreadable-gp`, `sync_ok` is
-never set from a failed parse, `clock_ratio` unchanged. No `sections.jsonl`.
+When a row's `gp` is a `.gp5`, `sync_track` looks for a matching `.gp`/`.gpx`
+(same normalized stem, ignoring `07 -` vs `07 `) beside it or under
+`BOO_GP_ROOT/gp7`, clocks that path, and records it in the sync dict `gp`
+(the note gains `· gpif`). `_tab_notes` / `_tab_play_seconds` read a
+`.gp`/`.gpx` via `gpif.load_score` + `note_events` / `duration_sec` FIRST
+(never `guitarpro.parse` first, never a conversion); `.gp5` still goes through
+`guitarpro.parse`. LAG 0.35 / SCORE 0.15 and the rate path are unchanged; no
+GP5 files are deleted and `map.csv` is not rewritten. `gpif_to_gp5` stays
+unused. No `sections.jsonl`.
 
 ## Learn (intern rank)
 

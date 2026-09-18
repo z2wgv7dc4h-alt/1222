@@ -2,6 +2,10 @@
 
 ## 2026-09-18
 
+### Sync clocks GP7 via GPIF; do not prefer sibling gp5
+
+- `sync_track` now prefers a GP7 score over a `.gp5`: given a row `gp` ending `.gp5`, `_prefer_gpif_path` finds a matching `.gp`/`.gpx` (same normalized stem, ignoring `07 -` vs `07 `) beside it or under `BOO_GP_ROOT/gp7`, clocks that path, and records it in the sync dict `gp` (note gains `· gpif`). `sync._tab_notes` / `_tab_play_seconds` read a `.gp`/`.gpx` via `gpif.load_score` + `note_events`/`duration_sec` FIRST instead of `guitarpro.parse`; `.gp5` and every other suffix still use guitarpro. `LAG_TOLERANCE`/`SCORE_THRESHOLD` and the clock-rate path are untouched, no GP5 files are deleted, `map.csv` is not rewritten, and `gpif_to_gp5` stays unused. Tests: sibling-`.gp` preference, GPIF-first routing, lone `.gp5` still guitarpro; 4 new, 322 pass.
+
 ### Expand GPIF notes (midi, voices, articulations, tempo map)
 
 - `gpif.GpifNote` gains `voice`, `dead`, `accent`, `hammer`, `slide`; every Voice in a Bar is parsed (both schemas) and each note carries its voice index; `midi = tuning_midi[string-1] + fret` when the index exists, else `None` (never invented), replacing the XML `<Midi>` read. `note_events` now yields `(seconds, midi, duration_sec, palm_mute)` — seconds stays element `[0]`, so `sync`'s GPIF onset clock keeps grading GP7s (the only `sync.py` change is `gp_onset_times` reading `e[0]`; the GPIF fallback stays and no new sync logic was added). `tempo_map` is now `(unexpanded beat, bpm)` and `duration_sec` uses it (else per-bar/score tempo). CLI `gpif` prints `n_with_midi`. Fixture `tests/fixtures/tiny.gp` extended with a second voice; tests updated. No `sections.jsonl`, no `guess.py`/`figures.py`/`extract.py` edits, `gpif_to_gp5` untouched/unused. 318 pass.

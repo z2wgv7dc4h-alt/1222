@@ -3,6 +3,7 @@ envelopes and tiny files under tmp_path; no real audio/torch."""
 from __future__ import annotations
 
 import json
+import shutil
 import sys
 from pathlib import Path
 
@@ -10,6 +11,8 @@ import pytest
 
 from boo_lab import extract, sync
 from boo_lab.catalogue import save_map
+
+FIX_GPIF = Path(__file__).parent / "fixtures" / "tiny.gp"
 
 
 def _env(times, n=400, hop=0.01):
@@ -182,6 +185,59 @@ def test_gp_onset_times_uses_song_tempo(monkeypatch):
     assert len(onsets) == 8
     assert onsets[0] == 0.0
     assert onsets[4] == pytest.approx(4 * beat, abs=1e-4)
+
+
+def test_prefer_gpif_path_finds_a_sibling(tmp_path, monkeypatch):
+    monkeypatch.delenv("BOO_GP_ROOT", raising=False)
+    gp5 = tmp_path / "07 Test.gp5"
+    gp5.write_bytes(b"x")
+    gp = tmp_path / "07 - Test.gp"          # same stem, "07 -" vs "07 "
+    shutil.copy(FIX_GPIF, gp)
+
+    chosen = sync._prefer_gpif_path(gp5)
+
+    assert chosen == gp and chosen.name.endswith(".gp")
+    onsets = sync.gp_onset_times(chosen)     # the GPIF clock is now used
+    assert onsets is not None and len(onsets) == 10
+
+
+def test_prefer_gpif_path_lone_gp5_is_unchanged(tmp_path, monkeypatch):
+    monkeypatch.delenv("BOO_GP_ROOT", raising=False)
+    gp5 = tmp_path / "Lone.gp5"
+    gp5.write_bytes(b"x")
+
+    assert sync._prefer_gpif_path(gp5) == gp5
+
+
+def test_gp_path_clocks_gpif_first(tmp_path, monkeypatch):
+    gp = tmp_path / "T.gp"
+    shutil.copy(FIX_GPIF, gp)
+    import guitarpro
+
+    monkeypatch.setattr(guitarpro, "parse",
+                        lambda p: (_ for _ in ()).throw(AssertionError("guitarpro tried first")))
+
+    events = sync._tab_notes(gp)
+
+    assert events and len(events) == 10 and len(events[0]) == 4
+    assert sync._tab_play_seconds(gp) == pytest.approx(8.0)
+
+
+def test_lone_gp5_goes_through_guitarpro(tmp_path, monkeypatch):
+    gp5 = tmp_path / "Lone.gp5"
+    gp5.write_bytes(b"x")
+    import guitarpro
+
+    calls = []
+
+    def _boom(p):
+        calls.append(p)
+        raise RuntimeError("parse")
+
+    monkeypatch.setattr(guitarpro, "parse", _boom)
+
+    assert sync._tab_notes(gp5) is None      # not GPIF-first
+    assert calls                             # guitarpro.parse was attempted
 
 
 def _lab(tmp_path, gp=None, flac=None):

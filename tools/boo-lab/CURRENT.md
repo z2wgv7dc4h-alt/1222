@@ -299,6 +299,7 @@ git push
 `POST /api/ingest` multipart `band` + `files`  
 `GET|POST|PUT /api/lyrics/{id}`  
 `POST /api/pack/{id}`  
+`POST /api/jams/{id}` keepers → `work/jams/<album>/<track>.jams` (409 when no keepers / VAL)  
 `POST /api/git/push`
 
 Track id is **map row index after album sort**; audio/cover/tab/drums/stem/lyrics/pack resolve by

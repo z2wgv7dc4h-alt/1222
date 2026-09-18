@@ -5,6 +5,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from boo_lab import jams_export
 from boo_lab.holdout import write_holdout
 
@@ -69,3 +71,59 @@ def test_export_empty_when_no_keepers(tmp_path):
     out = tmp_path / "out"
     report = jams_export.export_jams(lab, out)
     assert report["written"] == 0 and report["skipped_val"] == 0
+
+
+def test_export_jam_one_writes_per_album_path(tmp_path):
+    lab = _lab(tmp_path, [_box("riff", 0, 4)])
+
+    res = jams_export.export_jam_one(lab, "A", "T", out_dir=tmp_path / "work" / "jams")
+
+    assert res["written"] == 1
+    dest = Path(res["path"])
+    assert dest.name == "T.jams" and dest.parent.name == "A"
+
+
+def test_export_jam_one_refuses_no_keepers(tmp_path):
+    lab = _lab(tmp_path, [_box("riff", 0, 4, source="guess", heard=False)])
+
+    res = jams_export.export_jam_one(lab, "A", "T")
+
+    assert res["written"] == 0 and "no keepers" in res["reason"]
+
+
+def test_export_jam_one_refuses_val(tmp_path):
+    lab = _lab(tmp_path, [_box("riff", 0, 4)])
+    write_holdout(lab, {("A", "T")})
+
+    res = jams_export.export_jam_one(lab, "A", "T")
+
+    assert res["written"] == 0 and "VAL" in res["reason"]
+
+
+def test_api_jams_writes_for_keepers_and_refuses_empty(tmp_path):
+    pytest.importorskip("fastapi")
+    pytest.importorskip("httpx")
+    from fastapi.testclient import TestClient
+
+    from boo_lab import annotator as ann
+    from boo_lab.catalogue import save_map
+
+    lab = tmp_path / "lab"
+    (lab / "data").mkdir(parents=True)
+    flac = tmp_path / "T.flac"
+    flac.write_bytes(b"x")
+    save_map(lab / "data" / "map.csv", [
+        {"album": "A", "track": "T", "flac": str(flac), "gp": "", "match": "unknown"},
+        {"album": "A", "track": "U", "flac": str(flac), "gp": "", "match": "unknown"},
+    ])
+    (lab / "data" / "sections.jsonl").write_text(
+        json.dumps({"album": "A", "track": "T", "role": "riff", "source": "human",
+                    "heard": True, "start": 0.0, "end": 4.0}) + "\n", encoding="utf-8")
+    write_holdout(lab, {("A", "U")})  # keep T train, U val
+
+    client = TestClient(ann.create_app(lab, None, None))
+    ok = client.post("/api/jams/0")
+    empty = client.post("/api/jams/1")
+
+    assert ok.status_code == 200 and Path(ok.json()["written"]).name == "T.jams"
+    assert empty.status_code == 409

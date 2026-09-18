@@ -69,6 +69,24 @@ def _safe(s: str) -> str:
     return re.sub(r"[^A-Za-z0-9._-]+", "_", s or "").strip("_") or "x"
 
 
+def export_jam_one(lab_root, album, track, out_dir=None) -> dict:
+    """One song's keeper JAMS to `work/jams/<album>/<track>.jams` (or
+    `out_dir`). Refuses -- never writes -- when the song has no keepers or is a
+    validation-split song. Never touches `sections.jsonl`."""
+    lab_root = Path(lab_root)
+    boxes = [b for (a, t), bs in keeper_boxes_by_song(lab_root).items()
+             if a == (album or "") and t == (track or "") for b in bs]
+    if not boxes:
+        return {"written": 0, "reason": "no keepers to export"}
+    if split_for(album, track, load_holdout(lab_root)) == "val":
+        return {"written": 0, "reason": "VAL song - JAMS export is skipped"}
+    dest_dir = Path(out_dir) if out_dir else lab_root / "work" / "jams"
+    dest = dest_dir / _safe(album) / (_safe(track) + ".jams")
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    dest.write_text(json.dumps(build_jam(album, track, boxes), indent=2), encoding="utf-8")
+    return {"written": 1, "path": str(dest)}
+
+
 def export_jams(lab_root: Path, out_dir: Path, rows: list[dict] | None = None) -> dict:
     lab_root = Path(lab_root)
     out_dir = Path(out_dir)

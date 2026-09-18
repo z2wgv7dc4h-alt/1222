@@ -2,6 +2,10 @@
 
 ## 2026-09-18
 
+### Export keepers to JAMS from the studio
+
+- `jams_export.export_jam_one` writes one song's keeper boxes to `work/jams/<album>/<track>.jams` (JAMS 0.3, `segment_lab_figure` + `segment_lab_function`), reusing `build_jam`; it refuses with "no keepers to export" or a VAL reason and never touches `sections.jsonl`. New `POST /api/jams/{id}` exposes it (409 on refusal) and the Lab menu gains a **JAMS** button that reports the written path. USER.md Part B gets a JAMS note; CURRENT lists the endpoint.
+
 ### STATUS counts from disk
 
 - New `boo-lab status` (`src/boo_lab/status.py`): rewrites only the marker-delimited `<!-- status:counts -->` block in `STATUS.md` with counts read from disk — keeper rows/tracks via `schema.load_section_rows`, draft rows + sources, `sync_ok`/total, and `map.csv` rows (reusing `data/corpus_health.json` when it is at least as new as the CSV instead of a second walker). The test-count line and all prose paragraphs are left untouched; it never runs pytest. STATUS.md gains the block; README/CURRENT list the command.

@@ -261,6 +261,7 @@
             <button type="button" id="btnPack">Pack</button>
             <label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;white-space:nowrap" title="Snap box edges to the nearest downbeat (run `boo-lab beats` first)"><input type="checkbox" id="snapBeat" checked> Snap beats</label>
             <button type="button" id="btnDump">JSON</button>
+            <button type="button" id="btnJams" title="Write this song's keepers as one JAMS 0.3 file under work/jams/">JAMS</button>
             <button type="button" id="btnNext">Next GP</button>
           </div>
         </details>
@@ -1180,6 +1181,15 @@ document.getElementById("btnEst").onclick=estimate;
 document.getElementById("btnDrafts").onclick=loadDrafts;
 document.getElementById("btnSave").onclick=save;
 document.getElementById("btnDump").onclick=dump;
+document.getElementById("btnJams").onclick=()=>{
+  const t=tracks[trackId]; if(!t) return;
+  showErr("writing JAMS…");
+  fetch("/api/jams/"+t.id,{method:"POST"}).then(async r=>{
+    const x=await r.json().catch(()=>({}));
+    if(!r.ok) throw (x.detail||"jams failed");
+    showErr("JAMS → "+x.written);
+  }).catch(e=>showErr("jams: "+e, true));
+};
 document.getElementById("btnLyrics").onclick=()=>{
   const t=tracks[trackId]; if(!t) return;
   showErr("fetching lyrics…");

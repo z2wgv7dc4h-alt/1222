@@ -458,6 +458,21 @@ def create_app(lab_root: Path, flac_root: Path | None, gp_root: Path | None) -> 
             pass
         return {"drafts": out}
 
+    @app.post("/api/jams/{track_id}")
+    def api_jams(track_id: int):
+        """Write this song's keeper boxes as one JAMS 0.3 file (figure /
+        function layers) under `work/jams/<album>/<track>.jams`. Refuses when
+        there are no keepers, or the song is a validation (VAL) split song."""
+        row = _resolved(track_id)
+        if not row:
+            raise HTTPException(404)
+        from .jams_export import export_jam_one
+
+        res = export_jam_one(lab_root, row.get("album") or "", row.get("track") or "")
+        if not res.get("written"):
+            return JSONResponse({"detail": res.get("reason") or "no keepers"}, status_code=409)
+        return {"written": res["path"]}
+
     @app.post("/api/sections/{track_id}")
     async def api_save(track_id: int, request: Request):
         """Keeper-only save via `schema.stamp_box`. Writes `sections.jsonl`

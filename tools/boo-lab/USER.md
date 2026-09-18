@@ -167,6 +167,8 @@ Do not mark them. They do not vote for prefer=.
 ## Pack, stems, lyrics
 
 Pack cuts each saved box to disk (mix + stems) so you can listen later.
+**JAMS** (Lab → JAMS) writes your saved boxes as one `.jams` per song under `work/jams/` — an
+interchange format for MIR tools. Keepers only; refuses when there are no keepers or the song is VAL.
 Lyrics are optional timed lines. They are not structure gold.
 
 ## Commands

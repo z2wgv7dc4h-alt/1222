@@ -2,11 +2,12 @@
 
 Wiring only. Listen is not a pytest row.
 
-Active work is the lab: `tools/boo-lab` — see `tools/boo-lab/CURRENT.md` (**207 tests**).
+Active work is the lab: `tools/boo-lab` — see `tools/boo-lab/CURRENT.md` (**296 tests**).
 
 | Area | State | Note |
 |---|---|---|
-| boo-lab (`tools/boo-lab`) | ACTIVE | keepers/drafts, studio spectrogram, witnesses, agree/compare/JAMS; fail-closed keeper law + atomic writes |
+| boo-lab (`tools/boo-lab`) | ACTIVE | keepers/drafts, studio spectrogram, witnesses, agree/compare/JAMS; fail-closed keeper law + atomic writes; `boo-lab interns` runs the whole chain cache-first |
+| boo-lab interns pass | WIRED+TESTED | `interns [--album/--steps]` order `stems→beats→structure→drums→vocals→lyrics→sync→extract→figures→compare→learn→status`; resumable, failure-isolated, drafts only |
 | Studio beat grid + Snap | WIRED+TESTED | `data/beats.jsonl` ticks; Snap beats snaps a dragged edge to downbeat ≤250 ms else beat ≤120 ms |
 | Guess proposals | WIRED+TESTED | tab section letters/repeats (form/figure/unique); gates marker sections on `sync_ok`; snaps audio spans to the beat grid |
 | boo-lab interns (allin1/beat_this/torchcrepe) | GPU | `device.py` → CUDA when present; `boo-lab doctor` checks it; allin1 via `_natten_compat` (natten + py2 + numpy + collections) |

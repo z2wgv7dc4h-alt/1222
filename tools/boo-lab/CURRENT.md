@@ -25,7 +25,7 @@ Living docs are `USER.md` / `LAW.md` / `CURRENT.md` / `README.md` / `STATUS.md` 
 A **section lab** for metal FLACs (Born of Osiris first, other bands via ingest). Human output is `data/sections.jsonl` — **keeper pins only** (`source=human`/`guess-accepted`, `heard=true`), each with a figure/function `layer` and a `figure_id` — plus optional Pack clips under `work/` (gitignored). Machines write `data/drafts.jsonl` (MSA/SongFormer/Guess) and never keepers. It is not God Tier Metal, not a DAW, not a tab reader, not an auto-songwriter.
 
 GitHub: `https://github.com/z2wgv7dc4h-alt/1222` path `tools/boo-lab`.  
-Newest lab commit: `d22a5b8` (Guess snaps its audio spans to the beat grid); before it `90f041c` (studio beat/downbeat ticks + Snap; Guess gates markers on `sync_ok`), `5b1669a` (Guess carries the tab's section letters/repeats; simpler studio How), `9bac8fb` (Save transparency + one-step undo).
+Newest lab commit: `5df12ab` (one resumable `interns` pass; cache-first `structure`); before it `a21bc29` (`hash` fills `map.csv` `flac_sha256`), `21c54ea` (export keepers to JAMS from studio), `d22a5b8` (Guess snaps its audio spans to the beat grid), `90f041c` (studio beat/downbeat ticks + Snap; Guess gates markers on `sync_ok`), `5b1669a` (Guess carries the tab's section letters/repeats; simpler studio How), `9bac8fb` (Save transparency + one-step undo).
 
 ## Paths
 
@@ -391,6 +391,7 @@ Reading: **F3 high + role agreement low = the intern finds the edges but names t
 - **Every write is atomic** (`schema.write_jsonl_atomic`); a zero-row/failed run must never blank a prior file.
 - **Fail closed**: a missing/unknown source is never a keeper; an unmappable role is rejected at Save, never defaulted to `riff`.
 - **Labyrinth hard-fails on an uncovered bank role** (`RiffBankCoverageError`); tests encode that, not a silent Markov fallback.
+- **`interns` is a CLI pass, not a studio button.** It is a long, GPU-bound job; run `boo-lab interns [--album/--steps]` from cmd (resumable, so re-run is cheap). No SSE/progress endpoint, no blocking request.
 
 ## Bugs that already bit us (regressions to refuse)
 

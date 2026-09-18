@@ -122,6 +122,10 @@ torchcrepe / whisperx — melody / lyrics.
 
 None of these are required to mark by ear.
 
+You can run one intern at a time, or all of them in order with one command
+(`boo-lab interns`). That command skips work already done, so it is safe to
+run again. It only ever writes drafts.
+
 Do not press Guess on a song you already finished.
 Do not trust Guess when the list says tab off-clock.
 Load drafts pulls intern boxes for this song. Still unheard.
@@ -176,6 +180,8 @@ Lyrics are optional timed lines. They are not structure gold.
     python -m boo_lab.cli doctor
     python -m boo_lab.cli scan
     python -m boo_lab.cli studio
+    python -m boo_lab.cli interns
+    python -m boo_lab.cli interns --album ALBUM
     python -m boo_lab.cli learn
     python -m boo_lab.cli sync --album ALBUM --track TRACK
     python -m boo_lab.cli figures --album ALBUM --track TRACK

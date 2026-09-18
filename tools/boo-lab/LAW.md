@@ -8,6 +8,7 @@ Labelling lab. Not the generator.
 - `boo-lab structure` never writes `sections.jsonl` — drafts only.
 - Figure hashes (`figures.jsonl`, `source=figure-hash`) are drafts; they never write `sections.jsonl`.
 - Learn/rank may choose a draft intern; it still never labels (never writes `sections.jsonl`).
+- `boo-lab interns` only orchestrates the existing intern steps (structure/beats/drums/vocals/lyrics/sync/extract/figures/compare/learn/status); it inherits their law and never writes `sections.jsonl`.
 - Pin layer vs cell layer: human boxes + `figure_id` are the pin layer (a repeat may be one box or many boxes sharing an id). Extract/bank stores the shortest repeating cell inside that figure (2–4 bars). Pack slices the human box for listening. Do not dump a 40 s riff box into the bank as one fragment.
 - GP7 / Songsterr `.gp` is not a Guess marker clock. Prefer GP5 for markers. GP7 MAY feed extract and figure hashes after a deterministic export-to-GP5. Guess still drops markers when `sync_ok` is false.
 - Overlap **different** roles. Do not stack the same role on the same seconds.

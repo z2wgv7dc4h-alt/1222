@@ -86,11 +86,12 @@ The intern stack is a minefield; each fix is now code or a hard pin, not a sessi
 | a fresh machine drifts to incompatible versions | `constraints.txt` + `setup.bat` |
 | "is my box set up?" guessing | `boo-lab doctor` |
 | a failed/zero-row run blanking a derived file | `beats`/`structure`/`sync`/`agree`/`drums`/`vocals` write atomically and only replace on a real result |
+| re-running the whole analysis chain by hand (and re-paying for finished work) | `boo-lab interns` runs every step cache-first; each step is isolated so one failure never aborts the rest (`structure` reuses `work/msa/*.json`) |
 | a crash mid-Save destroying every label | every `sections.jsonl` write is atomic (`schema.write_jsonl_atomic`); Save keeps `data/sections.jsonl.bak` |
 | a machine draft / unknown role-sourced as human | fail-closed schema: `is_keeper`, `canonical_role`, `stamp_box`, and the one `load_section_rows` reader |
 
 Behavior is pinned by `tests/test_natten_compat.py`, `test_device.py`, `test_doctor.py`, plus bad-input
-tests for the keeper law and Save path. Lab: **278 tests**; engine: **820 passed, 1 skipped**. Generated
+tests for the keeper law and Save path. Lab: **296 tests**; engine: **820 passed, 1 skipped**. Generated
 outputs (`data/{drafts,beats,compare,sync,agree}.*`, `data/sections.jsonl.bak`, `*.tmp`) and
 `*.egg-info/` are gitignored; the tracked asset stays `data/sections.jsonl` (human pins).
 
@@ -118,7 +119,10 @@ Snap beats / JSON / Next GP live under **Lab**; Drop / Push git / Remove album l
    like music (not `0.00–0.25`).
 4. **Pack** once labels are good.
 5. Old pins without `heard`: `boo-lab hear --album X --track Y` (that track only).
-6. If the interns are installed: `boo-lab structure --album X`, then `boo-lab compare --album X`.
+6. If the interns are installed: `boo-lab interns --album X` runs the whole chain in order
+   (structure, beats, drums, vocals, lyrics, sync, extract, figures, compare, learn, status),
+   skipping what is already on disk. Or run one step: `boo-lab structure --album X`, then
+   `boo-lab compare --album X`.
 
 Rules: skip **VAL** songs; never Guess a finished song; the interns (Guess / allin1 / SongFormer /
 beat_this / Demucs) are optional **stencils**, not truth; `learn` does not train anything.
@@ -159,7 +163,8 @@ Then `python -m boo_lab.cli scan` and reload. Green GP5 = matched tab.
 | `drums` | per-section drum onsets + measured `low_confidence` |
 | `vocals` | per-section vocal melody (CREPE) |
 | `lyrics` | LRCLIB + WhisperX force-aligned plain lyrics |
-| `structure` | MSA/SongFormer drafts → `data/drafts.jsonl` (allin1 optional) |
+| `interns [--album X] [--steps a,b,c]` | run the whole analysis chain in order, cache-first and failure-isolated |
+| `structure` | MSA/SongFormer drafts → `data/drafts.jsonl` (allin1 optional; cache-first) |
 | `beats` | beat/downbeat grid → `data/beats.jsonl` (beat_this → allin1) |
 | `gp-export` | probe `.gp`/`.gpx`: already parse (run `scan`) or record `gpx-unsupported`/`gp7-unsupported` |
 | `learn` | rebuild `data/intern_rank.json`: rank draft sources from keepers (5-song vote, F@0.5) |

@@ -1,7 +1,7 @@
 # CURRENT
 
 updated: 2026-09-18
-pytest: engine **820 passed, 1 skipped**; boo-lab **207 passed**
+pytest: engine **820 passed, 1 skipped**; boo-lab **296 passed**
 
 ## Now
 
@@ -11,7 +11,11 @@ drafts machine output (`data/drafts.jsonl`), and ships a full studio + CLI
 (spectrogram, draft/keeper schema, witnesses, agreement/JAMS exports).
 Engine work below is paused; nothing here consumes the lab yet.
 
-Lab pass (latest commit `9bac8fb`): interns run on **GPU by default** (`boo_lab/device.py`); allin1 is
+Lab pass (latest commit `5df12ab`): `boo-lab interns [--album/--steps]` runs the whole
+analysis chain in order, cache-first and resumable (`structure` reuses `work/msa/*.json`;
+`beats`/`sync`/`lyrics` skip finished rows), each step isolated so one failure never aborts
+the rest, drafts only. Before it `a21bc29` (`hash` fills `flac_sha256`). Interns run on
+**GPU by default** (`boo_lab/device.py`); allin1 is
 repaired for modern natten + madmom on py3.12/numpy2 by `boo_lab/_natten_compat.py` (also aliases the
 `collections` ABCs and runs at `import boo_lab`); `setup.bat` + `constraints.txt` + `boo-lab doctor`
 make a fresh machine reproducible. **Hardening**: the keeper law fails closed (one
@@ -19,7 +23,7 @@ make a fresh machine reproducible. **Hardening**: the keeper law fails closed (o
 `sections.jsonl` write is atomic with a `sections.jsonl.bak` one-step undo, and `beats`/`structure`/
 `sync`/`agree`/`drums`/`vocal_melody` no longer blank their output on a zero-row run. `structure` wrote
 **125 drafts** (13 BoO tracks); `compare` on Rebirth (holdout): **F0.5=0.737 F3=0.800 role3=0.250**;
-`sync` **7/13**; engine **820 passed, 1 skipped**; boo-lab **207 passed**. Studio now draws beat/downbeat ticks and snaps box edges; Guess carries the tab's section letters/repeats, gates on `sync_ok`, and snaps its audio spans to the beat grid.
+`sync` **7/13**; engine **820 passed, 1 skipped**; boo-lab **296 passed**. Studio now draws beat/downbeat ticks and snaps box edges; Guess carries the tab's section letters/repeats, gates on `sync_ok`, and snaps its audio spans to the beat grid. The lab now ships one resumable `boo-lab interns` pass over the whole analysis chain (drafts only).
 
 Real, done, verified, pushed this pass (tools/boo-lab/ + engine/riff_bank.py):
 - Labyrinth bank redesigned: ONE real song, ONE 2-4 bar contiguous riff,

@@ -1,9 +1,12 @@
-"""Riff identity -- name windows that already exist as measures.
+"""Riff identity -- name RUNS of bars that already exist as measures.
 
-Given a matched GP5, hash 2-bar and 4-bar rhythm-guitar windows in playback
-order, cluster near-duplicates INSIDE one song, and suggest `figure_id`
-values. This is identity, not segmentation: it never cuts new boxes and never
-invents boundaries. Machines never write keepers -- output is drafts with
+Given a matched GP5, fingerprint each bar (`bar_fp`), segment playback order
+into maximal runs of equal bars, and emit windows that are RUNS -- an ostinato
+run is one window, never a pile of sliding 1-bar 2/4-bar windows. Cluster
+windows by exact fingerprint, name them by a consistent GP marker letter or
+`riff-A/B` by first start, and flag a letter that maps to two fingerprints
+(`conflict`). This is identity, not segmentation: it never cuts new boxes and
+never invents boundaries. Machines never write keepers -- output is drafts with
 `source="figure-hash"`, written to `data/figures.jsonl` under the same
 never-blank-on-a-zero-row law as `beats`/`structure`.
 """
@@ -33,76 +36,40 @@ def _field(obj, name, default=None):
     return getattr(obj, name, default)
 
 
-def _pitch_classes(measure) -> frozenset[int]:
-    """Pitch-class set of one measure (octave/velocity ignored, chords kept as
-    sets). Prefers riff_bank's complete `chord_notes`; falls back to the
-    cumulative top-note `deltas` only when no chord data exists."""
-    notes = _field(measure, "chord_notes", None)
-    pcs: set[int] = set()
-    if notes:
-        for hit in notes:
-            for n in hit:
-                pcs.add(int(n) % 12)
-        return frozenset(pcs)
-    deltas = _field(measure, "deltas", None) or []
-    cur = 0
-    for i, d in enumerate(deltas):
-        cur = int(d) if i == 0 else cur + int(d)
-        pcs.add(cur % 12)
-    return frozenset(pcs)
-
-
-def _rhythm_mask(measure) -> str:
-    """Coarse 4-beat onset grid for one measure: "1010" = onsets on beats 1
-    and 3. Durations are quarter-note beats; a rest contributes no onset."""
+def bar_fp(measure):
+    """One bar's identity: quantized 1/8 onsets (duration + is_rest), the
+    semitone `deltas`, and the tuple of pitch-class sets from `chord_notes`.
+    Octave/velocity ignored; a chord never collapses to its top note. Pure."""
     cell = _field(measure, "cell", None) or []
-    mask = [0, 0, 0, 0]
-    pos = 0.0
-    for hit in cell:
-        dur = float(_field(hit, "duration", 0) or 0)
-        if not _field(hit, "is_rest", False):
-            beat = int(pos + 1e-6)
-            if 0 <= beat < 4:
-                mask[beat] = 1
-        pos += dur
-    return "".join(str(b) for b in mask)
+    rhythm = tuple(
+        (int(round(float(_field(h, "duration", 0) or 0) * 2)),
+         bool(_field(h, "is_rest", False)))
+        for h in cell
+    )
+    deltas = tuple(int(d) for d in (_field(measure, "deltas", None) or []))
+    notes = _field(measure, "chord_notes", None) or []
+    if notes:
+        pcs = tuple(tuple(sorted(int(n) % 12 for n in hit)) for hit in notes)
+    else:
+        # No chord data: fall back to the cumulative top-note pitches.
+        cur = 0
+        seen = set()
+        for i, d in enumerate(deltas):
+            cur = int(d) if i == 0 else cur + int(d)
+            seen.add(cur % 12)
+        pcs = (tuple(sorted(seen)),) if seen else ()
+    return (rhythm, deltas, pcs)
+
+
+def window_fp(cells) -> str:
+    """Stable fingerprint of a window (one or more bars). Same bars in the
+    same order => same token, across songs."""
+    return hashlib.sha1(repr(tuple(bar_fp(c) for c in cells)).encode("utf-8")).hexdigest()[:12]
 
 
 def hash_window(cells) -> str:
-    """Stable fingerprint of a 2- or 4-measure window: per-measure pitch-class
-    set (chord-aware, octave/velocity ignored) plus the coarse 4-beat onset
-    grid. Same notes + rhythm => same hash, across songs. Pure function."""
-    parts = []
-    for measure in cells or []:
-        pcs = ",".join(str(p) for p in sorted(_pitch_classes(measure)))
-        parts.append(pcs + "|" + _rhythm_mask(measure))
-    return hashlib.sha1(";".join(parts).encode("utf-8")).hexdigest()[:12]
-
-
-def _grid(w):
-    return w.get("rhythm") or w.get("grid")
-
-
-def _pcs_list(w):
-    pcs = w.get("pcs")
-    return [set(m) for m in pcs] if pcs else None
-
-
-def _compatible(a, b, jaccard_min: float) -> bool:
-    """Two hashes may merge when their rhythm grids match AND the mean
-    measure-level pitch-class Jaccard across the window is >= `jaccard_min`.
-    Only possible when the windows carry `pcs`/`rhythm` (build_figures does)."""
-    ga, gb = _grid(a), _grid(b)
-    if not ga or not gb or list(ga) != list(gb):
-        return False
-    pa, pb = _pcs_list(a), _pcs_list(b)
-    if not pa or not pb or len(pa) != len(pb):
-        return False
-    scores = []
-    for sa, sb in zip(pa, pb):
-        union = sa | sb
-        scores.append(1.0 if not union else len(sa & sb) / len(union))
-    return bool(scores) and (sum(scores) / len(scores)) >= jaccard_min
+    """Backward-compatible alias for `window_fp`."""
+    return window_fp(cells)
 
 
 def _first_key(w):
@@ -115,46 +82,54 @@ def _occ(w):
             "start_bar": w.get("start_bar"), "end_bar": w.get("end_bar")}
 
 
-def cluster_song(windows, *, jaccard_min: float = 0.85) -> list[dict]:
-    """Group a song's windows into repeating figures.
+def cluster_song(windows) -> list[dict]:
+    """Cluster windows by EXACT fingerprint (no Jaccard merge).
 
-    Exact-hash groups first; a group may merge into another when the optional
-    per-window pitch-class Jaccard clears `jaccard_min` and the rhythm grids
-    match. `figure_id` is `riff-A`, `riff-B`, ... by first-start order;
-    `n_hits` counts windows in the cluster and `unique` is `n_hits == 1`."""
+    `figure_id` = a consistent GP marker letter (`{role}-{letter}`) else
+    `riff-A`, `riff-B`, ... by first start. `conflict` is true when one GP
+    letter maps to two different fingerprints."""
     groups: dict[str, list[dict]] = {}
     for w in windows or []:
         groups.setdefault(w.get("hash"), []).append(w)
 
-    merged: list[dict] = []
-    for group in groups.values():
-        placed = False
-        for m in merged:
-            if _compatible(m["rep"], group[0], jaccard_min):
-                m["windows"].extend(group)
-                placed = True
-                break
-        if not placed:
-            merged.append({"rep": group[0], "windows": list(group)})
-
     out: list[dict] = []
-    for m in merged:
-        occ = sorted(m["windows"], key=_first_key)
+    for group in groups.values():
+        occ = sorted(group, key=_first_key)
         first = occ[0]
+        letters = {w.get("letter") for w in occ if w.get("letter")}
+        role = None
+        for w in occ:
+            if w.get("role"):
+                role = w["role"]
+                break
         out.append({
-            "hash": m["rep"].get("hash"),
-            "n_bars": m["rep"].get("n_bars"),
+            "hash": first.get("hash"),
+            "n_bars": first.get("n_bars"),
             "start": first.get("start"),
             "end": first.get("end"),
             "start_bar": first.get("start_bar"),
             "end_bar": first.get("end_bar"),
-            "n_hits": len(m["windows"]),
-            "unique": len(m["windows"]) == 1,
+            "n_hits": len(group),
+            "unique": len(group) == 1,
             "occurrences": [_occ(w) for w in occ],
+            "role": role,
+            "letter": next(iter(letters)) if len(letters) == 1 else None,
         })
     out.sort(key=_first_key)
-    for i, c in enumerate(out):
-        c["figure_id"] = "riff-" + _letters(i)
+    unnamed = 0
+    for c in out:
+        if c["letter"]:
+            c["figure_id"] = "%s-%s" % (c["role"] or "riff", c["letter"])
+        else:
+            c["figure_id"] = "riff-" + _letters(unnamed)
+            unnamed += 1
+    by_letter: dict[str, set] = {}
+    for c in out:
+        if c["letter"]:
+            by_letter.setdefault(c["letter"], set()).add(c["hash"])
+    conflicts = {letter for letter, hashes in by_letter.items() if len(hashes) > 1}
+    for c in out:
+        c["conflict"] = bool(c["letter"] and c["letter"] in conflicts)
     return out
 
 
@@ -206,10 +181,31 @@ def _playback_slots(gp_path: Path):
     return slots
 
 
-def _song_windows(fragments, slots) -> list[dict]:
-    """Contiguous 2- and 4-measure windows over runs of consecutive measures
-    that actually carry a fragment -- no invented boundaries."""
-    by_mi = {f.measure_index: f for f in fragments}
+def _marker_of(frag):
+    from .extract import _section_letter
+
+    _form, letter = _section_letter(_field(frag, "raw_marker") or "")
+    return letter, _field(frag, "role")
+
+
+def _make_window(entries):
+    cells = [e[4] for e in entries]
+    letter, role = _marker_of(cells[0])
+    n_repeats = len(cells) if len({bar_fp(c) for c in cells}) == 1 else 1
+    return {
+        "start": entries[0][1],
+        "end": round(entries[-1][1] + entries[-1][3], 3),
+        "start_bar": entries[0][2],
+        "end_bar": entries[-1][2],
+        "hash": window_fp(cells),
+        "n_bars": len(cells),
+        "n_repeats": n_repeats,
+        "letter": letter,
+        "role": role,
+    }
+
+
+def _contiguous_runs(slots, by_mi):
     runs: list[list[tuple]] = []
     cur: list[tuple] = []
     prev = None
@@ -230,45 +226,50 @@ def _song_windows(fragments, slots) -> list[dict]:
         prev = mi
     if cur:
         runs.append(cur)
+    return runs
 
+
+def _song_windows(fragments, slots) -> list[dict]:
+    """RUNS, not slides: each maximal run of equal `bar_fp` becomes one
+    ostinato window; bars not inside such a run are paired into non-overlapping
+    2-bar blocks. A 2-bar window is never emitted inside a longer same-sequence
+    window."""
+    by_mi = {f.measure_index: f for f in fragments}
     windows: list[dict] = []
-    for run in runs:
-        n = len(run)
-        for i in range(n):
-            for size in (2, 4):
-                if i + size > n:
-                    continue
-                chunk = run[i:i + size]
-                cells = [c[4] for c in chunk]
-                windows.append({
-                    "start": chunk[0][1],
-                    "end": round(chunk[-1][1] + chunk[-1][3], 3),
-                    "start_bar": chunk[0][2],
-                    "end_bar": chunk[-1][2],
-                    "hash": hash_window(cells),
-                    "n_bars": size,
-                    "pcs": [sorted(_pitch_classes(c)) for c in cells],
-                    "rhythm": [_rhythm_mask(c) for c in cells],
-                })
+    for run in _contiguous_runs(slots, by_mi):
+        segments: list[tuple] = []
+        for entry in run:
+            fp = bar_fp(entry[4])
+            if segments and segments[-1][0] == fp:
+                segments[-1][1].append(entry)
+            else:
+                segments.append((fp, [entry]))
+
+        covered: set[int] = set()
+        for _fp, entries in segments:
+            if len(entries) >= 2:
+                windows.append(_make_window(entries))
+                covered.update(id(e) for e in entries)
+
+        i = 0
+        while i < len(run):
+            if id(run[i]) in covered:
+                i += 1
+                continue
+            block = [run[i]]
+            j = i + 1
+            while j < len(run) and id(run[j]) not in covered and len(block) < 2:
+                block.append(run[j])
+                j += 1
+            windows.append(_make_window(block))
+            i = j
     return windows
-
-
-def _span_contains(outer: dict, inner: dict) -> bool:
-    if outer.get("start") is not None and inner.get("start") is not None:
-        return (outer["start"] - 1e-6 <= inner["start"]
-                and inner["end"] <= outer["end"] + 1e-6)
-    ob0, ob1 = outer.get("start_bar"), outer.get("end_bar")
-    ib0, ib1 = inner.get("start_bar"), inner.get("end_bar")
-    if None in (ob0, ob1, ib0, ib1):
-        return False
-    return ob0 <= ib0 and ib1 <= ob1
 
 
 def build_figures(lab_root, rows, *, album=None, track=None) -> dict:
     """Suggest repeating `figure_id`s for each matched GP5 song.
 
-    Clusters 4-bar windows first, then 2-bar windows that are not already
-    inside a 4-bar cluster with `n_hits >= 2`. Replaces only the songs it
+    Writes one row per repeating window cluster. Replaces only the songs it
     rebuilt (keyed by album+track); a run that yields zero rows leaves an
     existing `data/figures.jsonl` untouched."""
     lab_root = Path(lab_root)
@@ -328,23 +329,11 @@ def build_figures(lab_root, rows, *, album=None, track=None) -> dict:
             print("FIGURES", rt, "0 windows")
             continue
 
-        four = [w for w in windows if w["n_bars"] == 4]
-        two = [w for w in windows if w["n_bars"] == 2]
-        covered = [c for c in cluster_song(four) if c["n_hits"] >= 2]
-
-        def covered_by(w):
-            return any(_span_contains(occ, w)
-                       for c in covered for occ in c["occurrences"])
-
-        two_keep = [w for w in two if not covered_by(w)]
-        clusters = cluster_song(four + two_keep)
-        song_rows = [c for c in clusters if c["n_hits"] >= 2]
+        clusters = [c for c in cluster_song(windows) if c["n_hits"] >= 2]
         # Seconds are only trustworthy when the tab clock actually matched the
         # audio (sync_ok). Otherwise keep bars/hashes and publish no times.
         trusted = bool((sync_by.get((ra, rt)) or {}).get("sync_ok") is True)
-        # Re-letter only the repeating clusters we actually suggest, by
-        # first-start order, so the studio sees riff-A, riff-B, ...
-        for i, c in enumerate(song_rows):
+        for c in clusters:
             if trusted:
                 start, end = c["start"], c["end"]
                 occ = c["occurrences"]
@@ -355,14 +344,14 @@ def build_figures(lab_root, rows, *, album=None, track=None) -> dict:
                        for o in c["occurrences"]]
             produced.append({
                 "album": ra, "track": rt,
-                "figure_id": "riff-" + _letters(i), "hash": c["hash"],
+                "figure_id": c["figure_id"], "hash": c["hash"],
                 "n_bars": c["n_bars"], "n_hits": c["n_hits"], "unique": c["unique"],
                 "start": start, "end": end,
                 "start_bar": c["start_bar"], "end_bar": c["end_bar"],
                 "occurrences": occ, "times_trusted": trusted,
-                "source": "figure-hash",
+                "conflict": c["conflict"], "source": "figure-hash",
             })
-        print("FIGURES", rt, len(windows), "windows,", len(song_rows), "repeating",
+        print("FIGURES", rt, len(windows), "window(s),", len(clusters), "repeating",
               "(times trusted)" if trusted else "(bars only; sync not ok)")
 
     if not produced:

@@ -43,6 +43,50 @@ def test_hash_window_chord_does_not_collapse_to_top_note():
     assert figures.hash_window([two_note]) != figures.hash_window([top_only])
 
 
+def test_bar_fp_ignores_octave():
+    assert figures.bar_fp(_m([[48], [55]])) == figures.bar_fp(_m([[60], [67]]))
+
+
+def test_bar_fp_chord_not_collapsed_to_top_note():
+    assert figures.bar_fp(_m([[0, 7]])) != figures.bar_fp(_m([[7]]))
+
+
+class _FragFp:
+    def __init__(self, mi, pc, raw=None):
+        self.measure_index = mi
+        self.cell = [{"duration": 1.0, "is_rest": False}]
+        self.chord_notes = [[pc]]
+        self.deltas = []
+        self.raw_marker = raw
+        self.role = "riff"
+
+
+def test_windowing_eight_identical_bars_is_one_ostinato():
+    frags = [_FragFp(mi, 0) for mi in range(8)]
+    slots = [(mi, mi * 2.0, mi + 1, 2.0) for mi in range(8)]
+
+    wins = figures._song_windows(frags, slots)
+
+    assert len(wins) == 1  # not seven sliding 2-bar windows
+    assert wins[0]["n_bars"] == 8 and wins[0]["n_repeats"] == 8
+
+
+def test_cluster_conflict_when_letter_maps_to_two_fingerprints():
+    wins = [
+        {"hash": "H1", "start": 0, "end": 2, "start_bar": 1, "end_bar": 1,
+         "n_bars": 1, "letter": "A", "role": "riff"},
+        {"hash": "H2", "start": 4, "end": 6, "start_bar": 3, "end_bar": 3,
+         "n_bars": 1, "letter": "A", "role": "riff"},
+        {"hash": "H2", "start": 8, "end": 10, "start_bar": 5, "end_bar": 5,
+         "n_bars": 1, "letter": "A", "role": "riff"},
+    ]
+
+    clusters = figures.cluster_song(wins)
+
+    assert all(c["conflict"] for c in clusters)
+    assert {c["figure_id"] for c in clusters} == {"riff-A"}
+
+
 def _w(h, start, bars=4, bar0=1):
     return {"hash": h, "start": start, "end": start + 8.0, "start_bar": bar0,
             "end_bar": bar0 + bars - 1, "n_bars": bars}
@@ -100,7 +144,8 @@ class _Frag:
 
 class _FakeBank:
     def extract_fragments_from_file(self, gp, song_title=None):
-        return [_Frag(mi) for mi in range(4)]
+        # Alternate bars so the run windowing emits two matching 2-bar blocks.
+        return [_Frag(mi, pc=(0 if mi % 2 == 0 else 5)) for mi in range(4)]
 
 
 def _gated_lab(tmp_path, monkeypatch, sync_ok):

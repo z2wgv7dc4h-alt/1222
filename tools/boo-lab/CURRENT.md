@@ -160,15 +160,19 @@ Guess is **not** a BoO brain. It carries the tab's section letters and repeats, 
 
 ## Figures (riff identity, never keepers)
 
-`boo-lab figures [--album X --track Y]` hashes 2-bar and 4-bar rhythm-guitar
-windows of a matched GP5 in playback order, clusters near-duplicates **inside one
-song**, and suggests `figure_id`s (`riff-A`, `riff-B`, ...). It names windows that
-already exist as measures — identity, not segmentation; it never cuts new boxes
-and never invents boundaries (the rejected 795–1057-section raw-note cutting is
-not this). Rows land in `data/figures.jsonl` with `source="figure-hash"` — a
-draft that never writes `sections.jsonl`/`drafts.jsonl` and never ticks `heard`.
-`--album` and `--track` must be passed together. The studio reads it at
-`GET /api/figures/{track_id}` to fill a `figure` datalist (no auto-fill).
+`boo-lab figures [--album X --track Y]` fingerprints each bar (`bar_fp`:
+quantized 1/8 onsets + `deltas` + pitch-class sets) and windows are **runs** —
+a maximal run of equal bars is ONE ostinato window, never sliding 2/4-bar
+windows. Windows cluster by exact fingerprint and are named by a consistent GP
+marker letter (`{role}-{letter}`) else `riff-A/B` by first start; a letter that
+maps to two fingerprints is flagged `conflict=true`. It names bars that already
+exist as measures — identity, not segmentation; it never cuts new boxes and
+never invents boundaries. Rows land in `data/figures.jsonl` with
+`source="figure-hash"` — a draft that never writes `sections.jsonl`/
+`drafts.jsonl` and never ticks `heard`. `--album` and `--track` must be passed
+together. The studio reads it at `GET /api/figures/{track_id}` to fill a
+`figure` datalist (no auto-fill, no Save of hashes); a conflict raises one coach
+line, "Tab letter maps to two figures — pick in the box."
 
 ## Ingest
 

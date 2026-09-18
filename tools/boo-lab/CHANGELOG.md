@@ -2,6 +2,10 @@
 
 ## 2026-09-18
 
+### Figure windows are runs; studio suggests ids only
+
+- `figures.py` windowing replaced: `bar_fp` (quantized 1/8 onsets + `deltas` + pitch-class sets; octave/velocity ignored, chords kept as sets) splits playback order into maximal equal-bar RUNS, and each run becomes ONE ostinato window — 8 identical bars yield 1 window, not 7 sliding 2-bar windows; leftover bars are paired into non-overlapping 2-bar blocks and a 2-bar window is never emitted inside a longer same-sequence window. `cluster_song` groups by exact fingerprint only (Jaccard merge removed), names a cluster by a consistent GP marker letter (`{role}-{letter}`) else `riff-A/B` by first start, and sets `conflict=true` when one letter maps to two fingerprints. `build_figures` emits only repeating clusters and carries `conflict`. The studio `<figure>` datalist still lists `n_hits>=2` ids (no auto-fill, no `heard`, no Save of hashes); a conflict raises one coach line without overwriting an explicit error. Lab tests: **241 passed**.
+
 ### Bank stores short cells per figure_id, not whole pins
 
 - New `src/boo_lab/cells.py`: `assemble_cells` groups one-bar riff_bank fragments by `figure_id` (a human keeper figure_id covering the bar when `sync_ok`, else a `figures.jsonl` occurrence, else the marker letter / a local bar hash) and emits **one representative cell of 2–4 bars** — preferring the hashed `figures.jsonl` window, then an identical-bar run, then the first 1–2 bars. Every other hit is only an `occurrences` pointer (seconds only when `times_trusted`), so an 8-bar human box becomes a 2-bar cell, never an 8-bar bank fragment. `song_cells`/`build_cells` write `data/riffs.jsonl` per song and never blank it on a zero-row run; `boo-lab extract` now emits cells (and reduces long pins) while keeping the audio fallback and writing atomically. `tests/test_role_map.py` guards the lab→engine role map (all 9 roles present; `pulse` deliberately `None`; unknown fails). Lab tests: **237 passed**.

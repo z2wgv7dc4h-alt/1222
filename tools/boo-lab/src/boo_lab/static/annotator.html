@@ -943,7 +943,10 @@ function select(i){
     const hints=(x.figures||[]).filter(f=>f.n_hits>=2);
     const dl=document.getElementById("figureSuggests");
     if(dl) dl.innerHTML=hints.map(f=>"<option value=\""+escAttr(f.figure_id)+"\">").join("");
-    window._figureHint=hints.length?("Tab suggests repeating figures: "+hints.map(f=>f.figure_id).join(", ")+" — pick in the figure box."):"";
+    const conflict=hints.some(f=>f.conflict);
+    window._figureHint=conflict
+      ? "Tab letter maps to two figures — pick in the box."
+      : (hints.length?("Tab suggests repeating figures: "+hints.map(f=>f.figure_id).join(", ")+" — pick in the figure box."):"");
     const err=document.getElementById("err");
     if(err && err.dataset.explicit!=="1") showErr("");
   }).catch(()=>{});

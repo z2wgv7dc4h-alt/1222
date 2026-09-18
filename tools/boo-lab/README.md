@@ -94,18 +94,24 @@ outputs (`data/{drafts,beats,compare,sync,agree}.*`, `data/sections.jsonl.bak`, 
 
 One album side per session.
 
+Primary bar: **Play · clock · Play box · Save · Undo · How**. Guess / Load drafts / Lyrics / Pack /
+Snap beats / JSON / Next GP live under **Lab**; Drop / Push git / Remove album live under **Corpus**.
+
 1. Pick a track. Clock must show full length before pinning. Use the waveform **and** the mel
    spectrogram (Wave / Spec / Both) to find edges. An empty wave shows a ghost hint
-   ("Drag to mark a section"); it disappears after the first box. Pins are refused until the
-   clock shows full length, and the status bar coaches the next step. The How drawer opens
-   once on first run.
-2. Give each box a `form` (large letter), a `figure_id` (small, e.g. `riff-A`), and a `role`;
-   mark `unique` for single-use figures, `instrument` when two guitars differ. Tick **heard**
-   when you have actually listened. With **Snap beats** on, a dragged edge snaps to the nearest
-   downbeat/beat (from `data/beats.jsonl`; run `boo-lab beats` once).
+   ("Press 1 for Riff"); it disappears after the first box. New boxes come from the role pins /
+   keys (1–4, I B C P) or Guess — drag only moves and resizes a box, it does not create one.
+   Pins are refused until the clock shows full length, and the status bar coaches the next step.
+   The How drawer opens once on first run.
+2. Daily pinning needs four things per box: **role**, **figure** (`figure_id`, e.g. `riff-A`), the
+   **start/end** seconds, and **heard** once you have actually listened. `form` / `uniq` /
+   `inst` / `bar0` / `bar1` are optional and sit behind **More columns**. With **Snap beats** on,
+   a dragged edge snaps to the nearest downbeat/beat (from `data/beats.jsonl`; run `boo-lab beats`
+   once).
 3. **Save.** Unheard boxes are dropped — the status line says how many, and the previous file is kept
-   as `data/sections.jsonl.bak` (one-step undo; there is no in-app undo). A box with `end <= start`
-   is refused, never repaired. Confirm table seconds look like music (not `0.00–0.25`).
+   as `data/sections.jsonl.bak`. In-app **Undo** (button or Ctrl+Z) steps back through this
+   session's edits. A box with `end <= start` is refused, never repaired. Confirm table seconds look
+   like music (not `0.00–0.25`).
 4. **Pack** once labels are good.
 5. Old pins without `heard`: `boo-lab hear --album X --track Y` (that track only).
 6. If the interns are installed: `boo-lab structure --album X`, then `boo-lab compare --album X`.

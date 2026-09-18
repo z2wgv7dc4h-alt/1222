@@ -2,6 +2,10 @@
 
 ## 2026-09-18
 
+### Studio copy tidy — pin then drag
+
+- The empty-wave ghost now reads **"Press 1 for Riff"**; the coach's zero-box line and the How drawer both say pins/keys **create** a box and drag only fits it; the table foot no longer implies dragging creates a box. **Pack** shows `"Save keepers before Pack."` (as an error) when there are no boxes, leaving the fetch path untouched. Docs corrected: in-app **Undo** exists (button + Ctrl+Z, plus `sections.jsonl.bak` on Save), daily pinning is role + figure + start/end + heard only (`form`/`uniq`/`inst`/bars sit behind **More columns**), and the Play/clock/Play box/Save/Undo/How bar with **Lab** / **Corpus** holding the rest is documented. No math, no endpoints, no ids changed.
+
 ### Coach line, first-run How, duration gate
 
 - **Live coach in `#err`.** `showErr` now fills the status bar with a contextual default when no explicit message is given: wait-for-clock (`ws` duration <2), `VAL — leave unpinned`, `Press 1 for Riff (drag moves a box; it does not create one).`, `N not heard — Save will drop them`, else `N boxes. Save writes keepers.` Explicit errors (save failed, Guess notes, dropped_unheard) are tagged and never overwritten; the row/clock observer refreshes the coach only when it is not explicit.
@@ -16,7 +20,7 @@
 ### Empty + waiting states
 
 - **List reads at a glance.** Each song meta is now `FLAC · GP5` / `FLAC · GP7` / `FLAC · no tab` / `FLAC · partial GP5`, built from the existing `has_flac` / `has_gp` / `gp_partial` / `gp_kind`; a tiny `VAL` tag shows when `split==="val"`; a mute `tab off-clock` shows only if a track row already carries `sync_ok===false` (the field is absent from `/api/tracks` today, so it is skipped — no new fetch). Filter pills are a segmented All / GP5 / No tab control.
-- **Empty wave ghost.** With a song selected, duration loaded, and no boxes, `#emptyghost` overlays the mix lane ("Drag to mark a section" / "1 Riff  2 Hook  3 Breakdown  I Intro"); it vanishes on the first box. Pure HTML/CSS overlay, `pointer-events:none`.
+- **Empty wave ghost.** With a song selected, duration loaded, and no boxes, `#emptyghost` overlays the mix lane ("Press 1 for Riff" / "1 Riff  2 Hook  3 Breakdown  I Intro"); it vanishes on the first box. Pure HTML/CSS overlay, `pointer-events:none`.
 - **Waiting signals.** The Lab summary carries a mute count of draft/guess rows; **Pack** is visually disabled (`.off` + `aria-disabled`) at zero boxes and its handler early-returns with "Save keepers before Pack."; Guess / Save / heard / Snap beats / VAL badge have hover `title`s.
 - Corpus drop-zone copy states the ingest contract; lyric/stem lanes get 8px bottom padding. Frontend only — no FFT / beat-canvas or API change, all ids intact.
 

@@ -29,8 +29,10 @@ tabs' marker letters plus the allin1 drafts are the real riff signal. Studio chr
 main layout with a two-row transport (**Lab** / **Corpus** `<details>`), equal-width role pins, and a
 **More columns** toggle (`form` / `uniq` / `inst` / `bar0` / `bar1` / `source` hidden by default) —
 restyle only, all ids and behavior unchanged. Waiting states: rows read `FLAC · GP5` / `no tab` /
-etc. (+ `VAL` tag), an empty wave shows a "Drag to mark a section" ghost, and the Lab summary counts
-draft rows while **Pack** is greyed until boxes exist. Regression pass (2026-09-18): all 46
+etc. (+ `VAL` tag), an empty wave shows a "Press 1 for Riff" ghost, and the Lab summary counts
+draft rows while **Pack** is greyed until boxes exist. Ghost copy and How now match "pin then drag"
+(pins/keys create a box; drag fits it); Pack refuses with "Save keepers before Pack." when there
+are no boxes. Regression pass (2026-09-18): all 46
 `getElementById` ids resolve, `harvestTable` reads every `data-f`, shortcuts/filters/dropzone/stems/
 spec/Snap/Save/Guess unchanged, no dup ids and no new network calls; `node --check` clean.
 The `#err` bar is now a live coach (wait-for-clock / VAL / "Press 1 for Riff" / unheard / box

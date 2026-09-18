@@ -288,7 +288,7 @@
       <div class="lane-lab">mix — drag boxes, click empty to seek</div>
       <div id="wave"></div>
       <div id="emptyghost" class="ghost" aria-hidden="true">
-        <div class="ghost-main">Drag to mark a section</div>
+        <div class="ghost-main">Press 1 for Riff</div>
         <div class="ghost-sub">1 Riff&nbsp;&nbsp;2 Hook&nbsp;&nbsp;3 Breakdown&nbsp;&nbsp;I Intro</div>
       </div>
     </div>
@@ -327,7 +327,7 @@
 </tr></thead>
       <tbody id="rows"></tbody>
     </table>
-    <p class="foot">Drag a box. Click empty wave to seek. Different roles may overlap. S save · N next</p>
+    <p class="foot">Pins / keys add boxes; drag to move or resize. Click empty wave to seek. S save · N next</p>
   </main>
   <div class="vizdock" id="vizdock">
     <label>spectrogram — click to seek</label>
@@ -367,7 +367,7 @@ function coach(){
   if(!ws || (ws.getDuration()||0)<2) return "Wait. Clock must show the full length before you draw.";
   const t=tracks[trackId];
   if(t && String(t.split||"").toLowerCase()==="val") return "VAL — leave unpinned";
-  if(!regs.length) return "Press 1 for Riff (drag moves a box; it does not create one).";
+  if(!regs.length) return "Press a role pin (or 1 for Riff) — pins create boxes; drag fits them.";
   const unh=regs.filter(p=>!p.heard).length;
   if(unh) return unh+" not heard — Save will drop them";
   return regs.length+" boxes. Save writes keepers.";
@@ -1181,7 +1181,7 @@ document.getElementById("btnRemoveAlbum").onclick=()=>{
 };
 document.getElementById("btnPack").onclick=()=>{
   const t=tracks[trackId]; if(!t) return;
-  if(!regs.length){ showErr("Save keepers before Pack."); return; }
+  if(!regs.length){ showErr("Save keepers before Pack.", true); return; }
   showErr("packing (Demucs if no cache)…");
   fetch("/api/pack/"+t.id,{method:"POST"}).then(async r=>{
     const x=await r.json();

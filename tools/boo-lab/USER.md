@@ -50,6 +50,16 @@ One album per sitting is enough.
 B build · C chill · P pulse · S save · J / K songs · Delete box · Ctrl+Z undo ·
 ? help.
 
+## Lanes and right-click
+
+Each role has its own lane on the wave (Intro at the top, Outro at the bottom).
+A box can only sit in its role's lane, so a Riff + Breakdown + Outro stack
+shows as three bars at once. Click a bar to select its row; click a row to
+light its bar. Right-click a bar to edit role / figure / heard / unique / inst,
+Play box, Split at playhead (when the playhead is inside), or Delete.
+Double-click a bar to toggle heard. The All / Figures / Functions buttons only
+hide bars and rows — they never edit. synth is an instrument (inst), not a role.
+
 ## Ignore until you need them
 
 Guess, Load drafts, Lyrics, Pack, Snap, JSON, Drop, git, Remove album,

@@ -47,7 +47,7 @@
     .dot { display:inline-block; width:6px; height:6px; border-radius:50%; margin-right:4px; background:#3a3a3e; }
     .dot.ok { background:#7dba7a; }
     .dot.part { background:#c4a35a; }
-    main { display:flex; flex-direction:column; min-width:0; padding:0 24px 10px; overflow:auto; grid-column:2; grid-row:1; }
+    main { display:flex; flex-direction:column; min-width:0; padding:0 24px 120px; overflow:auto; grid-column:2; grid-row:1; }
     header.now { display:flex; align-items:center; gap:14px; }
     header.now img { width:48px; height:48px; object-fit:cover; border-radius:6px; background:#111; border:1px solid var(--line); display:none; }
     header.now img.on { display:block; }
@@ -59,7 +59,7 @@
       background:linear-gradient(90deg,transparent,var(--line),transparent); }
     .lane { margin:10px 0 14px; }
     .lane-lab { color:var(--mute); font-size:11px; letter-spacing:.08em; text-transform:uppercase; margin:0 0 4px; background:var(--bg); }
-    #wave { width:100%; height:168px; min-height:168px; background:#0a0c10; border:1px solid var(--line); overflow:hidden; position:relative; border-radius:6px; box-shadow:inset 0 0 40px #0008; }
+    #wave { width:100%; height:240px; min-height:240px; background:#0a0c10; border:1px solid var(--line); overflow:hidden; position:relative; border-radius:6px; box-shadow:inset 0 0 40px #0008; }
     #wave > div { height:100% !important; }
     #drums { width:100%; height:72px; min-height:72px; background:#0a0c10; border:1px solid var(--line); overflow:hidden; position:relative; border-radius:6px; }
     #wavelane { position:relative; }
@@ -165,6 +165,20 @@
     .conf.bad { color:var(--break); }
     button.danger { color:var(--break); border-color:#5a2a26; }
     button.danger:hover { border-color:var(--break); color:#ffb0a6; }
+    /* per-role lanes: a region sits only in its role's strip */
+    #layerbtns { top:34px; }
+    .wavesurfer-region { border-radius:3px; }
+    .wavesurfer-region.sel { outline:2px solid #f4ead8 !important; box-shadow:0 0 0 1px #000c, 0 0 14px #f4ead866 !important; z-index:8 !important; }
+    input[data-f='figure_id'] { min-width:9em; }
+    /* right-click edit panel */
+    #ctx { position:fixed; z-index:60; min-width:196px; background:#14161c; border:1px solid var(--line);
+      border-radius:8px; padding:10px; display:none; flex-direction:column; gap:7px; box-shadow:0 18px 40px #000b; }
+    #ctx.open { display:flex; }
+    #ctx label { display:flex; justify-content:space-between; align-items:center; gap:8px; font-size:12px; color:var(--mute); }
+    #ctx input:not([type=checkbox]) { background:#111; color:var(--text); border:1px solid var(--line); padding:4px 6px; min-width:9em; }
+    #ctx .ctxrow { display:flex; gap:6px; }
+    #ctx .ctxrow button { flex:1; padding:5px 6px; font-size:12px; }
+    #ctx input[type=checkbox] { margin:0; }
   </style>
 </head>
 <body>
@@ -176,6 +190,12 @@
   <p>Guess and Load drafts are suggestions. They are not saved until heard and Save. Do not Guess a finished song. Do not pin VAL.</p>
   <p><b>Figure</b> is the riff's name. Same idea later = same figure (riff-A).</p>
   <p>Drag a box to move it, drag its edge to resize, click empty sound to jump there. Boxes may overlap <i>only</i> when their roles differ (e.g. a Breakdown sitting on a Riff).</p>
+  <h4>Lanes and right-click</h4>
+  <ul>
+    <li>One lane per role, top to bottom Intro → Outro. A box sits only in its role's lane, so a Riff + Breakdown + Outro stack shows as three bars at once.</li>
+    <li>Click a bar to select its table row (or click a row to light its bar). Right-click a bar to edit role / figure / heard / unique / inst, <b>Play box</b>, <b>Split at playhead</b>, or <b>Delete</b>. Double-click a bar toggles heard.</li>
+    <li><b>synth</b> is an instrument (inst), not a role. All / Figures / Functions filters only hide bars and rows — Guess still drafts only, never a keeper.</li>
+  </ul>
   <h4>What each table column means</h4>
   <ul>
     <li><b>role</b> — what the section is (pick from the list below). The only required label.</li>
@@ -290,7 +310,7 @@
       <div class="err" id="err">Space play · 1 riff 2 hook 3 slam · I intro B build C chill P pulse · S save J/K songs</div>
     </div>
     <div class="lane" id="wavelane">
-      <div class="lane-lab">mix — drag boxes, click empty to seek</div>
+      <div class="lane-lab">mix — one lane per role; drag boxes, click empty to seek</div>
       <div id="wave"></div>
       <div id="emptyghost" class="ghost" aria-hidden="true">
         <div class="ghost-main">Press 1 for Riff</div>
@@ -316,6 +336,10 @@
     </div>
     <div class="tabletools"><button type="button" id="btnMoreCols" class="textbtn">More columns</button></div>
     <datalist id="figureSuggests"></datalist>
+    <datalist id="instSuggests">
+      <option value="rhythm"></option><option value="lead"></option><option value="bass"></option>
+      <option value="drums"></option><option value="synth"></option><option value="vocal"></option><option value="mix"></option>
+    </datalist>
     <table id="sectable">
       <thead><tr>
 <th title="What the section is: intro, riff, hook, breakdown, solo, chill, pulse, build, outro">role</th>
@@ -335,12 +359,27 @@
     </table>
     <p class="foot">Pins / keys add boxes; drag to move or resize. Click empty wave to seek. S save · N next</p>
   </main>
+  <div id="ctx">
+    <label>role <select id="ctxRole"></select></label>
+    <label>figure <input id="ctxFig" list="figureSuggests" /></label>
+    <label>heard <input type="checkbox" id="ctxHeard" /></label>
+    <label>unique <input type="checkbox" id="ctxUnique" /></label>
+    <label>inst <input id="ctxInst" list="instSuggests" /></label>
+    <div class="ctxrow"><button type="button" id="ctxPlay">Play box</button></div>
+    <div class="ctxrow"><button type="button" id="ctxSplit">Split at playhead</button></div>
+    <button type="button" id="ctxDel" class="danger">Delete</button>
+  </div>
   <div class="vizdock" id="vizdock">
     <label>spectrogram — click to seek</label>
     <span class="viewbtns" id="viewbtns">
       <button type="button" data-v="wave">Wave</button>
       <button type="button" data-v="spec">Spec</button>
       <button type="button" data-v="both" class="on">Both</button>
+    </span>
+    <span class="viewbtns" id="layerbtns">
+      <button type="button" data-l="all" class="on">All</button>
+      <button type="button" data-l="figures">Figures</button>
+      <button type="button" data-l="functions">Functions</button>
     </span>
     <canvas id="viz"></canvas>
   </div>
@@ -361,6 +400,10 @@ const COLOR = {
   outro:"rgba(160,160,168,0.44)"
 };
 const LABEL = { riff:"Riff", hook:"Hook", breakdown:"Breakdown", solo:"Solo", intro:"Intro", build:"Build", chill:"Chill", pulse:"Pulse", outro:"Outro" };
+const LANE_N = ROLES.length;
+const FIGURE_ROLES = ["riff","hook","solo","pulse"];
+const FUNCTION_ROLES = ["intro","build","breakdown","chill","outro"];
+let layerFilter="all", ctxIdx=-1;
 let tracks=[], trackId=0, regs=[], sel=-1, undo=[], listFilter="all", listQ="";
 let shut={};
 let ws=null, drumsWs=null, regionsPlug=null, lock=false, curStem="drums";
@@ -633,6 +676,53 @@ function snapRegion(reg){
   pullRegions();
 }
 
+function laneForRole(role){
+  const i=ROLES.indexOf(canonRole(role));
+  return i<0?0:i;
+}
+function inLayer(role){
+  if(layerFilter==="all") return true;
+  const r=canonRole(role);
+  return layerFilter==="figures" ? FIGURE_ROLES.includes(r) : FUNCTION_ROLES.includes(r);
+}
+function tipText(p){
+  return (LABEL[p.role]||p.role)+" · "+(p.figure_id||"")+" · "+fmt(p.start)+"-"+fmt(p.end);
+}
+// Put a region in its role's lane (top = index*100/9, height = 100/9 - 1).
+// If the plugin has not built region.element yet, hook 'region-created'
+// (wired in makeWave) and retry on the next frames.
+function applyLane(reg, role){
+  if(!reg) return;
+  const top=(laneForRole(role)*(100/LANE_N))+"%";
+  const h=(100/LANE_N-1)+"%";
+  const set=()=>{
+    if(!reg.element) return false;
+    reg.element.style.top=top; reg.element.style.height=h;
+    return true;
+  };
+  if(!set()) requestAnimationFrame(()=>{ if(!set()) setTimeout(set,40); });
+}
+function applyRegionMeta(reg, p){
+  if(!reg||!p) return;
+  applyLane(reg, p.role);
+  if(reg.element){
+    reg.element.title=tipText(p);
+    reg.element.style.display=inLayer(p.role)?"":"none";
+  }
+}
+function highlightSel(){
+  if(!regionsPlug) return;
+  try{
+    regionsPlug.getRegions().forEach(r=>{
+      const on=(r._idx===sel);
+      if(!r.element) return;
+      r.element.classList.toggle("sel", on);
+      r.element.style.outline=on?"2px solid #f4ead8":"";
+      r.element.style.boxShadow=on?"0 0 0 1px #000c, 0 0 14px #f4ead866":"";
+      r.element.style.zIndex=on?"8":"";
+    });
+  }catch(e){}
+}
 function paintRegions(){
   if(!regionsPlug) return;
   lock=true;
@@ -648,8 +738,10 @@ function paintRegions(){
       resize:true
     });
     r._idx=i;
+    applyRegionMeta(r,p);
   });
   lock=false;
+  highlightSel();
 }
 
 function pullRegions(){
@@ -660,9 +752,118 @@ function pullRegions(){
     if(isNaN(i)||!regs[i]) return;
     regs[i].start=+r.start;
     regs[i].end=+r.end;
+    if(r.element) r.element.title=tipText(regs[i]);
   });
 }
 
+function setRowField(i,f,v){
+  const tr=document.querySelectorAll("#rows tr")[i]; if(!tr) return;
+  const el=tr.querySelector("[data-f='"+f+"']"); if(!el) return;
+  if(f==="heard"||f==="unique") el.checked=!!v; else el.value=(v==null?"":v);
+}
+function setRowInst(i,v){
+  const tr=document.querySelectorAll("#rows tr")[i]; if(!tr) return;
+  const s=tr.querySelector("select[data-f='instrument']"); if(!s) return;
+  if(v && ![...s.options].some(o=>o.value===v)){
+    const o=document.createElement("option"); o.value=v; o.textContent=v; s.appendChild(o);
+  }
+  s.value=v||"";
+}
+function toggleHeardRegion(reg){
+  const i=(reg&&reg._idx!=null)?reg._idx:-1;
+  if(i<0||!regs[i]) return;
+  regs[i].heard=!regs[i].heard;
+  setRowField(i,"heard",regs[i].heard);
+  if(ctxIdx===i) document.getElementById("ctxHeard").checked=regs[i].heard;
+}
+function regionElementAt(cx, cy){
+  const host=document.getElementById("wave"); if(!host) return -1;
+  const rect=host.getBoundingClientRect(), dur=ws?(ws.getDuration()||0):0;
+  if(!dur||!rect.width) return -1;
+  const t=(cx-rect.left)/rect.width*dur;
+  const lane=Math.floor(((cy-rect.top)/rect.height)*LANE_N);
+  let any=-1;
+  for(let i=regs.length-1;i>=0;i--){
+    const p=regs[i];
+    if(!inLayer(p.role) || t<p.start || t>p.end) continue;
+    if(laneForRole(p.role)===lane) return i;
+    if(any<0) any=i;
+  }
+  if(any<0 && sel>=0 && regs[sel] && t>=regs[sel].start && t<=regs[sel].end) any=sel;
+  return any;
+}
+function ctxTimeInRegion(){
+  if(ctxIdx<0||!regs[ctxIdx]||!ws) return false;
+  const t=ws.getCurrentTime()||0, p=regs[ctxIdx];
+  return t>p.start+0.02 && t<p.end-0.02;
+}
+function updateCtxSplit(){
+  const b=document.getElementById("ctxSplit");
+  if(b) b.style.display=ctxTimeInRegion()?"":"none";
+}
+function openCtx(i, x, y){
+  const p=regs[i]; if(!p) return;
+  ctxIdx=i; sel=i;
+  const box=document.getElementById("ctx");
+  document.getElementById("ctxRole").value=p.role;
+  document.getElementById("ctxFig").value=p.figure_id||"";
+  document.getElementById("ctxHeard").checked=!!p.heard;
+  document.getElementById("ctxUnique").checked=!!p.unique;
+  document.getElementById("ctxInst").value=p.instrument||"";
+  updateCtxSplit();
+  box.classList.add("open");
+  const w=box.offsetWidth||200, h=box.offsetHeight||230;
+  box.style.left=Math.max(6, Math.min(window.innerWidth-w-6, x))+"px";
+  box.style.top=Math.max(6, Math.min(window.innerHeight-h-6, y))+"px";
+  table();
+}
+function closeCtx(){
+  const box=document.getElementById("ctx");
+  if(box) box.classList.remove("open");
+  ctxIdx=-1;
+}
+function playBox(){
+  if(!ws){ showErr("wave not ready", true); return; }
+  pullRegions();
+  if(sel<0 && regs.length) sel=0;
+  if(sel<0||!regs[sel]){ showErr("click a coloured box or its table row first", true); return; }
+  const a=+regs[sel].start, b=Math.max(a+0.05, +regs[sel].end);
+  window._playUntil=b;
+  showErr("box "+fmt(a)+" → "+fmt(b));
+  table();
+  const hit=regionsPlug && regionsPlug.getRegions().find(r=>r._idx===sel);
+  try{
+    if(hit && typeof hit.play==="function"){ hit.play(); return; }
+  }catch(e){}
+  ws.setTime(a);
+  Promise.resolve(ws.play(a, b)).catch(()=>ws.play());
+}
+function refreshFigureSuggests(){
+  const dl=document.getElementById("figureSuggests"); if(!dl) return;
+  const fromRows=[...new Set(regs.map(r=>r.figure_id).filter(Boolean))];
+  const hints=((window._figHints)||[]).filter(f=>f.n_hits>=2).map(f=>f.figure_id);
+  const prefixes=["intro-","verse-","chorus-","bridge-"];
+  const extra=hints.filter(id=>!prefixes.some(p=>String(id).toLowerCase().startsWith(p)) || fromRows.includes(id));
+  const all=[...new Set([...fromRows, ...extra])];
+  dl.innerHTML=all.map(id=>"<option value=\""+escAttr(id)+"\">").join("");
+}
+function setLayer(m){
+  layerFilter=m;
+  document.querySelectorAll("#layerbtns button").forEach(b=>b.classList.toggle("on", b.dataset.l===m));
+  applyLayer();
+}
+function applyLayer(){
+  if(regionsPlug){
+    regionsPlug.getRegions().forEach(r=>{
+      const p=(r._idx!=null)?regs[r._idx]:null;
+      if(r.element&&p) r.element.style.display=inLayer(p.role)?"":"none";
+    });
+  }
+  document.querySelectorAll("#rows tr").forEach((tr,i)=>{
+    const p=regs[i];
+    if(p) tr.style.display=inLayer(p.role)?"":"none";
+  });
+}
 function makeWave(url){
   destroyWave();
   const clk=document.getElementById("clock"); if(clk) clk.textContent="0:00 / —";
@@ -671,7 +872,7 @@ function makeWave(url){
   ws=WaveSurfer.create({
     container:"#wave",
     url:url,
-    height:168,
+    height:240,
     waveColor:"#5c6570",
     progressColor:"#9aa8b8",
     cursorColor:"#d4b06a",
@@ -716,16 +917,37 @@ function makeWave(url){
   ws.on("play",()=>document.getElementById("btnPlay").textContent="Pause");
   ws.on("pause",()=>document.getElementById("btnPlay").textContent="Play");
   regionsPlug.on("region-updated",(reg)=>{ if(lock) return; snapRegion(reg); });
+  regionsPlug.on("region-created",(reg)=>{
+    const i=parseInt(String(reg.id||"").replace("r",""),10);
+    const p=(!isNaN(i))?regs[i]:null;
+    applyRegionMeta(reg, p||{role:"riff"});
+  });
+  regionsPlug.on("region-dblclicked",(reg)=>toggleHeardRegion(reg));
+  regionsPlug.on("region-dblclick",(reg)=>toggleHeardRegion(reg));
   if(!window._booWaveUp){
     window._booWaveUp=true;
     document.getElementById("wave").addEventListener("pointerup",()=>{ if(!lock){ pullRegions(); table(); }});
-    window.addEventListener("resize",()=>drawBeatGrid());
+    document.getElementById("wave").addEventListener("contextmenu",ev=>{
+      ev.preventDefault();
+      if(!ws) return;
+      const i=regionElementAt(ev.clientX, ev.clientY);
+      if(i>=0) openCtx(i, ev.clientX, ev.clientY);
+    });
+    document.addEventListener("pointerdown",ev=>{
+      if(ctxIdx>=0 && !(ev.target && ev.target.closest && ev.target.closest("#ctx"))) closeCtx();
+    });
+    document.addEventListener("keydown",ev=>{
+      if(ev.key==="Escape" && ctxIdx>=0){ closeCtx(); ev.stopPropagation(); }
+    }, true);
+    window.addEventListener("resize",()=>{ drawBeatGrid(); closeCtx(); });
   }
   regionsPlug.on("region-clicked",(reg, ev)=>{
     if(ev && ev.stopPropagation) ev.stopPropagation();
     const i=parseInt(String(reg.id).replace("r",""),10);
     if(!isNaN(i)) sel=i;
     table();
+    const tr=document.querySelectorAll("#rows tr")[sel];
+    if(tr) tr.scrollIntoView({block:"nearest"});
     if(ws && ev && ev.clientX!=null){
       const rect=document.getElementById("wave").getBoundingClientRect();
       const dur=ws.getDuration()||0;
@@ -954,7 +1176,7 @@ function select(i){
     badge.title=(split==="val"?"whole-song validation (holdout)":"training")+" split";
   }
   renderList(); showErr(""); regs=[]; sel=-1; window._lyricLines=null; spec=null;
-  window._figureHint=""; window._conflictHint=""; window._draftNudge=0; window._adaptNudge=0;
+  window._figureHint=""; window._conflictHint=""; window._draftNudge=0; window._adaptNudge=0; window._figHints=[];
   const stems=t.stems||[];
   curStem = stems.includes("drums") ? "drums" : (stems[0]||"drums");
   renderStemButtons(t);
@@ -965,8 +1187,8 @@ function select(i){
   loadLyrics(t.id);
   fetch("/api/figures/"+t.id).then(r=>r.ok?r.json():{figures:[]}).then(x=>{
     const hints=(x.figures||[]).filter(f=>f.n_hits>=2);
-    const dl=document.getElementById("figureSuggests");
-    if(dl) dl.innerHTML=hints.map(f=>"<option value=\""+escAttr(f.figure_id)+"\">").join("");
+    window._figHints=hints;
+    refreshFigureSuggests();
     const conflict=hints.some(f=>f.conflict);
     window._conflictHint=conflict?"Tab letter maps to two figures — pick the name in the box.":"";
     window._figureHint=(!conflict&&hints.length)
@@ -1004,7 +1226,9 @@ document.getElementById("btnPlay").onclick=toggle;
 const SOURCE_OPTS=["human","guess-accepted","guess","msa-draft","songformer-draft"];
 const INSTRUMENTS=["","rhythm","lead","bass","drums","synth","vocal","mix"];
 function instSelect(cur){
-  return "<select data-f='instrument'>"+INSTRUMENTS.map(o=>"<option value='"+o+"'"+(o===cur?" selected":"")+">"+(o||"—")+"</option>").join("")+"</select>";
+  const opts=INSTRUMENTS.slice();
+  if(cur && !opts.includes(cur)) opts.push(cur);
+  return "<select data-f='instrument'>"+opts.map(o=>"<option value='"+escAttr(o)+"'"+(o===cur?" selected":"")+">"+(o||"—")+"</option>").join("")+"</select>";
 }
 function roleSelect(cur){
   return "<select data-f='role'>"+ROLES.map(r=>"<option value='"+r+"'"+(r===cur?" selected":"")+">"+(LABEL[r]||r)+"</option>").join("")+"</select>";
@@ -1018,6 +1242,7 @@ function table(){
   regs.forEach((p,i)=>{
     const tr=document.createElement("tr");
     if(i===sel) tr.className="on";
+    tr.style.display=inLayer(p.role)?"":"none";
     const cRole=document.createElement("td"); cRole.innerHTML=roleSelect(p.role);
     const cFig=document.createElement("td"); cFig.innerHTML="<input type='text' list='figureSuggests' data-f='figure_id' value='"+escAttr(p.figure_id|| (p.role+"-A"))+"'>"+(p.adapt?" <span class='conf' title='adapted from your last saves'>"+escAttr(p.adapt)+"</span>":"");
     const cForm=document.createElement("td"); cForm.innerHTML="<input type='text' size='2' data-f='form' value='"+escAttr(p.form||"A")+"'>";
@@ -1041,11 +1266,12 @@ function table(){
       const tag=ev.target.tagName;
       if(tag==="SELECT"||tag==="OPTION"||tag==="INPUT"||tag==="BUTTON") return;
       sel=i; document.querySelectorAll("#rows tr").forEach(r=>r.classList.remove("on")); tr.className="on";
+      highlightSel();
     };
     cRole.querySelector("select").onchange=e=>{
       const old=p.role; p.role=e.target.value;
       if(!p.figure_id || p.figure_id===old+"-A"){ p.figure_id=p.role+"-A"; cFig.querySelector("input").value=p.figure_id; }
-      paintRegions();
+      paintRegions(); refreshFigureSuggests();
     };
     cSrc.querySelector("select").onchange=e=>{ p.source=e.target.value; };
     tr.querySelectorAll("input").forEach(inp=>{
@@ -1053,7 +1279,7 @@ function table(){
         const f=inp.dataset.f;
         if(f==="heard"){ p.heard=!!inp.checked; return; }
         if(f==="unique"){ p.unique=!!inp.checked; return; }
-        if(f==="figure_id"){ p.figure_id=inp.value.trim(); return; }
+        if(f==="figure_id"){ p.figure_id=inp.value.trim(); refreshFigureSuggests(); return; }
         if(f==="form"){ p.form=(inp.value||"A").trim().toUpperCase()||"A"; inp.value=p.form; return; }
         if(f==="start_bar"||f==="end_bar"){ p[f]=inp.value===""?null:parseInt(inp.value,10); return; }
         const v=parseFloat(inp.value);
@@ -1064,6 +1290,8 @@ function table(){
     });
     tb.appendChild(tr);
   });
+  refreshFigureSuggests();
+  highlightSel();
 }
 
 function dump(){
@@ -1243,23 +1471,55 @@ document.getElementById("btnPack").onclick=()=>{
   }).catch(e=>showErr("pack: "+e,true));
 };
 document.getElementById("btnUndo").onclick=()=>{ if(!undo.length) return; regs=JSON.parse(undo.pop()); sel=Math.min(sel,regs.length-1); table(); paintRegions(); };
-document.getElementById("btnPlayBox").onclick=()=>{
-  if(!ws){ showErr("wave not ready", true); return; }
-  pullRegions();
-  if(sel<0 && regs.length) sel=0;
-  if(sel<0||!regs[sel]){ showErr("click a coloured box or its table row first", true); return; }
-  const a=+regs[sel].start, b=Math.max(a+0.05, +regs[sel].end);
-  window._playUntil=b;
-  showErr("box "+fmt(a)+" → "+fmt(b));
-  table();
-  const hit=regionsPlug && regionsPlug.getRegions().find(r=>String(r.id)==="r"+sel);
-  try{
-    if(hit && typeof hit.play==="function"){ hit.play(); return; }
-  }catch(e){}
-  ws.setTime(a);
-  Promise.resolve(ws.play(a, b)).catch(()=>ws.play());
-};
+document.getElementById("btnPlayBox").onclick=playBox;
 document.getElementById("btnNext").onclick=nextGreen;
+// right-click edit panel + layer filter pills
+(function(){
+  const role=document.getElementById("ctxRole");
+  if(role) role.innerHTML=ROLES.map(r=>"<option value='"+r+"'>"+(LABEL[r]||r)+"</option>").join("");
+  role.onchange=e=>{
+    if(ctxIdx<0) return;
+    const p=regs[ctxIdx], old=p.role; p.role=e.target.value;
+    if(!p.figure_id || p.figure_id===old+"-A"){
+      p.figure_id=p.role+"-A";
+      document.getElementById("ctxFig").value=p.figure_id; setRowField(ctxIdx,"figure_id",p.figure_id);
+    }
+    setRowField(ctxIdx,"role",p.role);
+    paintRegions(); refreshFigureSuggests();
+  };
+  document.getElementById("ctxFig").oninput=e=>{
+    if(ctxIdx<0) return;
+    regs[ctxIdx].figure_id=e.target.value.trim(); setRowField(ctxIdx,"figure_id",regs[ctxIdx].figure_id);
+  };
+  document.getElementById("ctxHeard").onchange=e=>{
+    if(ctxIdx<0) return;
+    regs[ctxIdx].heard=!!e.target.checked; setRowField(ctxIdx,"heard",e.target.checked);
+  };
+  document.getElementById("ctxUnique").onchange=e=>{
+    if(ctxIdx<0) return;
+    regs[ctxIdx].unique=!!e.target.checked; setRowField(ctxIdx,"unique",e.target.checked);
+  };
+  document.getElementById("ctxInst").oninput=e=>{
+    if(ctxIdx<0) return;
+    const v=e.target.value; regs[ctxIdx].instrument=v; setRowInst(ctxIdx,v);
+  };
+  document.getElementById("ctxPlay").onclick=()=>{ if(ctxIdx>=0) sel=ctxIdx; playBox(); };
+  document.getElementById("ctxSplit").onclick=()=>{
+    if(ctxIdx<0||!ctxTimeInRegion()) return;
+    const i=ctxIdx, p=regs[i], t=snapTime(ws.getCurrentTime());
+    if(t<=p.start+0.02 || t>=p.end-0.02) return;
+    snap();
+    const tail=Object.assign({}, p, {start:t});
+    p.end=t; regs.splice(i+1, 0, tail);
+    table(); paintRegions();
+  };
+  document.getElementById("ctxDel").onclick=()=>{
+    if(ctxIdx<0) return;
+    const i=ctxIdx; snap(); regs.splice(i,1); sel=Math.min(i, regs.length-1);
+    closeCtx(); table(); paintRegions();
+  };
+  document.querySelectorAll("#layerbtns button").forEach(b=>b.onclick=()=>setLayer(b.dataset.l));
+})();
 document.getElementById("btnMoreCols").onclick=function(){
   const tb=document.getElementById("sectable");
   tb.classList.toggle("show-extra");

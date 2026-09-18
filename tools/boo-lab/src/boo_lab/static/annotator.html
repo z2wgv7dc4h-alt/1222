@@ -9,7 +9,8 @@
   <script src="https://unpkg.com/wavesurfer.js@7.8.16/dist/plugins/regions.min.js"></script>
   <style>
     :root { --bg:#07080b; --panel:#101218; --line:#262a33; --text:#ece8e1; --mute:#8b8680;
-      --riff:#d4b06a; --hook:#7eb4d8; --break:#d46555; --solo:#7dba7a; --intro:#8a7a9a; --gold:#d4b06a; }
+      --riff:#d4b06a; --hook:#7eb4d8; --break:#d46555; --solo:#7dba7a; --intro:#8a7a9a; --gold:#d4b06a;
+      --wash:#1c1a14; }
     /* studio chrome: pin primary, Lab/Corpus details, extra cols hidden, coach in #err */
     * { box-sizing: border-box; }
     html, body { margin:0; height:100vh; background:
@@ -35,9 +36,9 @@
     .alb:hover { color:var(--text); }
     .t { padding:7px 14px; cursor:pointer; border-left:2px solid transparent; }
     .t:hover { background:#17181e; }
-    .t.on { border-left-color:var(--gold); background:#1c1a14; }
+    .t.on { border-left-color:var(--gold); background:var(--wash); }
     .t.on:hover { background:#221f18; }
-    .t:focus-visible { outline:1px solid var(--gold); outline-offset:-1px; }
+    .t:focus-visible, button:focus-visible { outline:1px solid var(--gold); outline-offset:-1px; }
     .t > span:first-child { font-size:13px; }
     .t .meta { display:block; font-size:11px; color:var(--mute); margin-top:2px; }
     .t .meta .sep { color:#4a4640; margin:0 3px; }
@@ -348,15 +349,15 @@ const ROLES = ["intro","build","riff","hook","breakdown","solo","chill","pulse",
 const ROLE_ALIAS = { verse:"riff", chorus:"hook", interlude:"chill", lead:"solo", inst:"solo", instrumental:"solo" };
 function canonRole(r){ r=String(r||"").toLowerCase().trim(); r=ROLE_ALIAS[r]||r; return ROLES.includes(r)?r:"riff"; }
 const COLOR = {
-  riff:"rgba(255,168,16,0.40)",
-  hook:"rgba(64,176,255,0.42)",
-  breakdown:"rgba(255,64,56,0.40)",
-  solo:"rgba(64,220,120,0.38)",
-  intro:"rgba(168,140,220,0.40)",
-  build:"rgba(255,128,64,0.38)",
-  chill:"rgba(64,200,196,0.36)",
-  pulse:"rgba(216,96,255,0.38)",
-  outro:"rgba(160,160,168,0.36)"
+  riff:"rgba(255,168,16,0.48)",
+  hook:"rgba(64,176,255,0.50)",
+  breakdown:"rgba(255,64,56,0.48)",
+  solo:"rgba(64,220,120,0.46)",
+  intro:"rgba(168,140,220,0.48)",
+  build:"rgba(255,128,64,0.46)",
+  chill:"rgba(64,200,196,0.44)",
+  pulse:"rgba(216,96,255,0.46)",
+  outro:"rgba(160,160,168,0.44)"
 };
 const LABEL = { riff:"Riff", hook:"Hook", breakdown:"Breakdown", solo:"Solo", intro:"Intro", build:"Build", chill:"Chill", pulse:"Pulse", outro:"Outro" };
 let tracks=[], trackId=0, regs=[], sel=-1, undo=[], listFilter="all", listQ="";
@@ -671,7 +672,8 @@ function makeWave(url){
     height:168,
     waveColor:"#5c6570",
     progressColor:"#9aa8b8",
-    cursorColor:"#f4ead8",
+    cursorColor:"#d4b06a",
+    cursorWidth:2,
     barWidth:2,
     barGap:1,
     dragToSeek:true,
@@ -935,7 +937,9 @@ document.querySelectorAll(".filters button").forEach(b=>{
 function select(i){
   trackId=i; const t=tracks[i];
   if(t && t.album) shut[t.album]=false;
-  document.getElementById("title").textContent=t.track||"";
+  const titleEl=document.getElementById("title");
+  const setTitle=()=>{ titleEl.textContent=t.track||""; };
+  if(document.startViewTransition) document.startViewTransition(setTitle); else setTitle();
   document.getElementById("sub").textContent=t.album||"";
   const art=document.getElementById("art");
   if(t.has_cover){ art.src="/api/cover/"+t.id; art.classList.add("on"); }

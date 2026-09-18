@@ -20,9 +20,12 @@
       border-right:1px solid var(--line); overflow-y:scroll; overflow-x:hidden; }
     .app > aside h1 { margin:0; padding:22px 20px 6px; font-family:"Instrument Serif", serif; font-size:28px; font-weight:400; letter-spacing:.02em; color:var(--gold); }
     .app > aside p { margin:0 16px 12px; color:var(--mute); font-size:12px; line-height:1.5; }
-    .filters { display:flex; gap:6px; padding:0 16px 10px; flex-wrap:wrap; }
-    .filters button { padding:4px 8px; font-size:12px; }
-    .filters button.on { border-color:var(--riff); color:var(--riff); }
+    .filters { display:inline-flex; margin:0 16px 10px; padding:0; }
+    .filters button { padding:5px 10px; font-size:12px; border-radius:0; margin:0; }
+    .filters button + button { border-left:none; }
+    .filters button:first-child { border-radius:6px 0 0 6px; }
+    .filters button:last-child { border-radius:0 6px 6px 0; }
+    .filters button.on { background:color-mix(in srgb, var(--riff) 12%, transparent); border-color:var(--riff); color:var(--riff); }
     #dropzone { margin:0; padding:10px; border:1px dashed #4a4030; border-radius:8px; color:var(--mute); font-size:12px; text-align:center; }
     #dropzone.hot { border-color:var(--gold); color:var(--gold); }
     #bandName { width:100%; margin-top:8px; padding:6px 8px; background:#111; color:var(--text); border:1px solid var(--line); }
@@ -34,6 +37,9 @@
     .t.on { border-left-color:var(--gold); background:transparent; }
     .t > span:first-child { font-size:13px; }
     .t .meta { display:block; font-size:11px; color:var(--mute); margin-top:2px; }
+    .t .meta .sep { color:#4a4640; margin:0 3px; }
+    .t .meta .offclock { color:#6a625a; }
+    .t .valtag { color:var(--gold); border:1px solid #6a5a3a; border-radius:999px; font-size:9px; letter-spacing:.08em; padding:0 5px; margin-left:6px; vertical-align:middle; }
     .dot { display:inline-block; width:6px; height:6px; border-radius:50%; margin-right:4px; background:#3a3a3e; }
     .dot.ok { background:#7dba7a; }
     .dot.part { background:#c4a35a; }
@@ -52,6 +58,14 @@
     #wave { width:100%; height:168px; min-height:168px; background:#0a0c10; border:1px solid var(--line); overflow:hidden; position:relative; border-radius:6px; box-shadow:inset 0 0 40px #0008; }
     #wave > div { height:100% !important; }
     #drums { width:100%; height:72px; min-height:72px; background:#0a0c10; border:1px solid var(--line); overflow:hidden; position:relative; border-radius:6px; }
+    #wavelane { position:relative; }
+    #drumlane, #lyriclane { padding-bottom:8px; }
+    .ghost { position:absolute; left:0; right:0; top:24px; bottom:0; display:flex; flex-direction:column;
+      align-items:center; justify-content:center; gap:4px; pointer-events:none; opacity:0;
+      transition:opacity .2s ease; z-index:5; }
+    .ghost.show { opacity:1; }
+    .ghost-main { font-family:"Instrument Serif",serif; font-size:22px; color:#6a625a; }
+    .ghost-sub { font-size:12px; letter-spacing:.04em; color:#4f4a44; }
     .lane.idle { display:none; }
     .lyrics { max-height:160px; overflow:auto; border:1px solid var(--line); border-radius:6px; background:#0a0c10; padding:6px 8px; }
     .lyrics .ly { display:flex; align-items:center; gap:8px; padding:3px 0; color:#b8b0a4; font-size:13px; }
@@ -69,6 +83,8 @@
       background:#14161c; border:1px solid var(--line); border-radius:8px; padding:10px;
       display:flex; flex-direction:column; gap:8px; box-shadow:0 18px 40px #000a; }
     .menu-panel button, .menu-panel label { text-align:left; }
+    .menu-panel button.off { opacity:.45; }
+    .menu > summary .mute { color:#6a625a; margin-left:6px; }
     .pins { display:grid; grid-template-columns:repeat(9,1fr); gap:6px; margin:2px 0 10px; }
     button { background:#1a1d24; color:var(--text); border:1px solid var(--line); padding:8px 14px; font:inherit; cursor:pointer; border-radius:6px; }
     button:hover { border-color:#6a5a3a; color:#f3ead8; }
@@ -219,21 +235,21 @@
           <h2 id="title">…</h2>
           <span id="sub"></span>
         </div>
-        <span class="badge" id="splitbadge"></span>
+        <span class="badge" id="splitbadge" title="train / val split"></span>
       </header>
       <div class="transport">
         <button type="button" id="btnPlay">Play</button>
         <span class="time" id="clock">0:00 / 0:00</span>
         <button type="button" id="btnPlayBox">Play box</button>
-        <button type="button" id="btnSave">Save</button>
+        <button type="button" id="btnSave" title="Save keepers to data/sections.jsonl. Unticked boxes are dropped.">Save</button>
         <button type="button" id="btnUndo">Undo</button>
         <button type="button" id="btnHow">How</button>
       </div>
       <div class="transport2">
         <details id="labMenu" class="menu">
-          <summary>Lab</summary>
+          <summary>Lab<span id="labCount" class="mute"></span></summary>
           <div class="menu-panel">
-            <button type="button" id="btnEst">Guess</button>
+            <button type="button" id="btnEst" title="Proposes unheard boxes from GP markers + drum slams. Never a keeper until you tick heard and Save.">Guess</button>
             <button type="button" id="btnDrafts">Load drafts</button>
             <button type="button" id="btnLyrics">Lyrics</button>
             <button type="button" id="btnPack">Pack</button>
@@ -245,7 +261,7 @@
         <details id="corpusMenu" class="menu">
           <summary>Corpus</summary>
           <div class="menu-panel">
-            <div id="dropzone">Drop FLAC / GP / zip here
+            <div id="dropzone">Ingest — zip or folder. Type the band first. No RAR.
               <input id="bandName" placeholder="band name e.g. veil of maya" />
             </div>
             <button type="button" id="btnGit">Push git</button>
@@ -269,6 +285,10 @@
     <div class="lane" id="wavelane">
       <div class="lane-lab">mix — drag boxes, click empty to seek</div>
       <div id="wave"></div>
+      <div id="emptyghost" class="ghost" aria-hidden="true">
+        <div class="ghost-main">Drag to mark a section</div>
+        <div class="ghost-sub">1 Riff&nbsp;&nbsp;2 Hook&nbsp;&nbsp;3 Breakdown&nbsp;&nbsp;I Intro</div>
+      </div>
     </div>
     <div class="lane idle" id="drumlane">
       <div class="lane-lab">
@@ -833,8 +853,11 @@ function renderList(){
     d.dataset.tid=String(t.id);
     const gpClass=t.gp_partial?"part":(t.has_gp?"ok":"");
     const kind=(t.gp_kind||"").toUpperCase();
-    const gpWord=!t.has_gp?"no tab":(t.gp_partial?"partial "+kind:kind);
-    d.innerHTML="<span>"+(t.track||"")+"</span><span class='meta'><span class='dot "+(t.has_flac?"ok":"")+"'></span>flac <span class='dot "+gpClass+"'></span>"+gpWord+"</span>";
+    const gpWord=!t.has_gp?"no tab":(t.gp_partial?"partial "+(kind||"tab"):(kind||"tab"));
+    const flacWord=t.has_flac?"FLAC":"no FLAC";
+    const offClock=t.sync_ok===false?" <span class='offclock'>tab off-clock</span>":"";
+    const valTag=String(t.split||"").toLowerCase()==="val"?"<span class='valtag' title='whole-song validation (holdout)'>VAL</span>":"";
+    d.innerHTML="<span>"+(t.track||"")+valTag+"</span><span class='meta'><span class='dot "+(t.has_flac?"ok":"")+"'></span>"+flacWord+"<span class='sep'>·</span><span class='dot "+gpClass+"'></span>"+gpWord+offClock+"</span>";
     d.onclick=()=>select(tracks.indexOf(t)); box.appendChild(d);
   });
   const on=box.querySelector(".t.on");
@@ -1137,6 +1160,7 @@ document.getElementById("btnRemoveAlbum").onclick=()=>{
 };
 document.getElementById("btnPack").onclick=()=>{
   const t=tracks[trackId]; if(!t) return;
+  if(!regs.length){ showErr("Save keepers before Pack."); return; }
   showErr("packing (Demucs if no cache)…");
   fetch("/api/pack/"+t.id,{method:"POST"}).then(async r=>{
     const x=await r.json();
@@ -1166,6 +1190,37 @@ document.getElementById("btnMoreCols").onclick=function(){
   tb.classList.toggle("show-extra");
   this.textContent=tb.classList.contains("show-extra")?"Fewer columns":"More columns";
 };
+
+(function(){
+  const g=document.getElementById("emptyghost");
+  const tb=document.getElementById("rows");
+  const lab=document.getElementById("labCount");
+  const pack=document.getElementById("btnPack");
+  const clk=document.getElementById("clock");
+  const ghost=()=>{
+    if(!g) return;
+    const empty=regs.length===0;
+    const ready=!!(ws && typeof ws.getDuration==="function" && ws.getDuration()>1 &&
+                   clk && !/^0:00 \/ 0:00\b/.test(clk.textContent||""));
+    g.classList.toggle("show", empty && ready);
+  };
+  const sync=()=>{
+    ghost();
+    if(lab){
+      const n=regs.filter(r=>r.source && r.source!=="human").length;
+      lab.textContent=n?String(n):"";
+    }
+    if(pack){
+      const empty=regs.length===0;
+      pack.classList.toggle("off", empty);
+      pack.setAttribute("aria-disabled", empty?"true":"false");
+    }
+    if(tb) tb.querySelectorAll("input[data-f='heard']").forEach(el=>{ el.title="Unticked boxes are thrown away on Save."; });
+  };
+  if(tb) new MutationObserver(sync).observe(tb,{childList:true});
+  if(clk) new MutationObserver(ghost).observe(clk,{childList:true,characterData:true,subtree:true});
+  sync();
+})();
 
 document.body.addEventListener("keydown",e=>{
   if(e.target.tagName==="INPUT"||e.target.tagName==="SELECT") return;

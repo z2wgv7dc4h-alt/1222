@@ -28,7 +28,9 @@ segmentation was prototyped and **rejected** (795–1057 sections vs 143 markers
 tabs' marker letters plus the allin1 drafts are the real riff signal. Studio chrome is now a rail |
 main layout with a two-row transport (**Lab** / **Corpus** `<details>`), equal-width role pins, and a
 **More columns** toggle (`form` / `uniq` / `inst` / `bar0` / `bar1` / `source` hidden by default) —
-restyle only, all ids and behavior unchanged.
+restyle only, all ids and behavior unchanged. Waiting states: rows read `FLAC · GP5` / `no tab` /
+etc. (+ `VAL` tag), an empty wave shows a "Drag to mark a section" ghost, and the Lab summary counts
+draft rows while **Pack** is greyed until boxes exist.
 
 On disk now:
 - `data/sections.jsonl` — 6 rows, 1 track (Rebirth), all `heard=true`. The whole keeper set.

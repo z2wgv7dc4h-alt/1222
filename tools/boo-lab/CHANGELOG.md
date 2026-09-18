@@ -2,6 +2,13 @@
 
 ## 2026-09-18
 
+### Empty + waiting states
+
+- **List reads at a glance.** Each song meta is now `FLAC · GP5` / `FLAC · GP7` / `FLAC · no tab` / `FLAC · partial GP5`, built from the existing `has_flac` / `has_gp` / `gp_partial` / `gp_kind`; a tiny `VAL` tag shows when `split==="val"`; a mute `tab off-clock` shows only if a track row already carries `sync_ok===false` (the field is absent from `/api/tracks` today, so it is skipped — no new fetch). Filter pills are a segmented All / GP5 / No tab control.
+- **Empty wave ghost.** With a song selected, duration loaded, and no boxes, `#emptyghost` overlays the mix lane ("Drag to mark a section" / "1 Riff  2 Hook  3 Breakdown  I Intro"); it vanishes on the first box. Pure HTML/CSS overlay, `pointer-events:none`.
+- **Waiting signals.** The Lab summary carries a mute count of draft/guess rows; **Pack** is visually disabled (`.off` + `aria-disabled`) at zero boxes and its handler early-returns with "Save keepers before Pack."; Guess / Save / heard / Snap beats / VAL badge have hover `title`s.
+- Corpus drop-zone copy states the ingest contract; lyric/stem lanes get 8px bottom padding. Frontend only — no FFT / beat-canvas or API change, all ids intact.
+
 ### Studio chrome restyle + More columns
 
 - **Finished-instrument chrome.** App is a 280px rail | main grid with the spectrogram dock at 104px; the rail keeps album thumbs, the serif wordmark, and one quiet line ("Pick a song. Box a part. Tick heard. Save."); song rows are tighter (13px title / 11px meta) and the active song is a gold 2px left rule, not a slab. Work header is one strip (48px art, title, album, VAL badge).

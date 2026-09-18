@@ -95,7 +95,8 @@ outputs (`data/{drafts,beats,compare,sync,agree}.*`, `data/sections.jsonl.bak`, 
 One album side per session.
 
 1. Pick a track. Clock must show full length before pinning. Use the waveform **and** the mel
-   spectrogram (Wave / Spec / Both) to find edges.
+   spectrogram (Wave / Spec / Both) to find edges. An empty wave shows a ghost hint
+   ("Drag to mark a section"); it disappears after the first box.
 2. Give each box a `form` (large letter), a `figure_id` (small, e.g. `riff-A`), and a `role`;
    mark `unique` for single-use figures, `instrument` when two guitars differ. Tick **heard**
    when you have actually listened. With **Snap beats** on, a dragged edge snaps to the nearest

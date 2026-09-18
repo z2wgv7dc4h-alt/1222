@@ -2,6 +2,10 @@
 
 ## 2026-09-18
 
+### Guess stretches marker times by `sync` clock_ratio
+
+- When a song's `sync.jsonl` row is `sync_ok` with `clock_ratio` off 1.0 by ≥0.002, `estimate_hybrid` scales every tab-marker `start`/`end` by that ratio before the rest of the pipeline (existing beat snap unchanged), prints `guess: clock_ratio=1.027 stretched N markers`, and notes it. `clock_ratio` ~1.0/None leaves times unchanged; `sync_ok` false (or no row) still drops markers; audio-derived breakdown drafts are never stretched (they already live on the FLAC clock). Guess now resolves the typed album/track against `map.csv` before the sync/beats lookup. Thresholds untouched. Lab tests: **256 passed**.
+
 ### Intern rank spine; stub `enough_to_train` gone
 
 - `learn.py` rewritten. `record(lab_root, kind, album="", track="", **payload)` appends a `{ts, kind, album, track, payload}` event to `data/learn.jsonl` and never raises into the caller. `build_rank`/`run_learn` rebuild `data/intern_rank.json` from `compare.compare()` (rebuilt when stale; no second F@0.5) and mark `prefer` only when a draft source has **>= 5 non-holdout songs** with keepers+drafts, **F@0.5 >= 0.50**, and a **>= 0.03** lead; holdout scores stay in the dict but never vote. Read-only `figure_agree` (keeper `figure_id` vs `figures.jsonl`, no renames), `sync_rate`, and `agree_pass` (via agree.py's own `diff_passes`) are recorded. `enough_to_train`/`role_prior`/`note` are removed; Save logs `save_snapshot`, `compare` refreshes the rank best-effort, and `structure`/`guess` print `prefer=<source>` only when they emit it. CLI `boo-lab learn [--album X]`; `data/learn.jsonl` + `data/intern_rank.json` gitignored. Lab tests: **252 passed**.

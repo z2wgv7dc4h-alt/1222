@@ -158,6 +158,13 @@ If it says `librosa beats, no half-time`, drums ran and found no slam — correc
 
 Guess is **not** a BoO brain. It carries the tab's section letters and repeats, but a letter is not a role — the human paints hooks/breakdowns and the tail the tab doesn't notate.
 
+**Rate-aware markers.** When the song's `data/sync.jsonl` row is `sync_ok` with `clock_ratio` off 1.0
+by ≥0.002, Guess scales every tab-marker `start`/`end` by that ratio before the rest of the pipeline
+(the existing beat snap still applies afterwards), and prints
+`guess: clock_ratio=1.027 stretched N markers`. `clock_ratio` None/~1.0 (±0.002) leaves times
+unchanged; `sync_ok` false (or no row) still drops the markers. Audio-derived breakdown drafts are
+never stretched — they already live on the FLAC clock.
+
 ## Figures (riff identity, never keepers)
 
 `boo-lab figures [--album X --track Y]` fingerprints each bar (`bar_fp`:

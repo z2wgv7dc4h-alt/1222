@@ -215,3 +215,87 @@ def test_guess_keeps_tab_markers_when_sync_ok(tmp_path, monkeypatch):
     res = _wire_gp_estimate(tmp_path, monkeypatch, sync_ok=True)
     assert any(s.get("source") == "gp-marker" for s in res["sections"])
     assert any("gp markers (sync ok)" in n for n in res["notes"])
+
+
+# --- clock-ratio stretch of tab markers --------------------------------------
+
+
+def _wire_gp_ratio(tmp_path, monkeypatch, *, sync_ok, ratio, markers=None):
+    lab = tmp_path / "lab"
+    (lab / "data").mkdir(parents=True)
+    rec = {"album": "A", "track": "Fixture", "sync_ok": sync_ok}
+    if ratio is not None:
+        rec["clock_ratio"] = ratio
+    (lab / "data" / "sync.jsonl").write_text(json.dumps(rec) + "\n", encoding="utf-8")
+    flac = tmp_path / "song.flac"
+    flac.write_bytes(b"x")
+    monkeypatch.setattr(soundfile, "info",
+                        lambda *a, **k: types.SimpleNamespace(frames=int(22050 * 100), samplerate=22050))
+    monkeypatch.setattr(g, "GP5_ROOTS", [tmp_path / "no_gp5"])
+    monkeypatch.setattr(g, "_prefer_gp5", lambda gp, track: tmp_path / "x.gp5")
+    seed = markers if markers is not None else [
+        {"role": "riff", "start": 10.0, "end": 14.0, "source": "gp-marker"}]
+    import boo_lab.extract as ex
+    monkeypatch.setattr(ex, "estimate_from_gp",
+                        lambda p: {"bpm": 120, "duration": 100,
+                                   "sections": [dict(s) for s in seed]})
+    import boo_lab.stems as st
+    monkeypatch.setattr(st, "ensure_drums", lambda f, c: (None, "none"))
+    monkeypatch.setattr(g, "_librosa_beats", lambda wav: {"beats": [], "bpm": None})
+    monkeypatch.setattr(g, "_half_time_spans", lambda beats, min_len=6.0: [])
+    monkeypatch.setattr(g, "_kick_spans", lambda wav: [])
+    return g.estimate_hybrid(flac, tmp_path / "x.gp5", track="Fixture",
+                             cache=lab / "work" / "stems", album="A")
+
+
+def test_guess_stretches_markers_by_clock_ratio(tmp_path, monkeypatch, capsys):
+    res = _wire_gp_ratio(tmp_path, monkeypatch, sync_ok=True, ratio=1.027)
+
+    gp = [s for s in res["sections"] if s.get("source") == "gp-marker"]
+    assert len(gp) == 1
+    assert gp[0]["start"] == pytest.approx(10.0 * 1.027, abs=1e-3)
+    assert gp[0]["end"] == pytest.approx(14.0 * 1.027, abs=1e-3)
+    assert "guess: clock_ratio=1.027 stretched 1 markers" in capsys.readouterr().out
+
+
+def test_guess_drops_markers_when_not_sync_ok_even_with_ratio(tmp_path, monkeypatch):
+    res = _wire_gp_ratio(tmp_path, monkeypatch, sync_ok=False, ratio=1.027)
+    assert not any(s.get("source") == "gp-marker" for s in res["sections"])
+
+
+def test_guess_ratio_one_leaves_marker_times_unchanged(tmp_path, monkeypatch):
+    res = _wire_gp_ratio(tmp_path, monkeypatch, sync_ok=True, ratio=1.0)
+    gp = [s for s in res["sections"] if s.get("source") == "gp-marker"][0]
+    assert gp["start"] == 10.0 and gp["end"] == 14.0
+
+
+def test_audio_breakdown_draft_is_not_stretched(tmp_path, monkeypatch):
+    lab = tmp_path / "lab"
+    (lab / "data").mkdir(parents=True)
+    (lab / "data" / "sync.jsonl").write_text(
+        json.dumps({"album": "A", "track": "Fixture", "sync_ok": True,
+                    "clock_ratio": 1.027}) + "\n",
+        encoding="utf-8",
+    )
+    flac = tmp_path / "song.flac"
+    flac.write_bytes(b"x")
+    monkeypatch.setattr(soundfile, "info",
+                        lambda *a, **k: types.SimpleNamespace(frames=int(22050 * 100), samplerate=22050))
+    monkeypatch.setattr(g, "GP5_ROOTS", [tmp_path / "no_gp5"])
+    monkeypatch.setattr(g, "_prefer_gp5", lambda gp, track: tmp_path / "x.gp5")
+    import boo_lab.extract as ex
+    monkeypatch.setattr(ex, "estimate_from_gp",
+                        lambda p: {"bpm": 120, "duration": 100, "sections": []})
+    import boo_lab.stems as st
+    monkeypatch.setattr(st, "ensure_drums", lambda f, c: (None, "none"))
+    monkeypatch.setattr(g, "_librosa_beats", lambda wav: {"beats": [], "bpm": None})
+    monkeypatch.setattr(g, "_half_time_spans",
+                        lambda beats, min_len=6.0: [{"role": "breakdown", "start": 20.0,
+                                                     "end": 30.0, "source": "halftime"}])
+    monkeypatch.setattr(g, "_kick_spans", lambda wav: [])
+
+    res = g.estimate_hybrid(flac, tmp_path / "x.gp5", track="Fixture",
+                            cache=lab / "work" / "stems", album="A")
+
+    bd = [s for s in res["sections"] if s.get("source") == "halftime"][0]
+    assert bd["start"] == 20.0 and bd["end"] == 30.0

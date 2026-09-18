@@ -71,6 +71,23 @@ def _prefer_gp5(gp: Path | None, track: str) -> Path | None:
     return None
 
 
+def _resolve_names(lab_root: Path, album: str, track: str) -> tuple[str, str]:
+    """Map a studio-style name to the `map.csv` album/track (year-prefixed
+    folders, track punctuation), the same resolver sync/hear use. Passes the
+    typed pair through when incomplete or unmatched."""
+    try:
+        from .catalogue import load_map, resolve_row
+
+        mp = Path(lab_root) / "data" / "map.csv"
+        if mp.exists() and album and track:
+            row = resolve_row(load_map(mp), album, track)
+            if row is not None:
+                return row.get("album") or album, row.get("track") or track
+    except Exception:
+        pass
+    return album, track
+
+
 def _sync_for(lab_root: Path | None, album: str, track: str) -> dict | None:
     """The recorded tab-vs-audio witness for one song (`data/sync.jsonl`), or
     `None` when it was never run. Lets Guess refuse to emit tab-marker times
@@ -147,6 +164,9 @@ def estimate_hybrid(
     bpm = None
     beats: list[float] = []
     lab_root = Path(cache).parent.parent if cache else None
+    lookup_album, lookup_track = album, track
+    if lab_root is not None:
+        lookup_album, lookup_track = _resolve_names(lab_root, album, track)
 
     gp_use = _prefer_gp5(gp, track)
     key = _norm(track) or _norm(gp.stem if gp else "")
@@ -163,7 +183,7 @@ def estimate_hybrid(
             g = estimate_from_gp(gp_use)
             bpm = g.get("bpm") or bpm
             if g.get("sections"):
-                sync_rec = _sync_for(lab_root, album, track)
+                sync_rec = _sync_for(lab_root, lookup_album, lookup_track)
                 if sync_rec is not None and sync_rec.get("sync_ok") is False:
                     # Gate: don't propose times from a tab measured as misaligned.
                     lag = sync_rec.get("lag_sec")
@@ -172,7 +192,25 @@ def estimate_hybrid(
                         % ("" if lag is None else " (lag %.2fs)" % lag)
                     )
                 else:
-                    sections.extend(g["sections"])
+                    # A rate-aligned tab is notated off by a fixed ratio: apply
+                    # that stretch before the rest of the pipeline (audio-only
+                    # drafts already live on the FLAC clock and are untouched).
+                    markers = g["sections"]
+                    ratio = None
+                    if sync_rec is not None and sync_rec.get("sync_ok") is True:
+                        try:
+                            ratio = float(sync_rec.get("clock_ratio"))
+                        except (TypeError, ValueError):
+                            ratio = None
+                    if ratio is not None and abs(ratio - 1.0) >= 0.002:
+                        for s in markers:
+                            s["start"] = round(float(s["start"]) * ratio, 3)
+                            s["end"] = round(float(s["end"]) * ratio, 3)
+                        print("guess: clock_ratio=%.3f stretched %d markers"
+                              % (ratio, len(markers)))
+                        notes.append("clock_ratio=%.3f stretched %d markers"
+                                     % (ratio, len(markers)))
+                    sections.extend(markers)
                     notes.append("gp markers" + (" (sync ok)" if sync_rec is not None else ""))
             else:
                 notes.append(g.get("reason") or "tab has no markers")
@@ -240,7 +278,7 @@ def estimate_hybrid(
             pass
 
     # Snap the audio-derived spans (halftime/kick) to the recorded beat grid.
-    grid = _beats_for(lab_root, album, track)
+    grid = _beats_for(lab_root, lookup_album, lookup_track)
     if grid and grid.get("beats"):
         snapped = 0
         for s in sections:

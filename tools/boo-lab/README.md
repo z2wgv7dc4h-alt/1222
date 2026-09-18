@@ -4,9 +4,13 @@
 
 Local studio: listen to FLACs, mark structure, pack clips for later learning. Nothing leaves this PC except git of **code + `data/` labels**.
 
+Using it: read **USER.md** first (Part A to work, Part B for every button and file). This README is the developer/operator reference.
+
 Repo on GitHub: `z2wgv7dc4h-alt/1222` under `tools/boo-lab`.
 
 ## Paths
+
+Absolute Windows paths below are **this machine** only.
 
 ```
 LAB    C:\Users\RIGGUSPIG\Desktop\god-tier-metal\tools\boo-lab
@@ -20,7 +24,7 @@ GP     C:\Users\RIGGUSPIG\Desktop\god-tier-metal\reference\gp-tabs
 
 Easiest (scans, then serves): run `START.bat`.
 
-Manual equivalent:
+Manual equivalent (path is **this machine**):
 
 ```
 cd C:\Users\RIGGUSPIG\Desktop\god-tier-metal\tools\boo-lab
@@ -115,6 +119,9 @@ Snap beats / JSON / Next GP live under **Lab**; Drop / Push git / Remove album l
 4. **Pack** once labels are good.
 5. Old pins without `heard`: `boo-lab hear --album X --track Y` (that track only).
 6. If the interns are installed: `boo-lab structure --album X`, then `boo-lab compare --album X`.
+
+Rules: skip **VAL** songs; never Guess a finished song; the interns (Guess / allin1 / SongFormer /
+beat_this / Demucs) are optional **stencils**, not truth; `learn` does not train anything.
 
 ## The table columns
 

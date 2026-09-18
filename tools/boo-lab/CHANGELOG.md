@@ -2,6 +2,10 @@
 
 ## 2026-09-18
 
+### USER.md operator manual (gold vs stencil)
+
+- New `tools/boo-lab/USER.md`: the operator manual in two parts — Part A (open, mark, keys, stuck) and Part B (gold keeper vs stencil draft, roles, Guess/interns, sync, learn/adapt as a scoreboard not training, figures/cells, VAL, commands, do-nots). README points to it first (`Using it: read USER.md first`) and labels absolute Windows paths "this machine". The studio How drawer gains the two-line suggestion/VAL note, and Guess / Load drafts now show a coach nudge (`N drafts — tick heard on the ones you accept, then Save.`) without overwriting a real error. CURRENT: operators start at USER.md. No behavior/math changes.
+
 ### Per-album adapt from accepted drafts (edges, role, figure)
 
 - New `src/boo_lab/adapt.py`: `rebuild_album` pairs heard keepers with the album's drafts (greedy nearest start <= 3.0 s) and stores a per-album blob in `data/adapt.json` — median edge shift (`shift_start`/`shift_end`, clamped +/-0.50 s), intern-role -> saved-role map (min 2 pairs when n_pairs>=3, else 1), and draft `figure_id` -> saved `figure_id`. Holdout tracks never teach a mixed album (a holdout-only album may build for itself). `apply_adapt` shifts/maps only draft boxes, never ticks `heard`, never changes `source`, never writes `sections.jsonl`. Guess applies it after markers/breakdowns (prints `adapt: album=… n_pairs=… shift_start=…`); Save rebuilds the album blob and logs an `adapt` event best-effort; CLI `boo-lab adapt [--album X]`. `intern_rank`'s vote is untouched (still 5 songs). `data/adapt.json` gitignored. Lab tests: **265 passed**.

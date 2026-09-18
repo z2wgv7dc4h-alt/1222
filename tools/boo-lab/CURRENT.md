@@ -2,6 +2,8 @@
 
 Single source of truth for humans and later bots. If README/STATUS/LAW disagree with this file, this file wins. Then fix the others.
 
+Operators start at `USER.md` (Part A to work, Part B for every button and file).
+
 > **Read this first.**
 > Keepers = `data/sections.jsonl` (`source=human`/`guess-accepted` **and** `heard=true`).
 > Drafts = `data/drafts.jsonl` (`msa-draft` / `songformer-draft` / `guess`) — **never keepers**.

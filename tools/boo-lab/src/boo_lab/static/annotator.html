@@ -170,6 +170,7 @@
   <button type="button" class="close" id="btnCloseHow">Close</button>
   <h3>How to mark a song</h3>
   <p><b>Quick start:</b> (1) pick a song on the left and wait until the clock shows its full length. (2) Press a role pin (or 1 for Riff). Then drag the box to fit. (3) Tick <b>heard</b> on every box you actually listened to. (4) Press <b>Save</b>.</p>
+  <p>Guess and Load drafts are suggestions. They are not saved until heard and Save. Do not Guess a finished song. Do not pin VAL.</p>
   <p><b>Figure</b> is the riff's name. Same idea later = same figure (riff-A).</p>
   <p>Drag a box to move it, drag its edge to resize, click empty sound to jump there. Boxes may overlap <i>only</i> when their roles differ (e.g. a Breakdown sitting on a Riff).</p>
   <h4>What each table column means</h4>
@@ -368,6 +369,7 @@ function coach(){
   if(!ws || (ws.getDuration()||0)<2) return "Wait. Clock must show the full length before you draw.";
   const t=tracks[trackId];
   if(t && String(t.split||"").toLowerCase()==="val") return "VAL — leave unpinned";
+  if(window._draftNudge>0) return window._draftNudge+" draft"+(window._draftNudge===1?"":"s")+" — tick heard on the ones you accept, then Save.";
   if(!regs.length) return window._figureHint || "Press a role pin (or 1 for Riff) — pins create boxes; drag fits them.";
   const unh=regs.filter(p=>!p.heard).length;
   if(unh) return unh+" not heard — Save will drop them";
@@ -381,6 +383,13 @@ function showErr(m, bad){
   el.textContent=msg||DEFAULT_ERR;
   el.classList.toggle("bad", !!bad);
   el.dataset.explicit=explicit?"1":"0";
+}
+function draftNudge(n){
+  n=+n||0;
+  const err=document.getElementById("err");
+  if(!err || err.classList.contains("bad")) return;  // never overwrite a real error
+  window._draftNudge=n;
+  if(n>0) showErr("");
 }
 function openHow(on){
   document.getElementById("howto").classList.toggle("open", on);
@@ -930,7 +939,7 @@ function select(i){
     badge.title=(split==="val"?"whole-song validation (holdout)":"training")+" split";
   }
   renderList(); showErr(""); regs=[]; sel=-1; window._lyricLines=null; spec=null;
-  window._figureHint="";
+  window._figureHint=""; window._draftNudge=0;
   const stems=t.stems||[];
   curStem = stems.includes("drums") ? "drums" : (stems[0]||"drums");
   renderStemButtons(t);
@@ -1066,17 +1075,19 @@ function estimate(){
               form:s.form|| "A",unique:!!s.unique,instrument:"",start_bar:null,end_bar:null,
               source:(SOURCE_OPTS.includes(s.source)?s.source:"guess"),heard:false};
     });
+    let added=0;
     if(merge){
       draft.forEach(d=>{
         const hit=regs.some(p=>p.role===d.role && Math.min(p.end,d.end)-Math.max(p.start,d.start) > 0.7*Math.min(p.end-p.start,d.end-d.start));
-        if(!hit) regs.push(d);
+        if(!hit){ regs.push(d); added++; }
       });
-    } else regs=draft;
+    } else { regs=draft; added=draft.length; }
     sel=regs.length?0:-1;
     table(); paintRegions();
     loadStem(tracks[trackId].id, curStem);
     document.getElementById("sub").textContent=(x.sections||[]).length+" guessed";
-    showErr((x.notes||[]).join(" · "));
+    if(added>0) draftNudge(added);
+    else showErr((x.notes||[]).join(" · "));
   }).catch(e=>showErr("guess: "+e, true)).finally(()=>{ document.getElementById("btnEst").disabled=false; });
 }
 function harvestTable(){
@@ -1121,6 +1132,7 @@ function save(){
     if(x.dropped_unheard) msg+=" · "+x.dropped_unheard+" unheard box(es) dropped";
     if(x.malformed_lines_skipped) msg+=" · "+x.malformed_lines_skipped+" malformed line(s) skipped";
     msg+=" · backup: sections.jsonl.bak";
+    window._draftNudge=0;
     showErr(msg);
     document.getElementById("sub").textContent="saved "+x.saved;
   }).catch(e=>showErr("save failed: "+e, true));
@@ -1142,7 +1154,7 @@ function loadDrafts(){
                  source:(SOURCE_OPTS.includes(d.source)?d.source:"msa-draft"),heard:false});
     });
     table(); paintRegions();
-    showErr("loaded "+ds.length+" draft(s) as unheard — tick heard to accept");
+    draftNudge(ds.length);
   }).catch(e=>showErr("drafts: "+e,true));
 }
 document.getElementById("btnEst").onclick=estimate;

@@ -106,6 +106,9 @@ def main(argv: list[str] | None = None) -> int:
     s = sub.add_parser("learn", help="rank the machine draft sources from keepers")
     s.add_argument("--album")
 
+    s = sub.add_parser("adapt", help="per-album calibration from accepted drafts (drafts only)")
+    s.add_argument("--album")
+
     s = sub.add_parser("hear", help="mark already-keeper pins heard=true for one song")
     s.add_argument("--album")
     s.add_argument("--track")
@@ -261,6 +264,20 @@ def main(argv: list[str] | None = None) -> int:
               % (fa.get("match", 0), fa.get("miss", 0), fa.get("conflict", 0)))
         print("sync_ok %.3f (%d/%d)"
               % (sr.get("rate", 0.0), sr.get("ok", 0), sr.get("total", 0)))
+        return 0
+
+    if args.cmd == "adapt":
+        from .adapt import albums_with_keepers, rebuild_album
+
+        album = getattr(args, "album", None)
+        targets = [album] if album else albums_with_keepers(root())
+        if not targets:
+            print("adapt: no keeper albums")
+            return 0
+        for name in targets:
+            obj = rebuild_album(root(), name)
+            print("adapt: album=%s n_pairs=%d shift_start=%.3f shift_end=%.3f roles=%s"
+                  % (name, obj["n_pairs"], obj["shift_start"], obj["shift_end"], obj["roles"]))
         return 0
 
     if args.cmd == "hear":

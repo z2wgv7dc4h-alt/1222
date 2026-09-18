@@ -230,6 +230,16 @@ Save appends a `save_snapshot` event, `compare` refreshes the rank, and `structu
 `prefer=<source>` only when they emit that source. `data/learn.jsonl` and `data/intern_rank.json`
 stay local (gitignored).
 
+## Adapt (per-album calibration)
+
+`data/adapt.json` is per-album calibration from the first **heard** keeper pairs (greedy nearest
+start <= 3.0 s): a median edge shift (`shift_start`/`shift_end`, each clamped to +/-0.50 s), an
+intern-role -> saved-role map, and a draft/suggested `figure_id` -> saved map. Guess applies it to
+its draft boxes (later Guess on that album), drafts only — keepers are skipped, `heard` is never
+ticked, `sections.jsonl` is never written, and intern_rank's 5-song vote is untouched. Holdout
+tracks never teach a mixed album (a holdout-only album may build for itself); Save rebuilds the
+album's blob, and `boo-lab adapt [--album X]` prints it. Generated/local (gitignored).
+
 ## Pack / learning
 
 For each **keeper** box: mix clip + drums/bass/guitar/piano/other/vocals + no-vox (6-stem where cached) + `meta.json` (times, role, `figure_id`, source, split, gp path). Default Demucs model is 6-stem `htdemucs_6s`; guitar/piano are isolated, no-vox is mixed from the six. A track cached only under the old 4-stem model still packs (guitar/piano simply absent). That is enough until 20 labelled songs.
@@ -278,7 +288,7 @@ album+track so “Rebirth” cannot stream “Machine.”
 
 `init-map` `scan` `hash` `studio`/`annotate` `ingest` `stems` `pack` `drums` `vocals` `holdout`
 `lyrics` `structure` `beats` `audit` `extract` `gate` `report` `export-bank` `agree` `compare`
-`hear` `sync` `figures` `gp-export` `learn` `export-jams` `doctor`
+`hear` `sync` `figures` `gp-export` `learn` `adapt` `export-jams` `doctor`
 
 `structure` writes `data/drafts.jsonl` only (allin1 → `msa-draft`; SongFormer when
 `SONGFORMER_HOME`/import → `songformer-draft`). `agree` snapshots keeper pins (pass 1/2) and diffs

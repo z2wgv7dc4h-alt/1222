@@ -293,6 +293,19 @@ def estimate_hybrid(
 
     sections = _clean(sections)
 
+    # Per-album calibration: shift/map draft boxes from the first accepted
+    # pairs on this album. Keepers are never touched; silent when no blob.
+    try:
+        from .adapt import apply_adapt, load_adapt
+
+        blob = load_adapt(lab_root, lookup_album) if lab_root is not None else None
+        if blob and int(blob.get("n_pairs") or 0) >= 1:
+            sections = apply_adapt(sections, blob)
+            print("adapt: album=%s n_pairs=%d shift_start=%.3f"
+                  % (lookup_album, blob["n_pairs"], float(blob.get("shift_start") or 0.0)))
+    except Exception:
+        pass
+
     # Real, honest coverage report -- librosa's beat/onset detectors can
     # (and do, confirmed on a real BoO track: a quiet outro with too
     # little low-frequency onset energy) run out of signal well before

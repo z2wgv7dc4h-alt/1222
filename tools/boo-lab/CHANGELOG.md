@@ -2,6 +2,10 @@
 
 ## 2026-09-18
 
+### Per-album adapt from accepted drafts (edges, role, figure)
+
+- New `src/boo_lab/adapt.py`: `rebuild_album` pairs heard keepers with the album's drafts (greedy nearest start <= 3.0 s) and stores a per-album blob in `data/adapt.json` — median edge shift (`shift_start`/`shift_end`, clamped +/-0.50 s), intern-role -> saved-role map (min 2 pairs when n_pairs>=3, else 1), and draft `figure_id` -> saved `figure_id`. Holdout tracks never teach a mixed album (a holdout-only album may build for itself). `apply_adapt` shifts/maps only draft boxes, never ticks `heard`, never changes `source`, never writes `sections.jsonl`. Guess applies it after markers/breakdowns (prints `adapt: album=… n_pairs=… shift_start=…`); Save rebuilds the album blob and logs an `adapt` event best-effort; CLI `boo-lab adapt [--album X]`. `intern_rank`'s vote is untouched (still 5 songs). `data/adapt.json` gitignored. Lab tests: **265 passed**.
+
 ### Guess stretches marker times by `sync` clock_ratio
 
 - When a song's `sync.jsonl` row is `sync_ok` with `clock_ratio` off 1.0 by ≥0.002, `estimate_hybrid` scales every tab-marker `start`/`end` by that ratio before the rest of the pipeline (existing beat snap unchanged), prints `guess: clock_ratio=1.027 stretched N markers`, and notes it. `clock_ratio` ~1.0/None leaves times unchanged; `sync_ok` false (or no row) still drops markers; audio-derived breakdown drafts are never stretched (they already live on the FLAC clock). Guess now resolves the typed album/track against `map.csv` before the sync/beats lookup. Thresholds untouched. Lab tests: **256 passed**.

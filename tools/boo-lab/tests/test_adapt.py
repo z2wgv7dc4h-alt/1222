@@ -1,0 +1,142 @@
+"""Tests for src/boo_lab/adapt.py -- fake keepers/drafts in a tmp lab.
+No FLAC, no torch, no network."""
+from __future__ import annotations
+
+import json
+
+import pytest
+
+from boo_lab import adapt
+
+
+def _lab(tmp_path):
+    lab = tmp_path / "lab"
+    (lab / "data").mkdir(parents=True)
+    return lab
+
+
+def _keeper(album, track, start, end, role="riff", figure_id="riff-A"):
+    return {"album": album, "track": track, "start": start, "end": end,
+            "role": role, "figure_id": figure_id, "source": "human", "heard": True}
+
+
+def _draft(album, track, start, end, role="riff", figure_id="riff-A", source="msa-draft"):
+    return {"album": album, "track": track, "start": start, "end": end,
+            "role": role, "figure_id": figure_id, "source": source}
+
+
+def _write(lab, keepers, drafts):
+    (lab / "data" / "sections.jsonl").write_text(
+        "".join(json.dumps(k) + "\n" for k in keepers), encoding="utf-8")
+    (lab / "data" / "drafts.jsonl").write_text(
+        "".join(json.dumps(d) + "\n" for d in drafts), encoding="utf-8")
+
+
+def test_one_pair_shifts_edges(tmp_path):
+    lab = _lab(tmp_path)
+    _write(lab, [_keeper("A", "T", 10.2, 18.1)], [_draft("A", "T", 10.0, 18.0)])
+
+    blob = adapt.rebuild_album(lab, "A")
+
+    assert blob["n_pairs"] == 1
+    assert blob["shift_start"] == pytest.approx(0.2, abs=1e-3)
+    assert blob["shift_end"] == pytest.approx(0.1, abs=1e-3)
+
+    out = adapt.apply_adapt([_draft("A", "T", 20.0, 28.0)], blob)
+    assert out[0]["start"] == pytest.approx(20.2, abs=1e-3)
+    assert out[0]["end"] == pytest.approx(28.1, abs=1e-3)
+
+
+def test_role_remap_from_pairs(tmp_path):
+    lab = _lab(tmp_path)
+    _write(lab,
+           [_keeper("A", "T", 0.0, 1.0, role="riff"), _keeper("A", "T", 2.0, 3.0, role="riff")],
+           [_draft("A", "T", 0.0, 1.0, role="hook"), _draft("A", "T", 2.0, 3.0, role="hook")])
+
+    blob = adapt.rebuild_album(lab, "A")
+
+    assert blob["roles"].get("hook") == "riff"
+    out = adapt.apply_adapt([
+        {"role": "hook", "start": 0.0, "end": 1.0, "source": "msa-draft"},
+        {"role": "breakdown", "start": 5.0, "end": 6.0, "source": "halftime"},
+    ], blob)
+    assert out[0]["role"] == "riff"
+    assert out[1]["role"] == "breakdown"  # not in the map
+
+
+def test_figure_id_remap(tmp_path):
+    lab = _lab(tmp_path)
+    _write(lab, [_keeper("A", "T", 0.0, 1.0, figure_id="riff-B")],
+           [_draft("A", "T", 0.0, 1.0, figure_id="riff-A")])
+
+    blob = adapt.rebuild_album(lab, "A")
+
+    assert blob["figures"]["riff-A"] == "riff-B"
+    out = adapt.apply_adapt([{"figure_id": "riff-A", "start": 0.0, "end": 1.0,
+                              "source": "msa-draft"}], blob)
+    assert out[0]["figure_id"] == "riff-B"
+
+
+def test_shift_is_clamped(tmp_path):
+    lab = _lab(tmp_path)
+    _write(lab, [_keeper("A", "T", 10.9, 18.9)], [_draft("A", "T", 10.0, 18.0)])
+
+    blob = adapt.rebuild_album(lab, "A")
+
+    assert blob["shift_start"] == 0.5 and blob["shift_end"] == 0.5
+
+
+def test_holdout_track_does_not_teach_a_mixed_album(tmp_path):
+    lab = _lab(tmp_path)
+    (lab / "data" / "holdout.csv").write_text("album,track\nA,Rebirth\n", encoding="utf-8")
+    _write(lab,
+           [_keeper("A", "Rebirth", 10.9, 18.9), _keeper("A", "02", 5.0, 9.0)],
+           [_draft("A", "Rebirth", 10.0, 18.0), _draft("A", "02", 5.0, 9.0)])
+
+    blob = adapt.rebuild_album(lab, "A")
+
+    assert blob["n_pairs"] == 1                 # only the non-holdout pair
+    assert blob["shift_start"] == 0.0
+    assert blob["shift_end"] == 0.0
+
+
+def test_rebirth_only_keeper_does_not_teach_a_13_track_album(tmp_path):
+    lab = _lab(tmp_path)
+    (lab / "data" / "holdout.csv").write_text("album,track\nA,Rebirth\n", encoding="utf-8")
+    keepers = [_keeper("A", "Rebirth", 10.9, 18.9)]
+    drafts = [_draft("A", "Rebirth", 10.0, 18.0)] + \
+             [_draft("A", "%02d" % (i + 2), 0.0, 1.0) for i in range(12)]
+
+    blob = adapt.rebuild_album(lab, "A")
+
+    assert blob["n_pairs"] == 0  # album has other tracks -> holdout does not teach
+
+
+def test_holdout_only_album_may_build_for_itself(tmp_path):
+    lab = _lab(tmp_path)
+    (lab / "data" / "holdout.csv").write_text("album,track\nA,Only\n", encoding="utf-8")
+    _write(lab, [_keeper("A", "Only", 10.2, 18.1)], [_draft("A", "Only", 10.0, 18.0)])
+
+    blob = adapt.rebuild_album(lab, "A")
+
+    assert blob["n_pairs"] == 1
+
+
+def test_apply_never_sets_heard_and_leaves_sections_file(tmp_path):
+    lab = _lab(tmp_path)
+    sec = lab / "data" / "sections.jsonl"
+    sec.write_text(json.dumps(_keeper("A", "T", 0.0, 1.0)) + "\n", encoding="utf-8")
+    before = sec.read_text(encoding="utf-8")
+
+    blob = {"n_pairs": 1, "shift_start": 0.2, "shift_end": 0.1, "roles": {}, "figures": {}}
+    out = adapt.apply_adapt([{"start": 10.0, "end": 18.0, "role": "riff",
+                              "source": "msa-draft"}], blob)
+
+    assert "heard" not in out[0] and out[0]["source"] == "msa-draft"
+    assert sec.read_text(encoding="utf-8") == before
+
+
+def test_no_pairs_or_no_blob_returns_unchanged():
+    sections = [{"start": 1.0, "end": 2.0, "role": "riff", "source": "msa-draft"}]
+    assert adapt.apply_adapt(sections, None) is sections
+    assert adapt.apply_adapt(sections, {"n_pairs": 0}) is sections

@@ -86,7 +86,7 @@ The intern stack is a minefield; each fix is now code or a hard pin, not a sessi
 | a machine draft / unknown role-sourced as human | fail-closed schema: `is_keeper`, `canonical_role`, `stamp_box`, and the one `load_section_rows` reader |
 
 Behavior is pinned by `tests/test_natten_compat.py`, `test_device.py`, `test_doctor.py`, plus bad-input
-tests for the keeper law and Save path. Lab: **256 tests**; engine: **820 passed, 1 skipped**. Generated
+tests for the keeper law and Save path. Lab: **265 tests**; engine: **820 passed, 1 skipped**. Generated
 outputs (`data/{drafts,beats,compare,sync,agree}.*`, `data/sections.jsonl.bak`, `*.tmp`) and
 `*.egg-info/` are gitignored; the tracked asset stays `data/sections.jsonl` (human pins).
 
@@ -156,6 +156,7 @@ Then `python -m boo_lab.cli scan` and reload. Green GP5 = matched tab.
 | `beats` | beat/downbeat grid → `data/beats.jsonl` (beat_this → allin1) |
 | `gp-export` | probe `.gp`/`.gpx`: already parse (run `scan`) or record `gpx-unsupported`/`gp7-unsupported` |
 | `learn` | rebuild `data/intern_rank.json`: rank draft sources from keepers (5-song vote, F@0.5) |
+| `adapt` | rebuild `data/adapt.json`: per-album edge/role/figure calibration from heard pairs |
 | `doctor` | torch/GPU + optional-intern check with install hints |
 | `audit` | pin hygiene (sources, overlaps, heard, short boxes) |
 | `extract` | riff bank from GP (tab) or audio fallback → `data/riffs.jsonl` |

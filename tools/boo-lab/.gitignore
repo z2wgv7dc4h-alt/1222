@@ -41,3 +41,5 @@ data/gp_export.jsonl
 # (ranked from a tiny keeper set; not a committed artifact).
 data/learn.jsonl
 data/intern_rank.json
+# Per-album calibration blob (generated from the first heard pairs).
+data/adapt.json

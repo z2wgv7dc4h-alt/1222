@@ -2,6 +2,10 @@
 
 ## 2026-09-18
 
+### STATUS counts from disk
+
+- New `boo-lab status` (`src/boo_lab/status.py`): rewrites only the marker-delimited `<!-- status:counts -->` block in `STATUS.md` with counts read from disk — keeper rows/tracks via `schema.load_section_rows`, draft rows + sources, `sync_ok`/total, and `map.csv` rows (reusing `data/corpus_health.json` when it is at least as new as the CSV instead of a second walker). The test-count line and all prose paragraphs are left untouched; it never runs pytest. STATUS.md gains the block; README/CURRENT list the command.
+
 ### One operator doc stack (drop APPLY/PATCHES/PROTOCOL/QUALITY)
 
 - Removed `APPLY.md`, `PATCHES.md`, `PROTOCOL.md`, `QUALITY.md` (stale maintainer notes). The living docs are now only `USER.md` (operators), `LAW.md` (rules + a new "Quality bar" subsection), `CURRENT.md` (internals), `README.md` (install/reference), `STATUS.md` (snapshot), `CHANGELOG.md`. USER.md's first paragraph points at LAW/CURRENT/README; CURRENT lists the six living docs; no behavior change.

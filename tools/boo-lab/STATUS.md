@@ -2,6 +2,15 @@
 
 Canonical detail: **CURRENT.md**; commands in **README.md**.
 
+<!-- status:counts:start -->
+## Counts (from disk)
+
+- keepers: 6 row(s) across 1 track(s)
+- drafts: 125 row(s); sources: msa-draft
+- sync: 7 ok / 14 row(s)
+- map.csv: 71 row(s)
+<!-- status:counts:end -->
+
 Works: studio keeps pins (`human`/`guess-accepted` + `heard`) in `sections.jsonl`; mel
 spectrogram under the WaveSurfer waveform; 6-stem picker; drafts; `hear`/`sync`/`hash`;
 `agree`/`compare`/`export-jams`/`beats`/`audit`/`report`; **278 tests pass**.

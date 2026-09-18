@@ -87,6 +87,8 @@ def main(argv: list[str] | None = None) -> int:
     s = sub.add_parser("report", help="print real current state of the whole data pipeline")
     s.add_argument("--gp-root", type=Path, default=None, help="GP corpus for the failure breakdown (default: BOO_GP_ROOT)")
 
+    sub.add_parser("status", help="rewrite the STATUS.md counts block from data files")
+
     s = sub.add_parser("export-bank")
     s.add_argument("--out", type=Path, required=True)
 
@@ -192,6 +194,20 @@ def main(argv: list[str] | None = None) -> int:
         from .report import build_report
 
         build_report(root(), args.gp_root)
+        return 0
+
+    if args.cmd == "status":
+        from .status import run_status
+
+        report = run_status(root())
+        if not report.get("updated"):
+            print("status:", report.get("reason") or "not updated")
+            return 1
+        c = report["counts"]
+        print("status: keepers=%d/%d drafts=%d (%s) sync_ok=%d/%d map=%d -> %s"
+              % (c["keeper_rows"], c["keeper_tracks"], c["draft_rows"],
+                 ",".join(c["draft_sources"]) or "none", c["sync_ok"], c["sync_total"],
+                 c["map_rows"], report["path"]))
         return 0
 
     if args.cmd == "holdout":

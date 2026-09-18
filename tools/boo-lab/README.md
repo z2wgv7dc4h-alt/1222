@@ -163,6 +163,7 @@ Then `python -m boo_lab.cli scan` and reload. Green GP5 = matched tab.
 | `beats` | beat/downbeat grid → `data/beats.jsonl` (beat_this → allin1) |
 | `gp-export` | probe `.gp`/`.gpx`: already parse (run `scan`) or record `gpx-unsupported`/`gp7-unsupported` |
 | `learn` | rebuild `data/intern_rank.json`: rank draft sources from keepers (5-song vote, F@0.5) |
+| `status` | refresh the `STATUS.md` counts block from data files |
 | `adapt` | rebuild `data/adapt.json`: per-album edge/role/figure calibration from heard pairs |
 | `doctor` | torch/GPU + optional-intern check with install hints |
 | `audit` | pin hygiene (sources, overlaps, heard, short boxes) |

@@ -308,13 +308,17 @@ album+track so “Rebirth” cannot stream “Machine.”
 
 `init-map` `scan` `hash` `studio`/`annotate` `ingest` `stems` `pack` `drums` `vocals` `holdout`
 `lyrics` `structure` `beats` `audit` `extract` `gate` `report` `export-bank` `agree` `compare`
-`hear` `sync` `figures` `gp-export` `learn` `adapt` `export-jams` `doctor`
+`hear` `sync` `figures` `gp-export` `learn` `adapt` `export-jams` `status` `doctor`
 
 `structure` writes `data/drafts.jsonl` only (allin1 → `msa-draft`; SongFormer when
 `SONGFORMER_HOME`/import → `songformer-draft`). `agree` snapshots keeper pins (pass 1/2) and diffs
 them; `compare` scores drafts vs keepers per source; `export-jams` writes JAMS 0.3 figure/function
 layers; `beats` writes `beat_this`/allin1 beat grids; `hear` flips `heard` on one song's keepers.
 None of them writes `sections.jsonl` except the studio Save.
+
+`boo-lab status` rewrites only the marker block in `STATUS.md` from disk: keeper rows/tracks via
+`load_section_rows`, drafts + sources, `sync_ok`/total, and `map.csv` rows (reusing
+`data/corpus_health.json` when fresh). It never runs pytest and never touches the test-count line.
 
 Album/track arguments resolve the way the studio names them: `catalogue.resolve_row` ignores a
 leading `YYYY` / `YYYY - ` album prefix and track-number punctuation, so

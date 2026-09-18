@@ -2,6 +2,10 @@
 
 ## 2026-09-18
 
+### Studio: single click selects; double-click zooms to the box
+
+- In `annotator.html`, a **single click** on a waveform region or its table row now only selects it (region marked, row `.on`): no zoom/fit/`setMinMax`/`zoomTo`/`pxPerSec`, no playhead seek, and no `scrollIntoView` page jump. **Double-click** (region or row) is the only detail jump: select, seek the playhead to the box start, and zoom the spectrogram to that box with ~10% padding each side (`zoomSpecToBox`). The spectrogram gained a real time window (`specView`); `drawSpec` crops `spec.off` and maps boxes/playhead to it, and the spectrogram click-to-seek maps through the same window. `Esc` (or the existing reset path) restores the previous zoom, else the full-song view; loading a song / Guess adding drafts never auto-zooms. The old double-click-toggles-heard shortcut is gone (heard stays in the row and the right-click panel, which are unchanged). No backend/schema change.
+
 ### Per-track drums/vocals drafts; fix vocals 6-stem lookup
 
 - `drums`/`vocals` gain `--per-track`: `build_drum_patterns`/`build_vocal_melody` emit **one whole-track row per song** (`role=None`, `mode="track"`, `start=0`, `end=duration`, full onsets/notes, `split`) for every row with a cached 6-stem, no keeper pin needed. Both are still drafts only (never `sections.jsonl`); the two modes coexist — `_write_mode` replaces only its own `mode` and keeps the other (section rows carry no `mode` key). Fixed a real bug: `vocal_melody._find_vocals` omitted `htdemucs_6s` (the default 6-stem cache that `stems.find_stem` includes), so vocals found ~2 tracks; it now finds 34/71. Test count 327.

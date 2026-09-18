@@ -124,6 +124,7 @@ If Save ever wrote six `0.00–0.25` rows, the pins fired before duration loaded
 - Left: albums collapse, cover thumb if `cover.jpg` / `folder.jpg` / `Cover/` / Cyrillic `Сover.jpg` sits next to FLACs.
 - Green GP5 = matched tab. Partial only if notes/name say stub/fragment/bass-only.
 - Mix lane: drag boxes. Click empty wave to seek. Clicking a box edge should not steal the next pin — leave a gap or seek first.
+- Single-click a box or its table row **selects only** (region marked, row `.on`) — no zoom/fit/pxPerSec, no seek, no page scroll; **double-click** selects, seeks to the box start, and zooms the spectrogram to the box (~10% padding each side), with Esc restoring the previous or full-song view. Never auto-zooms on load or Guess.
 - Spectrogram: real mel spectrogram of the already-decoded buffer under the mix; **Wave / Spec / Both** toggle (default Both), click to seek, current boxes overlaid. Waveform stays WaveSurfer.
 - Stem lane: pick any cached Demucs stem (drums/bass/guitar/piano/other/vocals); the drum-confidence note flags sections the classifier is unsure about.
 - Beat grid: `GET /api/beats/{id}` (from `data/beats.jsonl`); the studio draws faint beat / brighter downbeat ticks over the waveform, and with **Snap beats** on, a dragged box edge snaps to the nearest downbeat (≤250 ms) else nearest beat (≤120 ms). Run `boo-lab beats` first, else no ticks/snap.

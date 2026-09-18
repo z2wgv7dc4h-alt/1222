@@ -2,6 +2,12 @@
 
 ## 2026-09-18
 
+### Studio chrome restyle + More columns
+
+- **Finished-instrument chrome.** App is a 280px rail | main grid with the spectrogram dock at 104px; the rail keeps album thumbs, the serif wordmark, and one quiet line ("Pick a song. Box a part. Tick heard. Save."); song rows are tighter (13px title / 11px meta) and the active song is a gold 2px left rule, not a slab. Work header is one strip (48px art, title, album, VAL badge).
+- **Two-row transport.** Primary row is Play · clock · Play box · Save (filled gold) · Undo · How (≤6 controls). A quiet second row holds `<details>` **Lab** (Guess, Load drafts, Lyrics, Pack, Snap beats, JSON, Next GP) and **Corpus** (drop zone + band name, Push git, Remove album). Role pins are their own equal-width row: 8px radius, coloured border only, fill at 12% on hover/active. Coach line is a full-width 13px bar; errors are breakdown red, never `alert()`.
+- **More columns.** The table still holds every column and `data-f` attribute; `form` / `uniq` / `inst` / `bar0` / `bar1` / `source` start hidden (`display:none`) and **More columns** (`#btnMoreCols`) toggles `show-extra`. The How drawer is 400px and the dock gains a gold hairline. Restyle only plus that one 8-line toggle — every `getElementById` id unchanged, no function body touched.
+
 ### Beat grid in the studio + Guess sync gate
 
 - **Beat grid used.** New `GET /api/beats/{id}` serves `data/beats.jsonl`; the studio draws beat/downbeat ticks over the waveform and, with **Snap beats** (default on), snaps a dragged box edge to the nearest downbeat (≤250 ms) else nearest beat (≤120 ms). Previously `beats.jsonl` was written and never read.

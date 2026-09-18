@@ -15,38 +15,42 @@
       radial-gradient(1200px 500px at 70% -10%, #1a140c 0%, transparent 50%),
       var(--bg); color:var(--text);
       font:15px/1.45 "Instrument Sans", "Segoe UI", system-ui, sans-serif; overflow:hidden; }
-    .app { display:grid; grid-template-columns:272px 1fr; grid-template-rows:1fr 100px; height:100vh; }
+    .app { display:grid; grid-template-columns:280px 1fr; grid-template-rows:1fr 104px; height:100vh; }
     .app > aside:not(.drawer) { grid-row:1 / -1; background:linear-gradient(180deg,#14161c,#0d0f14);
       border-right:1px solid var(--line); overflow-y:scroll; overflow-x:hidden; }
     .app > aside h1 { margin:0; padding:22px 20px 6px; font-family:"Instrument Serif", serif; font-size:28px; font-weight:400; letter-spacing:.02em; color:var(--gold); }
-    .app > aside p { margin:0 16px 8px; color:var(--mute); font-size:12px; }
+    .app > aside p { margin:0 16px 12px; color:var(--mute); font-size:12px; line-height:1.5; }
     .filters { display:flex; gap:6px; padding:0 16px 10px; flex-wrap:wrap; }
     .filters button { padding:4px 8px; font-size:12px; }
     .filters button.on { border-color:var(--riff); color:var(--riff); }
-    #dropzone { margin:8px 16px 12px; padding:12px; border:1px dashed #4a4030; border-radius:8px; color:var(--mute); font-size:12px; text-align:center; }
+    #dropzone { margin:0; padding:10px; border:1px dashed #4a4030; border-radius:8px; color:var(--mute); font-size:12px; text-align:center; }
     #dropzone.hot { border-color:var(--gold); color:var(--gold); }
     #bandName { width:100%; margin-top:8px; padding:6px 8px; background:#111; color:var(--text); border:1px solid var(--line); }
     #q { width:calc(100% - 32px); margin:0 16px 8px; padding:6px 8px; background:#111; color:var(--text); border:1px solid var(--line); }
     .alb { padding:12px 16px 6px; font-size:11px; letter-spacing:.06em; text-transform:uppercase; color:var(--riff); cursor:pointer; user-select:none; }
     .alb:hover { color:var(--text); }
-    .t { padding:10px 16px; cursor:pointer; border-left:3px solid transparent; }
-    .t:hover,.t.on { background:#1d1d20; }
-    .t.on { border-left-color:var(--break); }
-    .t .meta { display:block; font-size:11px; color:var(--mute); }
+    .t { padding:7px 14px; cursor:pointer; border-left:2px solid transparent; }
+    .t:hover { background:#17181e; }
+    .t.on { border-left-color:var(--gold); background:transparent; }
+    .t > span:first-child { font-size:13px; }
+    .t .meta { display:block; font-size:11px; color:var(--mute); margin-top:2px; }
     .dot { display:inline-block; width:6px; height:6px; border-radius:50%; margin-right:4px; background:#3a3a3e; }
     .dot.ok { background:#7dba7a; }
     .dot.part { background:#c4a35a; }
-    main { display:flex; flex-direction:column; min-width:0; padding:16px 24px 10px; overflow:auto; grid-column:2; grid-row:1; }
-    header.now { display:flex; align-items:center; gap:16px; }
-    header.now img { width:56px; height:56px; object-fit:cover; border-radius:6px; background:#111; border:1px solid var(--line); display:none; }
+    main { display:flex; flex-direction:column; min-width:0; padding:0 24px 10px; overflow:auto; grid-column:2; grid-row:1; }
+    header.now { display:flex; align-items:center; gap:14px; }
+    header.now img { width:48px; height:48px; object-fit:cover; border-radius:6px; background:#111; border:1px solid var(--line); display:none; }
     header.now img.on { display:block; }
-    header.now h2 { margin:0; font-family:"Instrument Serif", serif; font-size:24px; font-weight:400; letter-spacing:.01em; }
-    header.now span { color:var(--mute); font-size:13px; display:block; margin-top:4px; }
+    header.now h2 { margin:0; font-family:"Instrument Serif", serif; font-size:21px; font-weight:400; letter-spacing:.01em; }
+    header.now span { color:var(--mute); font-size:12px; display:block; margin-top:2px; }
     .alb img { width:28px; height:28px; object-fit:cover; border-radius:4px; margin-right:8px; vertical-align:middle; }
-    .workhead { position:sticky; top:0; z-index:6; background:#07080b; padding-bottom:4px; }
+    .workhead { position:sticky; top:0; z-index:6; background:var(--bg); padding:12px 0 6px; }
+    .workhead:after { content:""; display:block; height:1px; margin-top:8px;
+      background:linear-gradient(90deg,transparent,var(--line),transparent); }
     .lane { margin:10px 0 14px; }
     .lane-lab { color:var(--mute); font-size:11px; letter-spacing:.08em; text-transform:uppercase; margin:0 0 4px; background:var(--bg); }
-    #wave { width:100%; height:150px; min-height:150px; background:#0a0c10; border:1px solid var(--line); overflow:hidden; position:relative; border-radius:6px; box-shadow:inset 0 0 40px #0008; }
+    #wave { width:100%; height:168px; min-height:168px; background:#0a0c10; border:1px solid var(--line); overflow:hidden; position:relative; border-radius:6px; box-shadow:inset 0 0 40px #0008; }
+    #wave > div { height:100% !important; }
     #drums { width:100%; height:72px; min-height:72px; background:#0a0c10; border:1px solid var(--line); overflow:hidden; position:relative; border-radius:6px; }
     .lane.idle { display:none; }
     .lyrics { max-height:160px; overflow:auto; border:1px solid var(--line); border-radius:6px; background:#0a0c10; padding:6px 8px; }
@@ -55,7 +59,17 @@
     .lyrics .ly span.txt { flex:1; cursor:pointer; }
     .lyrics .ly button { padding:2px 8px; font-size:12px; }
     .lytools { display:flex; gap:6px; margin:0 0 6px; }
-    .transport, .pins { display:flex; align-items:center; gap:8px; margin:8px 0 12px; flex-wrap:wrap; }
+    .transport { display:flex; align-items:center; gap:8px; margin:2px 0 8px; flex-wrap:wrap; }
+    .transport2 { display:flex; align-items:center; gap:8px; margin:0 0 10px; }
+    .menu { position:relative; }
+    .menu > summary { list-style:none; cursor:pointer; color:var(--mute); font-size:12px; letter-spacing:.08em; text-transform:uppercase; padding:6px 10px; border:1px solid var(--line); border-radius:6px; }
+    .menu > summary::-webkit-details-marker { display:none; }
+    .menu[open] > summary { color:var(--text); border-color:#6a5a3a; }
+    .menu-panel { position:absolute; top:calc(100% + 6px); left:0; z-index:30; min-width:240px;
+      background:#14161c; border:1px solid var(--line); border-radius:8px; padding:10px;
+      display:flex; flex-direction:column; gap:8px; box-shadow:0 18px 40px #000a; }
+    .menu-panel button, .menu-panel label { text-align:left; }
+    .pins { display:grid; grid-template-columns:repeat(9,1fr); gap:6px; margin:2px 0 10px; }
     button { background:#1a1d24; color:var(--text); border:1px solid var(--line); padding:8px 14px; font:inherit; cursor:pointer; border-radius:6px; }
     button:hover { border-color:#6a5a3a; color:#f3ead8; }
     .time { font-variant-numeric:tabular-nums; color:var(--mute); min-width:7em; }
@@ -68,6 +82,8 @@
     .pins button.chill { border-color:#6a9e9a; color:#6a9e9a; }
     .pins button.pulse { border-color:#b07ad4; color:#b07ad4; }
     .pins button.outro { border-color:#888; color:#888; }
+    .pins button { padding:7px 6px; border-radius:8px; background:transparent; }
+    .pins button:hover, .pins button:active { background:color-mix(in srgb, currentColor 12%, transparent); }
     table { width:100%; border-collapse:collapse; }
     th, td { text-align:left; padding:8px 6px; border-bottom:1px solid var(--line); font-size:14px; }
     th { color:var(--mute); font-weight:500; }
@@ -75,27 +91,40 @@
     table input { width:6em; }
     table select { width:9em; }
     tr.on td { background:#1d1d22; }
-    .err { color:var(--mute); font-size:13px; min-height:18px; }
-    .err.bad { color:var(--break); }
+    .tabletools { display:flex; justify-content:flex-end; margin:2px 0 4px; }
+    .textbtn { background:none; border:1px solid transparent; color:var(--mute); font-size:12px; padding:3px 6px; border-radius:6px; }
+    .textbtn:hover { color:var(--gold); border-color:transparent; }
+    table:not(.show-extra) th.extra,
+    table:not(.show-extra) td:nth-child(3),
+    table:not(.show-extra) td:nth-child(4),
+    table:not(.show-extra) td:nth-child(5),
+    table:not(.show-extra) td:nth-child(6),
+    table:not(.show-extra) td:nth-child(7),
+    table:not(.show-extra) td:nth-child(10) { display:none; }
+    #btnSave { background:var(--gold); color:#14100a; border-color:var(--gold); font-weight:600; }
+    #btnSave:hover { background:#e2c07a; color:#14100a; }
+    .err { display:block; width:100%; margin:8px 0 0; padding:7px 12px; font-size:13px; color:var(--mute);
+      background:#0c0e13; border-left:2px solid var(--line); border-radius:4px; }
+    .err.bad { color:var(--break); border-left-color:var(--break); background:rgba(212,101,85,.08); }
     button:disabled { opacity:.45; cursor:wait; }
     .foot { color:var(--mute); font-size:12px; margin-top:auto; }
     .lyrics { max-height:160px; overflow:auto; border:1px solid var(--line); border-radius:6px; background:#0a0c10; padding:8px 12px; }
     .lyrics div { padding:4px 0; cursor:pointer; color:#b8b0a4; font-size:13px; }
     .lyrics div:hover, .lyrics div.on { color:var(--gold); }
     .drawer {
-      position:fixed; top:0; right:0; width:min(380px,92vw); height:100%;
+      position:fixed; top:0; right:0; width:min(400px,92vw); height:100%;
       background:#141416; border-left:1px solid var(--line); z-index:20;
       transform:translateX(100%); transition:transform .22s ease; overflow:auto; padding:22px 22px 40px;
     }
     .drawer.open { transform:translateX(0); }
     .scrim { position:fixed; inset:0; background:#0008; z-index:19; display:none; }
     .scrim.on { display:block; }
-    .drawer h3 { margin:0 0 10px; font-size:16px; }
+    .drawer h3 { margin:0 0 10px; font-family:"Instrument Serif",serif; font-weight:400; font-size:22px; }
     .drawer h4 { margin:18px 0 6px; font-size:13px; color:var(--mute); text-transform:uppercase; letter-spacing:.08em; }
     .drawer p, .drawer li { color:#c4c0ba; font-size:13px; line-height:1.5; }
     .drawer ul { margin:0; padding-left:18px; }
     .drawer .close { float:right; }
-    .vizdock { grid-column:2; grid-row:2; border-top:1px solid #2a2418; background:radial-gradient(80% 120% at 50% 120%, #1a1208 0%, #05060a 55%); position:relative; overflow:hidden; }
+    .vizdock { grid-column:2; grid-row:2; border-top:1px solid #6a5a3a; background:radial-gradient(80% 120% at 50% 120%, #1a1208 0%, #05060a 55%); position:relative; overflow:hidden; }
     .vizdock:before { content:""; position:absolute; inset:0; pointer-events:none; box-shadow:inset 0 20px 40px #000a; }
     .vizdock canvas { width:100%; height:100%; display:block; }
     .vizdock label { position:absolute; left:18px; top:10px; font-size:10px; letter-spacing:.2em; text-transform:uppercase; color:#7a6a4a; pointer-events:none; z-index:1; }
@@ -173,11 +202,7 @@
 <div class="app">
   <aside>
   <h1>boo-lab</h1>
-  <p>Pick a song → drag boxes → set role → tick heard → Save. <b>How</b> explains every column.
-  Green GP5 = a tab matched; grey = none.</p>
-    <div id="dropzone">Drop FLAC / GP / zip here
-      <input id="bandName" placeholder="band name e.g. veil of maya" />
-    </div>
+  <p>Pick a song. Box a part. Tick heard. Save.</p>
     <input id="q" placeholder="filter songs" />
     <div class="filters">
       <button type="button" data-f="all" class="on">All</button>
@@ -199,19 +224,34 @@
       <div class="transport">
         <button type="button" id="btnPlay">Play</button>
         <span class="time" id="clock">0:00 / 0:00</span>
-        <button type="button" id="btnEst">Guess</button>
-        <button type="button" id="btnDrafts">Load drafts</button>
-        <button type="button" id="btnSave">Save</button>
-        <button type="button" id="btnLyrics">Lyrics</button>
-        <button type="button" id="btnPack">Pack</button>
         <button type="button" id="btnPlayBox">Play box</button>
+        <button type="button" id="btnSave">Save</button>
         <button type="button" id="btnUndo">Undo</button>
-        <label style="display:inline-flex;align-items:center;gap:4px;font-size:12px;white-space:nowrap" title="Snap box edges to the nearest downbeat (run `boo-lab beats` first)"><input type="checkbox" id="snapBeat" checked> Snap beats</label>
-        <button type="button" id="btnDump">JSON</button>
-        <button type="button" id="btnNext">Next GP</button>
-        <button type="button" id="btnGit">Push git</button>
-        <button type="button" id="btnRemoveAlbum" class="danger">Remove album</button>
         <button type="button" id="btnHow">How</button>
+      </div>
+      <div class="transport2">
+        <details id="labMenu" class="menu">
+          <summary>Lab</summary>
+          <div class="menu-panel">
+            <button type="button" id="btnEst">Guess</button>
+            <button type="button" id="btnDrafts">Load drafts</button>
+            <button type="button" id="btnLyrics">Lyrics</button>
+            <button type="button" id="btnPack">Pack</button>
+            <label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;white-space:nowrap" title="Snap box edges to the nearest downbeat (run `boo-lab beats` first)"><input type="checkbox" id="snapBeat" checked> Snap beats</label>
+            <button type="button" id="btnDump">JSON</button>
+            <button type="button" id="btnNext">Next GP</button>
+          </div>
+        </details>
+        <details id="corpusMenu" class="menu">
+          <summary>Corpus</summary>
+          <div class="menu-panel">
+            <div id="dropzone">Drop FLAC / GP / zip here
+              <input id="bandName" placeholder="band name e.g. veil of maya" />
+            </div>
+            <button type="button" id="btnGit">Push git</button>
+            <button type="button" id="btnRemoveAlbum" class="danger">Remove album</button>
+          </div>
+        </details>
       </div>
       <div class="pins">
         <button type="button" class="intro" data-role="intro">Intro</button>
@@ -247,18 +287,19 @@
       </div>
       <div id="lyricbox" class="lyrics"></div>
     </div>
-    <table>
+    <div class="tabletools"><button type="button" id="btnMoreCols" class="textbtn">More columns</button></div>
+    <table id="sectable">
       <thead><tr>
 <th title="What the section is: intro, riff, hook, breakdown, solo, chill, pulse, build, outro">role</th>
 <th title="Name of the musical idea, e.g. riff-A. Same idea returning = same name">figure</th>
-<th title="Big-picture song-part letter: A, B, C… (usually A)">form</th>
-<th title="Tick if this idea happens only once">uniq</th>
-<th title="Which instrument leads here: rhythm / lead / bass / synth…">inst</th>
-<th title="Tab measure where the box starts (auto-filled on Save when a tab matches)">bar0</th>
-<th title="Tab measure where the box ends">bar1</th>
+<th class="extra" title="Big-picture song-part letter: A, B, C… (usually A)">form</th>
+<th class="extra" title="Tick if this idea happens only once">uniq</th>
+<th class="extra" title="Which instrument leads here: rhythm / lead / bass / synth…">inst</th>
+<th class="extra" title="Tab measure where the box starts (auto-filled on Save when a tab matches)">bar0</th>
+<th class="extra" title="Tab measure where the box ends">bar1</th>
 <th title="Start time in the audio (seconds)">start</th>
 <th title="End time in the audio (seconds)">end</th>
-<th title="Where the row came from: human, or a draft (guess / msa-draft)">source</th>
+<th class="extra" title="Where the row came from: human, or a draft (guess / msa-draft)">source</th>
 <th title="Tick only if you actually listened — unticked boxes are dropped on Save">heard</th>
 <th></th>
 </tr></thead>
@@ -1120,6 +1161,11 @@ document.getElementById("btnPlayBox").onclick=()=>{
   Promise.resolve(ws.play(a, b)).catch(()=>ws.play());
 };
 document.getElementById("btnNext").onclick=nextGreen;
+document.getElementById("btnMoreCols").onclick=function(){
+  const tb=document.getElementById("sectable");
+  tb.classList.toggle("show-extra");
+  this.textContent=tb.classList.contains("show-extra")?"Fewer columns":"More columns";
+};
 
 document.body.addEventListener("keydown",e=>{
   if(e.target.tagName==="INPUT"||e.target.tagName==="SELECT") return;

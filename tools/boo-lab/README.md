@@ -110,6 +110,7 @@ One album side per session.
 ## The table columns
 
 Header: `role figure form uniq inst bar0 bar1 start end source heard` (hover any header in the UI).
+The secondary columns (`form` / `uniq` / `inst` / `bar0` / `bar1` / `source`) start hidden — click **More columns** above the table to reveal them. Every column still harvests on Save.
 
 - **role** — what the section is (`intro riff hook breakdown solo chill pulse build outro`). The only required label.
 - **figure** — a name for the musical idea (`riff-A`); the same idea returning keeps the same name.

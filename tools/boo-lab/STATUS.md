@@ -25,7 +25,10 @@ now carries the tab's **section identity** (marker letter → `form`/`figure_id`
 expanded in playback order), **gates** its marker sections on `sync_ok` (drops them when the tab was
 measured as misaligned), and **snaps** its own half-time/kick spans to the beat grid. Raw-note content
 segmentation was prototyped and **rejected** (795–1057 sections vs 143 markers, precision 0.15) — the
-tabs' marker letters plus the allin1 drafts are the real riff signal.
+tabs' marker letters plus the allin1 drafts are the real riff signal. Studio chrome is now a rail |
+main layout with a two-row transport (**Lab** / **Corpus** `<details>`), equal-width role pins, and a
+**More columns** toggle (`form` / `uniq` / `inst` / `bar0` / `bar1` / `source` hidden by default) —
+restyle only, all ids and behavior unchanged.
 
 On disk now:
 - `data/sections.jsonl` — 6 rows, 1 track (Rebirth), all `heard=true`. The whole keeper set.

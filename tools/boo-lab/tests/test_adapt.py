@@ -140,3 +140,60 @@ def test_no_pairs_or_no_blob_returns_unchanged():
     sections = [{"start": 1.0, "end": 2.0, "role": "riff", "source": "msa-draft"}]
     assert adapt.apply_adapt(sections, None) is sections
     assert adapt.apply_adapt(sections, {"n_pairs": 0}) is sections
+
+
+def test_already_adapted_row_is_not_reapplied():
+    blob = {"n_pairs": 1, "shift_start": 0.5, "shift_end": 0.5,
+            "roles": {"hook": "breakdown"}, "figures": {}}
+    row = {"role": "hook", "start": 1.0, "end": 2.0, "source": "msa-draft",
+           "_adapted": True}
+
+    out = adapt.apply_adapt([row], blob)
+
+    assert out[0]["role"] == "hook" and out[0]["start"] == 1.0
+
+
+def test_intern_drafts_are_calibrated_on_load_and_sections_untouched(tmp_path):
+    pytest.importorskip("fastapi")
+    pytest.importorskip("httpx")
+    from fastapi.testclient import TestClient
+
+    from boo_lab import annotator as ann
+
+    lab = _lab(tmp_path)
+    (lab / "data" / "drafts.jsonl").write_text(
+        json.dumps({"album": "A", "track": "T", "role": "hook", "start": 0.0,
+                    "end": 2.0, "source": "msa-draft"}) + "\n", encoding="utf-8")
+    (lab / "data" / "adapt.json").write_text(
+        json.dumps({"A": {"n_pairs": 1, "shift_start": 0.0, "shift_end": 0.0,
+                          "roles": {"hook": "breakdown"}, "figures": {}}}) + "\n",
+        encoding="utf-8")
+    sec = lab / "data" / "sections.jsonl"
+    sec.write_text("", encoding="utf-8")
+
+    client = TestClient(ann.create_app(lab, None, None))
+    data = client.get("/api/drafts", params={"album": "A", "track": "T"}).json()
+
+    assert data["drafts"][0]["role"] == "breakdown"
+    assert sec.read_text(encoding="utf-8") == ""
+
+
+def test_structure_applies_adapt_before_writing(tmp_path, monkeypatch):
+    from boo_lab import structure
+
+    lab = _lab(tmp_path)
+    flac = tmp_path / "song.flac"
+    flac.write_bytes(b"x")
+    (lab / "data" / "adapt.json").write_text(
+        json.dumps({"A": {"n_pairs": 1, "shift_start": 0.0, "shift_end": 0.0,
+                          "roles": {"hook": "breakdown"}, "figures": {}}}) + "\n",
+        encoding="utf-8")
+    monkeypatch.setattr(structure, "songformer_available", lambda: False)
+    monkeypatch.setattr(structure, "run_allin1",
+                        lambda fp, cache_dir=None: {"segments": [{"start": 0.0, "label": "chorus"}]})
+
+    structure.build_drafts(lab, [{"album": "A", "track": "T", "flac_path": str(flac)}])
+
+    rows = [json.loads(line) for line in
+            (lab / "data" / "drafts.jsonl").read_text(encoding="utf-8").splitlines() if line.strip()]
+    assert rows and rows[0]["role"] == "breakdown"

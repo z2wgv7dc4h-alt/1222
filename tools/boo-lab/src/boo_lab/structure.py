@@ -207,6 +207,27 @@ def build_drafts(lab_root: Path, rows: list[dict]) -> dict:
                     ))
                 print("SONGFORMER", r.get("track"), "-> data/drafts.jsonl")
 
+    # Per-album calibration: nudge/remap the intern drafts before they land,
+    # so the studio and later reads see the calibrated box. Flag each row so a
+    # later Load does not apply the same shift twice.
+    if new_recs:
+        try:
+            from .adapt import apply_adapt, load_adapt
+
+            blobs: dict = {}
+            calibrated: list[dict] = []
+            for rec in new_recs:
+                alb = rec.get("album")
+                if alb not in blobs:
+                    blobs[alb] = load_adapt(lab_root, alb)
+                calibrated.extend(apply_adapt([rec], blobs[alb]))
+            new_recs = calibrated
+            for blob in blobs.values():
+                if blob and int(blob.get("n_pairs") or 0) >= 1:
+                    print("adapt: intern drafts n_pairs=%d" % int(blob["n_pairs"]))
+        except Exception:
+            pass
+
     # Non-destructive on a zero-row run (same discipline as `beats`): a failed
     # or no-op structure pass must never blank a good `data/drafts.jsonl`.
     # Atomic replace only when something was actually produced.

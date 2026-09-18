@@ -420,6 +420,17 @@ def create_app(lab_root: Path, flac_root: Path | None, gp_root: Path | None) -> 
                     continue
                 if (rec.get("album") or "") == album and (rec.get("track") or "") == track:
                     out.append(rec)
+        # Per-album calibration for intern drafts (drafts only; a row already
+        # flagged `_adapted` by structure is not shifted a second time).
+        try:
+            from .adapt import apply_adapt, load_adapt
+
+            blob = load_adapt(lab_root, album) if album else None
+            out = apply_adapt(out, blob)
+            if blob and int(blob.get("n_pairs") or 0) >= 1:
+                print("adapt: intern drafts n_pairs=%d" % int(blob["n_pairs"]))
+        except Exception:
+            pass
         return {"drafts": out}
 
     @app.post("/api/sections/{track_id}")

@@ -203,7 +203,9 @@ def apply_adapt(sections: list[dict], blob: dict | None) -> list[dict]:
     out: list[dict] = []
     for section in sections or []:
         s = dict(section)
-        if not is_keeper(s.get("source")):
+        # Keepers and already-calibrated rows are left alone (no double-apply
+        # when structure wrote an adapted row and the studio later loads it).
+        if not is_keeper(s.get("source")) and not s.get("_adapted"):
             new_start = float(s.get("start", 0.0)) + shift_start
             new_end = float(s.get("end", 0.0)) + shift_end
             if new_end > new_start:
@@ -216,5 +218,6 @@ def apply_adapt(sections: list[dict], blob: dict | None) -> list[dict]:
             figure = s.get("figure_id")
             if figure in figures:
                 s["figure_id"] = figures[figure]
+            s["_adapted"] = True
         out.append(s)
     return out

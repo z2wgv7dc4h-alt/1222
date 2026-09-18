@@ -4,7 +4,7 @@ Canonical detail: **CURRENT.md**; commands in **README.md**.
 
 Works: studio keeps pins (`human`/`guess-accepted` + `heard`) in `sections.jsonl`; mel
 spectrogram under the WaveSurfer waveform; 6-stem picker; drafts; `hear`/`sync`/`hash`;
-`agree`/`compare`/`export-jams`/`beats`/`audit`/`report`; **270 tests pass**.
+`agree`/`compare`/`export-jams`/`beats`/`audit`/`report`; **273 tests pass**.
 Learn (2026-09-18): `boo-lab learn` ranks the draft sources from keepers (5-song vote, F@0.5 >= 0.50,
 0.03 margin, holdout excluded) into `data/intern_rank.json`; the `enough_to_train` stub is gone and
 it still never writes keepers. Current keepers are Rebirth-only, so `prefer=none`.

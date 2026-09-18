@@ -299,3 +299,103 @@ def test_audio_breakdown_draft_is_not_stretched(tmp_path, monkeypatch):
 
     bd = [s for s in res["sections"] if s.get("source") == "halftime"][0]
     assert bd["start"] == 20.0 and bd["end"] == 30.0
+
+
+# --- figure-window drafts + breakdown gate -----------------------------------
+
+
+def _wire_figures(tmp_path, monkeypatch, *, sync_ok, times_trusted=True):
+    lab = tmp_path / "lab"
+    (lab / "data").mkdir(parents=True, exist_ok=True)
+    (lab / "data" / "sync.jsonl").write_text(
+        json.dumps({"album": "A", "track": "Fixture", "sync_ok": sync_ok}) + "\n",
+        encoding="utf-8",
+    )
+    (lab / "data" / "figures.jsonl").write_text(json.dumps({
+        "album": "A", "track": "Fixture", "figure_id": "riff-A",
+        "times_trusted": times_trusted,
+        "occurrences": [{"start": 1.0, "end": 3.0, "start_bar": 1, "end_bar": 2},
+                        {"start": 10.0, "end": 12.0, "start_bar": 5, "end_bar": 6}],
+    }) + "\n", encoding="utf-8")
+    flac = tmp_path / "song.flac"
+    flac.write_bytes(b"x")
+    monkeypatch.setattr(soundfile, "info",
+                        lambda *a, **k: types.SimpleNamespace(frames=int(22050 * 100), samplerate=22050))
+    monkeypatch.setattr(g, "GP5_ROOTS", [tmp_path / "no_gp5"])
+    monkeypatch.setattr(g, "_prefer_gp5", lambda gp, track: None)
+    import boo_lab.stems as st
+    monkeypatch.setattr(st, "ensure_drums", lambda f, c: (None, "none"))
+    monkeypatch.setattr(g, "_librosa_beats", lambda wav: {"beats": [], "bpm": None})
+    monkeypatch.setattr(g, "_half_time_spans", lambda beats, min_len=6.0: [])
+    monkeypatch.setattr(g, "_kick_spans", lambda wav: [])
+    return g.estimate_hybrid(flac, None, track="Fixture",
+                             cache=lab / "work" / "stems", album="A")
+
+
+def test_guess_adds_figure_drafts_when_sync_ok(tmp_path, monkeypatch):
+    res = _wire_figures(tmp_path, monkeypatch, sync_ok=True)
+
+    figs = [s for s in res["sections"]
+            if s.get("source") == "guess" and s.get("figure_id") == "riff-A"]
+    assert len(figs) == 2
+    assert all(s["heard"] is False for s in figs)
+
+
+def test_guess_no_figure_drafts_when_not_sync_ok(tmp_path, monkeypatch):
+    res = _wire_figures(tmp_path, monkeypatch, sync_ok=False)
+    assert not [s for s in res["sections"] if s.get("source") == "guess"]
+
+
+def test_guess_no_figure_drafts_when_times_not_trusted(tmp_path, monkeypatch):
+    res = _wire_figures(tmp_path, monkeypatch, sync_ok=True, times_trusted=False)
+    assert not [s for s in res["sections"] if s.get("source") == "guess"]
+
+
+def _wire_breakdown(tmp_path, monkeypatch, album, med=8.0, blob_album=None):
+    lab = tmp_path / "lab"
+    (lab / "data").mkdir(parents=True, exist_ok=True)
+    key = album if blob_album is None else blob_album
+    if key:
+        (lab / "data" / "adapt.json").write_text(
+            json.dumps({key: {"n_pairs": 0,
+                              "breakdowns": {"n": 2, "median_span_sec": med}}}) + "\n",
+            encoding="utf-8",
+        )
+    flac = tmp_path / "song.flac"
+    flac.write_bytes(b"x")
+    monkeypatch.setattr(soundfile, "info",
+                        lambda *a, **k: types.SimpleNamespace(frames=int(22050 * 100), samplerate=22050))
+    monkeypatch.setattr(g, "GP5_ROOTS", [tmp_path / "no_gp5"])
+    monkeypatch.setattr(g, "_prefer_gp5", lambda gp, track: None)
+    import boo_lab.stems as st
+    monkeypatch.setattr(st, "ensure_drums", lambda f, c: (None, "none"))
+    monkeypatch.setattr(g, "_librosa_beats", lambda wav: {"beats": [], "bpm": None})
+    monkeypatch.setattr(g, "_half_time_spans", lambda beats, min_len=6.0: [
+        {"role": "breakdown", "start": 0.0, "end": 8.0, "source": "halftime"},
+        {"role": "breakdown", "start": 20.0, "end": 22.0, "source": "halftime"},
+    ])
+    monkeypatch.setattr(g, "_kick_spans", lambda wav: [])
+    return g.estimate_hybrid(flac, None, track="Fixture",
+                             cache=lab / "work" / "stems", album=album)
+
+
+def test_breakdown_gate_is_per_album(tmp_path, monkeypatch):
+    res_a = _wire_breakdown(tmp_path, monkeypatch, "A")
+    res_b = _wire_breakdown(tmp_path, monkeypatch, "B", blob_album="A")
+
+    a = [s for s in res_a["sections"] if s.get("source") == "halftime"]
+    b = [s for s in res_b["sections"] if s.get("source") == "halftime"]
+    assert len(a) == 1 and [round(s["start"]) for s in a] == [0]  # 8.0 kept, 2.0 dropped
+    assert len(b) == 2  # album B has no blob -> unchanged
+
+
+def test_guess_never_writes_sections_jsonl(tmp_path, monkeypatch):
+    lab = tmp_path / "lab"
+    (lab / "data").mkdir(parents=True, exist_ok=True)
+    sec = lab / "data" / "sections.jsonl"
+    sec.write_text('{"album":"A","track":"Fixture","role":"riff"}\n', encoding="utf-8")
+    before = sec.read_text(encoding="utf-8")
+
+    _wire_figures(tmp_path, monkeypatch, sync_ok=True)
+
+    assert sec.read_text(encoding="utf-8") == before

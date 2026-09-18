@@ -242,6 +242,17 @@ ticked, `sections.jsonl` is never written, and intern_rank's 5-song vote is unto
 tracks never teach a mixed album (a holdout-only album may build for itself); Save rebuilds the
 album's blob, and `boo-lab adapt [--album X]` prints it. Generated/local (gitignored).
 
+## Detect (figure drafts + breakdown gate)
+
+Guess proposes **figure windows** as unheard riff drafts when the song's `sync.jsonl` is `sync_ok`
+and `data/figures.jsonl` occurrences are `times_trusted` (`source=guess`, `heard=false`; a marker
+already covering the span within 0.35 s with the same `figure_id` is skipped). No sync or untrusted
+times ⇒ zero figure drafts. Audio half-time/kick breakdowns obey a **per-album gate** built from
+heard `breakdown` keepers on that album excluding holdout (`breakdowns {n, median_span_sec}` in the
+album's `data/adapt.json` blob): with `n>=2`, only spans 0.5–1.5× the median are kept; `n<2` keeps
+the current rules. Guess prints `figures_drafts=M breakdowns_used=N`. VAL never teaches another
+album. Never writes `sections.jsonl`.
+
 ## Pack / learning
 
 For each **keeper** box: mix clip + drums/bass/guitar/piano/other/vocals + no-vox (6-stem where cached) + `meta.json` (times, role, `figure_id`, source, split, gp path). Default Demucs model is 6-stem `htdemucs_6s`; guitar/piano are isolated, no-vox is mixed from the six. A track cached only under the old 4-stem model still packs (guitar/piano simply absent). That is enough until 20 labelled songs.

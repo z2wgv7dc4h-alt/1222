@@ -152,6 +152,61 @@ def _snap_to_grid(t: float, downbeats, beats) -> float:
     return best if (best is not None and bd <= 0.12) else t
 
 
+def _figure_drafts(lab_root, album: str, track: str, existing: list[dict],
+                   tol: float = 0.35) -> list[dict]:
+    """Unheard riff drafts from `figures.jsonl` trusted occurrences. Skips a
+    span a marker already covers within `tol` with the same `figure_id`."""
+    from .figures import load_figures
+
+    out: list[dict] = []
+    for row in load_figures(lab_root, album, track):
+        if not row.get("times_trusted"):
+            continue
+        fid = row.get("figure_id")
+        role = row.get("role") or "riff"
+        for occ in row.get("occurrences") or []:
+            start, end = occ.get("start"), occ.get("end")
+            if start is None or end is None:
+                continue
+            start, end = float(start), float(end)
+            dup = any(
+                abs(float(s.get("start", 0.0)) - start) <= tol
+                and abs(float(s.get("end", 0.0)) - end) <= tol
+                and (s.get("figure_id") or "") == (fid or "")
+                for s in existing
+            )
+            if dup:
+                continue
+            out.append({
+                "role": role, "start": round(start, 3), "end": round(end, 3),
+                "figure_id": fid, "form": row.get("form") or "A",
+                "unique": bool(row.get("unique")), "instrument": "",
+                "start_bar": occ.get("start_bar"), "end_bar": occ.get("end_bar"),
+                "source": "guess", "heard": False,
+            })
+    return out
+
+
+def _gate_breakdowns(sections: list[dict], blob: dict | None) -> int:
+    """Keep audio breakdown drafts whose span is 0.5-1.5x the album's median
+    heard breakdown span (n>=2). n<2 leaves current behavior. Returns kept."""
+    bd = (blob or {}).get("breakdowns") or {}
+    n = int(bd.get("n") or 0)
+    median = float(bd.get("median_span_sec") or 0.0)
+    audio = [s for s in sections
+             if s.get("role") == "breakdown" and s.get("source") in {"halftime", "kick"}]
+    if n < 2 or median <= 0:
+        return len(audio)
+    kept = 0
+    for s in list(audio):
+        span = float(s.get("end", 0.0)) - float(s.get("start", 0.0))
+        if 0.5 * median <= span <= 1.5 * median:
+            kept += 1
+        else:
+            sections.remove(s)
+    return kept
+
+
 def estimate_hybrid(
     flac: Path | None,
     gp: Path | None,
@@ -169,6 +224,7 @@ def estimate_hybrid(
         lookup_album, lookup_track = _resolve_names(lab_root, album, track)
 
     gp_use = _prefer_gp5(gp, track)
+    sync_rec = _sync_for(lab_root, lookup_album, lookup_track)
     key = _norm(track) or _norm(gp.stem if gp else "")
     seen = 0
     root0 = _gp5_roots()[0]
@@ -183,7 +239,6 @@ def estimate_hybrid(
             g = estimate_from_gp(gp_use)
             bpm = g.get("bpm") or bpm
             if g.get("sections"):
-                sync_rec = _sync_for(lab_root, lookup_album, lookup_track)
                 if sync_rec is not None and sync_rec.get("sync_ok") is False:
                     # Gate: don't propose times from a tab measured as misaligned.
                     lag = sync_rec.get("lag_sec")
@@ -291,20 +346,42 @@ def estimate_hybrid(
         if snapped:
             notes.append("snapped %d audio boundary/ies to the beat grid" % snapped)
 
+    # Per-album calibration blob (load once; used by the gate and apply below).
+    adapt_blob = None
+    try:
+        from .adapt import load_adapt
+
+        adapt_blob = load_adapt(lab_root, lookup_album) if lab_root is not None else None
+    except Exception:
+        adapt_blob = None
+
+    # Figure windows as unheard riff drafts -- only when the tab clock matched
+    # and the occurrence seconds are trusted.
+    figures_drafts = 0
+    if lab_root is not None and sync_rec is not None and sync_rec.get("sync_ok") is True:
+        new_figs = _figure_drafts(lab_root, lookup_album, lookup_track, sections)
+        sections.extend(new_figs)
+        figures_drafts = len(new_figs)
+
+    # Breakdown gate: keep audio breakdown drafts near this album's median
+    # heard breakdown span (n>=2). n<2 keeps the current rules.
+    breakdowns_used = _gate_breakdowns(sections, adapt_blob)
+    print("figures_drafts=%d breakdowns_used=%d" % (figures_drafts, breakdowns_used))
+
     sections = _clean(sections)
 
     # Per-album calibration: shift/map draft boxes from the first accepted
     # pairs on this album. Keepers are never touched; silent when no blob.
-    try:
-        from .adapt import apply_adapt, load_adapt
+    if adapt_blob and int(adapt_blob.get("n_pairs") or 0) >= 1:
+        try:
+            from .adapt import apply_adapt
 
-        blob = load_adapt(lab_root, lookup_album) if lab_root is not None else None
-        if blob and int(blob.get("n_pairs") or 0) >= 1:
-            sections = apply_adapt(sections, blob)
+            sections = apply_adapt(sections, adapt_blob)
             print("adapt: album=%s n_pairs=%d shift_start=%.3f"
-                  % (lookup_album, blob["n_pairs"], float(blob.get("shift_start") or 0.0)))
-    except Exception:
-        pass
+                  % (lookup_album, adapt_blob["n_pairs"],
+                     float(adapt_blob.get("shift_start") or 0.0)))
+        except Exception:
+            pass
 
     # Real, honest coverage report -- librosa's beat/onset detectors can
     # (and do, confirmed on a real BoO track: a quiet outro with too

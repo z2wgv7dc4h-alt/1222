@@ -84,7 +84,7 @@ def albums_with_keepers(lab_root: Path) -> list[str]:
 def rebuild_album(lab_root, album) -> dict:
     """Rebuild one album's calibration object from its heard keeper pairs."""
     from .holdout import load_holdout
-    from .schema import is_keeper, write_jsonl_atomic
+    from .schema import canonical_role, is_keeper, write_jsonl_atomic
 
     lab_root = Path(lab_root)
     section_rows = _read_jsonl(lab_root / "data" / "sections.jsonl")
@@ -144,6 +144,15 @@ def rebuild_album(lab_root, album) -> dict:
              for dr, kr in by_drole.items() if len(kr) >= min_count}
     figures = {df: Counter(kf).most_common(1)[0][0] for df, kf in by_fig.items()}
 
+    # Per-album breakdown span gate: heard breakdown keepers on this album,
+    # excluding holdout (never let VAL teach another album). n>=2 arms it.
+    bd_spans = sorted(
+        float(r.get("end", 0.0)) - float(r.get("start", 0.0))
+        for r in keepers
+        if canonical_role(r.get("role")) == "breakdown" and (r.get("track") or "") not in held
+    )
+    bd_spans = [s for s in bd_spans if s > 0]
+
     obj = {
         "album": album,
         "n_pairs": len(pairs),
@@ -151,6 +160,7 @@ def rebuild_album(lab_root, album) -> dict:
         "shift_end": round(shift_end, 4),
         "roles": roles,
         "figures": figures,
+        "breakdowns": {"n": len(bd_spans), "median_span_sec": round(_median(bd_spans), 4)},
         "ts": round(time.time(), 3),
     }
     path = lab_root / "data" / "adapt.json"

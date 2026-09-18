@@ -2,6 +2,10 @@
 
 ## 2026-09-18
 
+### Guess proposes figure windows + breakdown gate
+
+- Guess now adds **figure-window drafts** from `data/figures.jsonl` when the song is `sync_ok` and the occurrence seconds are `times_trusted` (`role=riff`, `figure_id` set, `source=guess`, `heard=false`; a marker covering the same span within 0.35 s with the same `figure_id` is skipped). Not sync_ok or untrusted times ⇒ zero figure drafts. Audio half-time/kick breakdowns are filtered by a per-album gate: `rebuild_album` stores `breakdowns {n, median_span_sec}` (heard `breakdown` keepers, holdout excluded) in the album's `adapt.json` blob; with `n>=2` only spans 0.5–1.5× the median survive, `n<2` keeps current rules. Guess prints `figures_drafts=M breakdowns_used=N`; `sections.jsonl` untouched. Lab tests: **270 passed**.
+
 ### USER.md operator manual (gold vs stencil)
 
 - New `tools/boo-lab/USER.md`: the operator manual in two parts — Part A (open, mark, keys, stuck) and Part B (gold keeper vs stencil draft, roles, Guess/interns, sync, learn/adapt as a scoreboard not training, figures/cells, VAL, commands, do-nots). README points to it first (`Using it: read USER.md first`) and labels absolute Windows paths "this machine". The studio How drawer gains the two-line suggestion/VAL note, and Guess / Load drafts now show a coach nudge (`N drafts — tick heard on the ones you accept, then Save.`) without overwriting a real error. CURRENT: operators start at USER.md. No behavior/math changes.

@@ -6,14 +6,20 @@ Canonical detail: **CURRENT.md**; commands in **README.md**.
 ## Counts (from disk)
 
 - keepers: 6 row(s) across 1 track(s)
-- drafts: 125 row(s); sources: msa-draft
-- sync: 7 ok / 14 row(s)
+- drafts: 238 row(s); sources: msa-draft, songformer-draft
+- sync: 17 ok / 55 row(s)
 - map.csv: 71 row(s)
 <!-- status:counts:end -->
 
 Works: studio keeps pins (`human`/`guess-accepted` + `heard`) in `sections.jsonl`; mel
 spectrogram under the WaveSurfer waveform; 6-stem picker; drafts; `hear`/`sync`/`hash`;
-`agree`/`compare`/`export-jams`/`beats`/`audit`/`report`; **296 tests pass**.
+`agree`/`compare`/`export-jams`/`beats`/`audit`/`report`; **322 tests pass**.
+GP7/GPIF (2026-09-18): `boo_lab/gpif.py` reads a `.gp`/`.gpx` `score.gpif` natively
+(flat GP8/alphaTab + nested), exposing title/artist/album, tracks (tuning, instrument,
+capo), masterbars (time sig/repeats/sections/tempo), beats (dynamic/chord/text) and notes
+(voice, string/fret/duration, computed `midi`, articulations). `sync` prefers a matching
+`.gp/.gpx` over a `.gp5` sibling and clocks it via `gpif.note_events` (seconds first);
+`.gp5` stays guitarpro. No GP5 conversion (`gpif_to_gp5` unused).
 Interns pass (2026-09-18): `boo-lab interns [--album X] [--steps a,b,c]` runs the whole
 chain in order (`stems → beats → structure → drums → vocals → lyrics → sync → extract →
 figures → compare → learn → status`), cache-first and resumable — `structure` reuses
@@ -50,39 +56,39 @@ segmentation was prototyped and **rejected** (795–1057 sections vs 143 markers
 tabs' marker letters plus the allin1 drafts are the real riff signal. Studio chrome is now a rail |
 main layout with a two-row transport (**Lab** / **Corpus** `<details>`), equal-width role pins, and a
 **More columns** toggle (`form` / `uniq` / `inst` / `bar0` / `bar1` / `source` hidden by default) —
-restyle only, all ids and behavior unchanged. Waiting states: rows read `FLAC · GP5` / `no tab` /
+restyle only, all ids and behavior unchanged. Waiting states: rows read `FLAC · GP5/GP7` / `no tab` /
 etc. (+ `VAL` tag), an empty wave shows a "Press 1 for Riff" ghost, and the Lab summary counts
 draft rows while **Pack** is greyed until boxes exist. Ghost copy and How now match "pin then drag"
 (pins/keys create a box; drag fits it); Pack refuses with "Save keepers before Pack." when there
 are no boxes. Figures (2026-09-18): `boo-lab figures` hashes 2/4-bar GP windows, clusters repeats
 inside one song, and suggests `figure_id`s to `data/figures.jsonl` (`source=figure-hash`, drafts
 only — never `sections.jsonl`); the studio offers them as a `figure` datalist. Regression pass
-(2026-09-18): all 46
+(2026-09-18): all 58
 `getElementById` ids resolve, `harvestTable` reads every `data-f`, shortcuts/filters/dropzone/stems/
 spec/Snap/Save/Guess unchanged, no dup ids and no new network calls; `node --check` clean.
 The `#err` bar is now a live coach (wait-for-clock / VAL / "Press 1 for Riff" / unheard / box
 count) that never overwrites explicit errors; `add()` refuses before the clock is ready; How
-auto-opens once (`boo-lab-how-v1`); clock placeholder is `0:00 / —`; wave height is 168.
+auto-opens once (`boo-lab-how-v1`); clock placeholder is `0:00 / —`. The wave is 240px with **one
+lane per role** (a box sits only in its role's lane, so stacked parts show at once); click a bar to
+select its row and vice-versa, right-click it to edit role/figure/heard/unique/inst + Play box /
+Split at playhead / Delete, double-click toggles heard, and the All/Figures/Functions pills only
+hide (Save still harvests hidden rows).
 
 On disk now:
 - `data/sections.jsonl` — 6 rows, 1 track (Rebirth), all `heard=true`. The whole keeper set.
-- `data/drafts.jsonl` — 125 `msa-draft` rows across the 13 A Higher Place tracks (allin1, GPU).
+- `data/drafts.jsonl` — 238 rows across all albums (`msa-draft` + `songformer-draft`, GPU).
 - `data/beats.jsonl` — 13 tracks (`beat_this` preferred).
 - `data/compare.json` — drafts vs keepers. Rebirth (holdout): **F0.5=0.737 F3=0.800 role3=0.250**.
-- `data/sync.jsonl` — 13 A Higher Place tracks, all with a cached 6-stem **guitar** stem. `sync`
-  prefers the guitar stem and **falls back to the mix per witness** (isolated guitar can mis-peak
-  where the mix doesn't and vice versa). Two witnesses score alignment: a blurred (~120 ms) **onset**
-  correlation, and **chroma** (tab pitches sustained vs `chroma_cqt`). `sync_ok` passes if either
-  witness on either source is within 350 ms at score ≥0.15; `used_stem`, `clock_ratio`,
+- `data/sync.jsonl` — **17 `sync_ok` / 55 rows** across all albums. `sync`
+  prefers the cached **guitar** stem and **falls back to the mix per witness** (isolated guitar can
+  mis-peak where the mix doesn't and vice versa). Two witnesses score alignment: a blurred (~120 ms)
+  **onset** correlation, and **chroma** (tab pitches sustained vs `chroma_cqt`). `sync_ok` passes if
+  either witness on either source is within 350 ms at score ≥0.15; `used_stem`, `clock_ratio`,
   `chroma_lag`, `chroma_score`, `offset_sec` are recorded. An **aligned-with-offset** outcome also
   passes: a peak outside the 0.35 s zero window but within 5 s, with score ≥0.15, **peak prominence**
-  ≥0.05, and the other witness agreeing on the offset within 0.25 s. **7 `sync_ok` (snapshot)**: `02`/`04`/
-  `06`/`08`/`10` on onsets, `03` on chroma, `13` as a lead-in (`ok (lead-in -1.00s)`, both witnesses
-  at −1.00 s). Not passed: `05` and `12` agree on ~0.4–1.0 s but the peak isn't prominent enough;
-  `07` drifts 2.7 % (needs the rate fit, not an offset); `11` is 14 % short (missing section — a data
-  gap); `09`'s chroma alone suggests a ~0.67 s offset but the onset witness doesn't corroborate, so
-  it isn't trusted. `01 - Rebirth` `no-gp`.
-Read the live `sync_ok` count from `data/sync.jsonl` — never type 7/13 from memory.
+  ≥0.05, and the other witness agreeing on the offset within 0.25 s. A `.gp`/`.gpx` is clocked from
+  its parsed GPIF score (no conversion), and a `.gp5` row prefers a matching `.gp`/`.gpx` sibling.
+Read the live `sync_ok` count from `data/sync.jsonl` — never type 17/55 from memory.
 - `data/agree.jsonl` — Rebirth pass 1 (6 boxes). Pass 2 needs a human re-pin, then
   `boo-lab agree --album X --track Y --diff`.
 - `data/map.csv` — 71 rows, 55 `match=yes`; `flac_sha256` only once `scan`/`hash` runs.

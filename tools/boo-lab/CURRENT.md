@@ -14,7 +14,7 @@ Living docs are `USER.md` / `LAW.md` / `CURRENT.md` / `README.md` / `STATUS.md` 
 > `structure` writes `drafts.jsonl` only. `hear` and `sync` require **both** `--album` and `--track`.
 > `hash` fills `flac_sha256`; `sync` writes `data/sync.jsonl` (`sync_ok`/`lag_sec`); `beats` → `data/beats.jsonl`.
 > Every `sections.jsonl` write is atomic; Save keeps `data/sections.jsonl.bak`, reports `dropped_unheard`, and rejects bad boxes/roles/sources (fail closed).
-> Holdout songs stay unpinned. GP5 for extract; GP7 is eyes / export-to-GP5.
+> Holdout songs stay unpinned. GP7 `.gp`/`.gpx` is read natively (parsed GPIF) and preferred over `.gp5`; no conversion.
 > One album side per session. Default install is thin; interns (allin1 / beat-this / SongFormer) are optional.
 > Machines may draft. They never label.
 > Interns run on **GPU when present** (`boo_lab/device.py`); `boo-lab doctor` must print `cuda=True`.
@@ -25,7 +25,7 @@ Living docs are `USER.md` / `LAW.md` / `CURRENT.md` / `README.md` / `STATUS.md` 
 A **section lab** for metal FLACs (Born of Osiris first, other bands via ingest). Human output is `data/sections.jsonl` — **keeper pins only** (`source=human`/`guess-accepted`, `heard=true`), each with a figure/function `layer` and a `figure_id` — plus optional Pack clips under `work/` (gitignored). Machines write `data/drafts.jsonl` (MSA/SongFormer/Guess) and never keepers. It is not God Tier Metal, not a DAW, not a tab reader, not an auto-songwriter.
 
 GitHub: `https://github.com/z2wgv7dc4h-alt/1222` path `tools/boo-lab`.  
-Newest lab commit: `5df12ab` (one resumable `interns` pass; cache-first `structure`); before it `a21bc29` (`hash` fills `map.csv` `flac_sha256`), `21c54ea` (export keepers to JAMS from studio), `d22a5b8` (Guess snaps its audio spans to the beat grid), `90f041c` (studio beat/downbeat ticks + Snap; Guess gates markers on `sync_ok`), `5b1669a` (Guess carries the tab's section letters/repeats; simpler studio How), `9bac8fb` (Save transparency + one-step undo).
+Newest lab commit: `0a98c31` (sync clocks GP7 via GPIF, preferring a `.gp/.gpx` over a sibling `.gp5`); before it `e2a5dee` (GPIF notes: midi/voices/articulations/tempo map), `42d47f6` (GPIF→GP5 writer + GPIF sync fallback), `7dfdfe1` (parse `score.gpif`), `9fca6e6` (START.bat runs hash + beats/sync), `5df12ab` (one resumable `interns` pass), `a21bc29` (`hash` fills `flac_sha256`), `21c54ea` (JAMS from studio).
 
 ## Paths
 

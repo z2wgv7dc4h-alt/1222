@@ -10,11 +10,11 @@ Labelling lab. Not the generator.
 - Learn/rank may choose a draft intern; it still never labels (never writes `sections.jsonl`).
 - `boo-lab interns` only orchestrates the existing intern steps (structure/beats/drums/vocals/lyrics/sync/extract/figures/compare/learn/status); it inherits their law and never writes `sections.jsonl`.
 - Pin layer vs cell layer: human boxes + `figure_id` are the pin layer (a repeat may be one box or many boxes sharing an id). Extract/bank stores the shortest repeating cell inside that figure (2–4 bars). Pack slices the human box for listening. Do not dump a 40 s riff box into the bank as one fragment.
-- GP7 / Songsterr `.gp` is not a Guess marker clock. Prefer GP5 for markers. GP7 MAY feed extract and figure hashes after a deterministic export-to-GP5. Guess still drops markers when `sync_ok` is false.
+- GP7 `.gp`/`.gpx` is read natively via its parsed GPIF score (`gpif.py`), never a GP5 conversion. Prefer the GP7 score for sync/extract/figure hashes when present; Guess may use markers only from the parsed score, never invention. Guess still drops markers when `sync_ok` is false.
 - Overlap **different** roles. Do not stack the same role on the same seconds.
 - Pulse = named synth/keyboard figure, not “keys are audible.”
 - Breakdown = function (usually drums half-time), may sit on the same guitar as Riff.
-- GP7 / Songsterr `.gp` is not a marker source. Prefer `.gp5`.
+- Prefer a GP7 `.gp`/`.gpx` (parsed GPIF) over `.gp5`; never convert GP7 to GP5.
 - Do not rename FLACs. Match tabs in `map.csv` instead.
 - Do not train a song model on raw mixed FLACs.
 - Do not put audio, Guitar Pro, or tokens in git. `data/` labels are fine.
@@ -31,6 +31,6 @@ New bands go in `audio-corpus/<band>/`, tabs in `gp-tabs/gp5/<band>/`.
 - Machines never write `sections.jsonl` (`structure`, Guess, learn/adapt and Pack are drafts or reads).
 - Holdout / **VAL** songs do not vote for `prefer=` and are not training data.
 - Rebirth is labelled holdout by design — its keepers are real but held out of training and `prefer=`.
-- Prefer GP5 for markers; GP7 is eyes / export-to-GP5.
+- Prefer GP7 `.gp`/`.gpx` (parsed GPIF) over `.gp5` when both exist; no GP7→GP5 conversion.
 - A returning figure keeps its `figure_id`; a new idea gets a new id.
 - Do not train on raw mixed FLACs. Do not scrape tabs.

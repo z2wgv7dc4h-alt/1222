@@ -83,3 +83,16 @@ Pytest proves wiring. User ear proves a riff. STATUS may not tick “sounds like
   over-segments (795–1057 sections vs 143 markers; precision 0.15). Do not ship it; the tabs' marker
   letters and the allin1 `msa-draft` audio segmentation are the riff signal. Audio-based
   non-breakdown segmentation and an audio solo detector (0% hit rate) are likewise not shipped.
+
+## 2026-09-18 — GP7 native (facts)
+
+- **`gpif.py` parses GP7 GPIF directly.** `.gp`/`.gpx` is a zip whose `Content/score.gpif` is read
+  natively (flat GP8/alphaTab id-reference schema and a nested fixture both parse); no TuxGuitar,
+  no GP5 conversion, no invented GP7 writer.
+- **`sync` prefers the GP7 score.** When a row's `gp` is `.gp5`, a matching `.gp`/`.gpx` (same
+  normalized stem, ignoring `07 -` vs `07 `) beside it or under `BOO_GP_ROOT/gp7` is clocked
+  instead; `.gp5` still goes through `guitarpro.parse`. `LAG_TOLERANCE`/`SCORE_THRESHOLD` and the
+  clock-rate path are unchanged; `map.csv` is not rewritten and GP5 files are not deleted.
+- **GPIF is a score source, not a labeler.** GP7 supplies markers/notes only via the parsed score —
+  never Guess invention; machines never write `sections.jsonl`. `gpif_to_gp5` exists but is unused
+  (kept only as a fallback).

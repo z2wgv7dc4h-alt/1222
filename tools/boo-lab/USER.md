@@ -150,12 +150,13 @@ No match → those markers are dropped. You can still mark by ear.
 A small stretch (tempo a bit fast/slow) may be corrected.
 A missing intro or extra repeat will not be fixed. That is a tab problem.
 
-scan only rebuilds the list of files after you add FLACs or .gp5 tabs.
+scan only rebuilds the list of files after you add FLACs or GP tabs.
 It does not label and does not align clocks.
 
-The code reads GP5. GP7 / .gpx must be saved as GP5 first
-(TuxGuitar is free), then scan.
-If the song already shows GP5, you can ignore GP7.
+The lab reads GP7 `.gp` / `.gpx` directly (parsed score, no conversion) and
+still reads `.gp5`. When a song has both, sync clocks the GP7. Drop the GP7
+beside the GP5 or under `gp-tabs/gp7/` — no TuxGuitar, no export step.
+Inspect one with `boo-lab gpif --path FILE` (duration, bars, notes, midi).
 
 ## Learn and adapt (not training)
 
@@ -172,7 +173,7 @@ A later model would train on short tab cells, not on mixed FLACs.
 
 ## Figures and cells
 
-figures — from a GP5, suggest repeating-idea names. Dropdown only.
+figures — from a GP5 or GP7 tab, suggest repeating-idea names. Dropdown only.
 cells — one short 2-4 bar example per figure name you kept, not a 40-second box.
 
 ## VAL / holdout
@@ -197,6 +198,7 @@ Lyrics are optional timed lines. They are not structure gold.
     python -m boo_lab.cli learn
     python -m boo_lab.cli sync --album ALBUM --track TRACK
     python -m boo_lab.cli figures --album ALBUM --track TRACK
+    python -m boo_lab.cli gpif --path FILE
     python -m boo_lab.cli compare
 
 Short studio titles are fine; the lab maps year-prefixed folder names.
@@ -210,6 +212,7 @@ Expect unheard boxes to survive Save.
 Let a helper write sections.jsonl.
 Train a song model on raw mixed FLACs.
 Scrape tabs or commit audio / Guitar Pro files.
+Convert GP7 to GP5 — the lab reads GP7 directly.
 
 ## Four lines
 

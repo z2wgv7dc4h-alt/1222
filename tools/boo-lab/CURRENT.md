@@ -247,20 +247,18 @@ of re-running allin1/SongFormer). `compare` writes `data/compare.json` then
 
 ## GPIF reader
 
-`boo_lab/gpif.py` reads a GP7/GP6 `.gpx`/`.gp` **score** without converting it:
-`open_gp(path)` opens the zip and requires `Content/score.gpif` (fail closed
-otherwise); `parse_gpif(xml)` returns a `GpifScore` — `title`, `tempo`,
-`tracks` (`name`, `tuning_midi`), `masterbars` (`time_n`, `time_d`,
-`repeat_start`, `repeat_end`, `repeat_count`, `section`, optional `tempo`) and
-`notes` (`track`, `bar`, `t_beat`, `string`, `fret`, `duration`, `palm_mute`).
-`playback_bar_order` expands masterbar repeat groups (same open/close/count
-idea as Guess's `sync._playback_order`); `playback_beats` and `duration_sec`
-walk that order, `duration_sec` applying each bar's tempo over the score map.
-CLI `boo-lab gpif --path FILE` prints `duration_sec n_bars n_notes n_markers`
-and writes nothing. GP7 supplies markers/notes **only** via this parsed score,
-never via Guess invention; no GP5 writer and no TuxGuitar (LAW). Fixture
-`tests/fixtures/tiny.gp` is hand-made (2 bars 4/4 120 bpm, D-standard, 4 notes,
-2x repeat).
+`boo_lab/gpif.py` reads a GP7/GP6 `.gp`/`.gpx` **score** from the zip without
+converting (`open_gp` needs `Content/score.gpif`; flat GP8/alphaTab and the
+nested fixture both parse). `GpifScore`: `title`/`artist`/`album`/`tempo`,
+`tracks` (name, `tuning_midi`, instrument, capo), `masterbars` (time sig,
+repeat map, section, tempo), `beats` (dynamic/chord/text) and `notes` — **every
+Voice** in a Bar, with string/fret/duration/`voice`, `midi = tuning_midi[string-1]
++ fret` (None out of range), `palm_mute`/`dead`/`accent`/`hammer`/`slide` +
+`articulations`. Helpers: `tempo_map` (`(unexpanded beat, bpm)`, drives
+`duration_sec`), `time_sig_map`, `section_list`, `playback_bar_order`,
+`playback_beats`, `note_events` (`(seconds, midi, duration_sec, palm_mute)`;
+seconds first so `sync`'s GPIF clock keeps working). CLI `gpif` adds
+`n_with_midi`. No `sections.jsonl`; fixture `tiny.gp` is hand-made.
 
 ## GPIF to GP5 + sync clock from GP7
 

@@ -158,7 +158,8 @@ def gp_onset_times(gp_path: Path) -> list[float] | None:
     events = _tab_notes(gp_path)
     if events is None:
         return None
-    return [round(t, 4) for t, _pitches, _dur in events]
+    # seconds is always element [0]; GPIF events carry extra fields after it.
+    return [round(e[0], 4) for e in events]
 
 
 def envelope_from_times(times: list[float], n_frames: int, hop_s: float):

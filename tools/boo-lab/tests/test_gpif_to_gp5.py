@@ -32,7 +32,7 @@ def test_round_trips_the_tiny_gpif(tmp_path):
     assert parsed.measureHeaders[0].isRepeatOpen is True
     assert parsed.measureHeaders[1].repeatClose == 1
     beats = [b for m in parsed.tracks[0].measures for b in m.voices[0].beats]
-    assert sum(len(b.notes) for b in beats) == 4
+    assert sum(len(b.notes) for b in beats) == 5
 
 
 def test_drum_track_skipped_and_guitar_kept(tmp_path):
@@ -84,7 +84,7 @@ def test_sync_falls_back_to_gpif_onsets_and_duration():
     # pyguitarpro cannot read the zip, so the GPIF path clocks the tab.
     onsets = sync.gp_onset_times(FIX)
     assert onsets is not None
-    assert len(onsets) == 8  # 4 notes x 2 repeat passes
+    assert len(onsets) == 10  # 5 notes x 2 repeat passes
     assert onsets[0] == 0.0
     assert sync._tab_play_seconds(FIX) == pytest.approx(8.0)
 

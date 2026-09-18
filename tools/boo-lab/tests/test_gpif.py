@@ -68,16 +68,18 @@ def test_repeat_expands_the_playback():
     assert gpif.duration_sec(score) == pytest.approx(8.0)  # 16 beats at 120 bpm
 
 
-def test_parses_notes_with_positions_and_palm_mute():
+def test_parses_notes_with_positions_palm_mute_and_midi():
     score = gpif.load_score(FIX)
 
-    got = [(n.track, n.bar, n.t_beat, n.string, n.fret, n.duration, n.palm_mute)
-           for n in score.notes]
+    got = [(n.track, n.bar, n.t_beat, n.string, n.fret, n.duration,
+            n.palm_mute, n.voice, n.midi) for n in score.notes]
+    # midi = tuning[string-1] + fret, tuning [38,43,48,53,57,62]
     assert got == [
-        (0, 0, 0.0, 5, 7, 2.0, False),
-        (0, 0, 2.0, 5, 9, 2.0, True),
-        (0, 1, 0.0, 6, 3, 2.0, False),
-        (0, 1, 2.0, 6, 5, 2.0, False),
+        (0, 0, 0.0, 5, 7, 2.0, False, 0, 57 + 7),
+        (0, 0, 2.0, 5, 9, 2.0, True, 0, 57 + 9),
+        (0, 0, 0.0, 6, 0, 2.0, False, 1, 62 + 0),   # second voice in bar 0
+        (0, 1, 0.0, 6, 3, 2.0, False, 0, 62 + 3),
+        (0, 1, 2.0, 6, 5, 2.0, False, 0, 62 + 5),
     ]
 
 
@@ -112,13 +114,116 @@ def test_parses_namespaced_gpif():
     assert gpif.playback_beats(score) == 3.0
 
 
+FLAT_XML = """<GPIF>
+  <Score><Title>Flat</Title><Artist>A</Artist><Album>B</Album></Score>
+  <MasterTrack><Tracks>0 1</Tracks><Automations>
+    <Automation><Type>Tempo</Type><Bar>0</Bar><Position>0</Position><Value>120 2</Value></Automation>
+    <Automation><Type>Tempo</Type><Bar>1</Bar><Position>0</Position><Value>90 2</Value></Automation>
+  </Automations></MasterTrack>
+  <Tracks>
+    <Track id="0"><Name>Gtr</Name><InstrumentSet><Type>electricGuitar</Type></InstrumentSet>
+      <Staves><Staff><Properties><Property name="CapoFret"><Fret>2</Fret></Property>
+        <Property name="Tuning"><Pitches>38 43 48 53 57 62</Pitches></Property></Properties></Staff></Staves></Track>
+    <Track id="1"><Name>Bass</Name><InstrumentSet><Type>bass</Type></InstrumentSet></Track>
+  </Tracks>
+  <MasterBars>
+    <MasterBar><Time>4/4</Time><Bars>10 20</Bars></MasterBar>
+    <MasterBar><Time>3/4</Time><Bars>11 21</Bars><Section><Text>Verse</Text></Section></MasterBar>
+  </MasterBars>
+  <Rhythms><Rhythm id="0"><NoteValue>Quarter</NoteValue></Rhythm></Rhythms>
+  <Bars>
+    <Bar id="10"><Voices>100</Voices></Bar><Bar id="11"><Voices>101</Voices></Bar>
+    <Bar id="20"><Voices>200</Voices></Bar><Bar id="21"><Voices>201</Voices></Bar>
+  </Bars>
+  <Voices>
+    <Voice id="100"><Beats>1000 1001</Beats></Voice><Voice id="101"><Beats>1010</Beats></Voice>
+    <Voice id="200"><Beats>2000</Beats></Voice><Voice id="201"><Beats /></Voice>
+  </Voices>
+  <Beats>
+    <Beat id="1000"><Dynamic>F</Dynamic><Rhythm ref="0"/><Chord><Name>C5</Name></Chord><Text>hit</Text><Notes>1 2</Notes></Beat>
+    <Beat id="1001"><Dynamic>P</Dynamic><Rhythm ref="0"/><Notes>3</Notes></Beat>
+    <Beat id="1010"><Dynamic>F</Dynamic><Rhythm ref="0"/><Notes>4</Notes></Beat>
+    <Beat id="2000"><Dynamic>F</Dynamic><Rhythm ref="0"/><Notes>5</Notes></Beat>
+  </Beats>
+  <Notes>
+    <Note id="1"><Properties><Property name="String"><String>0</String></Property><Property name="Fret"><Fret>3</Fret></Property><Property name="Midi"><Number>41</Number></Property></Properties><PalmMute/></Note>
+    <Note id="2"><Properties><Property name="String"><String>1</String></Property><Property name="Fret"><Fret>5</Fret></Property><Property name="Midi"><Number>48</Number></Property><Property name="Hammer"><Hammer>true</Hammer></Property></Properties></Note>
+    <Note id="3"><Properties><Property name="String"><String>0</String></Property><Property name="Fret"><Fret>0</Fret></Property></Properties></Note>
+    <Note id="4"><Properties><Property name="String"><String>0</String></Property><Property name="Fret"><Fret>7</Fret></Property></Properties></Note>
+    <Note id="5"><Properties><Property name="String"><String>0</String></Property><Property name="Fret"><Fret>2</Fret></Property></Properties></Note>
+  </Notes>
+</GPIF>"""
+
+
+def test_flat_gp8_richer_model():
+    score = gpif.parse_gpif(FLAT_XML)
+
+    assert (score.title, score.artist, score.album) == ("Flat", "A", "B")
+    assert [(t.name, t.instrument, t.capo, t.tuning_midi) for t in score.tracks] == [
+        ("Gtr", "electricGuitar", 2, [38, 43, 48, 53, 57, 62]),
+        ("Bass", "bass", None, []),
+    ]
+    assert gpif.tempo_map(score) == [(0.0, 120.0), (4.0, 90.0)]  # unexpanded beats
+    assert gpif.time_sig_map(score) == [(0, 4, 4), (1, 3, 4)]
+    assert gpif.section_list(score) == [(1, "Verse")]
+
+
+def test_flat_notes_carry_midi_and_articulations():
+    score = gpif.parse_gpif(FLAT_XML)
+
+    assert len(score.notes) == 5
+    first = score.notes[0]
+    assert (first.track, first.bar, first.string, first.fret) == (0, 0, 1, 3)
+    assert first.midi == 41 and first.palm_mute is True
+    assert "palm_mute" in first.articulations
+    assert score.notes[1].midi == 48 and "hammer" in score.notes[1].articulations
+
+
+def test_flat_beats_carry_dynamic_chord_text_and_notes():
+    score = gpif.parse_gpif(FLAT_XML)
+
+    b0 = score.beats[0]
+    assert (b0.track, b0.bar, b0.t_beat, b0.duration) == (0, 0, 0.0, 1.0)
+    assert b0.dynamic == "F" and b0.chord == "C5" and b0.text == "hit"
+    assert len(b0.notes) == 2
+    assert score.beats[1].dynamic == "P" and len(score.beats[1].notes) == 1
+    # a tempo change after bar 0 makes bar 1 shorter in seconds
+    assert gpif.duration_sec(score) == pytest.approx(4 * 0.5 + 3 * (60.0 / 90.0))
+    assert len(gpif.note_events(score)) == 5
+
+
+def test_nested_fixture_exposes_beats_voices_and_articulations():
+    score = gpif.load_score(FIX)
+
+    assert len(score.beats) == 5                    # 2 + 1 (bar 0) + 2 (bar 1)
+    assert all(b.dynamic is None for b in score.beats)
+    assert "palm_mute" in score.notes[1].articulations
+    assert score.notes[1].palm_mute is True
+    # every note has a midi from the known tuning; two voices in bar 0
+    assert all(n.midi is not None for n in score.notes)
+    assert score.notes[2].voice == 1
+    assert {n.voice for n in score.notes if n.bar == 0} == {0, 1}
+
+
+def test_note_events_keep_seconds_first_and_are_finite():
+    score = gpif.load_score(FIX)
+
+    events = gpif.note_events(score)
+    assert len(events) == 10                         # 5 notes x 2 repeat passes
+    assert all(len(e) == 4 for e in events)
+    assert events[0][0] == 0.0 and events[0][1] == 57 + 7
+    assert events[0][3] is False and events[1][3] is True
+    assert gpif.duration_sec(score) > 0 and gpif.duration_sec(score) < 1e6
+
+
 def test_cli_prints_counts_and_writes_nothing(capsys):
     assert cli.main(["gpif", "--path", str(FIX)]) == 0
     out = capsys.readouterr().out
     assert "duration_sec=8.000" in out
     assert "n_bars=2" in out
-    assert "n_notes=4" in out
+    assert "n_notes=5" in out
     assert "n_markers=1" in out
+    assert "n_with_midi=5" in out
 
 
 def test_cli_bad_path_is_a_clean_error(tmp_path, capsys):

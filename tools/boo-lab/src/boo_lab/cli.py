@@ -238,9 +238,10 @@ def main(argv: list[str] | None = None) -> int:
         except Exception as exc:  # noqa: BLE001 - a bad/unreadable GP is a clean CLI error
             print("gpif:", exc)
             return 1
-        print("gpif %s: duration_sec=%.3f n_bars=%d n_notes=%d n_markers=%d"
+        n_midi = sum(1 for n in score.notes if n.midi is not None)
+        print("gpif %s: duration_sec=%.3f n_bars=%d n_notes=%d n_markers=%d n_with_midi=%d"
               % (args.path, duration_sec(score), len(score.masterbars),
-                 len(score.notes), count_markers(score)))
+                 len(score.notes), count_markers(score), n_midi))
         if getattr(args, "write_gp5", None):
             from .gpif_to_gp5 import gpif_to_gp5
 

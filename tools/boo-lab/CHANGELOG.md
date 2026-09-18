@@ -2,6 +2,10 @@
 
 ## 2026-09-18
 
+### Bank stores short cells per figure_id, not whole pins
+
+- New `src/boo_lab/cells.py`: `assemble_cells` groups one-bar riff_bank fragments by `figure_id` (a human keeper figure_id covering the bar when `sync_ok`, else a `figures.jsonl` occurrence, else the marker letter / a local bar hash) and emits **one representative cell of 2–4 bars** — preferring the hashed `figures.jsonl` window, then an identical-bar run, then the first 1–2 bars. Every other hit is only an `occurrences` pointer (seconds only when `times_trusted`), so an 8-bar human box becomes a 2-bar cell, never an 8-bar bank fragment. `song_cells`/`build_cells` write `data/riffs.jsonl` per song and never blank it on a zero-row run; `boo-lab extract` now emits cells (and reduces long pins) while keeping the audio fallback and writing atomically. Lab tests: **234 passed**.
+
 ### Album/track resolve the way the studio names them
 
 - New `catalogue.resolve_row`: exact → casefold → leading `YYYY` / `YYYY - ` album prefix + normalized track key (so `07 - Exist` == `07 Exist` == `Exist`; a different album that merely shares a year never matches; the numbered track wins when several reduce to the same title). Wired into `sync_track`, `hear`, `figures` (`build_figures` + CLI full-map reload), and the `agree`/`compare` CLI. A map miss is now `no-row`, distinct from a matched row whose gp is missing (`no-gp`, which fills the real gp/flac strings so the human sees the path); the returned record carries the resolved album/track. A genuinely failed `sync` note appends `tab_play=Xs flac=Ys dly=Zs`, reusing extract's `_playback_duration` (no second tempo walker). No sync math, thresholds, or keepers changed. Lab tests: **231 passed**.

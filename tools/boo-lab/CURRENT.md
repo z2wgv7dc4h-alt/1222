@@ -199,6 +199,14 @@ Then `scan` rebuilds `map.csv`.
 
 BoO rip folders that lie (Discovery living under “Soul Sphere”, Simulation under “FYE Discovery”) — `data/CATALOG.md`. Skip Misha mix FLACs for the bank.
 
+## Extract / cell layer
+
+`boo-lab extract` writes **one representative cell per `figure_id`** to `data/riffs.jsonl` — the
+shortest repeating cell inside that figure (2, 3, or 4 bars), preferring the hashed window in
+`data/figures.jsonl` when `n_hits>=2`; every other hit is only a pointer (`occurrences` bars,
+seconds only when `times_trusted`). An 8-bar human `riff-A` box becomes a 2-bar cell, never an 8-bar
+bank fragment. Zero cells never blanks an existing file.
+
 ## Pack / learning
 
 For each **keeper** box: mix clip + drums/bass/guitar/piano/other/vocals + no-vox (6-stem where cached) + `meta.json` (times, role, `figure_id`, source, split, gp path). Default Demucs model is 6-stem `htdemucs_6s`; guitar/piano are isolated, no-vox is mixed from the six. A track cached only under the old 4-stem model still packs (guitar/piano simply absent). That is enough until 20 labelled songs.

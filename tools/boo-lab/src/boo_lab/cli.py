@@ -359,69 +359,82 @@ def main(argv: list[str] | None = None) -> int:
         import dataclasses
 
         from .audio_extract import extract_fragments_from_audio
+        from .cells import song_cells
         from .extract import extract_riffs, load_human_sections
         from .holdout import ensure_holdout, split_for
+        from .schema import write_jsonl_atomic
 
         human = load_human_sections(data_dir())
         holdout = ensure_holdout(root(), rows)
         human_tracks = 0
         audio_tracks = 0
+        cell_songs = 0
+        skipped_long = 0
+        figure_ids: set[str] = set()
         out = data_dir() / "riffs.jsonl"
-        n = 0
-        with out.open("w", encoding="utf-8") as f:
-            for r in rows:
-                song = f"{r.get('album')}::{r.get('track')}"
-                sections = human.get((r.get("album"), r.get("track")))
-                gp = r.get("gp_path")
-                matched = (r.get("match") or "").lower() in {"yes", "y", "1", "true"}
-                flac_val = r.get("flac_path") or r.get("flac") or ""
-                flac = Path(flac_val) if flac_val else None
+        produced: list[dict] = []
 
-                tab_fragments = None
-                if matched and gp and Path(gp).exists():
-                    try:
-                        tab_fragments = extract_riffs(Path(gp), song, human_sections=sections)
-                    except Exception as e:  # noqa: BLE001 - real unparseable-GP files exist in this corpus
-                        print("TAB FAILED", r.get("track"), e)
-                        tab_fragments = None
-                if tab_fragments:
-                    # Real tab path -- these are `source_type="tab_verbatim"`
-                    # and must always be preferred over the audio fallback
-                    # below for the same role.
-                    if sections:
-                        human_tracks += 1
-                    for riff in tab_fragments:
-                        riff["album"] = r.get("album")
-                        riff["track"] = r.get("track")
-                        riff["tuning"] = r.get("tuning")
-                        riff["split"] = split_for(r.get("album"), r.get("track"), holdout)
-                        f.write(json.dumps(riff) + "\n")
-                        n += 1
-                    print("RIFFS", r.get("track"), "(human labels)" if sections else "(gp markers only)")
-                    continue
+        for r in rows:
+            album = r.get("album")
+            track = r.get("track")
+            song = f"{album}::{track}"
+            sections = human.get((album, track))
+            gp = r.get("gp_path")
+            matched = (r.get("match") or "").lower() in {"yes", "y", "1", "true"}
+            flac_val = r.get("flac_path") or r.get("flac") or ""
+            flac = Path(flac_val) if flac_val else None
 
-                # No usable real GP file (none matched, missing on disk, or
-                # unparseable/zero fragments) -> real audio transcription
-                # fallback (`source_type="audio_transcribed"`), instead of
-                # silently producing zero riff data for the song.
-                if flac is None or not flac.exists():
-                    print("SKIP extract", r.get("track"), "no usable gp and no flac")
-                    continue
-                fragments = extract_fragments_from_audio(flac, root() / "work" / "stems", song)
-                audio_tracks += 1
-                for frag in fragments:
-                    rec = dataclasses.asdict(frag)
-                    rec["album"] = r.get("album")
-                    rec["track"] = r.get("track")
-                    rec["tuning"] = r.get("tuning")
-                    rec["split"] = split_for(r.get("album"), r.get("track"), holdout)
-                    f.write(json.dumps(rec) + "\n")
-                    n += 1
-                print("AUDIO", r.get("track"), len(fragments), "transcribed fragments")
+            tab_fragments = None
+            if matched and gp and Path(gp).exists():
+                try:
+                    tab_fragments = extract_riffs(Path(gp), song, human_sections=sections)
+                except Exception as e:  # noqa: BLE001 - real unparseable-GP files exist in this corpus
+                    print("TAB FAILED", track, e)
+                    tab_fragments = None
+            if tab_fragments:
+                # Cell layer: one representative 2-4 bar cell per figure_id
+                # (never one fragment per bar, never a whole long pin).
+                cells, long_spans = song_cells(root(), r, fragments=tab_fragments)
+                for cell in cells:
+                    cell["tuning"] = r.get("tuning")
+                    cell["split"] = split_for(album, track, holdout)
+                    produced.append(cell)
+                    figure_ids.add(cell["figure_id"])
+                skipped_long += long_spans
+                if sections:
+                    human_tracks += 1
+                cell_songs += 1
+                print("CELLS", track, len(cells), "cell(s)")
+                continue
+
+            # No usable real GP file (none matched, missing on disk, or
+            # unparseable/zero fragments) -> real audio transcription
+            # fallback (`source_type="audio_transcribed"`), instead of
+            # silently producing zero riff data for the song.
+            if flac is None or not flac.exists():
+                print("SKIP extract", track, "no usable gp and no flac")
+                continue
+            fragments = extract_fragments_from_audio(flac, root() / "work" / "stems", song)
+            audio_tracks += 1
+            for frag in fragments:
+                rec = dataclasses.asdict(frag)
+                rec["album"] = album
+                rec["track"] = track
+                rec["tuning"] = r.get("tuning")
+                rec["split"] = split_for(album, track, holdout)
+                produced.append(rec)
+            print("AUDIO", track, len(fragments), "transcribed fragments")
+
+        if produced:
+            write_jsonl_atomic(out, produced)
+        else:
+            print("extract: 0 rows; leaving", out.name, "untouched")
         print(
-            "wrote", n, "riffs", out,
-            "-", human_tracks, "track(s) used real human sections.jsonl labels;",
-            audio_tracks, "track(s) used audio transcription fallback",
+            "wrote", len(produced), "rows", out,
+            "-", len(figure_ids), "figure(s),", cell_songs, "song(s) as cell(s);",
+            human_tracks, "used human sections.jsonl;",
+            audio_tracks, "audio fallback;",
+            skipped_long, "span(s) longer than 4 bars reduced",
         )
         return 0
 

@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import csv
 import hashlib
+import os
 import re
+import tempfile
 from pathlib import Path
 
 FIELDS = [
@@ -52,15 +54,47 @@ def sha256_file(path: Path, chunk: int = 1 << 20) -> str:
         return ""
 
 
+_HEX64 = re.compile(r"^[0-9a-fA-F]{64}$")
+
+
+def _write_map_atomic(path: Path, rows: list[dict]) -> None:
+    """Atomic CSV write (temp + fsync + os.replace): a crash mid-write leaves
+    the previous `map.csv` intact. Preserves unknown extra columns like
+    `save_map`."""
+    keys = list(FIELDS)
+    for row in rows:
+        for key in row:
+            if key not in keys:
+                keys.append(key)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(prefix=path.name + ".", suffix=".tmp", dir=str(path.parent))
+    try:
+        with os.fdopen(fd, "w", newline="", encoding="utf-8") as f:
+            w = csv.DictWriter(f, fieldnames=keys, extrasaction="ignore")
+            w.writeheader()
+            for row in rows:
+                w.writerow({k: row.get(k, "") for k in keys})
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp, path)
+    except BaseException:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
+
+
 def fill_hashes(map_path: Path, album: str | None = None) -> dict:
-    """Fill empty `flac_sha256` cells only (never rehash a populated cell).
-    Missing files are left empty."""
+    """Fill `flac_sha256` for rows whose FLAC exists on disk. A cell already
+    holding a valid 64-hex digest is never rehashed; empty (or malformed) cells
+    are filled. Atomic write; missing files are left empty."""
     rows = load_map(map_path) if map_path.exists() else []
     filled = 0
     for row in rows:
         if album and (row.get("album") or "").casefold() != album.casefold():
             continue
-        if row.get("flac_sha256"):
+        if _HEX64.match((row.get("flac_sha256") or "").strip()):
             continue
         flac = row.get("flac") or ""
         p = Path(flac) if flac else None
@@ -69,7 +103,7 @@ def fill_hashes(map_path: Path, album: str | None = None) -> dict:
             if digest:
                 row["flac_sha256"] = digest
                 filled += 1
-    save_map(map_path, rows)
+    _write_map_atomic(map_path, rows)
     return {"filled": filled, "rows": len(rows)}
 
 

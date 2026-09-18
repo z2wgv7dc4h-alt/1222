@@ -148,16 +148,17 @@ def test_load_map_missing_file_fails_closed(tmp_path):
         cat.load_map(tmp_path / "nope.csv")
 
 
-def test_fill_hashes_writes_sha256_only_for_empty_cells(tmp_path):
+def test_fill_hashes_fills_empty_skips_valid(tmp_path):
     import hashlib
 
     flac = tmp_path / "a.flac"
     flac.write_bytes(b"hello")
     missing = tmp_path / "nope.flac"
+    valid = "a" * 64
     cat.save_map(tmp_path / "map.csv", [
         {"album": "A", "track": "T", "flac": str(flac)},
         {"album": "A", "track": "U", "flac": str(missing)},
-        {"album": "A", "track": "V", "flac": str(flac), "flac_sha256": "deadbeef"},
+        {"album": "A", "track": "V", "flac": str(flac), "flac_sha256": valid},
     ])
 
     report = cat.fill_hashes(tmp_path / "map.csv")
@@ -165,8 +166,24 @@ def test_fill_hashes_writes_sha256_only_for_empty_cells(tmp_path):
     rows = cat.load_map(tmp_path / "map.csv")
     assert report["filled"] == 1
     assert rows[0]["flac_sha256"] == hashlib.sha256(b"hello").hexdigest()
-    assert rows[1]["flac_sha256"] == ""
-    assert rows[2]["flac_sha256"] == "deadbeef"
+    assert rows[1]["flac_sha256"] == ""          # missing file, left empty
+    assert rows[2]["flac_sha256"] == valid        # valid 64-hex, never rehashed
+
+
+def test_fill_hashes_repairs_a_malformed_cell(tmp_path):
+    import hashlib
+
+    flac = tmp_path / "a.flac"
+    flac.write_bytes(b"hello")
+    cat.save_map(tmp_path / "map.csv", [
+        {"album": "A", "track": "V", "flac": str(flac), "flac_sha256": "deadbeef"},
+    ])
+
+    report = cat.fill_hashes(tmp_path / "map.csv")
+
+    assert report["filled"] == 1
+    assert cat.load_map(tmp_path / "map.csv")[0]["flac_sha256"] == \
+        hashlib.sha256(b"hello").hexdigest()
 
 
 def test_save_map_preserves_unknown_columns(tmp_path):

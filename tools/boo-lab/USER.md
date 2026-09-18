@@ -1,5 +1,7 @@
 # boo-lab
 
+Read this file — not APPLY.md / PATCHES.md / PROTOCOL.md / QUALITY.md (those are maintainer notes).
+
 A bench for marking parts of songs you already own.
 
 You listen, you draw boxes on the waveform, you tick **heard**, you **Save**.

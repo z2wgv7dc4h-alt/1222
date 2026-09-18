@@ -374,6 +374,7 @@ function coach(){
   if(t && String(t.split||"").toLowerCase()==="val") return "VAL — leave unpinned";
   if(window._adaptNudge>0) return "Adapted "+window._adaptNudge+" drafts from your last saves on this album.";
   if(window._draftNudge>0) return window._draftNudge+" draft"+(window._draftNudge===1?"":"s")+" — tick heard on the ones you accept, then Save.";
+  if(window._conflictHint) return window._conflictHint;
   if(!regs.length) return window._figureHint || "Press a role pin (or 1 for Riff) — pins create boxes; drag fits them.";
   const unh=regs.filter(p=>!p.heard).length;
   if(unh) return unh+" not heard — Save will drop them";
@@ -952,7 +953,7 @@ function select(i){
     badge.title=(split==="val"?"whole-song validation (holdout)":"training")+" split";
   }
   renderList(); showErr(""); regs=[]; sel=-1; window._lyricLines=null; spec=null;
-  window._figureHint=""; window._draftNudge=0; window._adaptNudge=0;
+  window._figureHint=""; window._conflictHint=""; window._draftNudge=0; window._adaptNudge=0;
   const stems=t.stems||[];
   curStem = stems.includes("drums") ? "drums" : (stems[0]||"drums");
   renderStemButtons(t);
@@ -966,9 +967,10 @@ function select(i){
     const dl=document.getElementById("figureSuggests");
     if(dl) dl.innerHTML=hints.map(f=>"<option value=\""+escAttr(f.figure_id)+"\">").join("");
     const conflict=hints.some(f=>f.conflict);
-    window._figureHint=conflict
-      ? "Tab letter maps to two figures — pick in the box."
-      : (hints.length?("Tab suggests repeating figures: "+hints.map(f=>f.figure_id).join(", ")+" — pick in the figure box."):"");
+    window._conflictHint=conflict?"Tab letter maps to two figures — pick the name in the box.":"";
+    window._figureHint=(!conflict&&hints.length)
+      ?("Tab suggests repeating figures: "+hints.map(f=>f.figure_id).join(", ")+" — pick in the figure box.")
+      :"";
     const err=document.getElementById("err");
     if(err && err.dataset.explicit!=="1") showErr("");
   }).catch(()=>{});

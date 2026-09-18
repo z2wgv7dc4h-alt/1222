@@ -62,12 +62,13 @@ On disk now:
   witness on either source is within 350 ms at score ≥0.15; `used_stem`, `clock_ratio`,
   `chroma_lag`, `chroma_score`, `offset_sec` are recorded. An **aligned-with-offset** outcome also
   passes: a peak outside the 0.35 s zero window but within 5 s, with score ≥0.15, **peak prominence**
-  ≥0.05, and the other witness agreeing on the offset within 0.25 s. **7 `sync_ok`**: `02`/`04`/
+  ≥0.05, and the other witness agreeing on the offset within 0.25 s. **7 `sync_ok` (snapshot)**: `02`/`04`/
   `06`/`08`/`10` on onsets, `03` on chroma, `13` as a lead-in (`ok (lead-in -1.00s)`, both witnesses
   at −1.00 s). Not passed: `05` and `12` agree on ~0.4–1.0 s but the peak isn't prominent enough;
   `07` drifts 2.7 % (needs the rate fit, not an offset); `11` is 14 % short (missing section — a data
   gap); `09`'s chroma alone suggests a ~0.67 s offset but the onset witness doesn't corroborate, so
   it isn't trusted. `01 - Rebirth` `no-gp`.
+Read the live `sync_ok` count from `data/sync.jsonl` — never type 7/13 from memory.
 - `data/agree.jsonl` — Rebirth pass 1 (6 boxes). Pass 2 needs a human re-pin, then
   `boo-lab agree --album X --track Y --diff`.
 - `data/map.csv` — 71 rows, 55 `match=yes`; `flac_sha256` only once `scan`/`hash` runs.

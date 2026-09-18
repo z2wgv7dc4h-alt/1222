@@ -1312,7 +1312,7 @@ function add(role){
 document.querySelectorAll(".pins button").forEach(b=>b.onclick=()=>add(b.dataset.role));
 document.getElementById("btnPlay").onclick=toggle;
 
-const SOURCE_OPTS=["human","guess-accepted","guess","msa-draft","songformer-draft","tabnotes-draft"];
+const SOURCE_OPTS=["human","guess-accepted","guess","msa-draft","songformer-draft"];
 const INSTRUMENTS=["","rhythm","lead","bass","drums","synth","vocal","mix"];
 function instSelect(cur){
   const opts=INSTRUMENTS.slice();

@@ -25,7 +25,7 @@ Living docs are `USER.md` / `LAW.md` / `CURRENT.md` / `README.md` / `STATUS.md` 
 A **section lab** for metal FLACs (Born of Osiris first, other bands via ingest). Human output is `data/sections.jsonl` — **keeper pins only** (`source=human`/`guess-accepted`, `heard=true`), each with a figure/function `layer` and a `figure_id` — plus optional Pack clips under `work/` (gitignored). Machines write `data/drafts.jsonl` (MSA/SongFormer/Guess) and never keepers. It is not God Tier Metal, not a DAW, not a tab reader, not an auto-songwriter.
 
 GitHub: `https://github.com/z2wgv7dc4h-alt/1222` path `tools/boo-lab`.  
-Newest lab commit: GP rematch — scored unique assignment, GP7 packs win (Discovery/AHP/Eternal Reign now full GP7); before it `c851856` (ingest detects tab-notes zips into `data/tabnotes`), `3449785` (tab-notes pack reader), `ced52ad` (per-track drums/vocals), `0a98c31` (sync clocks GP7 via GPIF), `e2a5dee` (GPIF notes: midi/voices/articulations/tempo map), `42d47f6` (GPIF→GP5 writer + fallback), `7dfdfe1` (parse `score.gpif`), `9fca6e6` (START.bat runs hash + beats/sync), `5df12ab` (one resumable `interns` pass).
+Newest lab commit: `37e5d96` (studio lanes named once; tiles show `figure_id` not "Riff"); before it `4e3d283` (GP rematch — scored unique assignment, GP7 packs win: Discovery/AHP/Eternal Reign now full GP7), `c851856` (ingest detects tab-notes zips into `data/tabnotes`), `3449785` (tab-notes pack reader), `ced52ad` (per-track drums/vocals), `0a98c31` (sync clocks GP7 via GPIF), `e2a5dee` (GPIF notes: midi/voices/articulations/tempo map), `42d47f6` (GPIF→GP5 writer + fallback), `7dfdfe1` (parse `score.gpif`), `9fca6e6` (START.bat runs hash + beats/sync), `5df12ab` (one resumable `interns` pass).
 
 ## Paths
 

@@ -8,7 +8,7 @@ Canonical detail: **CURRENT.md**; commands in **README.md**.
 - keepers: 6 row(s) across 1 track(s)
 - drafts: 1450 row(s); sources: msa-draft, songformer-draft
 - sync: 14 ok / 52 row(s)
-- map.csv: 71 row(s)
+- map.csv: 83 row(s)
 <!-- status:counts:end -->
 
 Works: studio keeps pins (`human`/`guess-accepted` + `heard`) in `sections.jsonl`; mel
@@ -24,7 +24,7 @@ Matcher (2026-09-18): `catalogue._key` strips a space-numbered track prefix and 
 prefix in any punctuation; `_gp_candidates` scores each GP (exact > substring, lead-number
 bonus, GP7 `.gp`/`.gpx` bonus over `.gp5`, shorter name) and `scan_roots` assigns one GP
 file to one FLAC. The full GP7 packs for Discovery / A Higher Place / Eternal Reign live
-under `gp-tabs/gp7/<band>/<album>/` and win; `map.csv` rebuilt to 52 `match=yes`.
+under `gp-tabs/gp7/<band>/<album>/` and win; `map.csv` is 83 rows / 66 `match=yes`.
 Interns pass (2026-09-18): `boo-lab interns [--album X] [--steps a,b,c]` runs the whole
 chain in order (`stems → beats → structure → drums → vocals → lyrics → sync → extract →
 figures → compare → learn → status`), cache-first and resumable — `structure` reuses
@@ -96,8 +96,9 @@ On disk now:
 Read the live `sync_ok` count from `data/sync.jsonl` — never type 14/52 from memory.
 - `data/agree.jsonl` — Rebirth pass 1 (6 boxes). Pass 2 needs a human re-pin, then
   `boo-lab agree --album X --track Y --diff`.
-- `data/map.csv` — 71 rows, 52 `match=yes` (Discovery/AHP/Eternal Reign now full GP7; no
-  GP matched to two tracks); `flac_sha256` only once `scan`/`hash` runs.
+- `data/map.csv` — 83 rows, 66 `match=yes` (Discovery/AHP/Eternal Reign full GP7; no GP
+  matched to two tracks; the +12 are Veil of Maya `2015 - Matriarch` tracks from an ingest,
+  whose FLACs sit in `audio-corpus/01..12/`); `flac_sha256` only once `scan`/`hash` runs.
 - `data/holdout.csv` — 7 songs reserved. `engine/data/riff_bank.json` is local/gitignored.
 
 Sync (2026-09-18): the existing `best_clock_fit` rate fit is wired into `sync_ok` — the resampled

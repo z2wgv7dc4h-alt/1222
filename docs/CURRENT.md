@@ -11,7 +11,7 @@ drafts machine output (`data/drafts.jsonl`), and ships a full studio + CLI
 (spectrogram, draft/keeper schema, witnesses, agreement/JAMS exports).
 Engine work below is paused; nothing here consumes the lab yet.
 
-Lab pass (latest commit `c851856` + rematch): GP7 is native — `boo_lab/gpif.py` parses a
+Lab pass (latest commit `37e5d96`): studio lanes are named once in a 44px left gutter and a tile shows only its `figure_id` (no repeated "Riff"). Before it `4e3d283` (GP rematch) / `c851856` (ingest tab-notes). GP7 is native — `boo_lab/gpif.py` parses a
 `.gp`/`.gpx` `score.gpif` (tracks/tunings/instrument, masterbars/time-sig/repeats/sections,
 beats, notes with computed midi + articulations); `sync` prefers a matching `.gp`/`.gpx`
 over a `.gp5` sibling; `tabnotes.py` reads an operator `.zip`/folder pack and `ingest`

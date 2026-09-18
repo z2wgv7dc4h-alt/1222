@@ -37,3 +37,7 @@ data/drum_patterns.jsonl
 data/section_tempo.jsonl
 data/figures.jsonl
 data/gp_export.jsonl
+# Learn spine: the event log and the derived intern rank are local only
+# (ranked from a tiny keeper set; not a committed artifact).
+data/learn.jsonl
+data/intern_rank.json

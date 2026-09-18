@@ -2,6 +2,10 @@
 
 ## 2026-09-18
 
+### Intern rank spine; stub `enough_to_train` gone
+
+- `learn.py` rewritten. `record(lab_root, kind, album="", track="", **payload)` appends a `{ts, kind, album, track, payload}` event to `data/learn.jsonl` and never raises into the caller. `build_rank`/`run_learn` rebuild `data/intern_rank.json` from `compare.compare()` (rebuilt when stale; no second F@0.5) and mark `prefer` only when a draft source has **>= 5 non-holdout songs** with keepers+drafts, **F@0.5 >= 0.50**, and a **>= 0.03** lead; holdout scores stay in the dict but never vote. Read-only `figure_agree` (keeper `figure_id` vs `figures.jsonl`, no renames), `sync_rate`, and `agree_pass` (via agree.py's own `diff_passes`) are recorded. `enough_to_train`/`role_prior`/`note` are removed; Save logs `save_snapshot`, `compare` refreshes the rank best-effort, and `structure`/`guess` print `prefer=<source>` only when they emit it. CLI `boo-lab learn [--album X]`; `data/learn.jsonl` + `data/intern_rank.json` gitignored. Lab tests: **252 passed**.
+
 ### `gp-export` records GP7/gpx that cannot feed markers
 
 - New `boo-lab gp-export [--gp-root DIR]` (default `BOO_GP_ROOT`): finds every `.gp`/`.gpx` under the GP root and probes it through the already-used pyguitarpro path. A file that parses already works in `extract`/`scan`, so the command just tells you to run `boo-lab scan`; a `.gpx` — or a ZIP-container `.gp` (real `.gpx` content under a `.gp` name) — that pyguitarpro cannot read is recorded as `gpx-unsupported`, and any other parse failure as `gp7-unsupported`, in `data/gp_export.jsonl` (gitignored). No GP7 binary writer is invented, no converter is bundled, and `sections.jsonl` is never touched. Lab tests: **245 passed**.

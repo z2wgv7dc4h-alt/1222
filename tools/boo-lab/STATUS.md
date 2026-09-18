@@ -4,7 +4,10 @@ Canonical detail: **CURRENT.md**; commands in **README.md**.
 
 Works: studio keeps pins (`human`/`guess-accepted` + `heard`) in `sections.jsonl`; mel
 spectrogram under the WaveSurfer waveform; 6-stem picker; drafts; `hear`/`sync`/`hash`;
-`agree`/`compare`/`export-jams`/`beats`/`audit`/`report`; **245 tests pass**.
+`agree`/`compare`/`export-jams`/`beats`/`audit`/`report`; **252 tests pass**.
+Learn (2026-09-18): `boo-lab learn` ranks the draft sources from keepers (5-song vote, F@0.5 >= 0.50,
+0.03 margin, holdout excluded) into `data/intern_rank.json`; the `enough_to_train` stub is gone and
+it still never writes keepers. Current keepers are Rebirth-only, so `prefer=none`.
 Interns (allin1 structure, beat_this, torchcrepe) run on **CUDA** when present
 (RTX 5080, `torch 2.8.0+cu128`); `boo-lab doctor` reports the build. allin1 works
 without an old natten build via `_natten_compat` (legacy NATTEN API + madmom

@@ -214,4 +214,14 @@ def build_drafts(lab_root: Path, rows: list[dict]) -> dict:
         write_jsonl_atomic(draft_path, keep + new_recs)
     else:
         print("structure: 0 drafts written; leaving existing", draft_path.name, "untouched")
+    # Ranking only: if the intern rank prefers a source this command emits,
+    # say so. Other sources are never dropped; a missing rank changes nothing.
+    try:
+        from .learn import preferred_source
+
+        prefer = preferred_source(lab_root)
+        if prefer in {"msa-draft", "songformer-draft"}:
+            print("prefer=%s" % prefer)
+    except Exception:
+        pass
     return {"written": len(new_recs), "out": str(draft_path), "songformer": use_songformer}

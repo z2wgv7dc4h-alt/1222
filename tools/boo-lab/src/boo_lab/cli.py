@@ -103,6 +103,9 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("--album")
     s.add_argument("--track")
 
+    s = sub.add_parser("learn", help="rank the machine draft sources from keepers")
+    s.add_argument("--album")
+
     s = sub.add_parser("hear", help="mark already-keeper pins heard=true for one song")
     s.add_argument("--album")
     s.add_argument("--track")
@@ -238,6 +241,26 @@ def main(argv: list[str] | None = None) -> int:
         print(format_report(report))
         write_report(report, data_dir() / "compare.json")
         print("wrote", data_dir() / "compare.json")
+        try:
+            from .learn import run_learn
+
+            run_learn(root(), album)
+        except Exception:
+            pass  # ranking must never fail compare
+        return 0
+
+    if args.cmd == "learn":
+        from .learn import run_learn
+
+        rank = run_learn(root(), getattr(args, "album", None))
+        fa = rank.get("figure_agree") or {}
+        sr = rank.get("sync_rate") or {}
+        print("learn: prefer=%s n_voted=%d" % (rank["prefer"], rank["n_voted"]))
+        print("reason:", rank["reason"])
+        print("figure match=%d miss=%d conflict=%d"
+              % (fa.get("match", 0), fa.get("miss", 0), fa.get("conflict", 0)))
+        print("sync_ok %.3f (%d/%d)"
+              % (sr.get("rate", 0.0), sr.get("ok", 0), sr.get("total", 0)))
         return 0
 
     if args.cmd == "hear":

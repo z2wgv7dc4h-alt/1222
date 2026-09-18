@@ -232,9 +232,10 @@ def estimate_hybrid(
 
     if cache:
         try:
-            from .learn import note as learn_note
+            from .learn import preferred_source
 
-            notes.append(learn_note(cache.parent.parent))
+            if preferred_source(cache.parent.parent) == "guess":
+                notes.append("prefer=guess")
         except Exception:
             pass
 

@@ -582,7 +582,7 @@ def create_app(lab_root: Path, flac_root: Path | None, gp_root: Path | None) -> 
         try:
             from .learn import record
 
-            record(lab_root, meta["album"], meta["track"], keepers)
+            record(lab_root, "save_snapshot", meta["album"], meta["track"], n=len(keepers))
         except Exception:
             pass
         body: dict = {"saved": len(keepers), "path": str(sec_path),

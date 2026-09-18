@@ -32,7 +32,7 @@ _SPECS: list[dict] = [
     {"name": "data/drum_patterns.jsonl", "rel": "data/drum_patterns.jsonl", "kind": "jsonl", "keys": ("album", "track")},
     {"name": "data/vocal_melody.jsonl", "rel": "data/vocal_melody.jsonl", "kind": "jsonl", "keys": ("album", "track")},
     {"name": "data/riffs.jsonl", "rel": "data/riffs.jsonl", "kind": "jsonl", "keys": ("album", "track"), "extras": ("source_type", "instrument")},
-    {"name": "data/learn-log.jsonl", "rel": "data/learn-log.jsonl", "kind": "jsonl", "keys": ("album", "track")},
+    {"name": "data/learn.jsonl", "rel": "data/learn.jsonl", "kind": "jsonl", "keys": ("album", "track")},
     {"name": "data/section_tempo.jsonl", "rel": "data/section_tempo.jsonl", "kind": "jsonl", "keys": ("album", "track")},
     {"name": "engine/data/riff_bank.json", "rel": "engine/data/riff_bank.json", "kind": "json_array", "keys": ("source_song", "source_file"), "extras": ("instrument", "source_type", "role")},
     {"name": "engine/data/bass_riff_bank.json", "rel": "engine/data/bass_riff_bank.json", "kind": "json_array", "keys": ("source_song", "source_file"), "extras": ("instrument", "source_type", "role")},

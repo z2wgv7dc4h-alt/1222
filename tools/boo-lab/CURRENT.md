@@ -211,6 +211,18 @@ shortest repeating cell inside that figure (2, 3, or 4 bars), preferring the has
 seconds only when `times_trusted`). An 8-bar human `riff-A` box becomes a 2-bar cell, never an 8-bar
 bank fragment. Zero cells never blanks an existing file.
 
+## Learn (intern rank)
+
+`boo-lab learn [--album X]` rebuilds `data/intern_rank.json` from `compare.compare()` (never a
+second F@0.5) and appends events to `data/learn.jsonl`. A draft source (`guess` / `msa-draft` /
+`songformer-draft`) is preferred only with **>= 5 non-holdout songs** that carry both keepers and
+drafts, **F@0.5 >= 0.50**, and a **>= 0.03** lead over the next source; holdout songs are scored but
+never vote. Rank only chooses a draft intern — it never labels, never writes `sections.jsonl`, never
+trains torch, never fits a model on mixed FLACs. The old `enough_to_train`/`role_prior` gate is gone;
+Save appends a `save_snapshot` event, `compare` refreshes the rank, and `structure`/`guess` print
+`prefer=<source>` only when they emit that source. `data/learn.jsonl` and `data/intern_rank.json`
+stay local (gitignored).
+
 ## Pack / learning
 
 For each **keeper** box: mix clip + drums/bass/guitar/piano/other/vocals + no-vox (6-stem where cached) + `meta.json` (times, role, `figure_id`, source, split, gp path). Default Demucs model is 6-stem `htdemucs_6s`; guitar/piano are isolated, no-vox is mixed from the six. A track cached only under the old 4-stem model still packs (guitar/piano simply absent). That is enough until 20 labelled songs.
@@ -259,7 +271,7 @@ album+track so “Rebirth” cannot stream “Machine.”
 
 `init-map` `scan` `hash` `studio`/`annotate` `ingest` `stems` `pack` `drums` `vocals` `holdout`
 `lyrics` `structure` `beats` `audit` `extract` `gate` `report` `export-bank` `agree` `compare`
-`hear` `sync` `figures` `gp-export` `export-jams` `doctor`
+`hear` `sync` `figures` `gp-export` `learn` `export-jams` `doctor`
 
 `structure` writes `data/drafts.jsonl` only (allin1 → `msa-draft`; SongFormer when
 `SONGFORMER_HOME`/import → `songformer-draft`). `agree` snapshots keeper pins (pass 1/2) and diffs

@@ -1,6 +1,6 @@
 # boo-lab
 
-Read this file — not APPLY.md / PATCHES.md / PROTOCOL.md / QUALITY.md (those are maintainer notes).
+This is the operator guide. LAW.md = rules. CURRENT.md = internals. README.md = install.
 
 A bench for marking parts of songs you already own.
 

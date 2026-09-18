@@ -2,6 +2,10 @@
 
 ## 2026-09-18
 
+### One operator doc stack (drop APPLY/PATCHES/PROTOCOL/QUALITY)
+
+- Removed `APPLY.md`, `PATCHES.md`, `PROTOCOL.md`, `QUALITY.md` (stale maintainer notes). The living docs are now only `USER.md` (operators), `LAW.md` (rules + a new "Quality bar" subsection), `CURRENT.md` (internals), `README.md` (install/reference), `STATUS.md` (snapshot), `CHANGELOG.md`. USER.md's first paragraph points at LAW/CURRENT/README; CURRENT lists the six living docs; no behavior change.
+
 ### Highlight selected track; docs catch-up
 
 - The selected `#list` song is re-marked `.on` on every render (click, J/K, filter, first load) with `aria-current="true"` and a visible warm wash (`#1c1a14`), gold left rule, and `:focus-visible` gold outline — no reliance on the 2px border alone. `boo-lab figures` windows + adapt + `prefer=` remain wired; Guess still refuses a finished song. Docs: README points at `USER.md` and groups absolute paths under "This machine"; USER.md notes the guess refusal and the list highlight; STATUS's studio block covers adapt, figure windows, refusal, highlight and USER.md. Lab tests: **278 passed**.

@@ -20,3 +20,16 @@ Labelling lab. Not the generator.
 - Do not scrape tabs.
 
 New bands go in `audio-corpus/<band>/`, tabs in `gp-tabs/gp5/<band>/`.
+
+## Quality bar
+
+- A keeper is a **heard**, human or `guess-accepted` box a person can defend out loud: this
+  figure/function, this `role` + `figure_id`, these seconds, on this mix.
+- The studio **Save** is the only writer of `sections.jsonl`; it drops unheard boxes.
+- Two boxes of the **same** role overlapping on the same seconds refuse the whole Save.
+- Machines never write `sections.jsonl` (`structure`, Guess, learn/adapt and Pack are drafts or reads).
+- Holdout / **VAL** songs do not vote for `prefer=` and are not training data.
+- Rebirth is labelled holdout by design — its keepers are real but held out of training and `prefer=`.
+- Prefer GP5 for markers; GP7 is eyes / export-to-GP5.
+- A returning figure keeps its `figure_id`; a new idea gets a new id.
+- Do not train on raw mixed FLACs. Do not scrape tabs.

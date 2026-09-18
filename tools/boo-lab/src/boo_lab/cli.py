@@ -93,6 +93,9 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("--album")
     s.add_argument("--steps", default=None, help="comma list; default all")
 
+    s = sub.add_parser("gpif", help="read a GP7 .gpx/.gp GPIF score (duration/notes; no sections.jsonl)")
+    s.add_argument("--path", type=Path, required=True)
+
     s = sub.add_parser("export-bank")
     s.add_argument("--out", type=Path, required=True)
 
@@ -223,6 +226,19 @@ def main(argv: list[str] | None = None) -> int:
         print("interns summary:")
         for key, val in report.items():
             print("  %-10s %s" % (key, val))
+        return 0
+
+    if args.cmd == "gpif":
+        from .gpif import count_markers, duration_sec, load_score
+
+        try:
+            score = load_score(args.path)
+        except Exception as exc:  # noqa: BLE001 - a bad/unreadable GP is a clean CLI error
+            print("gpif:", exc)
+            return 1
+        print("gpif %s: duration_sec=%.3f n_bars=%d n_notes=%d n_markers=%d"
+              % (args.path, duration_sec(score), len(score.masterbars),
+                 len(score.notes), count_markers(score)))
         return 0
 
     if args.cmd == "holdout":

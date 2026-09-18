@@ -26,6 +26,8 @@ data/*.tmp
 *.gp5
 *.gpx
 *.gp
+# The one bundled GP fixture is hand-made for tests, not a real tab.
+!tests/fixtures/tiny.gp
 *.zip
 
 # Real extracted note/pitch/onset content -- same local-only posture as

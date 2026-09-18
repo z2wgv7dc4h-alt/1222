@@ -245,6 +245,23 @@ of re-running allin1/SongFormer). `compare` writes `data/compare.json` then
 `sections.jsonl`/keepers. Step functions live in `src/boo_lab/interns.py`;
 `structure.build_drafts` reads its cache first.
 
+## GPIF reader
+
+`boo_lab/gpif.py` reads a GP7/GP6 `.gpx`/`.gp` **score** without converting it:
+`open_gp(path)` opens the zip and requires `Content/score.gpif` (fail closed
+otherwise); `parse_gpif(xml)` returns a `GpifScore` — `title`, `tempo`,
+`tracks` (`name`, `tuning_midi`), `masterbars` (`time_n`, `time_d`,
+`repeat_start`, `repeat_end`, `repeat_count`, `section`, optional `tempo`) and
+`notes` (`track`, `bar`, `t_beat`, `string`, `fret`, `duration`, `palm_mute`).
+`playback_bar_order` expands masterbar repeat groups (same open/close/count
+idea as Guess's `sync._playback_order`); `playback_beats` and `duration_sec`
+walk that order, `duration_sec` applying each bar's tempo over the score map.
+CLI `boo-lab gpif --path FILE` prints `duration_sec n_bars n_notes n_markers`
+and writes nothing. GP7 supplies markers/notes **only** via this parsed score,
+never via Guess invention; no GP5 writer and no TuxGuitar (LAW). Fixture
+`tests/fixtures/tiny.gp` is hand-made (2 bars 4/4 120 bpm, D-standard, 4 notes,
+2x repeat).
+
 ## Learn (intern rank)
 
 `boo-lab learn [--album X]` rebuilds `data/intern_rank.json` from `compare.compare()` (never a
@@ -327,7 +344,7 @@ album+track so “Rebirth” cannot stream “Machine.”
 
 `init-map` `scan` `hash` `studio`/`annotate` `ingest` `stems` `pack` `drums` `vocals` `holdout`
 `lyrics` `structure` `beats` `audit` `extract` `gate` `report` `export-bank` `agree` `compare`
-`hear` `sync` `figures` `gp-export` `learn` `adapt` `export-jams` `interns` `status` `doctor`
+`hear` `sync` `figures` `gp-export` `learn` `adapt` `export-jams` `interns` `gpif` `status` `doctor`
 
 `structure` writes `data/drafts.jsonl` only (allin1 → `msa-draft`; SongFormer when
 `SONGFORMER_HOME`/import → `songformer-draft`). `agree` snapshots keeper pins (pass 1/2) and diffs

@@ -582,23 +582,46 @@ def sync_track(lab_root: Path, album: str | None, track: str | None) -> dict:
     rec["flac"] = row.get("flac") or ""
     rec["flac_sha256"] = row.get("flac_sha256") or ""
 
-    if rec["gp"]:
-        gp = _prefer_gpif_path(Path(rec["gp"]))  # .gp5 -> matching .gp/.gpx
-        rec["gp"] = str(gp)                      # gp field = path actually clocked
-    else:
-        gp = Path(rec["gp"])
+    # A local tab-notes pack is already on the AUDIO clock, so its guitar
+    # onsets win over any tab file (gp5, GPIF, or none).
+    gp = Path("")
+    onsets = None
+    used_pack = False
+    try:
+        from .tabnotes import discover_pack, load_pack, onsets_audio
+
+        pack_path = discover_pack(lab_root, rec["album"], rec["track"])
+        if pack_path is not None:
+            pack = load_pack(pack_path)
+            pack_onsets = onsets_audio(pack, category="guitar") or \
+                onsets_audio(pack, category="drums")
+            if pack_onsets:
+                onsets = pack_onsets
+                used_pack = True
+                rec["tabnotes"] = pack.source_path
+                rec["tabnotes_tracks"] = len(pack.tracks)
+    except Exception:
+        used_pack = False
+        onsets = None
+
+    if not used_pack:
+        if rec["gp"]:
+            gp = _prefer_gpif_path(Path(rec["gp"]))  # .gp5 -> matching .gp/.gpx
+            rec["gp"] = str(gp)                      # gp field = path actually clocked
+        else:
+            gp = Path(rec["gp"])
+        if not (rec["gp"] and gp.exists()):
+            rec["note"] = "no-gp"
+            _write_sync(lab_root, rec)
+            return rec
+
+        onsets = gp_onset_times(gp)
+        if onsets is None:
+            rec["note"] = "unreadable-gp"
+            _write_sync(lab_root, rec)
+            return rec
+
     flac = Path(rec["flac"])
-    if not (rec["gp"] and gp.exists()):
-        rec["note"] = "no-gp"
-        _write_sync(lab_root, rec)
-        return rec
-
-    onsets = gp_onset_times(gp)
-    if onsets is None:
-        rec["note"] = "unreadable-gp"
-        _write_sync(lab_root, rec)
-        return rec
-
     if not flac.exists():
         rec["note"] = "no-audio"
         _write_sync(lab_root, rec)
@@ -649,7 +672,9 @@ def sync_track(lab_root: Path, album: str | None, track: str | None) -> dict:
         extra = _duration_note(gp, flac, rec["lag_sec"])
         if extra:
             rec["note"] = rec["note"] + " · " + extra
-    if gp.suffix.lower() in GP7_EXTS:
+    if used_pack:
+        rec["note"] = rec["note"] + " · tabnotes"
+    elif gp.suffix.lower() in GP7_EXTS:
         rec["note"] = rec["note"] + " · gpif"
     _write_sync(lab_root, rec)
     return rec

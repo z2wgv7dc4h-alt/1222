@@ -26,9 +26,10 @@ data/*.tmp
 *.gp5
 *.gpx
 *.gp
-# The one bundled GP fixture is hand-made for tests, not a real tab.
-!tests/fixtures/tiny.gp
 *.zip
+# The bundled fixtures are hand-made for tests, not real tabs/packs.
+!tests/fixtures/tiny.gp
+!tests/fixtures/tabnotes_tiny.zip
 
 # Real extracted note/pitch/onset content -- same local-only posture as
 # engine/data/riff_bank.json (too close to source songs melodic content
@@ -43,5 +44,8 @@ data/gp_export.jsonl
 # (ranked from a tiny keeper set; not a committed artifact).
 data/learn.jsonl
 data/intern_rank.json
+# Operator-provided tab-notes packs (may be commercial tabs: never commit).
+data/tabnotes/
+data/tabnotes_index.jsonl
 # Per-album calibration blob (generated from the first heard pairs).
 data/adapt.json

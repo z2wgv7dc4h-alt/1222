@@ -1,0 +1,21 @@
+{
+  "tracks": [
+    {
+      "index": 0, "partId": 0, "name": "Guitar",
+      "instrumentName": "Electric Guitar", "category": "guitar",
+      "isPercussion": false,
+      "tuning": [40, 45, 50, 55, 59, 64],
+      "capo": 0, "strings": 6, "volume": 0.8, "balance": 0.0,
+      "automations": [
+        { "type": "tempo", "measure": 0, "position": 0, "bpm": 120, "linear": false }
+      ]
+    },
+    {
+      "index": 1, "partId": 1, "name": "Drums",
+      "instrumentName": "Drum Kit", "category": "drums",
+      "isPercussion": true,
+      "tuning": null, "capo": 0, "strings": 0, "volume": 0.9, "balance": 0.0,
+      "automations": []
+    }
+  ]
+}

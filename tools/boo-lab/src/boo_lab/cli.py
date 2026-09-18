@@ -102,6 +102,12 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("--write-gp5", type=Path, default=None,
                    help="also write <stem>.from-gpif.gp5 into this DIR")
 
+    s = sub.add_parser("tabnotes", help="read a local tab-notes pack (.zip or folder; no sections.jsonl)")
+    s.add_argument("--path", type=Path, required=True)
+    s.add_argument("--json", action="store_true", help="print the whole pack as JSON")
+    s.add_argument("--index", action="store_true",
+                   help="append data/tabnotes_index.jsonl (never sections.jsonl)")
+
     s = sub.add_parser("export-bank")
     s.add_argument("--out", type=Path, required=True)
 
@@ -257,6 +263,51 @@ def main(argv: list[str] | None = None) -> int:
                 return 1
             print("wrote", written)
             print("drops:", ", ".join(drops) if drops else "none")
+        return 0
+
+    if args.cmd == "tabnotes":
+        from .tabnotes import (
+            append_index, load_pack, onsets_audio, pack_to_dict, tempo_map,
+        )
+
+        try:
+            pack = load_pack(args.path)
+        except Exception as exc:  # noqa: BLE001 - a bad pack is a clean CLI error
+            print("tabnotes:", exc)
+            return 1
+        if args.json:
+            print(json.dumps(pack_to_dict(pack), indent=2, default=str))
+        else:
+            print("tabnotes %s: %s — %s" % (pack.id, pack.title or "?", pack.artist or "?"))
+            print("  clock_ratio=%.4f audio_total=%.3fs notated_total=%.1fms"
+                  % (pack.clock_ratio, pack.audio_total_sec, pack.notated_total_ms))
+            print("  tracks=%d measures=%d events=%d raw_beats=%d"
+                  % (len(pack.tracks), len(pack.measures), len(pack.events), len(pack.raw_beats)))
+            for t in pack.tracks:
+                n = sum(1 for e in pack.events if e.track == t.index)
+                print("  track %d %-16s cat=%-8s inst=%-18s tuning=%s capo=%s vol=%s n_events=%d"
+                      % (t.index, t.name or "-", t.category or "-", t.instrument_name or "-",
+                         t.tuning, t.capo, t.volume, n))
+            sigs = sorted({e.time_signature for e in pack.events if e.time_signature}
+                          | {m.time_signature for m in pack.measures if m.time_signature})
+            print("  signatures:", ", ".join(sigs) or "none")
+            tm = tempo_map(pack)
+            if tm:
+                bpms = [b for _s, b in tm]
+                print("  tempo bpm min=%.1f max=%.1f automations=%s"
+                      % (min(bpms), max(bpms), [round(b, 2) for _s, b in tm]))
+            n_guitar = sum(1 for t in pack.tracks if "guitar" in (t.category or "").lower())
+            n_drums = sum(1 for t in pack.tracks
+                          if t.is_percussion or "drum" in (t.category or "").lower())
+            print("  guitar=%d drums=%d other=%d"
+                  % (n_guitar, n_drums, len(pack.tracks) - n_guitar - n_drums))
+            n_tuplets = sum(1 for b in pack.raw_beats if b.tuplet)
+            n_bends = sum(1 for b in pack.raw_beats for nn in b.notes if nn.bend_points)
+            print("  raw tuplets=%d bends_with_points=%d" % (n_tuplets, n_bends))
+            print("  first guitar audio onsets:",
+                  [round(x, 3) for x in onsets_audio(pack, category="guitar")[:3]])
+        if args.index:
+            print("  indexed ->", append_index(root(), pack))
         return 0
 
     if args.cmd == "holdout":

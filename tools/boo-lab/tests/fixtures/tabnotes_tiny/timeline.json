@@ -1,0 +1,14 @@
+{
+  "measures": [
+    {
+      "measure": 0, "start_ms": 0.0, "start_sec_audio": 1.0,
+      "duration_ms": 2000.0, "audio_duration_sec": 2.0,
+      "tempo_bpm": 120, "time_signature": "4/4", "length_beats": 4
+    },
+    {
+      "measure": 1, "start_ms": 2000.0, "start_sec_audio": 3.0,
+      "duration_ms": 2000.0, "audio_duration_sec": 2.0,
+      "tempo_bpm": 120, "time_signature": "4/4", "length_beats": 4
+    }
+  ]
+}

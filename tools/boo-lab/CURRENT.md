@@ -273,6 +273,35 @@ When a row's `gp` is a `.gp5`, `sync_track` looks for a matching `.gp`/`.gpx`
 GP5 files are deleted and `map.csv` is not rewritten. `gpif_to_gp5` stays
 unused. No `sections.jsonl`.
 
+## Tab-notes packs (local zip/folder)
+
+`boo_lab/tabnotes.py` reads an operator-provided pack — a `.zip`, an unpacked
+folder, or its `notes.json` — with no HTTP fetch and no required unzip. Layout
+`<id>/{manifest,notes,timeline}.json` + `raw/{song,video_points}.json` +
+`raw/parts/N.json`. `notes.json` (format `tab-notes/1`) is flat events on the
+notated clock; `timeline.json` gives each measure's `start_sec_audio` /
+`audio_duration_sec` (the AUDIO clock); `raw/song.json` gives tracks
+(tuning/capo/volume/balance/tempo automations); `raw/parts/` gives raw beats
+(duration, dotted, rest, tuplet, tuplet_start/stop, velocity, tempo) and notes
+(string, fret, hp, slide, harmonic, bend_points). When notes/timeline and `raw/`
+both exist, both are parsed.
+
+`TabNotesPack.audio_sec(event)` = `start_sec_audio + (onset_ms-start_ms)/1000`,
+else `video_points[measure] + in-bar`, else `onset_ms/1000`. Helpers: `events_for`,
+`onsets_audio` (category/track), `onsets_audio_by_track`, `tempo_map` (raw
+automations first, else timeline), `tuning_of`, `bar_events`, `bar_fp_tab`
+(duration→1/8, `pitch%12`, palm_mute/dead/hammer). `clock_ratio` + both totals
+are recorded; `video_sec` comes from `raw/video_points.json` when lengths match.
+
+CLI `boo-lab tabnotes --path F [--json] [--index]` prints title/artist/
+clock_ratio/both totals, every track (category, instrument, tuning, volume,
+n_events), signatures, tempo min/max + automations, guitar/drums/other counts,
+raw tuplets/bends, and the first 3 guitar audio onsets; `--index` appends
+`data/tabnotes_index.jsonl` only. `sync` discovers a pack under `data/tabnotes/**`
+(fuzzy title/artist), clocks **guitar onsets on the audio grid** (else drums),
+records `tabnotes`/`tabnotes_tracks`, and prefers it over any sibling
+`.gp5`/GPIF. No keepers, no roles; machines never write `sections.jsonl`.
+
 ## Learn (intern rank)
 
 `boo-lab learn [--album X]` rebuilds `data/intern_rank.json` from `compare.compare()` (never a
@@ -355,7 +384,7 @@ album+track so “Rebirth” cannot stream “Machine.”
 
 `init-map` `scan` `hash` `studio`/`annotate` `ingest` `stems` `pack` `drums` `vocals` `holdout`
 `lyrics` `structure` `beats` `audit` `extract` `gate` `report` `export-bank` `agree` `compare`
-`hear` `sync` `figures` `gp-export` `learn` `adapt` `export-jams` `interns` `gpif` `status` `doctor`
+`hear` `sync` `figures` `gp-export` `learn` `adapt` `export-jams` `interns` `gpif` `tabnotes` `status` `doctor`
 
 `drums`/`vocals` default to keeper-section rows; `--per-track` adds one whole-track
 row per song (`role=None`, `mode="track"`) from the cached 6-stem, no keeper needed —

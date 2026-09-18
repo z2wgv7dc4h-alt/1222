@@ -169,6 +169,7 @@ Then `python -m boo_lab.cli scan` and reload. Green GP5/GP7 = matched tab.
 | `structure` | MSA/SongFormer drafts → `data/drafts.jsonl` (allin1 optional; cache-first) |
 | `beats` | beat/downbeat grid → `data/beats.jsonl` (beat_this → allin1) |
 | `gpif --path FILE` | read a GP7/GP6 `.gp`/`.gpx` score (duration, bars, notes, markers, `n_with_midi`); GP7 is read natively, never converted |
+| `tabnotes --path F [--json] [--index]` | read a local tab-notes pack (`.zip`/folder): tracks, both clocks, raw tuplets/bends; `--index` → `data/tabnotes_index.jsonl` |
 | `gp-export` | probe `.gp`/`.gpx`: already parse (run `scan`) or record `gpx-unsupported`/`gp7-unsupported` (+ GPIF `converted`/`drops`) |
 | `learn` | rebuild `data/intern_rank.json`: rank draft sources from keepers (5-song vote, F@0.5) |
 | `status` | refresh the `STATUS.md` counts block from data files |

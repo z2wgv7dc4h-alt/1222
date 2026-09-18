@@ -1,0 +1,29 @@
+{
+  "part_id": 0,
+  "measures": [
+    {
+      "measure": 0,
+      "beats": [
+        {
+          "type": "note", "duration": [1, 8], "dotted": false, "rest": false,
+          "tuplet": null, "tuplet_start": false, "tuplet_stop": false,
+          "velocity": 90, "tempo": 120,
+          "notes": [
+            { "string": 5, "fret": 0, "rest": false, "hp": null,
+              "slide": null, "harmonic": false, "bend_points": null }
+          ]
+        },
+        {
+          "type": "note", "duration": [1, 8], "dotted": false, "rest": false,
+          "tuplet": { "num": 3, "den": 2 }, "tuplet_start": true, "tuplet_stop": false,
+          "velocity": 90, "tempo": 120,
+          "notes": [
+            { "string": 5, "fret": 2, "rest": false, "hp": null,
+              "slide": null, "harmonic": false,
+              "bend_points": [ { "position": 0, "tone": 2 }, { "position": 1, "tone": 4 } ] }
+          ]
+        }
+      ]
+    }
+  ]
+}

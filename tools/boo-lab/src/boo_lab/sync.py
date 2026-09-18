@@ -99,7 +99,9 @@ def _tab_notes(gp_path: Path):
 
         song = guitarpro.parse(str(gp_path))
     except Exception:
-        return None
+        # A GP7 `.gp`/`.gpx` whose score.gpif parses may still clock the tab,
+        # via the parsed score only (never Guess invention).
+        return _gpif_events(gp_path)
     from .extract import _rhythm_track
 
     track = _rhythm_track(song) or (song.tracks[0] if song.tracks else None)
@@ -133,6 +135,22 @@ def _tab_notes(gp_path: Path):
                 break
 
     return walk()
+
+
+def _gpif_events(gp_path: Path):
+    """`_tab_notes`-shaped events from a GP7 `.gp`/`.gpx` via its parsed GPIF
+    score. `None` when the file is not GP7 or the score will not parse, so the
+    caller keeps its `unreadable-gp` outcome. Onsets only (no pitches)."""
+    p = Path(gp_path)
+    if p.suffix.lower() not in (".gp", ".gpx"):
+        return None
+    try:
+        from .gpif import load_score, note_events
+
+        score = load_score(p)
+    except Exception:
+        return None
+    return note_events(score)
 
 
 def gp_onset_times(gp_path: Path) -> list[float] | None:
@@ -391,6 +409,14 @@ def _tab_play_seconds(gp_path: Path) -> float | None:
         bpm = float(getattr(getattr(song, "tempo", None), "value", None) or 120.0)
         return float(_playback_duration(track, bpm))
     except Exception:
+        p = Path(gp_path)
+        if p.suffix.lower() in (".gp", ".gpx"):
+            try:
+                from .gpif import duration_sec, load_score
+
+                return float(duration_sec(load_score(p)))
+            except Exception:
+                return None
         return None
 
 

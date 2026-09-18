@@ -311,5 +311,25 @@ def duration_sec(score: GpifScore) -> float:
     return total
 
 
+def note_events(score: GpifScore) -> list[tuple[float, list, float]]:
+    """``(seconds, [], duration_sec)`` per note in playback order (repeats
+    expanded). Pitches are intentionally empty: GPIF string numbering is not
+    trusted enough to feed the chroma witness, so only the onset clock is used
+    (the caller's ``_tab_notes`` shape, for `sync`)."""
+    by_bar: dict = {}
+    for n in score.notes:
+        by_bar.setdefault(n.bar, []).append(n)
+    events: list[tuple[float, list, float]] = []
+    t = 0.0
+    for bi in playback_bar_order(score):
+        mb = score.masterbars[bi]
+        bpm = mb.tempo or score.tempo or 120.0
+        beat_sec = 60.0 / max(bpm, 1.0)
+        for n in by_bar.get(bi, []):
+            events.append((t + n.t_beat * beat_sec, [], n.duration * beat_sec))
+        t += (mb.time_n * 4.0 / mb.time_d) * beat_sec
+    return events
+
+
 def count_markers(score: GpifScore) -> int:
     return sum(1 for mb in score.masterbars if (mb.section or "").strip())

@@ -262,6 +262,18 @@ never via Guess invention; no GP5 writer and no TuxGuitar (LAW). Fixture
 `tests/fixtures/tiny.gp` is hand-made (2 bars 4/4 120 bpm, D-standard, 4 notes,
 2x repeat).
 
+## GPIF to GP5 + sync clock from GP7
+
+`gpif_to_gp5(score, out)` builds a real `guitarpro.Song` from a `GpifScore` and
+writes GP5 (`version=(5,1,0)`), returning `(Path, drops)` — a skipped drum track
+or a note on a missing string. Repeats go out as `isRepeatOpen`/`repeatClose`;
+section text becomes a `Marker`. `boo-lab gpif --path F --write-gp5 DIR` writes
+`<stem>.from-gpif.gp5`; `gp-export` converts GPIF-parsable `.gp/.gpx` into
+`work/gp5-from-gpif/` and logs `converted=true`+`drops` (no TuxGuitar). `sync`
+clocks a `.gp/.gpx` pyguitarpro rejects from parsed GPIF onsets
+(`gpif.note_events`); if GPIF also fails it stays `unreadable-gp`, `sync_ok` is
+never set from a failed parse, `clock_ratio` unchanged. No `sections.jsonl`.
+
 ## Learn (intern rank)
 
 `boo-lab learn [--album X]` rebuilds `data/intern_rank.json` from `compare.compare()` (never a

@@ -110,6 +110,9 @@ def main(argv: list[str] | None = None) -> int:
     s = sub.add_parser("beats", help="write beat/downbeat grid (beat_this or allin1)")
     s.add_argument("--album")
 
+    s = sub.add_parser("gp-export", help="probe .gp/.gpx: already usable by scan, or record why not")
+    s.add_argument("--gp-root", type=Path, default=None)
+
     s = sub.add_parser("sync", help="tab-vs-audio clock witness for one song")
     s.add_argument("--album")
     s.add_argument("--track")
@@ -353,6 +356,18 @@ def main(argv: list[str] | None = None) -> int:
 
         report = build_beats(root(), rows, getattr(args, "album", None))
         print("beats", report)
+        return 0
+
+    if args.cmd == "gp-export":
+        from .gp_export import export_gp
+
+        report = export_gp(root(), getattr(args, "gp_root", None) or gp_root)
+        if report["converter"]:
+            print("converter:", report["converter"])
+        print("gp-export: %d file(s); %d parse; %d unsupported -> %s"
+              % (report["scanned"], len(report["ok"]), len(report["unsupported"]), report["out"]))
+        if report["ok"]:
+            print("these .gp/.gpx already parse — run `boo-lab scan` to point map.csv at them")
         return 0
 
     if args.cmd == "extract":

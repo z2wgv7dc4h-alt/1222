@@ -36,3 +36,4 @@ data/vocal_melody.jsonl
 data/drum_patterns.jsonl
 data/section_tempo.jsonl
 data/figures.jsonl
+data/gp_export.jsonl

@@ -2,6 +2,10 @@
 
 ## 2026-09-18
 
+### `gp-export` records GP7/gpx that cannot feed markers
+
+- New `boo-lab gp-export [--gp-root DIR]` (default `BOO_GP_ROOT`): finds every `.gp`/`.gpx` under the GP root and probes it through the already-used pyguitarpro path. A file that parses already works in `extract`/`scan`, so the command just tells you to run `boo-lab scan`; a `.gpx` — or a ZIP-container `.gp` (real `.gpx` content under a `.gp` name) — that pyguitarpro cannot read is recorded as `gpx-unsupported`, and any other parse failure as `gp7-unsupported`, in `data/gp_export.jsonl` (gitignored). No GP7 binary writer is invented, no converter is bundled, and `sections.jsonl` is never touched. Lab tests: **245 passed**.
+
 ### Figure windows are runs; studio suggests ids only
 
 - `figures.py` windowing replaced: `bar_fp` (quantized 1/8 onsets + `deltas` + pitch-class sets; octave/velocity ignored, chords kept as sets) splits playback order into maximal equal-bar RUNS, and each run becomes ONE ostinato window — 8 identical bars yield 1 window, not 7 sliding 2-bar windows; leftover bars are paired into non-overlapping 2-bar blocks and a 2-bar window is never emitted inside a longer same-sequence window. `cluster_song` groups by exact fingerprint only (Jaccard merge removed), names a cluster by a consistent GP marker letter (`{role}-{letter}`) else `riff-A/B` by first start, and sets `conflict=true` when one letter maps to two fingerprints. `build_figures` emits only repeating clusters and carries `conflict`. The studio `<figure>` datalist still lists `n_hits>=2` ids (no auto-fill, no `heard`, no Save of hashes); a conflict raises one coach line without overwriting an explicit error. Lab tests: **241 passed**.

@@ -30,7 +30,9 @@ main layout with a two-row transport (**Lab** / **Corpus** `<details>`), equal-w
 **More columns** toggle (`form` / `uniq` / `inst` / `bar0` / `bar1` / `source` hidden by default) —
 restyle only, all ids and behavior unchanged. Waiting states: rows read `FLAC · GP5` / `no tab` /
 etc. (+ `VAL` tag), an empty wave shows a "Drag to mark a section" ghost, and the Lab summary counts
-draft rows while **Pack** is greyed until boxes exist.
+draft rows while **Pack** is greyed until boxes exist. Regression pass (2026-09-18): all 46
+`getElementById` ids resolve, `harvestTable` reads every `data-f`, shortcuts/filters/dropzone/stems/
+spec/Snap/Save/Guess unchanged, no dup ids and no new network calls; `node --check` clean.
 
 On disk now:
 - `data/sections.jsonl` — 6 rows, 1 track (Rebirth), all `heard=true`. The whole keeper set.

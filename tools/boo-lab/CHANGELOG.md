@@ -2,6 +2,10 @@
 
 ## 2026-09-18
 
+### Studio regression pass
+
+- **Chrome verified, not redesigned.** All 46 `getElementById` targets resolve; `harvestTable` still reads every `data-f` field and `table()` still builds the extra `<td>`s (CSS hides them, DOM keeps them); keyboard shortcuts (Space, 1–4, I/B/C/P, S, N, J/K, Delete, Ctrl+Z, ?, Esc) are intact and skipped for `INPUT`/`SELECT`; filters, dropzone, stem buttons, spec pills, Snap beats, Save's `dur<2`/`end<=start`/all-tiny refusals, and Guess's `/api/estimate/{id}` merge are unchanged. No duplicate ids, no new network calls, no `/api/sync` from the browser, and a zero-track load returns cleanly. Inline JS passes `node --check`. Added one comment above `*` in `<style>` marking the chrome intent.
+
 ### Empty + waiting states
 
 - **List reads at a glance.** Each song meta is now `FLAC · GP5` / `FLAC · GP7` / `FLAC · no tab` / `FLAC · partial GP5`, built from the existing `has_flac` / `has_gp` / `gp_partial` / `gp_kind`; a tiny `VAL` tag shows when `split==="val"`; a mute `tab off-clock` shows only if a track row already carries `sync_ok===false` (the field is absent from `/api/tracks` today, so it is skipped — no new fetch). Filter pills are a segmented All / GP5 / No tab control.

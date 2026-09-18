@@ -351,6 +351,18 @@ def create_app(lab_root: Path, flac_root: Path | None, gp_root: Path | None) -> 
                             "source": rec.get("source") or ""}
         return {"beats": [], "downbeats": [], "source": ""}
 
+    @app.get("/api/figures/{track_id}")
+    def api_figures(track_id: int):
+        """Suggested repeating-figure ids for the selected song
+        (data/figures.jsonl). Drafts only, never keeper pins; empty when the
+        song has not been hashed."""
+        meta = _meta(track_id)
+        if not meta:
+            return {"figures": []}
+        from .figures import load_figures
+
+        return {"figures": load_figures(lab_root, meta.get("album"), meta.get("track"))}
+
     @app.get("/api/estimate/{track_id}")
     def api_estimate(track_id: int):
         row = _resolved(track_id)

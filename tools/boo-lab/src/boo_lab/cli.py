@@ -100,6 +100,10 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("--album")
     s.add_argument("--track")
 
+    s = sub.add_parser("figures", help="suggest repeating figure ids from a matched GP5 (drafts; never keepers)")
+    s.add_argument("--album")
+    s.add_argument("--track")
+
     s = sub.add_parser("annotate", help="local UI: listen to FLAC, click section bounds")
     s.add_argument("--port", type=int, default=8765)
 
@@ -238,6 +242,19 @@ def main(argv: list[str] | None = None) -> int:
             print("refuse:", exc)
             return 1
         print("sync", record)
+        return 0
+
+    if args.cmd == "figures":
+        from .figures import build_figures
+
+        album = getattr(args, "album", None)
+        track = getattr(args, "track", None)
+        if (album is None) != (track is None):
+            print("need --album and --track together")
+            return 1
+        report = build_figures(root(), rows, album=album, track=track)
+        print("figures: %d song(s) processed, %d repeating cluster(s) -> %s"
+              % (report["songs"], report["clusters"], report["out"]))
         return 0
 
     if args.cmd == "stems":

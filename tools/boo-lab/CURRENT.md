@@ -158,6 +158,18 @@ If it says `librosa beats, no half-time`, drums ran and found no slam — correc
 
 Guess is **not** a BoO brain. It carries the tab's section letters and repeats, but a letter is not a role — the human paints hooks/breakdowns and the tail the tab doesn't notate.
 
+## Figures (riff identity, never keepers)
+
+`boo-lab figures [--album X --track Y]` hashes 2-bar and 4-bar rhythm-guitar
+windows of a matched GP5 in playback order, clusters near-duplicates **inside one
+song**, and suggests `figure_id`s (`riff-A`, `riff-B`, ...). It names windows that
+already exist as measures — identity, not segmentation; it never cuts new boxes
+and never invents boundaries (the rejected 795–1057-section raw-note cutting is
+not this). Rows land in `data/figures.jsonl` with `source="figure-hash"` — a
+draft that never writes `sections.jsonl`/`drafts.jsonl` and never ticks `heard`.
+`--album` and `--track` must be passed together. The studio reads it at
+`GET /api/figures/{track_id}` to fill a `figure` datalist (no auto-fill).
+
 ## Ingest
 
 Copies:

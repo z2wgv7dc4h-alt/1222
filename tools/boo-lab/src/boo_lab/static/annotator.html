@@ -310,6 +310,7 @@
       <div id="lyricbox" class="lyrics"></div>
     </div>
     <div class="tabletools"><button type="button" id="btnMoreCols" class="textbtn">More columns</button></div>
+    <datalist id="figureSuggests"></datalist>
     <table id="sectable">
       <thead><tr>
 <th title="What the section is: intro, riff, hook, breakdown, solo, chill, pulse, build, outro">role</th>
@@ -367,7 +368,7 @@ function coach(){
   if(!ws || (ws.getDuration()||0)<2) return "Wait. Clock must show the full length before you draw.";
   const t=tracks[trackId];
   if(t && String(t.split||"").toLowerCase()==="val") return "VAL — leave unpinned";
-  if(!regs.length) return "Press a role pin (or 1 for Riff) — pins create boxes; drag fits them.";
+  if(!regs.length) return window._figureHint || "Press a role pin (or 1 for Riff) — pins create boxes; drag fits them.";
   const unh=regs.filter(p=>!p.heard).length;
   if(unh) return unh+" not heard — Save will drop them";
   return regs.length+" boxes. Save writes keepers.";
@@ -929,6 +930,7 @@ function select(i){
     badge.title=(split==="val"?"whole-song validation (holdout)":"training")+" split";
   }
   renderList(); showErr(""); regs=[]; sel=-1; window._lyricLines=null; spec=null;
+  window._figureHint="";
   const stems=t.stems||[];
   curStem = stems.includes("drums") ? "drums" : (stems[0]||"drums");
   renderStemButtons(t);
@@ -937,6 +939,14 @@ function select(i){
   loadAnalysis(t.id);
   loadBeats(t.id);
   loadLyrics(t.id);
+  fetch("/api/figures/"+t.id).then(r=>r.ok?r.json():{figures:[]}).then(x=>{
+    const hints=(x.figures||[]).filter(f=>f.n_hits>=2);
+    const dl=document.getElementById("figureSuggests");
+    if(dl) dl.innerHTML=hints.map(f=>"<option value=\""+escAttr(f.figure_id)+"\">").join("");
+    window._figureHint=hints.length?("Tab suggests repeating figures: "+hints.map(f=>f.figure_id).join(", ")+" — pick in the figure box."):"";
+    const err=document.getElementById("err");
+    if(err && err.dataset.explicit!=="1") showErr("");
+  }).catch(()=>{});
   fetch("/api/sections/"+t.id).then(r=>r.json()).then(secs=>{
     regs=secs.map(s=>{
       const role=canonRole(s.role);
@@ -981,7 +991,7 @@ function table(){
     const tr=document.createElement("tr");
     if(i===sel) tr.className="on";
     const cRole=document.createElement("td"); cRole.innerHTML=roleSelect(p.role);
-    const cFig=document.createElement("td"); cFig.innerHTML="<input type='text' data-f='figure_id' value='"+escAttr(p.figure_id|| (p.role+"-A"))+"'>";
+    const cFig=document.createElement("td"); cFig.innerHTML="<input type='text' list='figureSuggests' data-f='figure_id' value='"+escAttr(p.figure_id|| (p.role+"-A"))+"'>";
     const cForm=document.createElement("td"); cForm.innerHTML="<input type='text' size='2' data-f='form' value='"+escAttr(p.form||"A")+"'>";
     const cUniq=document.createElement("td"); cUniq.innerHTML="<input type='checkbox' data-f='unique'"+(p.unique?" checked":"")+">";
     const cInst=document.createElement("td"); cInst.innerHTML=instSelect(p.instrument||"");

@@ -2,6 +2,10 @@
 
 ## 2026-09-18
 
+### Figure hashes — riff identity, never keepers
+
+- New `src/boo_lab/figures.py`: `hash_window` fingerprints a 2- or 4-measure window from riff_bank's per-measure fragments (chord-aware pitch-class sets, coarse 4-beat onset grid; octave/velocity ignored), `cluster_song` groups exact hashes (optional pitch-class Jaccard merge when windows carry `pcs`/`rhythm`) and letters `riff-A`, `riff-B`, ... by first start, and `build_figures` walks the matched GP5 in playback order, slices contiguous 2/4-bar windows, clusters 4-bar first then uncovered 2-bar, and writes `data/figures.jsonl` (`source="figure-hash"`) with the never-blank-on-zero-rows law. `load_figures` reads it back per song. CLI `boo-lab figures [--album X --track Y]` (album+track together) and studio `GET /api/figures/{track_id}` feed a `figure` datalist (no auto-fill, no `heard`). Reuses `extract._engine_riff_bank`, `sync._playback_order`, `schema.write_jsonl_atomic`; never touches `sections.jsonl`/`drafts.jsonl`. Lab tests: **215 passed** (9 new in `tests/test_figures.py`).
+
 ### Studio copy tidy — pin then drag
 
 - The empty-wave ghost now reads **"Press 1 for Riff"**; the coach's zero-box line and the How drawer both say pins/keys **create** a box and drag only fits it; the table foot no longer implies dragging creates a box. **Pack** shows `"Save keepers before Pack."` (as an error) when there are no boxes, leaving the fetch path untouched. Docs corrected: in-app **Undo** exists (button + Ctrl+Z, plus `sections.jsonl.bak` on Save), daily pinning is role + figure + start/end + heard only (`form`/`uniq`/`inst`/bars sit behind **More columns**), and the Play/clock/Play box/Save/Undo/How bar with **Lab** / **Corpus** holding the rest is documented. No math, no endpoints, no ids changed.

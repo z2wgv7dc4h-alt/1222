@@ -6,6 +6,7 @@ Labelling lab. Not the generator.
 - Human `sections.jsonl` beats Guess, GP markers, Demucs, librosa.
 - Keepers are `heard`. Machines may draft (`data/drafts.jsonl`); they never label.
 - `boo-lab structure` never writes `sections.jsonl` — drafts only.
+- Figure hashes (`figures.jsonl`, `source=figure-hash`) are drafts; they never write `sections.jsonl`.
 - Overlap **different** roles. Do not stack the same role on the same seconds.
 - Pulse = named synth/keyboard figure, not “keys are audible.”
 - Breakdown = function (usually drums half-time), may sit on the same guitar as Riff.

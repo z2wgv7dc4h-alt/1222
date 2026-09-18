@@ -2,6 +2,10 @@
 
 ## 2026-09-18
 
+### Studio: lanes named once; tiles show figure_id not "Riff"
+
+- `annotator.html`: region tiles no longer paint the role word (`content: LABEL[role]` → `""`); a tile shows only its `figure_id`, and only when it is wider than ~48px (`regionLabelFor`), so short boxes keep colour with no text and labels stop colliding. Each role's name now appears **once**, in a 44px left gutter overlay (`#lanegutter`, one label per lane), and the All/Figures/Functions pills hide the gutter label with its lane (`updateGutter`). No free-floating role text in the waveform; the region title tooltip still carries role·figure·times. Selection outline/row highlight, single-click-no-zoom, double-click zoom, and the right-click menu are unchanged.
+
 ### Rematch GP: scored unique assignment; GP7 packs win
 
 - `catalogue._key` now strips a leading track number whether it is followed by a separator **or a space** (`07 - Exist` and `07 Exist` both → `exist`) and strips the `Born Of Osiris` band prefix however it is punctuated (so `Born_Of_Osiris-Goddess_Of_The_Dawn-s402311.gp` keys as `goddessofthedawn`, not `bornofosirisgoddessofthedawn`). New `_gp_candidates` scores every GP for a track — exact key `1000`, meaningful substring (both keys ≥5) `500+overlap`, a lead-track-number bonus when the filenames agree, a small **GP7 `.gp`/`.gpx` bonus** over `.gp5`, then the shorter name — and `scan_roots` assigns **one GP file → one FLAC** (skips an already-claimed candidate). `_find_gp` now delegates to it. This drops the generic `me` alias overmatch (one tab was matched to four songs), restores the full Goddess tab, and lets the full GP7 packs (Discovery/AHP/Eternal Reign, placed under `gp-tabs/gp7/<band>/<album>/`, local) win over their numbered `.gp5` twins. `map.csv` rebuilt (71 rows, 52 `match=yes`; Discovery 13/13, AHP 12/12, Eternal Reign 9/9 now GP7); sync re-run (52 songs): **14 ok** — the GP7 tabs clock differently from the `.gp5`s, so the pass count dropped with the honest content mismatch. 3 new catalogue tests; a sync test made hermetic (`delenv BOO_GP_ROOT`). 342 pass.

@@ -169,6 +169,11 @@
     #layerbtns { top:34px; }
     .wavesurfer-region { border-radius:3px; }
     .wavesurfer-region.sel { outline:2px solid #f4ead8 !important; box-shadow:0 0 0 1px #000c, 0 0 14px #f4ead866 !important; z-index:8 !important; }
+    /* lane names once, in a left gutter -- never repeated on tiles */
+    #lanegutter { position:absolute; left:0; top:0; right:0; bottom:0; pointer-events:none; z-index:9; }
+    #lanegutter .ll { position:absolute; left:0; width:44px; padding-left:6px; display:flex; align-items:center;
+      font-size:10px; letter-spacing:.04em; text-transform:uppercase; color:#cfc8bc; overflow:hidden;
+      background:linear-gradient(90deg,#0a0c10d9,#0a0c1000); }
     input[data-f='figure_id'] { min-width:9em; }
     /* right-click edit panel */
     #ctx { position:fixed; z-index:60; min-width:196px; background:#14161c; border:1px solid var(--line);
@@ -722,6 +727,49 @@ function inLayer(role){
 function tipText(p){
   return (LABEL[p.role]||p.role)+" · "+(p.figure_id||"")+" · "+fmt(p.start)+"-"+fmt(p.end);
 }
+// The lane name lives once, in the left gutter -- a tile only ever shows its
+// figure_id (and only when it is wide enough to read).
+function ensureGutter(){
+  const host=document.getElementById("wave"); if(!host) return null;
+  let g=document.getElementById("lanegutter");
+  if(!g){ g=document.createElement("div"); g.id="lanegutter"; host.appendChild(g); }
+  if(g.dataset.built!=="1"){
+    g.innerHTML="";
+    ROLES.forEach((role,i)=>{
+      const d=document.createElement("div"); d.className="ll"; d.dataset.role=role;
+      d.style.top=(i*(100/LANE_N))+"%"; d.style.height=(100/LANE_N)+"%";
+      d.textContent=LABEL[role]||role;
+      g.appendChild(d);
+    });
+    g.dataset.built="1";
+  }
+  return g;
+}
+function updateGutter(){
+  const g=ensureGutter(); if(!g) return;
+  Array.prototype.forEach.call(g.children, el=>{
+    el.style.display=inLayer(el.dataset.role)?"":"none";
+  });
+}
+function regionLabelFor(p){
+  if(!p||!p.figure_id) return "";
+  const host=document.getElementById("wave");
+  const w=host?host.clientWidth:0, dur=specFullDur();
+  if(!w||!dur) return "";
+  const px=Math.abs((+p.end||0)-(+p.start||0))/dur*w;
+  return px>48 ? String(p.figure_id) : "";
+}
+function updateRegionContent(reg, p){
+  if(!reg) return;
+  const label=regionLabelFor(p);
+  if(reg._label===label) return;
+  reg._label=label;
+  try{ reg.setOptions({content:label}); }catch(e){}
+}
+function refreshRegionContent(){
+  if(!regionsPlug) return;
+  try{ regionsPlug.getRegions().forEach(r=>{ if(r._idx!=null) updateRegionContent(r, regs[r._idx]); }); }catch(e){}
+}
 // Put a region in its role's lane (top = index*100/9, height = 100/9 - 1).
 // If the plugin has not built region.element yet, hook 'region-created'
 // (wired in makeWave) and retry on the next frames.
@@ -739,6 +787,7 @@ function applyLane(reg, role){
 function applyRegionMeta(reg, p){
   if(!reg||!p) return;
   applyLane(reg, p.role);
+  updateRegionContent(reg, p);
   if(reg.element){
     reg.element.title=tipText(p);
     reg.element.style.display=inLayer(p.role)?"":"none";
@@ -767,7 +816,7 @@ function paintRegions(){
       start:p.start,
       end:Math.max(p.start+0.05, p.end),
       color:COLOR[p.role]||"rgba(136,136,136,0.4)",
-      content:LABEL[p.role]||p.role,
+      content:"",
       drag:true,
       resize:true
     });
@@ -776,6 +825,7 @@ function paintRegions(){
   });
   lock=false;
   highlightSel();
+  updateGutter();
 }
 
 function pullRegions(){
@@ -900,6 +950,7 @@ function applyLayer(){
     const p=regs[i];
     if(p) tr.style.display=inLayer(p.role)?"":"none";
   });
+  updateGutter();
 }
 function makeWave(url){
   destroyWave();
@@ -953,7 +1004,11 @@ function makeWave(url){
   });
   ws.on("play",()=>document.getElementById("btnPlay").textContent="Pause");
   ws.on("pause",()=>document.getElementById("btnPlay").textContent="Play");
-  regionsPlug.on("region-updated",(reg)=>{ if(lock) return; snapRegion(reg); });
+  regionsPlug.on("region-updated",(reg)=>{
+    if(lock) return;
+    snapRegion(reg);
+    updateRegionContent(reg, (reg._idx!=null)?regs[reg._idx]:null);
+  });
   regionsPlug.on("region-created",(reg)=>{
     const i=parseInt(String(reg.id||"").replace("r",""),10);
     const p=(!isNaN(i))?regs[i]:null;
@@ -978,7 +1033,7 @@ function makeWave(url){
       if(ctxIdx>=0){ closeCtx(); ev.stopPropagation(); }
       else if(specView){ resetSpecView(); ev.stopPropagation(); }  // zoom reset
     }, true);
-    window.addEventListener("resize",()=>{ drawBeatGrid(); closeCtx(); });
+    window.addEventListener("resize",()=>{ drawBeatGrid(); closeCtx(); refreshRegionContent(); });
   }
   // Select only. A click on a box never zooms/fits/crops the spectrogram,
   // never moves the playhead, and never scrolls the page; Play box and the
@@ -1257,7 +1312,7 @@ function add(role){
 document.querySelectorAll(".pins button").forEach(b=>b.onclick=()=>add(b.dataset.role));
 document.getElementById("btnPlay").onclick=toggle;
 
-const SOURCE_OPTS=["human","guess-accepted","guess","msa-draft","songformer-draft"];
+const SOURCE_OPTS=["human","guess-accepted","guess","msa-draft","songformer-draft","tabnotes-draft"];
 const INSTRUMENTS=["","rhythm","lead","bass","drums","synth","vocal","mix"];
 function instSelect(cur){
   const opts=INSTRUMENTS.slice();

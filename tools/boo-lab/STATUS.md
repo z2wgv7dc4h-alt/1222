@@ -33,6 +33,9 @@ etc. (+ `VAL` tag), an empty wave shows a "Drag to mark a section" ghost, and th
 draft rows while **Pack** is greyed until boxes exist. Regression pass (2026-09-18): all 46
 `getElementById` ids resolve, `harvestTable` reads every `data-f`, shortcuts/filters/dropzone/stems/
 spec/Snap/Save/Guess unchanged, no dup ids and no new network calls; `node --check` clean.
+The `#err` bar is now a live coach (wait-for-clock / VAL / "Press 1 for Riff" / unheard / box
+count) that never overwrites explicit errors; `add()` refuses before the clock is ready; How
+auto-opens once (`boo-lab-how-v1`); clock placeholder is `0:00 / —`; wave height is 168.
 
 On disk now:
 - `data/sections.jsonl` — 6 rows, 1 track (Rebirth), all `heard=true`. The whole keeper set.

@@ -2,6 +2,13 @@
 
 ## 2026-09-18
 
+### Coach line, first-run How, duration gate
+
+- **Live coach in `#err`.** `showErr` now fills the status bar with a contextual default when no explicit message is given: wait-for-clock (`ws` duration <2), `VAL — leave unpinned`, `Press 1 for Riff (drag moves a box; it does not create one).`, `N not heard — Save will drop them`, else `N boxes. Save writes keepers.` Explicit errors (save failed, Guess notes, dropped_unheard) are tagged and never overwritten; the row/clock observer refreshes the coach only when it is not explicit.
+- **Duration gate.** `add()` refuses to draw before the clock shows the full length (`showErr("Wait. Clock must show the full length before you draw.", true)`), the same guard to reuse for any future enableDragSelection.
+- **First-run How.** The drawer auto-opens once after tracks load; Close or the scrim stores `boo-lab-how-v1` so it never auto-opens again.
+- **Small type fixes.** Clock placeholder is `0:00 / —` in the HTML and pre-ready; `WaveSurfer.create` height is 168 to match `#wave`; the table header reads `figure (riff-A)`; How step 2 says to press a role pin (or 1) then drag, and explains figure naming.
+
 ### Studio regression pass
 
 - **Chrome verified, not redesigned.** All 46 `getElementById` targets resolve; `harvestTable` still reads every `data-f` field and `table()` still builds the extra `<td>`s (CSS hides them, DOM keeps them); keyboard shortcuts (Space, 1–4, I/B/C/P, S, N, J/K, Delete, Ctrl+Z, ?, Esc) are intact and skipped for `INPUT`/`SELECT`; filters, dropzone, stem buttons, spec pills, Snap beats, Save's `dur<2`/`end<=start`/all-tiny refusals, and Guess's `/api/estimate/{id}` merge are unchanged. No duplicate ids, no new network calls, no `/api/sync` from the browser, and a zero-track load returns cleanly. Inline JS passes `node --check`. Added one comment above `*` in `<style>` marking the chrome intent.

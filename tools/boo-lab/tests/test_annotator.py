@@ -448,3 +448,50 @@ def test_remove_album_never_deletes_outside_configured_roots(tmp_path):
 
     assert outside.exists(), "file outside BOO_FLAC_ROOT must never be deleted"
     assert any("outside" in s for s in body["skipped"])
+
+
+# --- Guess finished-song guard + prefer --------------------------------------
+
+def test_estimate_refuses_a_finished_song(tmp_path):
+    lab = tmp_path / "lab"
+    (lab / "data").mkdir(parents=True)
+    flac = tmp_path / "T.flac"
+    flac.write_bytes(b"x")
+    save_map(lab / "data" / "map.csv",
+             [{"album": "A", "track": "T", "flac": str(flac), "gp": "", "match": "unknown"}])
+    (lab / "data" / "sections.jsonl").write_text(
+        json.dumps({"album": "A", "track": "T", "role": "riff", "source": "human",
+                    "heard": True, "start": 0.0, "end": 1.0}) + "\n", encoding="utf-8")
+    drafts = lab / "data" / "drafts.jsonl"
+    drafts.write_text("", encoding="utf-8")
+
+    client = TestClient(ann.create_app(lab, None, None))
+    resp = client.get("/api/estimate/0")
+
+    assert resp.status_code == 409
+    assert "already has keepers" in resp.json()["detail"]
+    assert drafts.read_text(encoding="utf-8") == ""
+
+
+def test_estimate_runs_when_no_keepers(tmp_path, monkeypatch):
+    from boo_lab import guess as _guess
+
+    monkeypatch.setattr(_guess, "estimate_hybrid",
+                        lambda *a, **k: {"sections": [], "notes": ["stub"]})
+    lab = tmp_path / "lab"
+    (lab / "data").mkdir(parents=True)
+    flac = tmp_path / "T.flac"
+    flac.write_bytes(b"x")
+    save_map(lab / "data" / "map.csv",
+             [{"album": "A", "track": "T", "flac": str(flac), "gp": "", "match": "unknown"}])
+
+    client = TestClient(ann.create_app(lab, None, None))
+    resp = client.get("/api/estimate/0")
+
+    assert resp.status_code == 200
+
+
+def test_tracks_payload_includes_prefer(tmp_path):
+    lab = _lab(tmp_path)
+    client = TestClient(ann.create_app(lab, None, None))
+    assert client.get("/api/tracks").json()["prefer"] == "none"

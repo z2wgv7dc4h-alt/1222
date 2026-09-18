@@ -8,7 +8,7 @@ Using it: read **USER.md** first (Part A to work, Part B for every button and fi
 
 Repo on GitHub: `z2wgv7dc4h-alt/1222` under `tools/boo-lab`.
 
-## Paths
+## This machine
 
 Absolute Windows paths below are **this machine** only.
 
@@ -22,12 +22,12 @@ GP     C:\Users\RIGGUSPIG\Desktop\god-tier-metal\reference\gp-tabs
 
 ## Start
 
-Easiest (scans, then serves): run `START.bat`.
+New here? Read **USER.md** first. Easiest (scans, then serves): run `START.bat`.
 
-Manual equivalent (path is **this machine**):
+Manual equivalent (use the lab root under **This machine** above):
 
 ```
-cd C:\Users\RIGGUSPIG\Desktop\god-tier-metal\tools\boo-lab
+cd <lab root from "This machine">
 .venv\Scripts\activate
 python -m boo_lab.cli scan
 python -m boo_lab.cli studio --port 8765
@@ -90,7 +90,7 @@ The intern stack is a minefield; each fix is now code or a hard pin, not a sessi
 | a machine draft / unknown role-sourced as human | fail-closed schema: `is_keeper`, `canonical_role`, `stamp_box`, and the one `load_section_rows` reader |
 
 Behavior is pinned by `tests/test_natten_compat.py`, `test_device.py`, `test_doctor.py`, plus bad-input
-tests for the keeper law and Save path. Lab: **273 tests**; engine: **820 passed, 1 skipped**. Generated
+tests for the keeper law and Save path. Lab: **278 tests**; engine: **820 passed, 1 skipped**. Generated
 outputs (`data/{drafts,beats,compare,sync,agree}.*`, `data/sections.jsonl.bak`, `*.tmp`) and
 `*.egg-info/` are gitignored; the tracked asset stays `data/sections.jsonl` (human pins).
 

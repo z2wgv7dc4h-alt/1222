@@ -167,6 +167,10 @@ by ≥0.002, Guess scales every tab-marker `start`/`end` by that ratio before th
 unchanged; `sync_ok` false (or no row) still drops the markers. Audio-derived breakdown drafts are
 never stretched — they already live on the FLAC clock.
 
+Guess refuses a **finished** song (any heard keeper already on the track → `409`, no new drafts);
+a draft changed by `apply_adapt` carries an `adapt` stamp (`shift`/`role`/`figure`, never a keeper
+source) and the Lab summary shows `prefer=…` from `intern_rank.json`.
+
 ## Figures (riff identity, never keepers)
 
 `boo-lab figures [--album X --track Y]` fingerprints each bar (`bar_fp`:

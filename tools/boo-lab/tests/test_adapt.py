@@ -142,6 +142,29 @@ def test_no_pairs_or_no_blob_returns_unchanged():
     assert adapt.apply_adapt(sections, {"n_pairs": 0}) is sections
 
 
+def test_apply_stamps_the_adapt_reason():
+    blob = {"n_pairs": 1, "shift_start": 0.2, "shift_end": 0.0,
+            "roles": {"hook": "breakdown"}, "figures": {"riff-A": "riff-B"}}
+    row = {"role": "hook", "start": 10.0, "end": 18.0, "figure_id": "riff-A",
+           "source": "msa-draft"}
+
+    out = adapt.apply_adapt([row], blob)
+
+    assert out[0]["adapt"] == "shift+role+figure"
+    assert out[0]["start"] == pytest.approx(10.2, abs=1e-3)
+    assert out[0]["source"] == "msa-draft"  # never a keeper source
+
+
+def test_tiny_shift_does_not_stamp_adapt():
+    blob = {"n_pairs": 1, "shift_start": 0.01, "shift_end": 0.0,
+            "roles": {}, "figures": {}}
+
+    out = adapt.apply_adapt([{"role": "riff", "start": 1.0, "end": 2.0,
+                              "source": "msa-draft"}], blob)
+
+    assert "adapt" not in out[0]
+
+
 def test_already_adapted_row_is_not_reapplied():
     blob = {"n_pairs": 1, "shift_start": 0.5, "shift_end": 0.5,
             "roles": {"hook": "breakdown"}, "figures": {}}

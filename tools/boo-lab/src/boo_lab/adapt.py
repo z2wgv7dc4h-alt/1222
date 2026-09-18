@@ -206,18 +206,29 @@ def apply_adapt(sections: list[dict], blob: dict | None) -> list[dict]:
         # Keepers and already-calibrated rows are left alone (no double-apply
         # when structure wrote an adapted row and the studio later loads it).
         if not is_keeper(s.get("source")) and not s.get("_adapted"):
-            new_start = float(s.get("start", 0.0)) + shift_start
-            new_end = float(s.get("end", 0.0)) + shift_end
+            old_start = float(s.get("start", 0.0))
+            old_end = float(s.get("end", 0.0))
+            new_start = old_start + shift_start
+            new_end = old_end + shift_end
+            parts: list[str] = []
             if new_end > new_start:
+                if abs(new_start - old_start) >= 0.02 or abs(new_end - old_end) >= 0.02:
+                    parts.append("shift")
                 s["start"] = round(new_start, 3)
                 s["end"] = round(new_end, 3)
             # else: an inverted box keeps its original times (shift skipped)
             role = s.get("role")
             if role in roles:
+                if roles[role] != role:
+                    parts.append("role")
                 s["role"] = roles[role]
             figure = s.get("figure_id")
             if figure in figures:
+                if figures[figure] != figure:
+                    parts.append("figure")
                 s["figure_id"] = figures[figure]
+            if parts:
+                s["adapt"] = "+".join(parts)  # visibility only; never a source
             s["_adapted"] = True
         out.append(s)
     return out

@@ -55,6 +55,8 @@ More columns.
 
 **VAL** = exam song. Do not mark it.
 
+Guess refuses a song that already has saved boxes.
+
 ## Stuck
 
 Clock 0:00 / — means wait. Do not draw yet.

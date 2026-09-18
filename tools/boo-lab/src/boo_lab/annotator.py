@@ -14,6 +14,7 @@ from .schema import (
     SOURCES,
     ROLES as _SCHEMA_ROLES,
     canonical_role,
+    is_keeper,
     same_role_overlaps,
     stamp_box,
     write_jsonl_atomic,
@@ -221,9 +222,17 @@ def create_app(lab_root: Path, flac_root: Path | None, gp_root: Path | None) -> 
     def index():
         return (static / "annotator.html").read_text(encoding="utf-8")
 
+    def _prefer() -> str:
+        try:
+            from .learn import preferred_source
+
+            return preferred_source(lab_root) or "none"
+        except Exception:
+            return "none"
+
     @app.get("/api/tracks")
     def api_tracks():
-        return {"roles": ROLES, "tracks": tracks()}
+        return {"roles": ROLES, "tracks": tracks(), "prefer": _prefer()}
 
     def _resolved(track_id: int) -> dict | None:
         rows = [resolve(r, flac_root, gp_root) for r in load_map(map_path)]
@@ -368,6 +377,22 @@ def create_app(lab_root: Path, flac_root: Path | None, gp_root: Path | None) -> 
         row = _resolved(track_id)
         if not row:
             raise HTTPException(404)
+        # Finished song: it already has a heard keeper, so Guess stays out.
+        if sec_path.exists():
+            for line in sec_path.read_text(encoding="utf-8").splitlines():
+                if not line.strip():
+                    continue
+                try:
+                    rec = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if ((rec.get("album") or "") == (row.get("album") or "")
+                        and (rec.get("track") or "") == (row.get("track") or "")
+                        and is_keeper(rec.get("source")) and rec.get("heard") is True):
+                    return JSONResponse(
+                        {"detail": "This song already has keepers. Guess is for a first pass."},
+                        status_code=409,
+                    )
         flac = row.get("flac_path")
         gp = row.get("gp_path")
         from .guess import estimate_hybrid

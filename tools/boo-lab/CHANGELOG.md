@@ -2,6 +2,10 @@
 
 ## 2026-09-18
 
+### Guess won't touch finished songs; show adapt + prefer
+
+- Guess refuses a song that already has a heard keeper: the studio button and `GET /api/estimate/{id}` return/alert "This song already has keepers. Guess is for a first pass." (`409`) instead of merging new drafts; an empty-keeper track still Guess-es. `apply_adapt` now stamps a changed draft with `adapt` (`shift` / `role` / `figure` combinations, only when a shift is ≥0.02 s or a role/figure actually changed; never a keeper source), and Guess/Load drafts coach once with "Adapted N drafts from your last saves on this album." `GET /api/tracks` carries `prefer` from `intern_rank.json` and the studio's Lab summary shows `prefer=none|…`. Docs: README paths moved under a "This machine" heading, USER.md notes the guess refusal, STATUS notes adapt/refuse/prefer. Lab tests: **278 passed**.
+
 ### Adapt intern drafts on load/structure
 
 - `apply_adapt` now also runs on intern drafts: `structure.build_drafts` calibrates each new draft row before writing `data/drafts.jsonl`, and the studio's Load drafts (`GET /api/drafts`) calibrates the returned list; both print `adapt: intern drafts n_pairs=…` when the album blob has `n_pairs>=1`. Rows are flagged `_adapted` so a structure-written row is never shifted twice on load. Drafts only (keepers skipped), `heard`/`source` untouched, `sections.jsonl` never written. Lab tests: **273 passed**.

@@ -250,7 +250,7 @@
       </div>
       <div class="transport2">
         <details id="labMenu" class="menu">
-          <summary>Lab<span id="labCount" class="mute"></span></summary>
+          <summary>Lab<span id="labCount" class="mute"></span><span id="preferTag" class="mute"></span></summary>
           <div class="menu-panel">
             <button type="button" id="btnEst" title="Proposes unheard boxes from GP markers + drum slams. Never a keeper until you tick heard and Save.">Guess</button>
             <button type="button" id="btnDrafts">Load drafts</button>
@@ -369,6 +369,7 @@ function coach(){
   if(!ws || (ws.getDuration()||0)<2) return "Wait. Clock must show the full length before you draw.";
   const t=tracks[trackId];
   if(t && String(t.split||"").toLowerCase()==="val") return "VAL — leave unpinned";
+  if(window._adaptNudge>0) return "Adapted "+window._adaptNudge+" drafts from your last saves on this album.";
   if(window._draftNudge>0) return window._draftNudge+" draft"+(window._draftNudge===1?"":"s")+" — tick heard on the ones you accept, then Save.";
   if(!regs.length) return window._figureHint || "Press a role pin (or 1 for Riff) — pins create boxes; drag fits them.";
   const unh=regs.filter(p=>!p.heard).length;
@@ -384,12 +385,13 @@ function showErr(m, bad){
   el.classList.toggle("bad", !!bad);
   el.dataset.explicit=explicit?"1":"0";
 }
-function draftNudge(n){
-  n=+n||0;
+function draftNudge(n, adapted){
+  n=+n||0; adapted=+adapted||0;
   const err=document.getElementById("err");
   if(!err || err.classList.contains("bad")) return;  // never overwrite a real error
-  window._draftNudge=n;
-  if(n>0) showErr("");
+  window._adaptNudge=adapted;
+  window._draftNudge=adapted>0?0:n;
+  if(adapted>0 || n>0) showErr("");
 }
 function openHow(on){
   document.getElementById("howto").classList.toggle("open", on);
@@ -851,6 +853,8 @@ startSpecLoop();
 fetch("/api/tracks").then(r=>r.json()).then(d=>{
   tracks=d.tracks||[];
   renderList();
+  const pt=document.getElementById("preferTag");
+  if(pt) pt.textContent=d.prefer?("prefer="+d.prefer):"";
   try{ if(!localStorage["boo-lab-how-v1"]) openHow(true); }catch(e){}
   if(!tracks.length){ showErr("no tracks in map.csv", true); return; }
   const first=tracks.findIndex(t=>t.has_flac);
@@ -939,7 +943,7 @@ function select(i){
     badge.title=(split==="val"?"whole-song validation (holdout)":"training")+" split";
   }
   renderList(); showErr(""); regs=[]; sel=-1; window._lyricLines=null; spec=null;
-  window._figureHint=""; window._draftNudge=0;
+  window._figureHint=""; window._draftNudge=0; window._adaptNudge=0;
   const stems=t.stems||[];
   curStem = stems.includes("drums") ? "drums" : (stems[0]||"drums");
   renderStemButtons(t);
@@ -1003,7 +1007,7 @@ function table(){
     const tr=document.createElement("tr");
     if(i===sel) tr.className="on";
     const cRole=document.createElement("td"); cRole.innerHTML=roleSelect(p.role);
-    const cFig=document.createElement("td"); cFig.innerHTML="<input type='text' list='figureSuggests' data-f='figure_id' value='"+escAttr(p.figure_id|| (p.role+"-A"))+"'>";
+    const cFig=document.createElement("td"); cFig.innerHTML="<input type='text' list='figureSuggests' data-f='figure_id' value='"+escAttr(p.figure_id|| (p.role+"-A"))+"'>"+(p.adapt?" <span class='conf' title='adapted from your last saves'>"+escAttr(p.adapt)+"</span>":"");
     const cForm=document.createElement("td"); cForm.innerHTML="<input type='text' size='2' data-f='form' value='"+escAttr(p.form||"A")+"'>";
     const cUniq=document.createElement("td"); cUniq.innerHTML="<input type='checkbox' data-f='unique'"+(p.unique?" checked":"")+">";
     const cInst=document.createElement("td"); cInst.innerHTML=instSelect(p.instrument||"");
@@ -1059,6 +1063,8 @@ function dump(){
   a.click();
 }
 function estimate(){
+  const finished=regs.some(p=>(p.source==="human"||p.source==="guess-accepted")&&p.heard);
+  if(finished){ showErr("This song already has keepers. Guess is for a first pass.", true); return; }
   const merge = regs.length>0;
   const btn=document.getElementById("btnEst");
   btn.disabled=true;
@@ -1073,20 +1079,21 @@ function estimate(){
       return {role,start:+s.start,end:+s.end,
               figure_id:s.figure_id|| (role+"-A"),
               form:s.form|| "A",unique:!!s.unique,instrument:"",start_bar:null,end_bar:null,
+              adapt:s.adapt||"",
               source:(SOURCE_OPTS.includes(s.source)?s.source:"guess"),heard:false};
     });
-    let added=0;
+    let added=0, adapted=0;
     if(merge){
       draft.forEach(d=>{
         const hit=regs.some(p=>p.role===d.role && Math.min(p.end,d.end)-Math.max(p.start,d.start) > 0.7*Math.min(p.end-p.start,d.end-d.start));
-        if(!hit){ regs.push(d); added++; }
+        if(!hit){ regs.push(d); added++; if(d.adapt) adapted++; }
       });
-    } else { regs=draft; added=draft.length; }
+    } else { regs=draft; added=draft.length; adapted=draft.filter(d=>d.adapt).length; }
     sel=regs.length?0:-1;
     table(); paintRegions();
     loadStem(tracks[trackId].id, curStem);
     document.getElementById("sub").textContent=(x.sections||[]).length+" guessed";
-    if(added>0) draftNudge(added);
+    if(added>0) draftNudge(added, adapted);
     else showErr((x.notes||[]).join(" · "));
   }).catch(e=>showErr("guess: "+e, true)).finally(()=>{ document.getElementById("btnEst").disabled=false; });
 }
@@ -1132,7 +1139,7 @@ function save(){
     if(x.dropped_unheard) msg+=" · "+x.dropped_unheard+" unheard box(es) dropped";
     if(x.malformed_lines_skipped) msg+=" · "+x.malformed_lines_skipped+" malformed line(s) skipped";
     msg+=" · backup: sections.jsonl.bak";
-    window._draftNudge=0;
+    window._draftNudge=0; window._adaptNudge=0;
     showErr(msg);
     document.getElementById("sub").textContent="saved "+x.saved;
   }).catch(e=>showErr("save failed: "+e, true));
@@ -1151,10 +1158,11 @@ function loadDrafts(){
       const role=canonRole(d.role);
       regs.push({role,start:+d.start,end:+d.end,figure_id:d.figure_id|| (role+"-A"),
                  form:"A",unique:false,instrument:"",start_bar:null,end_bar:null,
+                 adapt:d.adapt||"",
                  source:(SOURCE_OPTS.includes(d.source)?d.source:"msa-draft"),heard:false});
     });
     table(); paintRegions();
-    draftNudge(ds.length);
+    draftNudge(ds.length, ds.filter(d=>d.adapt).length);
   }).catch(e=>showErr("drafts: "+e,true));
 }
 document.getElementById("btnEst").onclick=estimate;

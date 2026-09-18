@@ -43,6 +43,59 @@ def test_build_drum_patterns_ignores_non_keeper_rows(tmp_path):
     assert len(rows) == 1 and rows[0]["role"] == "riff"
 
 
+def test_per_track_emits_one_row_per_song(tmp_path, monkeypatch):
+    from boo_lab import stems
+
+    lab = tmp_path / "lab"
+    (lab / "data").mkdir(parents=True)
+    monkeypatch.setattr(stems, "find_drums", lambda flac, cache: None)
+    rows = [{"album": "A", "track": "T", "flac": ""},
+            {"album": "A", "track": "U", "flac": ""}]
+
+    rep = de.build_drum_patterns(lab, rows, lab / "work" / "stems", per_track=True)
+
+    assert rep["tracks"] == 2 and rep["mode"] == "track" and rep["no_stem"] == 2
+    out = [json.loads(l) for l in
+           (lab / "data" / "drum_patterns.jsonl").read_text(encoding="utf-8").splitlines() if l.strip()]
+    assert len(out) == 2
+    assert all(r["mode"] == "track" and r["role"] is None for r in out)
+
+
+def test_per_track_keeps_section_rows(tmp_path, monkeypatch):
+    lab = tmp_path / "lab"
+    (lab / "data").mkdir(parents=True)
+    out = lab / "data" / "drum_patterns.jsonl"
+    out.write_text(json.dumps({"album": "A", "track": "T", "role": "riff", "onsets": []}) + "\n",
+                   encoding="utf-8")
+    from boo_lab import stems
+
+    monkeypatch.setattr(stems, "find_drums", lambda flac, cache: None)
+
+    de.build_drum_patterns(lab, [{"album": "A", "track": "U", "flac": ""}],
+                           lab / "work" / "stems", per_track=True)
+
+    rows = [json.loads(l) for l in out.read_text(encoding="utf-8").splitlines() if l.strip()]
+    assert any(r.get("role") == "riff" for r in rows)      # section row kept
+    assert any(r.get("mode") == "track" for r in rows)     # track row added
+
+
+def test_section_run_keeps_track_rows(tmp_path):
+    lab = tmp_path / "lab"
+    (lab / "data").mkdir(parents=True)
+    out = lab / "data" / "drum_patterns.jsonl"
+    out.write_text(json.dumps({"album": "A", "track": "T", "role": None, "mode": "track", "onsets": []}) + "\n",
+                   encoding="utf-8")
+    (lab / "data" / "sections.jsonl").write_text(
+        json.dumps({"album": "A", "track": "T", "start": 0.0, "end": 5.0, "role": "riff",
+                    "source": "human", "heard": True}) + "\n", encoding="utf-8")
+
+    de.build_drum_patterns(lab, [], lab / "work" / "stems")
+
+    rows = [json.loads(l) for l in out.read_text(encoding="utf-8").splitlines() if l.strip()]
+    assert any(r.get("mode") == "track" for r in rows)     # track row kept
+    assert any(r.get("role") == "riff" for r in rows)      # section row added
+
+
 def _onsets(*roles):
     return [{"time": i * 0.5, "role": r} for i, r in enumerate(roles)]
 

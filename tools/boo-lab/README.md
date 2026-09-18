@@ -162,8 +162,8 @@ Then `python -m boo_lab.cli scan` and reload. Green GP5/GP7 = matched tab.
 | `ingest DROP --band NAME` | copy drop into corpus |
 | `stems` | Demucs 6-stem separation into `work/stems` |
 | `pack` | slice mix/drums/bass/other/guitar/piano/vocals/no-vox per keeper box |
-| `drums` | per-section drum onsets + measured `low_confidence` |
-| `vocals` | per-section vocal melody (CREPE) |
+| `drums [--per-track]` | drum onsets + measured `low_confidence` per keeper section, or one whole-track row per song |
+| `vocals [--per-track]` | vocal melody (CREPE) per keeper section, or one whole-track row per song |
 | `lyrics` | LRCLIB + WhisperX force-aligned plain lyrics |
 | `interns [--album X] [--steps a,b,c]` | run the whole analysis chain in order, cache-first and failure-isolated |
 | `structure` | MSA/SongFormer drafts → `data/drafts.jsonl` (allin1 optional; cache-first) |

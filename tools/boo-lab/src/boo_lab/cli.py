@@ -58,9 +58,13 @@ def main(argv: list[str] | None = None) -> int:
 
     s = sub.add_parser("drums", help="classify drum onsets per human-labeled section")
     s.add_argument("--album")
+    s.add_argument("--per-track", action="store_true",
+                   help="one whole-track row per song (no keeper needed; drafts only)")
 
     s = sub.add_parser("vocals", help="extract real vocal melody per human-labeled section")
     s.add_argument("--album")
+    s.add_argument("--per-track", action="store_true",
+                   help="one whole-track row per song (no keeper needed; drafts only)")
 
     sub.add_parser("holdout", help="write/print the fixed whole-song validation split")
 
@@ -411,14 +415,16 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "drums":
         from .drums_extract import build_drum_patterns
 
-        report = build_drum_patterns(root(), rows, root() / "work" / "stems")
+        report = build_drum_patterns(root(), rows, root() / "work" / "stems",
+                                     per_track=getattr(args, "per_track", False))
         print("drums", report)
         return 0
 
     if args.cmd == "vocals":
         from .vocal_melody import build_vocal_melody
 
-        report = build_vocal_melody(root(), rows, root() / "work" / "stems")
+        report = build_vocal_melody(root(), rows, root() / "work" / "stems",
+                                    per_track=getattr(args, "per_track", False))
         print("vocals", report)
         return 0
 

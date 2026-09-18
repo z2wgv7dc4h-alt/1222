@@ -1,9 +1,42 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import librosa
 import numpy as np
+
+
+def _read_rows(path: Path) -> list[dict]:
+    if not path.exists():
+        return []
+    rows: list[dict] = []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        try:
+            rows.append(json.loads(line))
+        except json.JSONDecodeError:
+            continue
+    return rows
+
+
+def _write_mode(out_path: Path, rows: list[dict], mode: str) -> None:
+    """Replace only this mode's rows; keep the other mode (`section` rows
+    carry no `mode` key). Drafts only -- never `sections.jsonl`."""
+    from .schema import write_jsonl_atomic
+
+    kept = [r for r in _read_rows(out_path) if (r.get("mode") or "section") != mode]
+    write_jsonl_atomic(out_path, kept + rows)
+
+
+def _duration_seconds(path) -> float:
+    if path is None:
+        return 0.0
+    try:
+        return float(librosa.get_duration(path=str(path)))
+    except Exception:
+        return 0.0
 
 # Real f0 search range for a sung/screamed metal vocal line -- C2 (the low
 # end of a male chest voice) up to C7 (falsetto/scream harmonics).
@@ -29,7 +62,7 @@ def _find_vocals(flac: Path, cache: Path) -> Path | None:
     pattern as `stems.find_drums`, just the vocals stem. Reads an existing
     separation; never re-runs demucs."""
     name = flac.stem
-    for model in ("htdemucs", "htdemucs_ft", "mdx_extra", "mdx_extra_q"):
+    for model in ("htdemucs_6s", "htdemucs", "htdemucs_ft", "mdx_extra", "mdx_extra_q"):
         p = cache / model / name / "vocals.wav"
         if p.exists():
             return p
@@ -171,7 +204,52 @@ def extract_vocal_melody(
     return notes
 
 
-def build_vocal_melody(lab_root: Path, rows: list[dict], cache: Path) -> dict:
+def _per_track_rows(lab_root: Path, rows: list[dict], cache: Path) -> dict:
+    """One whole-track row per row that has a cached vocals stem (or an honest
+    empty row when it does not) -- no keeper needed. Drafts only."""
+    from .holdout import ensure_holdout, split_for
+
+    holdout = ensure_holdout(lab_root, rows)
+    row_by = {(r.get("album") or "", r.get("track") or ""): r for r in rows}
+    out_path = lab_root / "data" / "vocal_melody.jsonl"
+
+    out_rows: list[dict] = []
+    analyzed: dict[str, list[dict]] = {}
+    n_tracks = with_notes = empty = no_stem = 0
+    for (album, track), r in sorted(row_by.items()):
+        fp = r.get("flac_path") or r.get("flac") or ""
+        flac = Path(fp) if fp else None
+        vocals = _find_vocals(flac, cache) if flac else None
+        if not vocals:
+            print("SKIP vocals", track, "no cached vocals stem")
+        elif str(vocals) not in analyzed:
+            analyzed[str(vocals)] = extract_vocal_melody(flac, cache)
+
+        notes = analyzed.get(str(vocals), []) if vocals else []
+        out_rows.append({
+            "album": album, "track": track, "role": None, "mode": "track",
+            "start": 0.0, "end": round(_duration_seconds(vocals or flac), 4),
+            "split": split_for(album, track, holdout), "notes": notes,
+        })
+        n_tracks += 1
+        if not vocals:
+            no_stem += 1
+            empty += 1
+        elif notes:
+            with_notes += 1
+        else:
+            empty += 1
+        print("VOCALS", track, "track", len(notes))
+
+    _write_mode(out_path, out_rows, "track")
+    return {
+        "tracks": n_tracks, "with_notes": with_notes, "empty": empty,
+        "no_stem": no_stem, "mode": "track", "out": str(out_path),
+    }
+
+
+def build_vocal_melody(lab_root: Path, rows: list[dict], cache: Path, *,
+                       per_track: bool = False) -> dict:
     """For every row in `data/sections.jsonl`, extract that track's real
     vocal melody from its cached demucs vocals stem (once per track), then
     cut the note list to each human-labeled `[start, end]` window -- the
@@ -183,7 +261,12 @@ def build_vocal_melody(lab_root: Path, rows: list[dict], cache: Path) -> dict:
     or anywhere in this pipeline. A section whose track has no cached
     vocals stem, or whose window contains no onsets, is still written with
     an empty `notes` list -- an honest gap, not a dropped row.
+
+    `per_track=True` switches to one whole-track row per song (no keeper
+    needed); it replaces only `mode="track"` rows and keeps the section rows.
     """
+    if per_track:
+        return _per_track_rows(lab_root, rows, cache)
     from .holdout import ensure_holdout, split_for
     from .schema import load_section_rows
 
@@ -243,9 +326,7 @@ def build_vocal_melody(lab_root: Path, rows: list[dict], cache: Path) -> dict:
                 empty += 1
             print("VOCALS", track, seg.get("role"), len(notes))
 
-    from .schema import write_jsonl_atomic
-
-    write_jsonl_atomic(out_path, out_rows)
+    _write_mode(out_path, out_rows, "section")
     return {
         "sections": n_sections,
         "with_notes": with_notes,

@@ -22,6 +22,38 @@ def test_build_vocal_melody_ignores_non_keeper_rows(tmp_path):
     assert len(rows) == 1 and rows[0]["role"] == "riff"
 
 
+def test_per_track_emits_one_row_per_song(tmp_path, monkeypatch):
+    lab = tmp_path / "lab"
+    (lab / "data").mkdir(parents=True)
+    monkeypatch.setattr(vm, "_find_vocals", lambda flac, cache: None)
+    rows = [{"album": "A", "track": "T", "flac": ""},
+            {"album": "A", "track": "U", "flac": ""}]
+
+    rep = vm.build_vocal_melody(lab, rows, lab / "work" / "stems", per_track=True)
+
+    assert rep["tracks"] == 2 and rep["mode"] == "track" and rep["no_stem"] == 2
+    out = [json.loads(l) for l in
+           (lab / "data" / "vocal_melody.jsonl").read_text(encoding="utf-8").splitlines() if l.strip()]
+    assert len(out) == 2
+    assert all(r["mode"] == "track" and r["role"] is None and r["notes"] == [] for r in out)
+
+
+def test_per_track_keeps_section_rows(tmp_path, monkeypatch):
+    lab = tmp_path / "lab"
+    (lab / "data").mkdir(parents=True)
+    out = lab / "data" / "vocal_melody.jsonl"
+    out.write_text(json.dumps({"album": "A", "track": "T", "role": "hook", "notes": []}) + "\n",
+                   encoding="utf-8")
+    monkeypatch.setattr(vm, "_find_vocals", lambda flac, cache: None)
+
+    vm.build_vocal_melody(lab, [{"album": "A", "track": "U", "flac": ""}],
+                          lab / "work" / "stems", per_track=True)
+
+    rows = [json.loads(l) for l in out.read_text(encoding="utf-8").splitlines() if l.strip()]
+    assert any(r.get("role") == "hook" for r in rows)
+    assert any(r.get("mode") == "track" for r in rows)
+
+
 def test_extract_vocal_melody_rejects_unknown_backend(tmp_path):
     with pytest.raises(ValueError):
         vm.extract_vocal_melody(tmp_path / "x.flac", tmp_path, backend="nope")

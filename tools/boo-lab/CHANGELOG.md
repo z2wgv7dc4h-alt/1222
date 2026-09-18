@@ -2,6 +2,10 @@
 
 ## 2026-09-18
 
+### Per-track drums/vocals drafts; fix vocals 6-stem lookup
+
+- `drums`/`vocals` gain `--per-track`: `build_drum_patterns`/`build_vocal_melody` emit **one whole-track row per song** (`role=None`, `mode="track"`, `start=0`, `end=duration`, full onsets/notes, `split`) for every row with a cached 6-stem, no keeper pin needed. Both are still drafts only (never `sections.jsonl`); the two modes coexist — `_write_mode` replaces only its own `mode` and keeps the other (section rows carry no `mode` key). Fixed a real bug: `vocal_melody._find_vocals` omitted `htdemucs_6s` (the default 6-stem cache that `stems.find_stem` includes), so vocals found ~2 tracks; it now finds 34/71. Test count 327.
+
 ### Sync clocks GP7 via GPIF; do not prefer sibling gp5
 
 - `sync_track` now prefers a GP7 score over a `.gp5`: given a row `gp` ending `.gp5`, `_prefer_gpif_path` finds a matching `.gp`/`.gpx` (same normalized stem, ignoring `07 -` vs `07 `) beside it or under `BOO_GP_ROOT/gp7`, clocks that path, and records it in the sync dict `gp` (note gains `· gpif`). `sync._tab_notes` / `_tab_play_seconds` read a `.gp`/`.gpx` via `gpif.load_score` + `note_events`/`duration_sec` FIRST instead of `guitarpro.parse`; `.gp5` and every other suffix still use guitarpro. `LAG_TOLERANCE`/`SCORE_THRESHOLD` and the clock-rate path are untouched, no GP5 files are deleted, `map.csv` is not rewritten, and `gpif_to_gp5` stays unused. Tests: sibling-`.gp` preference, GPIF-first routing, lone `.gp5` still guitarpro; 4 new, 322 pass.

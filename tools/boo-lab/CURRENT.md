@@ -356,6 +356,10 @@ album+track so “Rebirth” cannot stream “Machine.”
 `lyrics` `structure` `beats` `audit` `extract` `gate` `report` `export-bank` `agree` `compare`
 `hear` `sync` `figures` `gp-export` `learn` `adapt` `export-jams` `interns` `gpif` `status` `doctor`
 
+`drums`/`vocals` default to keeper-section rows; `--per-track` adds one whole-track
+row per song (`role=None`, `mode="track"`) from the cached 6-stem, no keeper needed —
+drafts only, and the two modes coexist in `data/drum_patterns.jsonl` / `data/vocal_melody.jsonl`.
+
 `structure` writes `data/drafts.jsonl` only (allin1 → `msa-draft`; SongFormer when
 `SONGFORMER_HOME`/import → `songformer-draft`). `agree` snapshots keeper pins (pass 1/2) and diffs
 them; `compare` scores drafts vs keepers per source; `export-jams` writes JAMS 0.3 figure/function

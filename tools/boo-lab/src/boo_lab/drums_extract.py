@@ -1,7 +1,42 @@
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
+
+
+def _read_rows(path: Path) -> list[dict]:
+    if not path.exists():
+        return []
+    rows: list[dict] = []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        try:
+            rows.append(json.loads(line))
+        except json.JSONDecodeError:
+            continue
+    return rows
+
+
+def _write_mode(out_path: Path, rows: list[dict], mode: str) -> None:
+    """Replace only this mode's rows; keep the other mode (`section` rows
+    carry no `mode` key). Drafts only -- never `sections.jsonl`."""
+    from .schema import write_jsonl_atomic
+
+    kept = [r for r in _read_rows(out_path) if (r.get("mode") or "section") != mode]
+    write_jsonl_atomic(out_path, kept + rows)
+
+
+def _duration_seconds(path) -> float:
+    if path is None:
+        return 0.0
+    try:
+        import librosa
+
+        return float(librosa.get_duration(path=str(path)))
+    except Exception:
+        return 0.0
 
 
 def _engine_audio_vocab():
@@ -88,7 +123,59 @@ def classify_drums(drum_path: Path) -> list[dict]:
     ]
 
 
-def build_drum_patterns(lab_root: Path, rows: list[dict], cache: Path) -> dict:
+def _per_track_rows(lab_root: Path, rows: list[dict], cache: Path) -> dict:
+    """One whole-track row per row that has a cached drum stem (or an honest
+    empty row when it does not) -- no keeper needed. Drafts only."""
+    from .holdout import ensure_holdout, split_for
+    from .stems import find_drums
+
+    holdout = ensure_holdout(lab_root, rows)
+    row_by = {(r.get("album") or "", r.get("track") or ""): r for r in rows}
+    out_path = lab_root / "data" / "drum_patterns.jsonl"
+
+    out_rows: list[dict] = []
+    analyzed: dict[str, list[dict]] = {}
+    n_tracks = with_onsets = empty = no_stem = low_confidence = 0
+    for (album, track), r in sorted(row_by.items()):
+        fp = r.get("flac_path") or r.get("flac") or ""
+        flac = Path(fp) if fp else None
+        drums = find_drums(flac, cache) if flac else None
+        if not drums:
+            print("SKIP drums", track, "no cached drum stem")
+        elif str(drums) not in analyzed:
+            analyzed[str(drums)] = classify_drums(drums)
+
+        onsets = analyzed.get(str(drums), []) if drums else []
+        confidence = _drum_confidence(onsets)
+        out_rows.append({
+            "album": album, "track": track, "role": None, "mode": "track",
+            "start": 0.0, "end": round(_duration_seconds(drums or flac), 4),
+            "split": split_for(album, track, holdout),
+            **confidence, "onsets": onsets,
+        })
+        n_tracks += 1
+        if not drums:
+            no_stem += 1
+            empty += 1
+        elif onsets:
+            with_onsets += 1
+        else:
+            empty += 1
+        if confidence["low_confidence"]:
+            low_confidence += 1
+        print("DRUMS", track, "track", len(onsets),
+              "LOW-CONF" if confidence["low_confidence"] else "")
+
+    _write_mode(out_path, out_rows, "track")
+    return {
+        "tracks": n_tracks, "with_onsets": with_onsets, "empty": empty,
+        "no_stem": no_stem, "low_confidence": low_confidence, "mode": "track",
+        "out": str(out_path),
+    }
+
+
+def build_drum_patterns(lab_root: Path, rows: list[dict], cache: Path, *,
+                        per_track: bool = False) -> dict:
     """For every row in `data/sections.jsonl`, take that track's cached
     demucs drum stem (`stems.find_drums`), classify its real onsets once,
     then cut the onset list to each human-labeled `[start, end]` window.
@@ -104,7 +191,12 @@ def build_drum_patterns(lab_root: Path, rows: list[dict], cache: Path) -> dict:
     track has no cached stem, or whose window contains no detected onset,
     is still written with an empty `onsets` list — an honest gap, not a
     dropped row.
+
+    `per_track=True` switches to one whole-track row per song (no keeper
+    needed); it replaces only `mode="track"` rows and keeps the section rows.
     """
+    if per_track:
+        return _per_track_rows(lab_root, rows, cache)
     from .holdout import ensure_holdout, split_for
     from .schema import load_section_rows
     from .stems import find_drums
@@ -175,9 +267,7 @@ def build_drum_patterns(lab_root: Path, rows: list[dict], cache: Path) -> dict:
                 "LOW-CONF" if confidence["low_confidence"] else "",
             )
 
-    from .schema import write_jsonl_atomic
-
-    write_jsonl_atomic(out_path, out_rows)
+    _write_mode(out_path, out_rows, "section")
     return {
         "sections": n_sections,
         "with_onsets": with_onsets,

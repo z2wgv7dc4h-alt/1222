@@ -8,10 +8,11 @@ spectrogram under the WaveSurfer waveform; 6-stem picker; drafts; `hear`/`sync`/
 Learn (2026-09-18): `boo-lab learn` ranks the draft sources from keepers (5-song vote, F@0.5 >= 0.50,
 0.03 margin, holdout excluded) into `data/intern_rank.json`; the `enough_to_train` stub is gone and
 it still never writes keepers. Current keepers are Rebirth-only, so `prefer=none`.
-Studio (2026-09-18): per-album adapt calibrates intern drafts (structure write + `GET /api/drafts`),
-a changed draft carries an `adapt` stamp (never a keeper source), Guess refuses a song that already
-has heard keepers (`409`), and the Lab summary shows `prefer=…` from intern_rank. Still 6/Rebirth
-keepers.
+Studio (2026-09-18): per-album adapt calibrates intern drafts (Guess application + structure write +
+`GET /api/drafts`), a changed draft carries an `adapt` stamp (never a keeper source), Guess proposes
+figure windows when `sync_ok`, Guess refuses a song that already has heard keepers (`409`), the
+selected `#list` row is highlighted (`.on` + `aria-current`), and the Lab summary shows `prefer=…`
+from intern_rank. Operators start at `USER.md`. Still 6/Rebirth keepers.
 Interns (allin1 structure, beat_this, torchcrepe) run on **CUDA** when present
 (RTX 5080, `torch 2.8.0+cu128`); `boo-lab doctor` reports the build. allin1 works
 without an old natten build via `_natten_compat` (legacy NATTEN API + madmom

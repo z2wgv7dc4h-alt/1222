@@ -169,7 +169,8 @@ never stretched — they already live on the FLAC clock.
 
 Guess refuses a **finished** song (any heard keeper already on the track → `409`, no new drafts);
 a draft changed by `apply_adapt` carries an `adapt` stamp (`shift`/`role`/`figure`, never a keeper
-source) and the Lab summary shows `prefer=…` from `intern_rank.json`.
+source), the Lab summary shows `prefer=…` from `intern_rank.json`, and the selected `#list` row gets
+`.on` + `aria-current="true"` on every render (gold rule, warm wash, focus ring).
 
 ## Figures (riff identity, never keepers)
 

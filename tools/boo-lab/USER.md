@@ -56,6 +56,7 @@ More columns.
 **VAL** = exam song. Do not mark it.
 
 Guess refuses a song that already has saved boxes.
+Selected song is highlighted in the left list.
 
 ## Stuck
 

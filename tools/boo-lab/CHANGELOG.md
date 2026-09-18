@@ -2,6 +2,10 @@
 
 ## 2026-09-18
 
+### Highlight selected track; docs catch-up
+
+- The selected `#list` song is re-marked `.on` on every render (click, J/K, filter, first load) with `aria-current="true"` and a visible warm wash (`#1c1a14`), gold left rule, and `:focus-visible` gold outline — no reliance on the 2px border alone. `boo-lab figures` windows + adapt + `prefer=` remain wired; Guess still refuses a finished song. Docs: README points at `USER.md` and groups absolute paths under "This machine"; USER.md notes the guess refusal and the list highlight; STATUS's studio block covers adapt, figure windows, refusal, highlight and USER.md. Lab tests: **278 passed**.
+
 ### Guess won't touch finished songs; show adapt + prefer
 
 - Guess refuses a song that already has a heard keeper: the studio button and `GET /api/estimate/{id}` return/alert "This song already has keepers. Guess is for a first pass." (`409`) instead of merging new drafts; an empty-keeper track still Guess-es. `apply_adapt` now stamps a changed draft with `adapt` (`shift` / `role` / `figure` combinations, only when a shift is ≥0.02 s or a role/figure actually changed; never a keeper source), and Guess/Load drafts coach once with "Adapted N drafts from your last saves on this album." `GET /api/tracks` carries `prefer` from `intern_rank.json` and the studio's Lab summary shows `prefer=none|…`. Docs: README paths moved under a "This machine" heading, USER.md notes the guess refusal, STATUS notes adapt/refuse/prefer. Lab tests: **278 passed**.

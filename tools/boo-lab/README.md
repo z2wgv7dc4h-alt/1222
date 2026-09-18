@@ -4,7 +4,7 @@
 
 Local studio: listen to FLACs, mark structure, pack clips for later learning. Nothing leaves this PC except git of **code + `data/` labels**.
 
-Using it: read **USER.md** first (Part A to work, Part B for every button and file). This README is the developer/operator reference.
+Using it: [USER.md](USER.md) first (Part A to work, Part B for every button and file). This README is the developer/operator reference.
 
 Repo on GitHub: `z2wgv7dc4h-alt/1222` under `tools/boo-lab`.
 

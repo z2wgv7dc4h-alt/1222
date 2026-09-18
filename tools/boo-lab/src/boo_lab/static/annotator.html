@@ -35,7 +35,9 @@
     .alb:hover { color:var(--text); }
     .t { padding:7px 14px; cursor:pointer; border-left:2px solid transparent; }
     .t:hover { background:#17181e; }
-    .t.on { border-left-color:var(--gold); background:transparent; }
+    .t.on { border-left-color:var(--gold); background:#1c1a14; }
+    .t.on:hover { background:#221f18; }
+    .t:focus-visible { outline:1px solid var(--gold); outline-offset:-1px; }
     .t > span:first-child { font-size:13px; }
     .t .meta { display:block; font-size:11px; color:var(--mute); margin-top:2px; }
     .t .meta .sep { color:#4a4640; margin:0 3px; }
@@ -883,7 +885,10 @@ function renderList(){
     }
     if(shut[alb]) return;
     const d=document.createElement("div");
-    d.className="t"+(cur===t?" on":"");
+    const active=cur===t;
+    d.className="t"+(active?" on":"");
+    d.tabIndex=0;
+    if(active) d.setAttribute("aria-current","true");
     d.dataset.tid=String(t.id);
     const gpClass=t.gp_partial?"part":(t.has_gp?"ok":"");
     const kind=(t.gp_kind||"").toUpperCase();

@@ -665,7 +665,7 @@ def create_app(lab_root: Path, flac_root: Path | None, gp_root: Path | None) -> 
         from .catalogue import save_map, scan_roots
         from .ingest import ingest
 
-        report = ingest(drop, flac_root, gp_root, band)
+        report = ingest(drop, flac_root, gp_root, band, lab_root=lab_root)
         drafted = scan_roots(flac_root, gp_root)
         save_map(lab_root / "data" / "map.csv", drafted)
         report["saved_uploads"] = saved

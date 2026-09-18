@@ -18,9 +18,12 @@ from __future__ import annotations
 
 import json
 import re
+import shutil
 import zipfile
 from dataclasses import dataclass, field
 from pathlib import Path
+
+PACK_FORMAT = "tab-notes/1"
 
 
 # --- tiny coercion helpers ------------------------------------------------
@@ -603,6 +606,67 @@ def bar_fp_tab(pack: TabNotesPack, measure, track_idx) -> str:
     return "|".join(parts)
 
 
+# --- detection / unpack ---------------------------------------------------
+def _notes_is_pack(text) -> bool:
+    obj = _json(text)
+    return isinstance(obj, dict) and str(obj.get("format", "")).strip() == PACK_FORMAT
+
+
+def is_pack(path) -> bool:
+    """`True` only for a real tab-notes pack: a directory whose `notes.json`
+    is `format: tab-notes/1`, or a `.zip` containing such a `notes.json`
+    (any folder prefix). A `.gp`/`.gp5`/FLAC zip is never a pack."""
+    p = Path(path)
+    if p.is_dir():
+        n = p / "notes.json"
+        return n.exists() and _notes_is_pack(n.read_text(encoding="utf-8", errors="replace"))
+    if p.is_file() and p.suffix.lower() == ".zip":
+        try:
+            with zipfile.ZipFile(p) as zf:
+                prefix = _zip_prefix(zf)
+                if prefix is None:
+                    return False
+                return _notes_is_pack(_ZipSrc(zf, prefix).read("notes.json"))
+        except Exception:
+            return False
+    return False
+
+
+def safe_id(name) -> str:
+    """`<id>` for the data/tabnotes folder: lowercase alnum + underscore."""
+    s = re.sub(r"[^a-z0-9]+", "_", _str(name).lower()).strip("_")
+    return s or "pack"
+
+
+def unpack_pack(src, dest) -> Path:
+    """Unpack a pack `.zip` (stripping the `<id>/` prefix) or copy a pack
+    folder's contents into `dest`, overwriting same-id files only. Other ids
+    in `data/tabnotes/` are never touched, and nothing goes to the FLAC/GP
+    roots."""
+    src, dest = Path(src), Path(dest)
+    dest.mkdir(parents=True, exist_ok=True)
+    if src.is_file() and src.suffix.lower() == ".zip":
+        with zipfile.ZipFile(src) as zf:
+            prefix = _zip_prefix(zf) or ""
+            for name in zf.namelist():
+                if name.endswith("/") or not name.startswith(prefix):
+                    continue
+                rel = name[len(prefix):]
+                if not rel:
+                    continue
+                target = dest / rel
+                target.parent.mkdir(parents=True, exist_ok=True)
+                with zf.open(name) as f, target.open("wb") as out:
+                    shutil.copyfileobj(f, out)
+    elif src.is_dir():
+        for p in src.rglob("*"):
+            if p.is_file():
+                target = dest / p.relative_to(src)
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(p, target)
+    return dest
+
+
 # --- discovery + index ----------------------------------------------------
 def _pack_candidates(lab_root):
     base = Path(lab_root) / "data" / "tabnotes"
@@ -647,6 +711,10 @@ def pack_to_dict(pack: TabNotesPack) -> dict:
 
 
 def append_index(lab_root, pack: TabNotesPack) -> Path:
+    """Upsert one row (by pack id) into `data/tabnotes_index.jsonl`. Never
+    touches `sections.jsonl` or `map.csv`."""
+    from .schema import write_jsonl_atomic
+
     path = Path(lab_root) / "data" / "tabnotes_index.jsonl"
     path.parent.mkdir(parents=True, exist_ok=True)
     rec = {
@@ -655,6 +723,18 @@ def append_index(lab_root, pack: TabNotesPack) -> Path:
         "events": len(pack.events), "measures": len(pack.measures),
         "raw_beats": len(pack.raw_beats), "clock_ratio": pack.clock_ratio,
     }
-    with path.open("a", encoding="utf-8") as f:
-        f.write(json.dumps(rec, ensure_ascii=False) + "\n")
+    kept = []
+    if path.exists():
+        for line in path.read_text(encoding="utf-8").splitlines():
+            if not line.strip():
+                continue
+            try:
+                obj = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if rec["id"] and obj.get("id") == rec["id"]:
+                continue
+            kept.append(obj)
+    kept.append(rec)
+    write_jsonl_atomic(path, kept, ensure_ascii=False)
     return path

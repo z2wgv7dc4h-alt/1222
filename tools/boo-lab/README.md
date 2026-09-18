@@ -151,6 +151,8 @@ two boxes of the *same* role overlapping >50 ms refuses the whole Save.
 
 Type the band name. Drop a **zip or folder** (not RAR). FLACs + `cover.jpg` + `.gp5` can arrive together or tabs-only.
 
+A local **tab-notes pack** (`.zip` or folder with `notes.json` `format: tab-notes/1`) may be in the same drop: it is detected and unpacked into `data/tabnotes/<id>/`, indexed in `data/tabnotes_index.jsonl`, and never copied into the FLAC/GP roots. Put packs in the ingest drop folder or directly in `data/tabnotes/`.
+
 Then `python -m boo_lab.cli scan` and reload. Green GP5/GP7 = matched tab.
 
 ## Commands

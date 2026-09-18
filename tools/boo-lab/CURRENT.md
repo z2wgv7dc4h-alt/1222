@@ -293,6 +293,15 @@ automations first, else timeline), `tuning_of`, `bar_events`, `bar_fp_tab`
 (duration→1/8, `pitch%12`, palm_mute/dead/hammer). `clock_ratio` + both totals
 are recorded; `video_sec` comes from `raw/video_points.json` when lengths match.
 
+Ingest: a tab-notes `.zip` or folder in the ingest drop is detected by
+`tabnotes.is_pack` (`notes.json` `format: tab-notes/1`; a GP/FLAC zip is not),
+unpacked (zip `<id>/` prefix stripped) into `data/tabnotes/<safe_id>/`,
+`load_pack`ed, and upserted into `data/tabnotes_index.jsonl` — never copied to
+`BOO_FLAC_ROOT`/`BOO_GP_ROOT`, never written to `map.csv` or `sections.jsonl`.
+`ingest.py` still copies FLAC/GP as before; the studio drop and
+`boo-lab ingest <drop> --band NAME` use the same detect path. Put a pack in the
+ingest drop folder or directly in `data/tabnotes/`.
+
 CLI `boo-lab tabnotes --path F [--json] [--index]` prints title/artist/
 clock_ratio/both totals, every track (category, instrument, tuning, volume,
 n_events), signatures, tempo min/max + automations, guitar/drums/other counts,

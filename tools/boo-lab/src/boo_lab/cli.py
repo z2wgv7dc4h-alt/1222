@@ -174,7 +174,7 @@ def main(argv: list[str] | None = None) -> int:
         if not flac_root or not gp_root:
             print("set BOO_FLAC_ROOT and BOO_GP_ROOT")
             return 1
-        report = ingest(args.drop, flac_root, gp_root, args.band)
+        report = ingest(args.drop, flac_root, gp_root, args.band, lab_root=root())
         print(report)
         drafted = scan_roots(flac_root, gp_root)
         save_map(map_path, drafted)

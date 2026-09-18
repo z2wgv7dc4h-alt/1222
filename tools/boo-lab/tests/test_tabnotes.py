@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import shutil
+import zipfile
 from pathlib import Path
 
 import pytest
@@ -96,6 +97,47 @@ def test_append_index_writes_only_its_file(tmp_path):
     recs = [json.loads(l) for l in path.read_text(encoding="utf-8").splitlines() if l.strip()]
     assert recs[0]["title"] == "Tiny Pack" and recs[0]["tracks"] == 2
     assert not (tmp_path / "data" / "sections.jsonl").exists()
+
+
+def test_is_pack_detects_only_tabnotes(tmp_path):
+    assert tn.is_pack(FIX_DIR) is True
+    assert tn.is_pack(FIX_ZIP) is True
+
+    plain = tmp_path / "x.zip"
+    with zipfile.ZipFile(plain, "w") as z:
+        z.writestr("a.txt", "hi")
+    assert tn.is_pack(plain) is False
+    # the GP fixture is a zip too, but not a tab-notes pack
+    assert tn.is_pack(Path(__file__).parent / "fixtures" / "tiny.gp") is False
+
+
+def test_safe_id():
+    assert tn.safe_id("Tiny Pack!") == "tiny_pack"
+    assert tn.safe_id("") == "pack"
+
+
+def test_ingest_detects_tabnotes_zip(tmp_path):
+    from boo_lab.ingest import ingest
+
+    drop = tmp_path / "drop"
+    (drop / "album").mkdir(parents=True)
+    shutil.copy(FIX_ZIP, drop / "album" / "tabnotes_tiny.zip")
+    (drop / "album" / "Dummy.flac").write_bytes(b"not really audio")
+    lab = tmp_path / "lab"
+    (lab / "data").mkdir(parents=True)
+
+    report = ingest(drop, tmp_path / "corpus", tmp_path / "gp", "Synthetic", lab_root=lab)
+
+    dest = lab / "data" / "tabnotes" / "tabnotes_tiny"
+    assert (dest / "notes.json").exists()
+    pack = tn.load_pack(dest)                     # parses without any FLAC
+    assert pack.title == "Tiny Pack" and len(pack.tracks) == 2
+    assert report["tabnotes"] == 1
+    # never copied into the FLAC/GP roots
+    assert not (tmp_path / "corpus" / "Synthetic" / "album" / "notes.json").exists()
+    # index row written; no keepers anywhere
+    assert (lab / "data" / "tabnotes_index.jsonl").exists()
+    assert not (lab / "data" / "sections.jsonl").exists()
 
 
 def test_sync_prefers_the_tabnotes_pack(tmp_path, monkeypatch):

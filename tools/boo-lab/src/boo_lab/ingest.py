@@ -82,8 +82,12 @@ def _gp_kind(p: Path) -> str:
 
 
 def _unpack_zips(drop: Path, scratch: Path) -> None:
+    from .tabnotes import is_pack
+
     scratch.mkdir(parents=True, exist_ok=True)
     for z in list(drop.rglob("*.zip")):
+        if is_pack(z):  # tab-notes packs go to data/tabnotes, not scratch
+            continue
         dest = scratch / z.stem
         dest.mkdir(parents=True, exist_ok=True)
         try:
@@ -91,6 +95,61 @@ def _unpack_zips(drop: Path, scratch: Path) -> None:
                 zh.extractall(dest)
         except Exception as e:
             print("skip zip", z, e)
+
+
+def _pack_id(src: Path) -> str:
+    from .tabnotes import read_manifest
+
+    try:
+        man = read_manifest(src)
+        if man.get("id"):
+            return str(man["id"])
+    except Exception:
+        pass
+    return src.stem if src.is_file() else src.name
+
+
+def _ingest_tabnotes(drop: Path, lab_root: Path) -> list[dict]:
+    """Unpack/index every tab-notes pack under the drop into
+    `lab_root/data/tabnotes/<safe_id>/`. Never copies a pack into the FLAC or
+    GP roots; never deletes another id."""
+    from . import tabnotes
+
+    base = Path(lab_root) / "data" / "tabnotes"
+    base.mkdir(parents=True, exist_ok=True)
+
+    sources: list[Path] = []
+    if tabnotes.is_pack(drop):
+        sources.append(drop)
+    for z in sorted(drop.rglob("*.zip")):
+        if tabnotes.is_pack(z):
+            sources.append(z)
+    accepted: list[Path] = []
+    for d in sorted(p for p in drop.rglob("*") if p.is_dir()):
+        if not tabnotes.is_pack(d):
+            continue
+        if any(d == a or a in d.parents for a in accepted):
+            continue  # nested inside an already-accepted pack
+        accepted.append(d)
+        sources.append(d)
+
+    results: list[dict] = []
+    for src in sources:
+        try:
+            sid = tabnotes.safe_id(_pack_id(src))
+            dest = base / sid
+            tabnotes.unpack_pack(src, dest)
+            pack = tabnotes.load_pack(dest)
+            tabnotes.append_index(lab_root, pack)
+            results.append({"id": pack.id or sid, "title": pack.title,
+                            "tracks": len(pack.tracks), "events": len(pack.events),
+                            "dest": str(dest)})
+            print("TABNOTES %s | %s | tracks=%d events=%d -> %s"
+                  % (pack.id or sid, pack.title or "?", len(pack.tracks), len(pack.events), dest))
+        except Exception as e:  # noqa: BLE001 - one bad pack never aborts ingest
+            results.append({"source": str(src), "error": str(e)})
+            print("TABNOTES FAIL", src, e)
+    return results
 
 
 def _album_name(p: Path, drop: Path) -> str:
@@ -103,11 +162,14 @@ def _album_name(p: Path, drop: Path) -> str:
     return d.name
 
 
-def ingest(drop: Path, flac_root: Path, gp_root: Path, band: str) -> dict:
-    """Copy FLACs, art, and GP into the corpus. Never deletes the drop folder."""
+def ingest(drop: Path, flac_root: Path, gp_root: Path, band: str,
+           lab_root: Path | None = None) -> dict:
+    """Copy FLACs, art, and GP into the corpus (unchanged), and unpack any
+    tab-notes packs into `lab_root/data/tabnotes/`. Never deletes the drop."""
     typed = band
     scratch = drop / "_unpacked"
     _unpack_zips(drop, scratch)
+    packs = _ingest_tabnotes(drop, lab_root) if lab_root is not None else []
     audio_dest = gp5_dest = gp7_dest = None
     n_a = n_5 = n_7 = n_art = 0
     search = [drop, scratch]
@@ -171,5 +233,7 @@ def ingest(drop: Path, flac_root: Path, gp_root: Path, band: str) -> dict:
         "gp5": n_5,
         "gp7": n_7,
         "art": n_art,
+        "tabnotes": len([p for p in packs if "error" not in p]),
+        "tabnotes_packs": packs,
         "audio": str(audio_dest),
     }

@@ -89,6 +89,10 @@ def main(argv: list[str] | None = None) -> int:
 
     sub.add_parser("status", help="rewrite the STATUS.md counts block from data files")
 
+    s = sub.add_parser("interns", help="run every intern over the corpus (cached, resumable)")
+    s.add_argument("--album")
+    s.add_argument("--steps", default=None, help="comma list; default all")
+
     s = sub.add_parser("export-bank")
     s.add_argument("--out", type=Path, required=True)
 
@@ -208,6 +212,17 @@ def main(argv: list[str] | None = None) -> int:
               % (c["keeper_rows"], c["keeper_tracks"], c["draft_rows"],
                  ",".join(c["draft_sources"]) or "none", c["sync_ok"], c["sync_total"],
                  c["map_rows"], report["path"]))
+        return 0
+
+    if args.cmd == "interns":
+        from .interns import run_interns
+
+        steps = [s.strip() for s in args.steps.split(",")] if getattr(args, "steps", None) else None
+        report = run_interns(root(), flac_root, gp_root,
+                             album=getattr(args, "album", None), steps=steps)
+        print("interns summary:")
+        for key, val in report.items():
+            print("  %-10s %s" % (key, val))
         return 0
 
     if args.cmd == "holdout":

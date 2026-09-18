@@ -94,6 +94,46 @@ def test_no_songformer_only_msa(tmp_path, monkeypatch):
     assert {d["source"] for d in _drafts(lab)} == {"msa-draft"}
 
 
+def test_cached_songformer_json_is_still_emitted(tmp_path, monkeypatch):
+    lab, flac = _lab(tmp_path)
+    msa = lab / "work" / "msa"
+    msa.mkdir(parents=True)
+    (msa / "T.json").write_text(json.dumps(
+        {"bpm": 120, "segments": [{"start": 0, "end": 4, "label": "verse"}]}),
+        encoding="utf-8")
+    (msa / "T.songformer.json").write_text(json.dumps(
+        {"segments": [{"start": 0, "end": 6, "label": "intro"}]}), encoding="utf-8")
+
+    def _no_rerun(_p, **_k):
+        raise AssertionError("cached payload must not be re-run")
+
+    monkeypatch.setattr(structure, "run_allin1", _no_rerun)
+    monkeypatch.setattr(structure, "songformer_available", lambda: True)
+    monkeypatch.setattr(structure, "run_songformer", _no_rerun)
+
+    report = structure.build_drafts(lab, [{"album": "A", "track": "T", "flac_path": str(flac)}])
+
+    assert report["written"] == 2
+    assert {d["source"] for d in _drafts(lab)} == {"msa-draft", "songformer-draft"}
+
+
+def test_songformer_failure_does_not_crash_or_emit(tmp_path, monkeypatch):
+    lab, flac = _lab(tmp_path)
+    monkeypatch.setattr(structure, "run_allin1", lambda p, **k: {
+        "segments": [{"start": 0, "end": 4, "label": "verse"}]})
+
+    def _boom(_p):
+        raise RuntimeError("songformer model missing")
+
+    monkeypatch.setattr(structure, "songformer_available", lambda: True)
+    monkeypatch.setattr(structure, "run_songformer", _boom)
+
+    report = structure.build_drafts(lab, [{"album": "A", "track": "T", "flac_path": str(flac)}])
+
+    assert report["written"] == 1
+    assert {d["source"] for d in _drafts(lab)} == {"msa-draft"}
+
+
 def test_preserves_other_album_drafts(tmp_path, monkeypatch):
     lab, flac = _lab(tmp_path)
     (lab / "data" / "drafts.jsonl").write_text(

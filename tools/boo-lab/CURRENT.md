@@ -227,6 +227,19 @@ shortest repeating cell inside that figure (2, 3, or 4 bars), preferring the has
 seconds only when `times_trusted`). An 8-bar human `riff-A` box becomes a 2-bar cell, never an 8-bar
 bank fragment. Zero cells never blanks an existing file.
 
+## Interns pass (one command)
+
+`boo-lab interns [--album X] [--steps a,b,c]` runs the whole chain in order —
+`stems beats structure drums vocals lyrics sync extract figures compare learn
+status` — over the `map.csv` rows (album-filtered). Every step is independent:
+a failure is recorded as `{"error": …}` and the rest still run, so a re-run
+resumes. It skips finished work (`beats` / `sync` / `lyrics` already on disk;
+`structure` reuses cached `work/msa/<track>.json` + `.songformer.json` instead
+of re-running allin1/SongFormer). `compare` writes `data/compare.json` then
+`learn`; `extract` shells `boo-lab extract --album`. It never writes
+`sections.jsonl`/keepers. Step functions live in `src/boo_lab/interns.py`;
+`structure.build_drafts` reads its cache first.
+
 ## Learn (intern rank)
 
 `boo-lab learn [--album X]` rebuilds `data/intern_rank.json` from `compare.compare()` (never a
@@ -309,7 +322,7 @@ album+track so “Rebirth” cannot stream “Machine.”
 
 `init-map` `scan` `hash` `studio`/`annotate` `ingest` `stems` `pack` `drums` `vocals` `holdout`
 `lyrics` `structure` `beats` `audit` `extract` `gate` `report` `export-bank` `agree` `compare`
-`hear` `sync` `figures` `gp-export` `learn` `adapt` `export-jams` `status` `doctor`
+`hear` `sync` `figures` `gp-export` `learn` `adapt` `export-jams` `interns` `status` `doctor`
 
 `structure` writes `data/drafts.jsonl` only (allin1 → `msa-draft`; SongFormer when
 `SONGFORMER_HOME`/import → `songformer-draft`). `agree` snapshots keeper pins (pass 1/2) and diffs

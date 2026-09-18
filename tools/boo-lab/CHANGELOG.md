@@ -2,6 +2,10 @@
 
 ## 2026-09-18
 
+### One resumable `interns` pass (cached analysis)
+
+- New `src/boo_lab/interns.py` + `boo-lab interns [--album X] [--steps a,b,c]`: runs the whole analysis chain in order — `stems → beats → structure → drums → vocals → lyrics → sync → extract → figures → compare → learn → status` — over the real `map.csv` rows. Each step is wrapped so one failure never aborts the rest (its error is reported and the run continues), and re-running resumes: `structure` reuses cached allin1/SongFormer JSON, `beats`/`sync`/`lyrics` skip rows already on disk. `compare` mirrors the CLI (writes `data/compare.json`, then `learn`), `learn` returns the rank summary, `extract` shells the CLI with `--album`. Never writes `sections.jsonl`. `structure.build_drafts` now loads `work/msa/<track>.json` / `.songformer.json` before re-running an intern, and a crashed/failed SongFormer run no longer feeds `None` into the segment reader (regression: the cached SongFormer payload is still emitted). Lab tests: **296 passed** (new `tests/test_interns.py`).
+
 ### Export keepers to JAMS from the studio
 
 - `jams_export.export_jam_one` writes one song's keeper boxes to `work/jams/<album>/<track>.jams` (JAMS 0.3, `segment_lab_figure` + `segment_lab_function`), reusing `build_jam`; it refuses with "no keepers to export" or a VAL reason and never touches `sections.jsonl`. New `POST /api/jams/{id}` exposes it (409 on refusal) and the Lab menu gains a **JAMS** button that reports the written path. USER.md Part B gets a JAMS note; CURRENT lists the endpoint.

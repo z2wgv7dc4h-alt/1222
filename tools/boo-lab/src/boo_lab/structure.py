@@ -89,11 +89,26 @@ def run_allin1(flac: Path, cache_dir: Path | None = None) -> dict:
     return {"raw": str(result)}
 
 
-def songformer_available() -> bool:
-    """`SONGFORMER_HOME` set, or `import songformer` works."""
+def _songformer_repo() -> Path | None:
+    """The official repo checkout (has `src/SongFormer/infer/infer.py`)."""
     import os
 
-    if os.environ.get("SONGFORMER_HOME"):
+    home = os.environ.get("SONGFORMER_HOME")
+    if not home:
+        return None
+    root = Path(home)
+    if (root / "src" / "SongFormer" / "infer" / "infer.py").exists():
+        return root
+    return None
+
+
+def songformer_available() -> bool:
+    """Usable when the official repo env is configured (`SONGFORMER_HOME` +
+    `SONGFORMER_PY` pointing at its own interpreter), or a plain `import
+    songformer` works."""
+    import os
+
+    if _songformer_repo() and os.environ.get("SONGFORMER_PY"):
         return True
     try:
         import songformer  # noqa: F401
@@ -102,10 +117,47 @@ def songformer_available() -> bool:
         return False
 
 
+def _run_songformer_subprocess(repo: Path, py: str, flac: Path) -> dict:
+    """Run the official `infer.py` in its OWN env and read back its segments.
+    Heavy (MuQ + MusicFM + SongFormer weights); only used when configured."""
+    import os
+    import subprocess
+    import tempfile
+
+    sf = Path(repo) / "src" / "SongFormer"
+    with tempfile.TemporaryDirectory() as td:
+        scp = Path(td) / "in.scp"
+        scp.write_text(str(Path(flac).resolve()) + "\n", encoding="utf-8")
+        out = Path(td) / "out"
+        out.mkdir()
+        cmd = [
+            py, str(sf / "infer" / "infer.py"), "-i", str(scp), "-o", str(out),
+            "-gn", "1", "-tn", "1", "--model", "SongFormer",
+            "--checkpoint", "SongFormer.safetensors", "--config_path", "SongFormer.yaml",
+        ]
+        env = dict(os.environ)
+        env["PYTHONUTF8"] = "1"
+        env["PYTHONPATH"] = os.pathsep.join([
+            str(sf), str(Path(repo) / "src" / "third_party"), env.get("PYTHONPATH", ""),
+        ])
+        subprocess.run(cmd, cwd=str(sf), check=True, env=env, timeout=1800)
+        produced = list(out.glob("*.json"))
+        if not produced:
+            raise RuntimeError("SongFormer produced no output")
+        return {"segments": json.loads(produced[0].read_text(encoding="utf-8"))}
+
+
 def run_songformer(flac: Path) -> dict:
-    """Best-effort SongFormer inference -> a dict with `segments`. The exact
-    model API is resolved at call time so a missing/renamed entry point fails
-    closed per track rather than crashing the run."""
+    """Best-effort SongFormer inference -> a dict with `segments`. With the
+    official repo configured (`SONGFORMER_HOME` + `SONGFORMER_PY`) this shells
+    out to its own env's `infer.py`; otherwise it falls back to an in-process
+    `songformer` module. Fails closed per track."""
+    import os
+
+    repo = _songformer_repo()
+    py = os.environ.get("SONGFORMER_PY")
+    if repo is not None and py:
+        return _run_songformer_subprocess(repo, py, flac)
     import songformer
 
     model = None
@@ -165,14 +217,23 @@ def build_drafts(lab_root: Path, rows: list[dict]) -> dict:
             print("SKIP structure", r.get("track"), "no flac")
             continue
 
-        try:
-            payload = run_allin1(Path(fp), cache_dir=lab_root / "work" / "allin1")
-        except Exception as exc:
-            print("SKIP structure", r.get("track"), exc)
-            payload = None
+        msa_path = out_dir / f"{r.get('track')}.json"
+        payload = None
+        if msa_path.exists():
+            try:
+                payload = json.loads(msa_path.read_text(encoding="utf-8"))
+                print("CACHE allin1", r.get("track"))
+            except Exception:
+                payload = None
+        if payload is None:
+            try:
+                payload = run_allin1(Path(fp), cache_dir=lab_root / "work" / "allin1")
+            except Exception as exc:
+                print("SKIP structure", r.get("track"), exc)
+                payload = None
+            if payload is not None:
+                msa_path.write_text(json.dumps(payload, indent=2, default=str), encoding="utf-8")
         if payload is not None:
-            (out_dir / f"{r.get('track')}.json").write_text(
-                json.dumps(payload, indent=2, default=str), encoding="utf-8")
             for seg in segments_from_allin1(payload):
                 role = canonical_role(seg.get("role") or seg.get("label"))
                 if role is None:
@@ -186,14 +247,23 @@ def build_drafts(lab_root: Path, rows: list[dict]) -> dict:
             print("DRAFT", r.get("track"), payload.get("bpm"), "-> data/drafts.jsonl")
 
         if use_songformer:
-            try:
-                sres = run_songformer(Path(fp))
-            except Exception as exc:
-                print("SKIP songformer", r.get("track"), exc)
-                sres = None
+            sf_path = out_dir / f"{r.get('track')}.songformer.json"
+            sres = None
+            if sf_path.exists():
+                try:
+                    sres = json.loads(sf_path.read_text(encoding="utf-8"))
+                    print("CACHE songformer", r.get("track"))
+                except Exception:
+                    sres = None
+            if sres is None:
+                try:
+                    sres = run_songformer(Path(fp))
+                except Exception as exc:
+                    print("SKIP songformer", r.get("track"), exc)
+                    sres = None
+                if sres is not None:
+                    sf_path.write_text(json.dumps(sres, indent=2, default=str), encoding="utf-8")
             if sres is not None:
-                (out_dir / f"{r.get('track')}.songformer.json").write_text(
-                    json.dumps(sres, indent=2, default=str), encoding="utf-8")
                 for seg in segments_from_songformer(sres):
                     role = canonical_role(seg.get("role") or seg.get("label"))
                     if role is None:

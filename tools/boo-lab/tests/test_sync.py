@@ -42,6 +42,65 @@ def test_best_clock_fit_recovers_a_uniform_rate():
     assert score > 0.9
 
 
+def _no_chroma(_path):
+    raise RuntimeError("no chroma witness in this test")
+
+
+def _rate_source(monkeypatch, rate):
+    """Fake one audio source whose notes are spaced `rate` seconds while the
+    tab's are spaced 1.0s. Returns `(env_gp, ev)` with chroma unavailable."""
+    gp_times = [i * 1.0 for i in range(1, 30)]
+    env_a = sync.envelope_from_times([i * rate for i in range(1, 30)], 4000, 0.01)
+    monkeypatch.setattr(sync, "audio_envelope", lambda p: (env_a, 0.01))
+    monkeypatch.setattr(sync, "audio_chroma", _no_chroma)
+    ev = sync._evaluate_source(Path("x.flac"), Path("x.gp5"), gp_times)
+    return gp_times, ev
+
+
+def test_identical_envelopes_rate_is_one(monkeypatch):
+    times = [1.0, 2.0, 3.0]
+    env = sync.envelope_from_times(times, 400, 0.01)
+    monkeypatch.setattr(sync, "audio_envelope", lambda p: (env, 0.01))
+    monkeypatch.setattr(sync, "audio_chroma", _no_chroma)
+
+    ev = sync._evaluate_source(Path("x.flac"), Path("x.gp5"), times)
+
+    assert sync.decide(ev["lag"], ev["score"]) is True
+    assert ev["ratio"] == pytest.approx(1.0, abs=0.01)
+    assert sync._outcome(ev)[0] == "aligned"
+
+
+def test_rate_fit_passes_2_7_percent_drift(monkeypatch):
+    gp_times, ev = _rate_source(monkeypatch, 1.027)
+
+    # The searched rate wins; ratio=1 alone does not decide.
+    assert ev["ratio"] == pytest.approx(1.027, abs=0.01)
+    lag0, score0 = sync.best_lag_and_score(
+        sync.envelope_from_times(gp_times, 4000, 0.01),
+        sync.envelope_from_times([i * 1.027 for i in range(1, 30)], 4000, 0.01), 0.01)
+    assert not sync.decide(lag0, score0) or score0 < ev["rscore"]
+    assert sync.decide(ev["rlag"], ev["rscore"]) is True
+    assert ev["rate_ok"] is True
+    assert sync._outcome(ev)[0] == "rate"
+
+
+def test_twenty_percent_drift_still_fails(monkeypatch):
+    _gp_times, ev = _rate_source(monkeypatch, 1.20)
+
+    assert abs(ev["ratio"] - 1.0) <= sync.CLOCK_SPAN + 1e-9
+    assert ev["rate_ok"] is False
+    assert sync._outcome(ev)[0] == "fail"
+
+
+def test_searched_ratio_alone_is_not_a_pass():
+    # A searched ratio with a bad rate-adjusted lag must stay a fail.
+    assert sync.decide(0.9, 0.5) is False
+    ev = {"onset_ok": False, "chroma_ok": False, "rate_ok": False,
+          "onset_leadin": False, "lag": 2.0, "clag": None,
+          "ratio": 1.05, "rlag": 0.9, "rscore": 0.5}
+    assert sync._outcome(ev)[0] == "fail"
+
+
 def test_low_score_is_not_ok():
     import numpy as np
 
@@ -166,6 +225,25 @@ def test_sync_ok_with_mocked_envelopes(tmp_path, monkeypatch):
 
     assert rec["sync_ok"] is True and rec["used_stem"] == "mix"
     assert rec["lag_sec"] == 0.0
+
+
+def test_sync_track_reports_a_rate_pass(tmp_path, monkeypatch):
+    gp = tmp_path / "x.gp5"
+    gp.write_bytes(b"x")
+    flac = tmp_path / "x.flac"
+    flac.write_bytes(b"x")
+    lab = _lab(tmp_path, gp=gp, flac=flac)
+    gp_times = [i * 1.0 for i in range(1, 30)]
+    env_a = sync.envelope_from_times([i * 1.027 for i in range(1, 30)], 4000, 0.01)
+    monkeypatch.setattr(sync, "gp_onset_times", lambda p: gp_times)
+    monkeypatch.setattr(sync, "audio_envelope", lambda p: (env_a, 0.01))
+    monkeypatch.setattr(sync, "audio_chroma", _no_chroma)
+
+    rec = sync.sync_track(lab, "A", "T")
+
+    assert rec["sync_ok"] is True
+    assert rec["clock_ratio"] == pytest.approx(1.027, abs=0.01)
+    assert rec["note"].startswith("ok (rate")
 
 
 def test_chroma_lag_and_score_identical_matrices():

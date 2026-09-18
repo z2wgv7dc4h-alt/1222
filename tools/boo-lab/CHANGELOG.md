@@ -2,6 +2,12 @@
 
 ## 2026-09-18
 
+### Clock rate-fit wired into sync_ok; untrusted figure times stay bars-only
+
+- **Rate drift is a first-class outcome.** `sync.py` already computed `best_clock_fit` but `decide()` only used the ratio=1 lag; now the rate-adjusted onset lag must pass `decide` (still `|lag| < 0.35 s`, score ≥ 0.15 — no threshold loosened) and the chroma witness must agree at that same ratio within 0.25 s (a lone onset rate-fit may stand when no chroma exists). `clock_ratio` is always recorded (1.0 when no stretch) and a pass notes `ok (rate 1.027)`. The ~2.7% uniform-drift class passes; 20% still fails; a searched ratio with a bad resampled lag is not a pass.
+- **Figure times follow the clock.** `build_figures` looks up `data/sync.jsonl`; unless that song's `sync_ok` is true it writes `start`/`end` and occurrence seconds as `null`, keeps `start_bar`/`end_bar` and the hash, and adds `times_trusted`.
+- **LAW**: pin-layer vs cell-layer (2–4 bar cell inside a figure, never a 40 s box), and GP7 is not a Guess marker clock (GP5 markers; GP7 only after deterministic export-to-GP5). Lab tests: **223 passed**.
+
 ### Figure hashes — riff identity, never keepers
 
 - New `src/boo_lab/figures.py`: `hash_window` fingerprints a 2- or 4-measure window from riff_bank's per-measure fragments (chord-aware pitch-class sets, coarse 4-beat onset grid; octave/velocity ignored), `cluster_song` groups exact hashes (optional pitch-class Jaccard merge when windows carry `pcs`/`rhythm`) and letters `riff-A`, `riff-B`, ... by first start, and `build_figures` walks the matched GP5 in playback order, slices contiguous 2/4-bar windows, clusters 4-bar first then uncovered 2-bar, and writes `data/figures.jsonl` (`source="figure-hash"`) with the never-blank-on-zero-rows law. `load_figures` reads it back per song. CLI `boo-lab figures [--album X --track Y]` (album+track together) and studio `GET /api/figures/{track_id}` feed a `figure` datalist (no auto-fill, no `heard`). Reuses `extract._engine_riff_bank`, `sync._playback_order`, `schema.write_jsonl_atomic`; never touches `sections.jsonl`/`drafts.jsonl`. Lab tests: **216 passed** (9 new in `tests/test_figures.py`).

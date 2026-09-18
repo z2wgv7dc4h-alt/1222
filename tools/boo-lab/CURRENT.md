@@ -272,6 +272,14 @@ at `import boo_lab` (so `doctor`/CLI/structure get it first). No old natten buil
 - `boo-lab beats [--album X]` — `data/beats.jsonl` (`beat_this` preferred, allin1 fallback).
 - `boo-lab sync --album X --track Y` — GP clock vs the audio through **two** co-witnesses: a blurred (~120 ms) onset correlation and a chroma correlation (tab pitches held over each beat vs `chroma_cqt`), preferring the cached guitar stem with a per-witness mix fallback. `sync_ok` if either is within 350 ms at score ≥ 0.15, or an **aligned-with-offset** lead-in (within 5 s, peak prominence ≥ 0.05, other witness agreeing ≤ 0.25 s). Records `used_stem`/`lag_sec`/`score`/`clock_ratio`/`chroma_lag`/`chroma_score`/`offset_sec`. `|lag|` alone is not the rule.
 - `boo-lab hash [--album X]` — fills empty `flac_sha256` cells in `map.csv` (scan hashes on rewrite).
+
+**Sync clock rate.** `boo-lab sync` now wires the existing `best_clock_fit` (span ±0.08, step 0.01)
+into `sync_ok`: the rate-adjusted onset lag must pass `decide` (still `|lag| < 0.35 s`, score ≥ 0.15)
+and the chroma witness must agree at that same ratio within 0.25 s (a lone onset rate-fit may stand
+when no chroma exists). So the ~2.7% uniform-drift class can pass; 20% still fails. `clock_ratio` is
+always recorded (1.0 when no stretch) and a pass reads `ok (rate 1.027)`. No threshold was loosened.
+Figure hashes (`data/figures.jsonl`) publish `start`/`end` seconds only when that song's `sync_ok`
+is true (`times_trusted`); otherwise bars/hashes only.
 - `boo-lab audit` — sources/overlaps/heard/short-box hygiene.
 
 Reading: **F3 high + role agreement low = the intern finds the edges but names them wrong.**

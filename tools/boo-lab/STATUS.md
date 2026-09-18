@@ -4,7 +4,7 @@ Canonical detail: **CURRENT.md**; commands in **README.md**.
 
 Works: studio keeps pins (`human`/`guess-accepted` + `heard`) in `sections.jsonl`; mel
 spectrogram under the WaveSurfer waveform; 6-stem picker; drafts; `hear`/`sync`/`hash`;
-`agree`/`compare`/`export-jams`/`beats`/`audit`/`report`; **216 tests pass**.
+`agree`/`compare`/`export-jams`/`beats`/`audit`/`report`; **223 tests pass**.
 Interns (allin1 structure, beat_this, torchcrepe) run on **CUDA** when present
 (RTX 5080, `torch 2.8.0+cu128`); `boo-lab doctor` reports the build. allin1 works
 without an old natten build via `_natten_compat` (legacy NATTEN API + madmom
@@ -64,5 +64,10 @@ On disk now:
   `boo-lab agree --album X --track Y --diff`.
 - `data/map.csv` — 71 rows, 55 `match=yes`; `flac_sha256` only once `scan`/`hash` runs.
 - `data/holdout.csv` — 7 songs reserved. `engine/data/riff_bank.json` is local/gitignored.
+
+Sync (2026-09-18): the existing `best_clock_fit` rate fit is wired into `sync_ok` — the resampled
+onset lag must pass `decide` and the chroma witness must agree within 0.25 s at that ratio;
+`clock_ratio` is always recorded and the ~2.7% drift class can pass while 20% still fails. Figure
+rows omit `start`/`end` seconds unless the song's `sync_ok` is true.
 
 Pytest proves wiring. It does not prove a riff.

@@ -285,6 +285,9 @@ def build_figures(lab_root, rows, *, album=None, track=None) -> dict:
     from .extract import _engine_riff_bank
     from .schema import write_jsonl_atomic
 
+    sync_by = {(s.get("album"), s.get("track")): s
+               for s in _read_jsonl(lab_root / "data" / "sync.jsonl")}
+
     for r in rows:
         ra = r.get("album") or ""
         rt = r.get("track") or ""
@@ -329,18 +332,31 @@ def build_figures(lab_root, rows, *, album=None, track=None) -> dict:
         two_keep = [w for w in two if not covered_by(w)]
         clusters = cluster_song(four + two_keep)
         song_rows = [c for c in clusters if c["n_hits"] >= 2]
+        # Seconds are only trustworthy when the tab clock actually matched the
+        # audio (sync_ok). Otherwise keep bars/hashes and publish no times.
+        trusted = bool((sync_by.get((ra, rt)) or {}).get("sync_ok") is True)
         # Re-letter only the repeating clusters we actually suggest, by
         # first-start order, so the studio sees riff-A, riff-B, ...
         for i, c in enumerate(song_rows):
+            if trusted:
+                start, end = c["start"], c["end"]
+                occ = c["occurrences"]
+            else:
+                start = end = None
+                occ = [{"start": None, "end": None,
+                        "start_bar": o["start_bar"], "end_bar": o["end_bar"]}
+                       for o in c["occurrences"]]
             produced.append({
                 "album": ra, "track": rt,
                 "figure_id": "riff-" + _letters(i), "hash": c["hash"],
                 "n_bars": c["n_bars"], "n_hits": c["n_hits"], "unique": c["unique"],
-                "start": c["start"], "end": c["end"],
+                "start": start, "end": end,
                 "start_bar": c["start_bar"], "end_bar": c["end_bar"],
-                "occurrences": c["occurrences"], "source": "figure-hash",
+                "occurrences": occ, "times_trusted": trusted,
+                "source": "figure-hash",
             })
-        print("FIGURES", rt, len(windows), "windows,", len(song_rows), "repeating")
+        print("FIGURES", rt, len(windows), "windows,", len(song_rows), "repeating",
+              "(times trusted)" if trusted else "(bars only; sync not ok)")
 
     if not produced:
         print("figures: 0 rows written; leaving", out.name, "untouched")

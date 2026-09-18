@@ -90,6 +90,57 @@ def test_load_figures_filters_by_album_track(tmp_path):
     assert figures.load_figures(lab, "A", "U") == []
 
 
+class _Frag:
+    def __init__(self, mi, pc=0):
+        self.measure_index = mi
+        self.cell = [{"duration": 1.0, "is_rest": False}]
+        self.chord_notes = [[pc]]
+        self.deltas = []
+
+
+class _FakeBank:
+    def extract_fragments_from_file(self, gp, song_title=None):
+        return [_Frag(mi) for mi in range(4)]
+
+
+def _gated_lab(tmp_path, monkeypatch, sync_ok):
+    from boo_lab import extract
+
+    monkeypatch.setattr(extract, "_engine_riff_bank", lambda: _FakeBank())
+    monkeypatch.setattr(figures, "_playback_slots",
+                        lambda gp: [(mi, float(mi), mi + 1, 1.0) for mi in range(4)])
+    lab = tmp_path / "lab"
+    (lab / "data").mkdir(parents=True)
+    gp = tmp_path / "x.gp5"
+    gp.write_bytes(b"x")
+    (lab / "data" / "sync.jsonl").write_text(
+        '{"album":"A","track":"T","sync_ok":%s}\n' % ("true" if sync_ok else "false"),
+        encoding="utf-8",
+    )
+    figures.build_figures(lab, [{"album": "A", "track": "T",
+                                 "gp_path": str(gp), "match": "yes"}])
+    return figures.load_figures(lab, "A", "T")
+
+
+def test_build_figures_omits_seconds_when_sync_not_ok(tmp_path, monkeypatch):
+    rows = _gated_lab(tmp_path, monkeypatch, sync_ok=False)
+
+    assert rows
+    assert all(r["start"] is None and r["end"] is None for r in rows)
+    assert all(r["times_trusted"] is False for r in rows)
+    assert all(o["start"] is None and o["end"] is None
+               for r in rows for o in r["occurrences"])
+    assert all(r["start_bar"] is not None for r in rows)
+
+
+def test_build_figures_keeps_seconds_when_sync_ok(tmp_path, monkeypatch):
+    rows = _gated_lab(tmp_path, monkeypatch, sync_ok=True)
+
+    assert rows
+    assert all(r["times_trusted"] is True for r in rows)
+    assert any(r["start"] is not None for r in rows)
+
+
 def test_api_figures_returns_rows_for_selected_song(tmp_path):
     pytest.importorskip("fastapi")
     pytest.importorskip("httpx")

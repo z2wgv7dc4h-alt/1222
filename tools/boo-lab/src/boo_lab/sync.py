@@ -21,6 +21,8 @@ SMOOTH_SECONDS = 0.12  # blur before correlating: onsets need only land near eac
 RATE_TOLERANCE = 0.015  # sync_ok requires the tab clock rate within 1.5% of the audio
 LEADIN_MAX = 5.0  # an "aligned with offset" pass must be within this many seconds
 PROMINENCE_MIN = 0.05  # ... and the correlation peak must stand out this much
+CLOCK_SPAN = 0.08  # best_clock_fit search half-width (a searched rate only passes inside this)
+CO_WITNESS_SECONDS = 0.25  # two witnesses "agree" within this; never a pass threshold on its own
 
 
 def _read_jsonl(path: Path) -> list[dict]:
@@ -321,6 +323,42 @@ def best_clock_fit(
     return best
 
 
+def _resample_rows(matrix, ratio: float):
+    """Time-scale a `(12, T)` chroma matrix by `ratio`, the chroma twin of
+    `best_clock_fit`'s envelope resample. Scores the chroma witness at the SAME
+    winning ratio -- chroma is never searched independently."""
+    import numpy as np
+
+    A = np.asarray(matrix, dtype=float)
+    if A.size == 0 or abs(ratio - 1.0) <= 1e-9:
+        return A
+    n = A.shape[1]
+    m = max(2, int(round(n * ratio)))
+    src = np.arange(n, dtype=float)
+    dst = np.linspace(0, n - 1, m)
+    out = np.empty((A.shape[0], m))
+    for pc in range(A.shape[0]):
+        out[pc] = np.interp(dst, src, A[pc])
+    return out
+
+
+def _rate_corroborated(rlag, clag_r, cscore_r, clag, cscore):
+    """Whether a chroma witness backs an onset rate-fit at `rlag`.
+
+    Returns `True`/`False` when any chroma witness exists, and `None` when
+    there is none at all -- a lone onset rate-fit may then stand on its own,
+    exactly as the ratio=1 `onset_ok` rule already can. A bare ratio is never a
+    pass; `decide(rlag, rscore)` still has to hold."""
+    if clag_r is None and clag is None:
+        return None
+    if clag_r is not None and abs(clag_r - rlag) < CO_WITNESS_SECONDS:
+        return True
+    if (clag is not None and cscore is not None
+            and cscore >= SCORE_THRESHOLD and abs(clag - rlag) < CO_WITNESS_SECONDS):
+        return True
+    return False
+
+
 def decide(lag_sec: float, score: float) -> bool:
     return bool(abs(lag_sec) < LAG_TOLERANCE and score >= SCORE_THRESHOLD)
 
@@ -338,25 +376,40 @@ def _write_sync(lab_root: Path, rec: dict) -> None:
 
 
 def _evaluate_source(src: Path, gp: Path, onsets: list[float]) -> dict:
-    """Run both witnesses (onset + chroma) on one audio source."""
+    """Run both witnesses (onset + chroma) on one audio source, at ratio=1 and
+    at the best-fit clock rate. The rate is never a pass on its own: the
+    resampled onset envelope still has to peak near zero (`decide`) and the
+    chroma witness has to agree at that same ratio."""
     env_audio, hop_s = audio_envelope(Path(src))
     env_gp = envelope_from_times(onsets, len(env_audio), hop_s)
     lag, score, prom = best_alignment(env_gp, env_audio, hop_s)
-    ratio, _rlag, rscore = best_clock_fit(env_gp, env_audio, hop_s, span=0.08)
+    ratio, rlag, rscore = best_clock_fit(env_gp, env_audio, hop_s, span=CLOCK_SPAN)
     clag = cscore = None
+    clag_r = cscore_r = None
     try:
         audio_c, chop = audio_chroma(Path(src))
         gp_c = gp_chroma(gp, chop, audio_c.shape[1])
         if gp_c is not None:
             clag, cscore = chroma_lag_and_score(gp_c, audio_c, chop)
+            if abs(ratio - 1.0) > 1e-9:
+                clag_r, cscore_r = chroma_lag_and_score(
+                    _resample_rows(gp_c, ratio), audio_c, chop)
+            else:
+                clag_r, cscore_r = clag, cscore
     except Exception:
         pass
     onset_ok = decide(lag, score)
+    chroma_ok = clag is not None and decide(clag, cscore)
+    within = abs(ratio - 1.0) <= CLOCK_SPAN + 1e-9
+    corrob = _rate_corroborated(rlag, clag_r, cscore_r, clag, cscore)
+    rate_ok = bool(within and decide(rlag, rscore) and corrob is not False)
     return {
-        "lag": lag, "score": score, "prom": prom, "ratio": ratio, "rscore": rscore,
-        "clag": clag, "cscore": cscore,
+        "lag": lag, "score": score, "prom": prom,
+        "ratio": ratio, "rlag": rlag, "rscore": rscore,
+        "clag": clag, "cscore": cscore, "clag_r": clag_r, "cscore_r": cscore_r,
         "onset_ok": onset_ok,
-        "chroma_ok": clag is not None and decide(clag, cscore),
+        "chroma_ok": chroma_ok,
+        "rate_ok": rate_ok,
         # "aligned with offset": a bounded, prominent peak the other witness sees too
         "onset_leadin": (
             not onset_ok
@@ -367,18 +420,22 @@ def _evaluate_source(src: Path, gp: Path, onsets: list[float]) -> dict:
     }
 
 
-_OUTCOME_RANK = {"fail": 0, "lead-in": 1, "aligned": 2}
+_OUTCOME_RANK = {"fail": 0, "lead-in": 1, "rate": 2, "aligned": 3}
 
 
 def _outcome(ev: dict) -> tuple[str, float | None]:
-    """Classify one source's witnesses as `aligned`, `lead-in`, or `fail`."""
+    """Classify one source's witnesses as `aligned`, `rate`, `lead-in`, or
+    `fail`. `rate` uses `ev.get` so a hand-built witness dict (tests) without
+    the clock-fit keys still classifies."""
     if ev["onset_ok"]:
         return "aligned", ev["lag"]
     if ev["chroma_ok"]:
         return "aligned", ev["clag"]
+    if ev.get("rate_ok"):
+        return "rate", ev.get("rlag")
     if ev["onset_leadin"]:
         clag = ev["clag"]
-        if clag is not None and abs(clag) <= LEADIN_MAX and abs(clag - ev["lag"]) < 0.25:
+        if clag is not None and abs(clag) <= LEADIN_MAX and abs(clag - ev["lag"]) < CO_WITNESS_SECONDS:
             return "lead-in", ev["lag"]
     return "fail", ev["lag"]
 
@@ -439,15 +496,23 @@ def sync_track(lab_root: Path, album: str | None, track: str | None) -> dict:
         if kind == "aligned":
             break
     rec["used_stem"] = used
-    rec["clock_ratio"] = round(ev["ratio"], 4)
-    rec["lag_sec"] = round(ev["lag"], 4)
-    rec["score"] = round(ev["score"], 4)
+    if kind == "rate":
+        # Best fit is the rate-adjusted one; clock_ratio is the stretch applied.
+        rec["clock_ratio"] = round(ev["ratio"], 4)
+        rec["lag_sec"] = round(ev["rlag"], 4)
+        rec["score"] = round(ev["rscore"], 4)
+    else:
+        rec["clock_ratio"] = 1.0  # no stretch on the aligned/lead-in path
+        rec["lag_sec"] = round(ev["lag"], 4)
+        rec["score"] = round(ev["score"], 4)
     rec["chroma_lag"] = round(ev["clag"], 4) if ev["clag"] is not None else None
     rec["chroma_score"] = round(ev["cscore"], 4) if ev["cscore"] is not None else None
     rec["sync_ok"] = kind != "fail"
     rec["offset_sec"] = round(offset, 4) if kind == "lead-in" else None
     if kind == "aligned":
         rec["note"] = "ok" if ev["onset_ok"] else "ok (chroma)"
+    elif kind == "rate":
+        rec["note"] = "ok (rate %.3f)" % ev["ratio"]
     elif kind == "lead-in":
         rec["note"] = "ok (lead-in %.2fs)" % offset
     elif abs(ev["ratio"] - 1.0) > RATE_TOLERANCE and ev["rscore"] > ev["score"] + 0.03:

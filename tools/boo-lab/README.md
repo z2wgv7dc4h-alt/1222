@@ -121,8 +121,8 @@ Snap beats / JSON / Next GP live under **Lab**; Drop / Push git / Remove album l
 4. **Pack** once labels are good.
 5. Old pins without `heard`: `boo-lab hear --album X --track Y` (that track only).
 6. If the interns are installed: `boo-lab interns --album X` runs the whole chain in order
-   (structure, beats, drums, vocals, lyrics, sync, extract, figures, compare, learn, status),
-   skipping what is already on disk. `sync` clocks a GP7 `.gp`/`.gpx` when one is present
+   (structure, beats, drums, vocals, lyrics, sync, extract, figures, tempo_hints, compare, learn,
+   status), skipping what is already on disk. `sync` clocks a GP7 `.gp`/`.gpx` when one is present
    (parsed natively, no conversion), else the `.gp5`. Or run one step: `boo-lab structure
    --album X`, then `boo-lab compare --album X`.
 

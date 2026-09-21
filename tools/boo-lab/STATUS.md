@@ -14,6 +14,18 @@ Canonical detail: **CURRENT.md**; commands in **README.md**.
 Works: studio keeps pins (`human`/`guess-accepted` + `heard`) in `sections.jsonl`; mel
 spectrogram under the WaveSurfer waveform; 6-stem picker; drafts; `hear`/`sync`/`hash`;
 `agree`/`compare`/`export-jams`/`beats`/`audit`/`report`; **362 tests pass**.
+Wiring audit (2026-09-21): `tempo_hints.build_tempo_hints` was real, tested and
+CLI-reachable (`boo-lab tempo-hints`) but never ran as part of `boo-lab interns` --
+the exact "computed and never called from the real path" anti-pattern this project
+explicitly guards against. Added as a `tempo_hints` step (`interns.STEPS`,
+`_step_tempo_hints`) right after `figures`; `LAW.md`/`README.md` updated to match.
+Caught because `test_interns.py`'s generic step-dispatch test builds each mock as
+`_step_` + the step name -- a hyphenated step id (`tempo-hints`) would silently
+never get mocked (`_step_tempo-hints` isn't a valid attribute the real code calls),
+so the step id is `tempo_hints` (underscore) even though the CLI command stays the
+hyphenated `boo-lab tempo-hints`. Also noted, not fixed: `status.py`/`report.py`/
+`audit.py` don't count `figures.jsonl` or `tempo_hints.jsonl` rows at all (pre-existing
+for `figures.jsonl`, so not a new gap, but real -- neither shows up in `boo-lab status`).
 UI catch-up (2026-09-21): the new tabnotes drafting (bass/pulse/tempo-hints/kick-
 notation) was backend-only until now. `_figure_drafts` (`guess.py`) prefills a draft
 box's `inst` from `figures.jsonl`'s own `instrument` field (`bass`→`bass`,

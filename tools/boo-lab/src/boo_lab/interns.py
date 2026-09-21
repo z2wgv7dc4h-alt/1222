@@ -6,7 +6,10 @@ failure does not abort the rest; re-running resumes where it stopped. Never
 writes `sections.jsonl`.
 
 Steps (default order): stems -> beats -> structure -> drums -> vocals ->
-lyrics -> sync -> extract -> figures -> compare -> learn -> status.
+lyrics -> sync -> extract -> figures -> tempo_hints -> compare -> learn ->
+status. (Step id is `tempo_hints` with an underscore, matching this file's
+own `_step_<name>` dispatch convention; the CLI command it runs is the
+hyphenated `boo-lab tempo-hints`.)
 """
 from __future__ import annotations
 
@@ -16,7 +19,7 @@ import sys
 from pathlib import Path
 
 STEPS = ("stems", "beats", "structure", "drums", "vocals", "lyrics",
-         "sync", "extract", "figures", "compare", "learn", "status")
+         "sync", "extract", "figures", "tempo_hints", "compare", "learn", "status")
 
 
 def _read_jsonl(path: Path) -> list[dict]:
@@ -162,6 +165,12 @@ def _step_figures(lab_root, rows, cache, album):
     return build_figures(lab_root, rows, album=album)
 
 
+def _step_tempo_hints(lab_root, rows, cache, album):
+    from .tempo_hints import build_tempo_hints
+
+    return build_tempo_hints(lab_root, rows, album=album)
+
+
 def _step_compare(lab_root, rows, cache, album):
     from .compare import compare, write_report
 
@@ -217,6 +226,8 @@ def run_interns(lab_root, flac_root=None, gp_root=None, *, album=None,
                 results[step] = _step_extract(lab_root, rows, cache, album)
             elif step == "figures":
                 results[step] = _step_figures(lab_root, rows, cache, album)
+            elif step == "tempo_hints":
+                results[step] = _step_tempo_hints(lab_root, rows, cache, album)
             elif step == "compare":
                 results[step] = _step_compare(lab_root, rows, cache, album)
             elif step == "learn":

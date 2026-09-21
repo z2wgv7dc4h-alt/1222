@@ -676,3 +676,12 @@ Label Elimination by ear. Do not wait on Guess. Scan after any ingest. Push docs
 - Pack spine (no GP): measure-grid guitar activity, not peak-relative density — full-song coverage; warn if <45%.
 - Unique pack bar-runs now populate Guess (figures emit unique=true; pack spine yields to figure-hash).
 - Pack Guess uses tabnotes-phrase mid-grain boxes (~10), not unique 2-bar spam.
+
+## Pack excellence roadmap (in flight)
+
+1. Pitch/contour splits inside dense runs — **now**
+2. Returning figure_id via fuzzy bar-fp identity — **now**
+3. Multi-track lead/rhythm/bass tags
+4. Articulation draft hints
+5. Pack lyrics / section labels
+6. Heard keepers teach phrase splits

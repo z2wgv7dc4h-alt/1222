@@ -239,15 +239,58 @@ def build_drafts(lab_root: Path, rows: list[dict]) -> dict:
 
     use_songformer = songformer_available()
     new_recs: list[dict] = []
+    # Tracks that already have stamped drafts for cached models — skip rewrite noise.
+    drafted_msa: set[tuple[str, str]] = set()
+    drafted_sf: set[tuple[str, str]] = set()
+    if draft_path.exists():
+        for line in draft_path.read_text(encoding="utf-8").splitlines():
+            if not line.strip():
+                continue
+            try:
+                rec = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            key = (rec.get("album") or "", rec.get("track") or "")
+            src = rec.get("source") or ""
+            if src == "msa-draft":
+                drafted_msa.add(key)
+            elif src == "songformer-draft":
+                drafted_sf.add(key)
+
     for r in rows:
         fp = r.get("flac_path")
         if not fp or not Path(fp).exists():
             print("SKIP structure", r.get("track"), "no flac")
             continue
 
+        album = r.get("album") or ""
+        track = r.get("track") or ""
+        key = (album, track)
         msa_path = out_dir / f"{r.get('track')}.json"
+        sf_path = out_dir / f"{r.get('track')}.songformer.json"
+        msa_cached = msa_path.exists()
+        sf_cached = sf_path.exists()
+        # Fully warm: model JSON on disk and drafts already stamped — keep prior
+        # draft rows for this track (do not drop them via row_keys filter alone).
+        if (msa_cached and key in drafted_msa
+                and ((not use_songformer) or (sf_cached and key in drafted_sf))):
+            # Preserve this track's drafts (stripped above by row_keys filter).
+            if draft_path.exists():
+                for line in draft_path.read_text(encoding="utf-8").splitlines():
+                    if not line.strip():
+                        continue
+                    try:
+                        rec = json.loads(line)
+                    except json.JSONDecodeError:
+                        continue
+                    if (rec.get("album") or "", rec.get("track") or "") == key:
+                        if rec.get("source") in {"msa-draft", "songformer-draft"}:
+                            new_recs.append(rec)
+            print("CACHE structure", track, "(drafts unchanged)")
+            continue
+
         payload = None
-        if msa_path.exists():
+        if msa_cached:
             try:
                 payload = json.loads(msa_path.read_text(encoding="utf-8"))
                 print("CACHE allin1", r.get("track"))

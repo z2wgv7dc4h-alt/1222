@@ -339,6 +339,35 @@ def spine_coverage_ratio(spans: list[tuple[float, float]] | list[dict],
 
 
 
+
+def _fp_token_set(fp: str) -> set[str]:
+    return {p for p in (fp or "").split("|") if p}
+
+
+def _fp_jaccard(a: str, b: str) -> float:
+    sa, sb = _fp_token_set(a), _fp_token_set(b)
+    if not sa and not sb:
+        return 1.0
+    if not sa or not sb:
+        return 0.0
+    return len(sa & sb) / float(len(sa | sb))
+
+
+def _phrase_fingerprint(pack, start: float, end: float, track_idx) -> str:
+    """Stable fingerprint of bars overlapping [start, end) on one track."""
+    parts: list[str] = []
+    for m in getattr(pack, "measures", None) or []:
+        a = float(getattr(m, "start_sec_audio", 0.0) or 0.0)
+        b = _measure_audio_end(m)
+        if b <= start or a >= end:
+            continue
+        try:
+            parts.append(tabnotes.bar_fp_tab(pack, m, track_idx))
+        except Exception:
+            continue
+    return "||".join(parts)
+
+
 def pack_phrase_spans(
     pack,
     *,
@@ -347,12 +376,16 @@ def pack_phrase_spans(
     gap_split: float = 0.75,
     rate_frac: float = 0.45,
     rate_floor: float = 2.0,
+    fp_split: float = 0.42,
+    identity_jaccard: float = 0.72,
 ) -> list[dict]:
-    """Phrase-level riff boxes from pack guitar activity.
+    """Phrase-level riff boxes from pack guitar activity + pitch contour.
 
     Finer than the coverage spine (~4 blobs) and coarser than unique bar-run
-    hashes (~60 one-shots). Splits on silence gaps, meter/tempo cuts, and
-    guitar-density jumps; merges shorts and bisects longs. `[]` when no guitar.
+    hashes (~60 one-shots). Splits on silence gaps, meter/tempo cuts,
+    guitar-density jumps, and bar-fingerprint (pitch/articulation) changes.
+    Returning phrases reuse the first `figure_id` when fuzzy bar-fp Jaccard
+    >= `identity_jaccard`. `[]` when no guitar.
     """
     import bisect
     import statistics
@@ -362,7 +395,17 @@ def pack_phrase_spans(
     if len(measures) < 4 or len(times) < 8:
         return []
 
-    rows: list[tuple[float, float, int, float]] = []
+    # Primary guitar track for contour fingerprints
+    track_idx = 0
+    try:
+        from .figures import _tab_track_by_category
+        tr = _tab_track_by_category(pack, "guitar")
+        if tr is not None:
+            track_idx = int(getattr(tr, "index", 0) or 0)
+    except Exception:
+        track_idx = 0
+
+    rows: list[tuple[float, float, int, float, str]] = []
     for m in measures:
         a = float(getattr(m, "start_sec_audio", 0.0) or 0.0)
         b = _measure_audio_end(m)
@@ -373,23 +416,29 @@ def pack_phrase_spans(
         n = hi - lo
         if n < 2:
             continue
-        rows.append((a, b, n, n / (b - a)))
+        try:
+            fp = tabnotes.bar_fp_tab(pack, m, track_idx)
+        except Exception:
+            fp = ""
+        rows.append((a, b, n, n / (b - a), fp))
     if not rows:
         return []
 
-    rates = [r for *_, r in rows]
+    rates = [r[3] for r in rows]
     med = statistics.median(rates) if rates else 0.0
     cuts = set(meter_cuts(pack))
 
-    segs: list[list[tuple[float, float, int, float]]] = [[rows[0]]]
+    segs: list[list[tuple[float, float, int, float, str]]] = [[rows[0]]]
     for prev, cur in zip(rows, rows[1:]):
         gap = cur[0] - prev[1]
         r0, r1 = prev[3], cur[3]
         at_cut = any(abs(cur[0] - c) < 0.35 for c in cuts)
+        fp_jump = _fp_jaccard(prev[4], cur[4]) < fp_split if (prev[4] or cur[4]) else False
         split = (
             gap > gap_split
             or at_cut
             or abs(r1 - r0) > max(med * rate_frac, rate_floor)
+            or fp_jump
         )
         if split:
             segs.append([cur])
@@ -414,15 +463,46 @@ def pack_phrase_spans(
             final.append((round(s, 3), round(e, 3)))
             continue
         mid = (s + e) / 2.0
-        best = min(cands, key=lambda r: abs(r[0] - mid))
+        # Prefer a strong fingerprint jump near the middle when splitting longs
+        def score(r):
+            # lower is better: distance to mid, prefer low jaccard vs prev bar
+            return abs(r[0] - mid)
+        best = min(cands, key=score)
         final.append((round(s, 3), round(best[0], 3)))
         final.append((round(best[0], 3), round(e, 3)))
 
-    return [
-        {"role": "riff", "start": s, "end": e, "figure_id": "riff-%s" % _letter(i)}
-        for i, (s, e) in enumerate(final)
-        if e - s >= min_span * 0.5
-    ]
+    # Assign figure_ids with returning identity
+    phrases: list[dict] = []
+    seen: list[tuple[str, str]] = []  # (fp, figure_id)
+    letter_i = 0
+    for s, e in final:
+        if e - s < min_span * 0.5:
+            continue
+        fp = _phrase_fingerprint(pack, s, e, track_idx)
+        fid = None
+        # Empty fingerprints (no notes resolved) must not collapse everything
+        # to riff-A via Jaccard(empty, empty) == 1.
+        if fp and any(tok.strip("|") for tok in fp.split("||")):
+            for prev_fp, prev_id in seen:
+                if not prev_fp:
+                    continue
+                if _fp_jaccard(fp, prev_fp) >= identity_jaccard:
+                    fid = prev_id
+                    break
+        if fid is None:
+            fid = "riff-%s" % _letter(letter_i)
+            letter_i += 1
+            if fp:
+                seen.append((fp, fid))
+        phrases.append({
+            "role": "riff", "start": s, "end": e, "figure_id": fid,
+        })
+    from collections import Counter
+    counts = Counter(p["figure_id"] for p in phrases)
+    for p in phrases:
+        p["unique"] = counts[p["figure_id"]] == 1
+    return phrases
+
 
 
 def phrase_drafts_for_song(lab_root, album: str, track: str, *,
@@ -446,7 +526,8 @@ def phrase_drafts_for_song(lab_root, album: str, track: str, *,
     return [
         stamp_box(s["start"], s["end"], s["role"], source=SOURCE_PHRASE,
                   figure_id=s["figure_id"], heard=False,
-                  extra={"album": album, "track": track, "kind": "phrase"})
+                  extra={"album": album, "track": track, "kind": "phrase",
+                         "unique": bool(s.get("unique", True))})
         for s in spans
     ]
 

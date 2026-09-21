@@ -609,7 +609,9 @@ def tuning_of(pack: TabNotesPack, track) -> list[int] | None:
 
 
 def bar_events(pack: TabNotesPack, measure, track=None) -> list[TabEvent]:
-    return [e for e in events_for(pack, track=track) if e.measure == measure]
+    """Events in one bar. `measure` may be a measure number or a `TabMeasure`."""
+    mnum = measure if isinstance(measure, int) else getattr(measure, "measure", measure)
+    return [e for e in events_for(pack, track=track) if e.measure == mnum]
 
 
 def bar_fp_tab(pack: TabNotesPack, measure, track_idx) -> str:

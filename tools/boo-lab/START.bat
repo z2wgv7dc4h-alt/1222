@@ -22,7 +22,13 @@ python -m boo_lab.cli hash
 echo.
 echo Intern prep in a separate window (stems/beats/structure/...; cache-first).
 echo That window can sit on SongFormer without blocking studio. Close it anytime.
-start "boo-lab interns" cmd /k "cd /d "%~dp0" && call .venv\Scripts\activate.bat && echo === boo-lab interns (background) === && echo Resumable / cache-first. Never Guess / never Save keepers. && python -m boo_lab.cli interns & echo. & echo interns finished. Close this window when done. & pause"
+REM Only one interns window — stacked START.bat used to freeze the PC.
+tasklist /FI "WINDOWTITLE eq boo-lab interns*" 2>nul | find /I "cmd.exe" >nul
+if %ERRORLEVEL%==0 (
+  echo Interns already running — not starting another.
+) else (
+  start "boo-lab interns" cmd /k "cd /d "%~dp0" && call .venv\Scripts\activate.bat && echo === boo-lab interns (background) === && echo Resumable / cache-first. Never Guess / never Save keepers. && python -m boo_lab.cli interns & echo. & echo interns finished. Close this window when done. & pause"
+)
 
 echo.
 echo Studio: http://127.0.0.1:8765   (Ctrl+C to stop; restart after .py changes)

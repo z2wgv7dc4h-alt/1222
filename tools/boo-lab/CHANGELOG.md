@@ -1,5 +1,14 @@
 ## 2026-09-21 — unique pack bar-runs → Guess
 
+## 2026-09-21 — intern cache footguns + pack phrase identity
+
+- **beats.jsonl**: merge by album+track (no more wipe-replace); `work/beats/` disk cache for beat_this.
+- **START.bat**: refuse a second interns window if one is already titled `boo-lab interns`.
+- **structure**: `CACHE structure (drafts unchanged)` when allin1/SongFormer JSON + drafts already exist.
+- **bar_events**: accept TabMeasure objects (was comparing object==int → empty fingerprints).
+- Pack phrases: pitch/articulation bar-fp splits + returning figure_id via fuzzy Jaccard.
+
+
 ## 2026-09-21 — pack Guess phrase boxes (not 60 crumbs)
 
 - `pack_phrase_spans` / `phrase_drafts_for_song` (`source=tabnotes-phrase`): mid-grain riff boxes from density jumps, gaps, meter cuts.

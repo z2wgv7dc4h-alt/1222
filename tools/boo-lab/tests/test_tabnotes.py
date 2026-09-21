@@ -167,3 +167,26 @@ def test_sync_prefers_the_tabnotes_pack(tmp_path, monkeypatch):
     assert rec["tabnotes_tracks"] == 2
     assert "tabnotes" in rec["note"]
     assert rec["sync_ok"] is True
+
+
+def test_bar_events_accepts_tabmeasure_object():
+    """Regression: comparing TabMeasure to int left every bar_fp empty."""
+    from types import SimpleNamespace
+    from boo_lab.tabnotes import bar_events, TabEvent
+
+    pack = SimpleNamespace(events=[
+        SimpleNamespace(measure=3, track=1, category="guitar", pitch=40,
+                        duration_beats=1.0, palm_mute=False, dead=False, hammer=False,
+                        onset_beat=0, onset_ms=0),
+    ])
+    # monkeypatch events_for used inside bar_events — call with patched module
+    import boo_lab.tabnotes as tn
+
+    def fake_events_for(pack, category=None, track=None):
+        return list(pack.events)
+
+    tn.events_for = fake_events_for
+    m = SimpleNamespace(measure=3)
+    got = tn.bar_events(pack, m, track=1)
+    assert len(got) == 1
+    assert tn.bar_events(pack, 3, track=1)[0].measure == 3

@@ -108,3 +108,50 @@ def test_album_filter_and_missing_flac(tmp_path, monkeypatch):
 
     assert report["written"] == 1 and report["skipped"] == 1
     assert _rows(lab)[0]["album"] == "A"
+
+def test_build_beats_merges_without_wiping_other_albums(tmp_path, monkeypatch):
+    """Rebuilding one album must not erase other albums in beats.jsonl."""
+    import json
+    from boo_lab import beats as B
+
+    lab = tmp_path
+    (lab / "data").mkdir(parents=True)
+    existing = lab / "data" / "beats.jsonl"
+    existing.write_text(
+        json.dumps({"album": "A", "track": "1", "beats": [0.0], "downbeats": [],
+                    "source": "beat_this"}) + "\n",
+        encoding="utf-8",
+    )
+    flac = tmp_path / "x.flac"
+    flac.write_bytes(b"flac")
+
+    def fake_track_beats(flac, cache_dir=None, lab_root=None):
+        return [1.0, 2.0], [1.0], "beat_this"
+
+    monkeypatch.setattr(B, "track_beats", fake_track_beats)
+    B.build_beats(lab, [{"album": "B", "track": "2", "flac": str(flac)}])
+    lines = [json.loads(l) for l in existing.read_text(encoding="utf-8").splitlines() if l.strip()]
+    keys = {(r["album"], r["track"]) for r in lines}
+    assert ("A", "1") in keys and ("B", "2") in keys
+
+
+def test_track_beats_uses_disk_cache(tmp_path, monkeypatch):
+    import json
+    from boo_lab import beats as B
+
+    flac = tmp_path / "song.flac"
+    flac.write_bytes(b"x" * 100)
+    cache = B._beats_cache_path(tmp_path, flac)
+    cache.parent.mkdir(parents=True)
+    cache.write_text(json.dumps({"beats": [0.5, 1.0], "downbeats": [0.5],
+                                 "source": "beat_this"}), encoding="utf-8")
+    calls = {"n": 0}
+
+    def boom(flac):
+        calls["n"] += 1
+        raise AssertionError("should not call beat_this")
+
+    monkeypatch.setattr(B, "_beat_this", boom)
+    beats, downs, src = B.track_beats(flac, lab_root=tmp_path)
+    assert calls["n"] == 0
+    assert beats == [0.5, 1.0] and "cache" in src

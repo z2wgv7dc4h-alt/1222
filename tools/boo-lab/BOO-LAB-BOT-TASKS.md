@@ -34,7 +34,7 @@ The live bug: Guess/extract emit `gp-marker` and figures emit `figure-hash`, but
   - `adapt` is a stamp field, never a `source`. Leave it that way.
   - Update `LAW.md` / `USER.md` Part B / `CURRENT.md` “Read this first” to the same list. One list. No extras.
 
-- [ ] **P1.2 Save promotes every non-keeper source.** `annotator.py` already does `SOURCES - KEEPER_SOURCES` → `guess-accepted` when `heard`. Add a test that a heard `gp-marker` box and a heard `figure-hash` box Save as `guess-accepted` and land in `sections.jsonl`. Unknown source still 400s the whole save.
+- [x] **P1.2 Save promotes every non-keeper source.** `annotator.py` already does `SOURCES - KEEPER_SOURCES` → `guess-accepted` when `heard`. Add a test that a heard `gp-marker` box and a heard `figure-hash` box Save as `guess-accepted` and land in `sections.jsonl`. Unknown source still 400s the whole save.
 
 - [ ] **P1.3 `load_section_rows` really is the one reader.** Replace ad-hoc `sections.jsonl` parsers in:
   - `extract.load_human_sections`

@@ -61,6 +61,7 @@ def _drafts(lab):
 def test_train_produces_a_checkpoint_with_one_track(tmp_path):
     torch.manual_seed(0)
     lab, rows = _lab(tmp_path, songs=[("A", "TA")])
+    write_holdout(lab, set())  # not VAL ? smoke train needs a non-holdout keeper
 
     report = predict.train(lab, epochs=10, rows=rows)
 
@@ -77,6 +78,7 @@ def test_train_produces_a_checkpoint_with_one_track(tmp_path):
 def test_predict_writes_keeper_model_drafts_and_never_sections(tmp_path):
     torch.manual_seed(0)
     lab, rows = _lab(tmp_path, songs=[("A", "TA")])
+    write_holdout(lab, set())
     predict.train(lab, epochs=40, rows=rows)
     sec = lab / "data" / "sections.jsonl"
     before = sec.read_text(encoding="utf-8")
@@ -104,12 +106,24 @@ def test_holdout_track_excluded_from_train_features(tmp_path):
     assert samples and all(s["track"] != "TB" for s in samples)
 
 
-def test_holdout_only_lab_falls_back_and_flags(tmp_path):
+def test_holdout_only_lab_skips_train_by_default(tmp_path):
     torch.manual_seed(0)
     lab, rows = _lab(tmp_path, songs=[("A", "TA")])
     write_holdout(lab, {("A", "TA")})
 
     report = predict.train(lab, epochs=2, rows=rows)
+
+    assert report["trained"] is False
+    assert report["holdout_fallback"] is False
+    assert "holdout-only" in report["reason"]
+
+
+def test_holdout_only_lab_falls_back_when_opted_in(tmp_path):
+    torch.manual_seed(0)
+    lab, rows = _lab(tmp_path, songs=[("A", "TA")])
+    write_holdout(lab, {("A", "TA")})
+
+    report = predict.train(lab, epochs=2, rows=rows, allow_holdout_fallback=True)
 
     assert report["trained"] is True and report["holdout_fallback"] is True
 

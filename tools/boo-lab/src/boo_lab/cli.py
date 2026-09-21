@@ -129,6 +129,8 @@ def main(argv: list[str] | None = None) -> int:
 
     s = sub.add_parser("predict-train", help="train the keeper structure predictor (drafts only)")
     s.add_argument("--album")
+    s.add_argument("--holdout-fallback", action="store_true",
+                   help="opt in to train when only VAL/holdout keepers exist")
 
     s = sub.add_parser("predict", help="keeper-model structure drafts -> data/drafts.jsonl")
     s.add_argument("--album")
@@ -414,7 +416,9 @@ def main(argv: list[str] | None = None) -> int:
         album = getattr(args, "album", None)
         full = ([resolve(r, flac_root, gp_root) for r in load_map(map_path)]
                 if map_path.exists() else rows)
-        train(root(), album=album, rows=full)
+        from .predict import holdout_fallback_enabled
+        allow = bool(getattr(args, "holdout_fallback", False)) or holdout_fallback_enabled()
+        train(root(), album=album, rows=full, allow_holdout_fallback=allow)
         return 0
 
     if args.cmd == "predict":

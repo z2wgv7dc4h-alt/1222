@@ -82,9 +82,10 @@ def ensure_holdout(lab_root: Path, rows: list[dict]) -> set[tuple[str, str]]:
     current candidates and written once."""
     from .schema import load_section_rows
 
-    existing = load_holdout(lab_root)
-    if existing:
-        return existing
+    path = Path(lab_root) / "data" / HOLDOUT_FILENAME
+    if path.exists():
+        # Empty file means "deliberately reserve nothing" ? do not re-select.
+        return load_holdout(lab_root)
     # Keepers-only: a validation split must be reserved from real labeled
     # songs, never from machine drafts. Shares schema's single reader.
     sections = load_section_rows(Path(lab_root) / "data" / "sections.jsonl")

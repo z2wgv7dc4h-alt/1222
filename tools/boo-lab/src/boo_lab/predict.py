@@ -321,8 +321,14 @@ def _group_keepers(lab_root, album: str | None) -> dict:
     return groups
 
 
+
+def holdout_fallback_enabled() -> bool:
+    """Opt-in: train on holdout-only gold. Env `BOO_PREDICT_HOLDOUT_FALLBACK=1`."""
+    return os.environ.get("BOO_PREDICT_HOLDOUT_FALLBACK", "0") == "1"
+
+
 def build_dataset(lab_root, rows, *, album=None, cache=None, holdout=None,
-                  allow_holdout_fallback: bool = True) -> tuple[list[dict], dict]:
+                  allow_holdout_fallback: bool = False) -> tuple[list[dict], dict]:
     """`(train_samples, info)`. Holdout keeper songs are excluded unless that
     leaves zero training songs and `allow_holdout_fallback` is on (cold start,
     recorded in `info["holdout_fallback"]`)."""
@@ -519,7 +525,7 @@ def _save_files(md: Path, model, *, classes: list[str], n_features: int,
 
 
 def train(lab_root, *, album: str | None = None, epochs: int = DEFAULT_EPOCHS,
-          rows=None, cache=None, allow_holdout_fallback: bool = True) -> dict:
+          rows=None, cache=None, allow_holdout_fallback: bool | None = None) -> dict:
     """Train / fine-tune from keepers. Writes `work/models/structure-v1/`.
     Zero usable keepers exits cleanly (`trained: False`), never raises."""
     from .device import torch_device
@@ -527,13 +533,19 @@ def train(lab_root, *, album: str | None = None, epochs: int = DEFAULT_EPOCHS,
     lab_root = Path(lab_root)
     cache = Path(cache) if cache else lab_root / "work" / "stems"
     rows = list(rows) if rows is not None else _map_rows(lab_root)
+    if allow_holdout_fallback is None:
+        allow_holdout_fallback = holdout_fallback_enabled()
 
     samples, info = build_dataset(
         lab_root, rows, album=album, cache=cache,
         allow_holdout_fallback=allow_holdout_fallback)
     if not samples:
-        reason = ("no usable keepers with audio (need heard human/guess-accepted "
-                  "boxes on a track with a FLAC)")
+        if info.get("n_keepers") and not allow_holdout_fallback and not info.get("train_tracks"):
+            reason = ("holdout-only keepers; pass allow_holdout_fallback=True or "
+                      "set BOO_PREDICT_HOLDOUT_FALLBACK=1 to opt in")
+        else:
+            reason = ("no usable keepers with audio (need heard human/guess-accepted "
+                      "boxes on a track with a FLAC)")
         print("predict-train:", reason)
         return {"trained": False, "reason": reason, "n_tracks": 0,
                 "n_keepers": info["n_keepers"], "holdout_fallback": False}
@@ -802,7 +814,8 @@ def maybe_train_on_save(lab_root, album: str = "", track: str = ""):
 
     def _run():
         try:
-            train(lab_root, album=album or None, epochs=SAVE_EPOCHS)
+            train(lab_root, album=album or None, epochs=SAVE_EPOCHS,
+                  allow_holdout_fallback=holdout_fallback_enabled())
         except Exception as exc:  # noqa: BLE001 - Save must never be harmed
             print("predict: save-train skipped:", exc)
         finally:

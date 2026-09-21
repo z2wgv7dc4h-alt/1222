@@ -1,4 +1,4 @@
-# Hard pins for the fragile optional-intern stack. Pass to pip with
+﻿# Hard pins for the fragile optional-intern stack. Pass to pip with
 #   python -m pip install -c constraints.txt -e ".[intern,pitch,align]"
 # (setup.bat already does; pyproject.toml cannot express -c itself.)
 # Each line is here because a different version broke a real run:
@@ -27,3 +27,8 @@ beat-this==1.1.0
 whisperx==3.8.6
 torchcrepe==0.0.24
 librosa==0.11.0
+#   setuptools <81   : madmom (via allin1) still imports pkg_resources. setuptools
+#                       82+ removed that module, so live allin1 analyze SKIP'd with
+#                       ModuleNotFoundError: pkg_resources (cached allin1 JSON still
+#                       worked, which is why Higher Place drafted and TWDA did not).
+setuptools>=45,<81

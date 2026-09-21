@@ -1,4 +1,5 @@
 ﻿## Unreleased
+- constraints: pin `setuptools>=45,<81` so madmom/allin1 keep `pkg_resources` (fixes TWDA structure SKIP).
 - Guess: merge adjacent same-letter GP markers into one continuous box; nested blast/breakdown drafts no longer split those runs. Later returns of the same figure stay separate.
 # Changelog
 

@@ -413,3 +413,25 @@ def test_api_figures_returns_rows_for_selected_song(tmp_path):
     data = client.get("/api/figures/0").json()
 
     assert data["figures"][0]["figure_id"] == "riff-A"
+
+
+def test_emit_clusters_includes_unique_one_shot_runs():
+    """Through-composed packs must still write unique bar-run rows."""
+    rows = []
+    windows = [
+        {"hash": "A", "n_bars": 2, "start": 0.0, "end": 3.3,
+         "start_bar": 1, "end_bar": 2, "letter": None, "role": "riff"},
+        {"hash": "B", "n_bars": 2, "start": 3.3, "end": 6.6,
+         "start_bar": 3, "end_bar": 4, "letter": None, "role": "riff"},
+        {"hash": "A", "n_bars": 2, "start": 6.6, "end": 9.9,
+         "start_bar": 5, "end_bar": 6, "letter": None, "role": "riff"},
+    ]
+    clusters = figures._emit_clusters(
+        rows, windows, album="Alb", track="Trk", trusted=True,
+        note_source="tabnotes", instrument="guitar",
+    )
+    assert len(clusters) == 2  # A repeats, B unique
+    by_id = {r["figure_id"]: r for r in rows}
+    assert by_id["riff-A"]["n_hits"] == 2 and by_id["riff-A"]["unique"] is False
+    assert by_id["riff-B"]["n_hits"] == 1 and by_id["riff-B"]["unique"] is True
+    assert by_id["riff-B"]["times_trusted"] is True

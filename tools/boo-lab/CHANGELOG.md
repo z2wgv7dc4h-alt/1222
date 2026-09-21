@@ -1,3 +1,9 @@
+## 2026-09-21 — unique pack bar-runs → Guess
+
+- `figures._emit_clusters` now writes **unique** (one-shot) bar-run clusters, not only repeats — Mindful-like through-composed packs were writing 0 rows.
+- Guess: pack `tabnotes-structure` is coverage only (not spine-primary); when figure drafts exist they **replace** the activity blobs. Unique runs may be as short as 2s.
+- Mindful after re-extract: ~130 figure rows → Guess ~50+ riff boxes instead of 4 giant spine blobs.
+
 ﻿## Unreleased
 - Guess pack spine: measure-grid guitar activity covers the full song (Mindful no longer starves until 1:24). Coverage warn <45%; regression test for uneven density.
 - START opens studio after scan/hash; interns run in a side window. SongFormer per-track timeout 360s + process-tree kill (was 1800s hang that blocked studio). `PREP.bat` for prep-only.

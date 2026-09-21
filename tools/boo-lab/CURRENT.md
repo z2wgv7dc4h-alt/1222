@@ -674,3 +674,4 @@ Label Elimination by ear. Do not wait on Guess. Scan after any ingest. Push docs
 - START: studio no longer waits on interns/SongFormer; prep is a side window + 360s SongFormer timeout.
 
 - Pack spine (no GP): measure-grid guitar activity, not peak-relative density — full-song coverage; warn if <45%.
+- Unique pack bar-runs now populate Guess (figures emit unique=true; pack spine yields to figure-hash).

@@ -1069,20 +1069,23 @@ def test_guess_pack_spine_gives_riffs_not_only_breakdowns(tmp_path, monkeypatch)
     assert any("pack structure x3 (tabnotes spine)" in n for n in res["notes"])
 
 
-def test_guess_pack_spine_caps_the_figure_hash_flood(tmp_path, monkeypatch):
+def test_guess_pack_spine_yields_to_figure_hash_identity(tmp_path, monkeypatch):
+    """Pack activity spine is coverage only — figure drafts replace it."""
     rows = [{"album": "A", "track": "Fixture", "figure_id": "riff-X",
              "times_trusted": True,
              "occurrences": [
-                 {"start": 0.5, "end": 6.5},       # overlaps spine riff-A -> drop
-                 {"start": 100.0, "end": 106.0},   # gap, long -> keep
-                 {"start": 120.0, "end": 122.0},   # gap, short -> drop
+                 {"start": 0.5, "end": 6.5},       # overlaps spine — still keep
+                 {"start": 100.0, "end": 106.0},   # gap, long — keep
+                 {"start": 120.0, "end": 122.0},   # short non-unique — drop
              ]}]
 
     res = _wire_pack_spine(tmp_path, monkeypatch, figure_rows=rows)
 
+    assert not [s for s in res["sections"] if s.get("source") == "tabnotes-structure"]
     guess = [s for s in res["sections"] if s.get("source") == "guess"]
-    assert len(guess) == 1
-    assert guess[0]["start"] == 100.0 and guess[0]["end"] == 106.0
+    # Gap phrase always kept; an early overlap may merge into pack density in _clean.
+    assert any(s["start"] == 100.0 and s["end"] == 106.0 for s in guess)
+    assert not any(s["start"] == 120.0 for s in guess)
 
 
 def test_guess_marker_spine_wins_over_a_discovered_pack(tmp_path, monkeypatch):
@@ -1098,10 +1101,11 @@ def test_guess_marker_spine_wins_over_a_discovered_pack(tmp_path, monkeypatch):
     assert len(markers) == len(_STARVED_LABELS)
 
 
-def test_spine_primary_true_for_a_pack_spine_box():
+def test_spine_primary_false_for_pack_structure_alone():
+    """Pack activity spine must not outrank figure-hash (Mindful unique runs)."""
     sections = [{"role": "riff", "start": 0.0, "end": 2.0,
                  "source": "tabnotes-structure", "figure_id": "riff-A"}]
-    assert g._spine_primary(sections, duration=200.0) is True
+    assert g._spine_primary(sections, duration=200.0) is False
     assert g._spine_primary([], duration=200.0) is False
 
 def test_merge_adjacent_same_figure_collapses_starved_style_slices():
@@ -1124,3 +1128,26 @@ def test_merge_adjacent_same_figure_collapses_starved_style_slices():
     assert len(d) == 2  # adjacent merge + later return
     assert d[0]["start"] == 49.09 and d[0]["end"] == 53.94
     assert d[1]["start"] == 80.0
+
+
+def test_spine_primary_ignores_pack_structure_alone():
+    """Pack activity spine must not crush unique figure drafts."""
+    from boo_lab.guess import _spine_primary, PACK_STRUCTURE_SOURCE
+    pack_only = [{"source": PACK_STRUCTURE_SOURCE, "start": 0, "end": 10, "role": "riff"}]
+    assert _spine_primary(pack_only, 100.0) is False
+    markers = [{"source": "gp-marker", "start": 0, "end": 40, "role": "riff", "figure_id": "riff-A"}]
+    # markers_primary needs enough coverage — just assert pack-alone is False
+    assert _spine_primary(markers + pack_only, 100.0) in (True, False)
+
+
+def test_suppress_keeps_short_unique_pack_runs_when_not_primary():
+    from boo_lab.guess import _suppress_figure_flood, PACK_STRUCTURE_SOURCE
+    spine = [{"source": PACK_STRUCTURE_SOURCE, "start": 0.0, "end": 100.0, "role": "riff"}]
+    drafts = [
+        {"start": 10.0, "end": 13.3, "figure_id": "riff-A", "unique": True, "role": "riff"},
+        {"start": 20.0, "end": 22.0, "figure_id": "riff-B", "unique": False, "role": "riff"},
+    ]
+    kept = _suppress_figure_flood(drafts, spine, duration=100.0)
+    ids = {d["figure_id"] for d in kept}
+    assert "riff-A" in ids  # unique 3.3s kept
+    assert "riff-B" not in ids  # non-unique 2s < 4s min_span

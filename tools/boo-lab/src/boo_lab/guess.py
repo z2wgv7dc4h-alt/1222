@@ -187,8 +187,11 @@ _FIGURE_INSTRUMENT_TO_UI = {"bass": "bass", "other": "synth"}
 
 def _figure_drafts(lab_root, album: str, track: str, existing: list[dict],
                    tol: float = 0.35) -> list[dict]:
-    """Unheard riff drafts from `figures.jsonl` trusted occurrences. Skips a
-    span a marker already covers within `tol` with the same `figure_id`."""
+    """Unheard riff drafts from `figures.jsonl` occurrences with trusted times.
+
+    Includes unique (non-repeating) rows — they still need `times_trusted` so
+    seconds came from a sync_ok clock. Skips a span a marker already covers
+    within `tol` with the same `figure_id`."""
     from .figures import load_figures
 
     out: list[dict] = []
@@ -375,10 +378,11 @@ def _markers_primary(sections: list[dict], duration: float | None = None) -> boo
 
 
 def _spine_primary(sections: list[dict], duration: float | None = None) -> bool:
-    """True when the structural spine outranks the figure-hash stream: any
-    pack-spine box, or the tab's own markers reaching `_markers_primary`."""
-    if any(s.get("source") == PACK_STRUCTURE_SOURCE for s in sections):
-        return True
+    """True when GP/tab markers outrank the figure-hash stream.
+
+    Pack activity spine (`tabnotes-structure`) is coverage only — it must NOT
+    suppress unique/repeating figure drafts or pack-only songs stay empty.
+    """
     return _markers_primary(sections, duration)
 
 
@@ -392,10 +396,11 @@ def _suppress_figure_flood(drafts: list[dict], sections: list[dict], *,
                            tol: float = MARKER_OVERLAP_TOL) -> list[dict]:
     """Cap figure-hash drafts against the structural spine.
 
-    With any spine box present (`gp-marker` or a tab-notes pack's
-    `tabnotes-structure`), a figure draft shorter than `min_span` (a 2-bar
-    crumb) is dropped. When the spine is primary (`_spine_primary`), a draft
-    that overlaps it is dropped too, so only uncovered gaps get filled. A
+    With any spine box present, a non-unique figure draft shorter than
+    `min_span` is dropped (unique pack runs may be as short as 2s).
+    When GP markers make the spine primary (`_spine_primary`), a draft
+    that overlaps them is dropped too, so only uncovered gaps get filled.
+    Pack activity spine alone is not primary. A
     returning marker letter is already the same `figure_id`, so the pile of
     short hashes is noise. Function overlays (breakdown/blast/kick) are not
     figure drafts and pass through untouched."""
@@ -409,7 +414,8 @@ def _suppress_figure_flood(drafts: list[dict], sections: list[dict], *,
             start, end = float(d["start"]), float(d["end"])
         except (KeyError, TypeError, ValueError):
             continue
-        if end - start < min_span:
+        need = 2.0 if d.get("unique") else min_span
+        if end - start < need:
             continue
         if primary and not _in_marker_gap(start, end, spans, tol):
             continue
@@ -670,6 +676,13 @@ def estimate_hybrid(
                          % (len(new_figs) - len(kept)))
         sections.extend(kept)
         figures_drafts = len(kept)
+        if figures_drafts > 0 and pack_spine > 0:
+            sections[:] = [s for s in sections
+                           if s.get("source") != PACK_STRUCTURE_SOURCE]
+            notes.append(
+                "pack spine replaced by figure drafts x%d" % figures_drafts
+            )
+            pack_spine = 0
 
     # Pack density drafts: high guitar-onset-density spans as unheard riff
     # drafts from the pack's own audio-clock onsets. Riff only here -- the

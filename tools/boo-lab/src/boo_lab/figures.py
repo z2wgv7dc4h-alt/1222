@@ -7,7 +7,12 @@ and emit windows that are RUNS -- an ostinato run is one window, never a pile
 of sliding 1-bar 2/4-bar windows. Cluster windows by exact fingerprint, name
 them by a consistent GP marker letter or `riff-A/B` by first start, and flag a
 letter that maps to two fingerprints (`conflict`). This is identity, not
-segmentation: it never cuts new boxes and never invents boundaries. Machines
+segmentation: it never cuts new boxes and never invents boundaries.
+
+Repeating clusters (`n_hits >= 2`) stay the trusted identity stream. Unique
+(one-shot) runs are also written as drafts (`unique=true`) so pack-only songs
+still populate Guess — through-composed phrases never qualified under a
+repeats-only gate. Machines
 never write keepers -- output is drafts with `source="figure-hash"`, written
 to `data/figures.jsonl` under the same never-blank-on-a-zero-row law as
 `beats`/`structure`.
@@ -342,13 +347,14 @@ def _tab_pulse_windows(pack) -> list[dict]:
 
 def _emit_clusters(rows, windows, *, album, track, trusted, note_source, instrument,
                    id_prefix="", extra=None):
-    """Cluster `windows` and append one produced row per repeating cluster
-    (`n_hits >= 2`) to `rows`. Shared by the guitar/GP, extra-guitar-track
-    and bass emission paths in `build_figures` so the cluster-to-row mapping
-    exists once, not copy-pasted per instrument. `extra` merges additional
-    fields (e.g. `track_index`) into every row. Returns the clusters for the
-    caller's log line."""
-    clusters = [c for c in cluster_song(windows) if c["n_hits"] >= 2]
+    """Cluster `windows` and append one produced row per cluster to `rows`.
+
+    Repeating (`n_hits >= 2`) and unique one-shot runs (`unique=true`) both
+    land so pack-only through-composed songs still populate Guess. Shared by
+    the guitar/GP, extra-guitar-track and bass emission paths in
+    `build_figures`. `extra` merges additional fields (e.g. `track_index`)
+    into every row. Returns the clusters for the caller's log line."""
+    clusters = [c for c in cluster_song(windows) if c["n_hits"] >= 1]
     for c in clusters:
         if trusted:
             start, end = c["start"], c["end"]
@@ -460,12 +466,12 @@ def _song_windows(fragments, slots) -> list[dict]:
 
 
 def build_figures(lab_root, rows, *, album=None, track=None) -> dict:
-    """Suggest repeating `figure_id`s for each song with a tab-notes pack or
-    a matched GP5 (the pack wins when both exist -- see module docstring).
+    """Suggest `figure_id`s for each song with a tab-notes pack or a matched
+    GP5 (the pack wins when both exist -- see module docstring).
 
-    Writes one row per repeating window cluster. Replaces only the songs it
-    rebuilt (keyed by album+track); a run that yields zero rows leaves an
-    existing `data/figures.jsonl` untouched."""
+    Writes one row per window cluster, including unique (non-repeating) runs.
+    Replaces only the songs it rebuilt (keyed by album+track); a run that
+    yields zero rows leaves an existing `data/figures.jsonl` untouched."""
     lab_root = Path(lab_root)
     out = lab_root / "data" / "figures.jsonl"
     out.parent.mkdir(parents=True, exist_ok=True)
@@ -560,7 +566,7 @@ def build_figures(lab_root, rows, *, album=None, track=None) -> dict:
         else:
             clusters = _emit_clusters(produced, windows, album=ra, track=rt, trusted=trusted,
                                       note_source=note_source, instrument="guitar")
-            print("FIGURES", rt, len(windows), "window(s),", len(clusters), "repeating",
+            print("FIGURES", rt, len(windows), "window(s),", len(clusters), "cluster(s)",
                   "(times trusted)" if trusted else "(bars only; sync not ok)",
                   "[%s]" % note_source)
 
@@ -594,7 +600,7 @@ def build_figures(lab_root, rows, *, album=None, track=None) -> dict:
                     note_source="tabnotes", instrument="guitar",
                     id_prefix="guitar%d-" % t.index, extra={"track_index": t.index})
                 print("FIGURES", rt, len(g_windows), "guitar[%d] window(s)," % t.index,
-                      len(g_clusters), "repeating")
+                      len(g_clusters), "cluster(s)")
 
         # Bass: a tab-notes pack's `bass`-category track, same cluster/RUNS
         # machinery as guitar (`_tab_fragments_and_slots(pack, "bass")`),
@@ -615,7 +621,7 @@ def build_figures(lab_root, rows, *, album=None, track=None) -> dict:
                         produced, bass_windows, album=ra, track=rt, trusted=trusted,
                         note_source="tabnotes", instrument="bass", id_prefix="bass-")
                     print("FIGURES", rt, len(bass_windows), "bass window(s),",
-                          len(bass_clusters), "repeating")
+                          len(bass_clusters), "cluster(s)")
 
         # Pulse: a tab-notes pack's `other`-category track (named synth/
         # keyboard, LAW.md's Pulse definition) has no GP-side equivalent --

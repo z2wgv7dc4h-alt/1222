@@ -177,3 +177,4 @@ onset lag must pass `decide` and the chroma witness must agree within 0.25 s at 
 rows omit `start`/`end` seconds unless the song's `sync_ok` is true.
 
 Pytest proves wiring. It does not prove a riff.
+- Unique pack bar-runs now populate Guess (figures emit unique=true; pack spine yields to figure-hash).

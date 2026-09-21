@@ -278,6 +278,48 @@ def test_build_figures_emits_pulse_rows_even_without_riff_fragments(tmp_path, mo
     assert p["note_source"] == "tabnotes"
 
 
+def _two_guitar_pack():
+    from boo_lab.tabnotes import TabEvent, TabMeasure, TabNotesPack, TabTrack
+
+    # track 0 = lowest mean pitch (picked as the primary/unprefixed guitar);
+    # track 1 = a second guitar track, currently discarded before this ticket.
+    tracks = [TabTrack(index=0, name="Rhythm A", category="guitar"),
+              TabTrack(index=1, name="Rhythm B", category="guitar")]
+    measures = [TabMeasure(measure=i, start_ms=i * 1000.0, start_sec_audio=float(i),
+                           duration_ms=1000.0, length_beats=1.0) for i in range(4)]
+    events = []
+    for i in range(4):
+        events.append(TabEvent(track=0, measure=i, onset_beat=0.0, onset_ms=i * 1000.0,
+                               duration_beats=1.0, duration_ms=1000.0,
+                               pitch=(28 if i % 2 == 0 else 33)))
+        events.append(TabEvent(track=1, measure=i, onset_beat=0.0, onset_ms=i * 1000.0,
+                               duration_beats=1.0, duration_ms=1000.0,
+                               pitch=(60 if i % 2 == 0 else 65)))
+    return TabNotesPack(id="p", title="P", tracks=tracks, events=events, measures=measures)
+
+
+def test_build_figures_clusters_a_second_guitar_track_separately(tmp_path, monkeypatch):
+    from boo_lab import tabnotes as tn
+
+    lab = tmp_path / "lab"
+    (lab / "data").mkdir(parents=True)
+    (lab / "data" / "sync.jsonl").write_text(
+        '{"album":"A","track":"T","sync_ok":true}\n', encoding="utf-8")
+
+    pack = _two_guitar_pack()
+    monkeypatch.setattr(tn, "discover_pack", lambda lab_root, album, track: "fake-path")
+    monkeypatch.setattr(tn, "load_pack", lambda path: pack)
+
+    figures.build_figures(lab, [{"album": "A", "track": "T", "gp_path": "", "match": "no"}])
+
+    rows = figures.load_figures(lab, "A", "T")
+    primary = [r for r in rows if r.get("instrument") == "guitar" and "track_index" not in r]
+    extra = [r for r in rows if r.get("track_index") == 1]
+    assert primary and all(not r["figure_id"].startswith("guitar1-") for r in primary)
+    assert extra and all(r["figure_id"].startswith("guitar1-") for r in extra)
+    assert all(r["instrument"] == "guitar" and r["note_source"] == "tabnotes" for r in extra)
+
+
 def _bass_pack():
     from boo_lab.tabnotes import TabEvent, TabMeasure, TabNotesPack, TabTrack
 
@@ -328,8 +370,10 @@ def test_build_figures_prefers_tabnotes_pack_over_gp(tmp_path, monkeypatch):
     # clusters, same pattern `_gated_lab` above already uses for the GP path.
     fake_frags = [_Frag(mi, pc=(0 if mi % 2 == 0 else 5)) for mi in range(4)]
     fake_slots = [(mi, float(mi), mi + 1, 1.0) for mi in range(4)]
-    monkeypatch.setattr(figures, "_tab_fragments_and_slots",
-                        lambda pack: (fake_frags, fake_slots))
+    monkeypatch.setattr(
+        figures, "_tab_fragments_and_slots",
+        lambda pack, category="guitar", track=None:
+            (fake_frags, fake_slots) if category == "guitar" else (None, None))
 
     def _boom():
         raise AssertionError("GP path must not run when a tabnotes pack exists")

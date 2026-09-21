@@ -13,7 +13,13 @@ Canonical detail: **CURRENT.md**; commands in **README.md**.
 
 Works: studio keeps pins (`human`/`guess-accepted` + `heard`) in `sections.jsonl`; mel
 spectrogram under the WaveSurfer waveform; 6-stem picker; drafts; `hear`/`sync`/`hash`;
-`agree`/`compare`/`export-jams`/`beats`/`audit`/`report`; **360 tests pass**.
+`agree`/`compare`/`export-jams`/`beats`/`audit`/`report`; **361 tests pass**.
+Multi-guitar tracks (2026-09-21): a tab-notes pack can carry more than one
+`guitar`-category track (checked on a real corpus song: three, mean pitches 51.7/
+50.1/46.6 — too close together to be a real rhythm/lead register split, so no
+"lead" guessing). `figures.py` now clusters every extra guitar track on its own
+(`guitar<index>-` figure_id prefix + a `track_index` field), instead of silently
+discarding everything but the single lowest-mean-pitch track.
 Tabnotes bass/pulse/tempo/kick (2026-09-21): `figures.py` now clusters a tab-notes
 pack's `bass`-category track too (same RUNS/cluster machinery as guitar, `bass-`
 figure_id prefix + `instrument` field so a bass riff can never collide with a guitar

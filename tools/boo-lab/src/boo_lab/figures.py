@@ -247,21 +247,26 @@ def _measure_cell_and_deltas_tab(events, length_beats):
     return cell, deltas, chord_notes
 
 
-def _tab_fragments_and_slots(pack, category="guitar"):
-    """`(fragments, slots)` from a tab-notes pack's `category` track -- the
-    pack-native mirror of the GP `_playback_slots` + `_engine_riff_bank().
+def _tab_fragments_and_slots(pack, category="guitar", track=None):
+    """`(fragments, slots)` from one tab-notes pack track -- the pack-native
+    mirror of the GP `_playback_slots` + `_engine_riff_bank().
     extract_fragments_from_file`/`extract_bass_fragments_from_file` pair.
     `RiffFragment` is the real engine dataclass (`_engine_riff_bank`), never
     a second definition; `instrument` on it is set to `category` so a bass
     cluster is never mistaken for a guitar one downstream. No repeat-bar
     expansion: the format carries none, so each measure appears once, in
     written order -- a known gap versus the GP path's `playback_bar_order`.
-    `(None, None)` when the pack has no track of that category or no
-    measures."""
+
+    `track` selects a specific `TabTrack` directly (used to cluster a
+    second/third guitar track on its own, since a pack can carry several --
+    see `build_figures`); when omitted, `_tab_track_by_category(pack,
+    category)` picks one. `(None, None)` when there's no matching track or
+    no measures."""
     from .extract import _engine_riff_bank
     from .tabnotes import bar_events
 
-    track = _tab_track_by_category(pack, category)
+    if track is None:
+        track = _tab_track_by_category(pack, category)
     if track is None or not pack.measures:
         return None, None
 
@@ -335,12 +340,14 @@ def _tab_pulse_windows(pack) -> list[dict]:
     return windows
 
 
-def _emit_clusters(rows, windows, *, album, track, trusted, note_source, instrument, id_prefix=""):
+def _emit_clusters(rows, windows, *, album, track, trusted, note_source, instrument,
+                   id_prefix="", extra=None):
     """Cluster `windows` and append one produced row per repeating cluster
-    (`n_hits >= 2`) to `rows`. Shared by the guitar/GP and bass emission
-    paths in `build_figures` so the cluster-to-row mapping exists once, not
-    copy-pasted per instrument. Returns the clusters for the caller's log
-    line."""
+    (`n_hits >= 2`) to `rows`. Shared by the guitar/GP, extra-guitar-track
+    and bass emission paths in `build_figures` so the cluster-to-row mapping
+    exists once, not copy-pasted per instrument. `extra` merges additional
+    fields (e.g. `track_index`) into every row. Returns the clusters for the
+    caller's log line."""
     clusters = [c for c in cluster_song(windows) if c["n_hits"] >= 2]
     for c in clusters:
         if trusted:
@@ -351,7 +358,7 @@ def _emit_clusters(rows, windows, *, album, track, trusted, note_source, instrum
             occ = [{"start": None, "end": None,
                     "start_bar": o["start_bar"], "end_bar": o["end_bar"]}
                    for o in c["occurrences"]]
-        rows.append({
+        row = {
             "album": album, "track": track,
             "figure_id": id_prefix + c["figure_id"], "hash": c["hash"],
             "n_bars": c["n_bars"], "n_hits": c["n_hits"], "unique": c["unique"],
@@ -360,7 +367,10 @@ def _emit_clusters(rows, windows, *, album, track, trusted, note_source, instrum
             "occurrences": occ, "times_trusted": trusted,
             "conflict": c["conflict"], "source": "figure-hash",
             "note_source": note_source, "instrument": instrument,
-        })
+        }
+        if extra:
+            row.update(extra)
+        rows.append(row)
     return clusters
 
 
@@ -505,9 +515,10 @@ def build_figures(lab_root, rows, *, album=None, track=None) -> dict:
 
         fragments = slots = None
         note_source = None
+        primary_guitar = _tab_track_by_category(pack, "guitar") if pack is not None else None
         if pack is not None:
             try:
-                fragments, slots = _tab_fragments_and_slots(pack)
+                fragments, slots = _tab_fragments_and_slots(pack, track=primary_guitar)
             except Exception as exc:
                 print("SKIP figures (tabnotes fragments)", rt, exc)
                 fragments = slots = None
@@ -552,6 +563,38 @@ def build_figures(lab_root, rows, *, album=None, track=None) -> dict:
             print("FIGURES", rt, len(windows), "window(s),", len(clusters), "repeating",
                   "(times trusted)" if trusted else "(bars only; sync not ok)",
                   "[%s]" % note_source)
+
+        # Extra guitar tracks: a pack can carry more than one `guitar`-
+        # category track (e.g. two rhythm guitars doubled/panned, a third
+        # layered part) and only the lowest-mean-pitch one becomes the
+        # unprefixed `riff-*` stream above. Register alone doesn't reliably
+        # separate "lead" from a doubled rhythm part on real corpus data
+        # (checked: three same-song guitar tracks all landed in the same
+        # 46-52 mean-pitch band) -- so every other guitar track gets its own
+        # independent cluster pass instead of being discarded or guessed at,
+        # namespaced `guitar<index>-` and tagged with `track_index` so it's
+        # traceable back to the source track.
+        if pack is not None and primary_guitar is not None:
+            extra_guitars = [t for t in pack.tracks
+                             if (t.category or "").lower() == "guitar"
+                             and t.index != primary_guitar.index]
+            for t in extra_guitars:
+                try:
+                    g_frags, g_slots = _tab_fragments_and_slots(pack, track=t)
+                except Exception as exc:
+                    print("SKIP figures (tabnotes guitar track)", rt, t.index, exc)
+                    continue
+                if not g_frags or not g_slots:
+                    continue
+                g_windows = _song_windows(g_frags, g_slots)
+                if not g_windows:
+                    continue
+                g_clusters = _emit_clusters(
+                    produced, g_windows, album=ra, track=rt, trusted=trusted,
+                    note_source="tabnotes", instrument="guitar",
+                    id_prefix="guitar%d-" % t.index, extra={"track_index": t.index})
+                print("FIGURES", rt, len(g_windows), "guitar[%d] window(s)," % t.index,
+                      len(g_clusters), "repeating")
 
         # Bass: a tab-notes pack's `bass`-category track, same cluster/RUNS
         # machinery as guitar (`_tab_fragments_and_slots(pack, "bass")`),

@@ -335,6 +335,14 @@ guitar yields no riffs still gets Pulse. `guess.py`'s `_figure_drafts` already
 turns any `figures.jsonl` row into a draft box, so guitar/bass/pulse rows all
 reach Guess for free once `sync_ok` is true.
 
+A pack can carry more than one `guitar`-category track (checked on a real corpus
+song: three, all landing in the same 46-52 mean-pitch band — too close to be a
+real rhythm/lead split, so this deliberately never guesses "lead" from register).
+`build_figures` clusters every guitar track *other* than the primary one
+separately too, prefixed `guitar<index>-` (e.g. `guitar1-riff-A`) and carrying a
+`track_index` field, so a second/third guitar part is clustered on its own
+instead of being silently discarded.
+
 `tempo_hints.py`/`data/tempo_hints.jsonl` (`boo-lab tempo-hints`, 2026-09-21):
 one row per BPM change in a pack's tempo automation (`tabnotes.tempo_map`).
 Deliberately informational, never a box — a tempo jump correlates with a section

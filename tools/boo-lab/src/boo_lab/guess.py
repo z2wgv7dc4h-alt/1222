@@ -638,6 +638,21 @@ def estimate_hybrid(
     except Exception:
         adapt_blob = None
 
+    # Pack structure/phrase spine eligibility is the shared tab/pack
+    # precedence decision (`precedence.resolve_precedence`): trusted sync and
+    # no GP markers already on the board -> pack may be the spine. `has_pack`
+    # is passed `True` here because eligibility (may Guess try a pack spine
+    # at all?) doesn't need the pack to already be loaded -- the calls below
+    # already handle "no pack found" by getting an empty list back.
+    from .precedence import resolve_precedence
+
+    has_gp_markers = any(s.get("source") == "gp-marker" for s in sections)
+    sync_ok_val = sync_rec.get("sync_ok") if sync_rec is not None else None
+    pack_spine_eligible = lab_root is not None and resolve_precedence(
+        sync_ok=sync_ok_val, has_gp_markers=has_gp_markers,
+        has_pack=True, has_gp=bool(gp_use),
+    )["spine"] == "pack"
+
     # Pack structure spine: when the map has no GP markers but a tab-notes
     # pack is discovered and its clock matched (`sync_ok`), the pack's own
     # high-density guitar phrases are the spine -- the structural equal of
@@ -647,9 +662,7 @@ def estimate_hybrid(
     # functions already ride on top through `_tab_kick_spans`/`_blast_spans`.
     # Marker songs are untouched: markers stay the spine.
     pack_spine = 0
-    if (lab_root is not None and sync_rec is not None
-            and sync_rec.get("sync_ok") is True
-            and not any(s.get("source") == "gp-marker" for s in sections)):
+    if pack_spine_eligible:
         try:
             from .tabnotes_drafts import structure_drafts_for_song
 
@@ -665,9 +678,7 @@ def estimate_hybrid(
     # ~4 coverage spine, not unique 2-bar hash spam). Replaces pack spine when
     # present. GP markers still win and stay primary for figure-hash suppress.
     pack_phrases = 0
-    if (lab_root is not None and sync_rec is not None
-            and sync_rec.get("sync_ok") is True
-            and not any(s.get("source") == "gp-marker" for s in sections)):
+    if pack_spine_eligible:
         try:
             from .tabnotes_drafts import phrase_drafts_for_song
 

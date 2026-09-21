@@ -557,8 +557,15 @@ def build_figures(lab_root, rows, *, album=None, track=None) -> dict:
         rebuilt.add((ra, rt))
         songs += 1
         # Seconds are only trustworthy when the tab clock actually matched the
-        # audio (sync_ok). Otherwise keep bars/hashes and publish no times.
-        trusted = bool((sync_by.get((ra, rt)) or {}).get("sync_ok") is True)
+        # audio (sync_ok) -- the same trust gate `precedence.resolve_precedence`
+        # uses for the tab/pack spine decision. Otherwise keep bars/hashes and
+        # publish no times.
+        from .precedence import resolve_precedence
+
+        sync_ok_val = (sync_by.get((ra, rt)) or {}).get("sync_ok")
+        trusted = resolve_precedence(
+            sync_ok=sync_ok_val, has_gp_markers=False, has_pack=False, has_gp=False,
+        )["sync_ok"]
 
         windows = _song_windows(fragments, slots) if fragments and slots else []
         if not windows:

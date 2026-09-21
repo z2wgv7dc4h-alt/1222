@@ -26,6 +26,7 @@ from . import tabnotes
 
 SOURCE_DENSITY = "tabnotes-density"
 SOURCE_STRUCTURE = "tabnotes-structure"
+SOURCE_PHRASE = "tabnotes-phrase"
 AUDIO_SOURCES = frozenset({"halftime", "kick", "kick-notation", "blast-hint",
                            SOURCE_DENSITY, SOURCE_STRUCTURE})
 
@@ -335,6 +336,119 @@ def spine_coverage_ratio(spans: list[tuple[float, float]] | list[dict],
         if b > a:
             covered += b - a
     return min(1.0, covered / total)
+
+
+
+def pack_phrase_spans(
+    pack,
+    *,
+    min_span: float = 8.0,
+    max_span: float = 36.0,
+    gap_split: float = 0.75,
+    rate_frac: float = 0.45,
+    rate_floor: float = 2.0,
+) -> list[dict]:
+    """Phrase-level riff boxes from pack guitar activity.
+
+    Finer than the coverage spine (~4 blobs) and coarser than unique bar-run
+    hashes (~60 one-shots). Splits on silence gaps, meter/tempo cuts, and
+    guitar-density jumps; merges shorts and bisects longs. `[]` when no guitar.
+    """
+    import bisect
+    import statistics
+
+    times = tabnotes.onsets_audio(pack, category="guitar")
+    measures = list(getattr(pack, "measures", None) or [])
+    if len(measures) < 4 or len(times) < 8:
+        return []
+
+    rows: list[tuple[float, float, int, float]] = []
+    for m in measures:
+        a = float(getattr(m, "start_sec_audio", 0.0) or 0.0)
+        b = _measure_audio_end(m)
+        if b <= a:
+            continue
+        lo = bisect.bisect_left(times, a)
+        hi = bisect.bisect_left(times, b)
+        n = hi - lo
+        if n < 2:
+            continue
+        rows.append((a, b, n, n / (b - a)))
+    if not rows:
+        return []
+
+    rates = [r for *_, r in rows]
+    med = statistics.median(rates) if rates else 0.0
+    cuts = set(meter_cuts(pack))
+
+    segs: list[list[tuple[float, float, int, float]]] = [[rows[0]]]
+    for prev, cur in zip(rows, rows[1:]):
+        gap = cur[0] - prev[1]
+        r0, r1 = prev[3], cur[3]
+        at_cut = any(abs(cur[0] - c) < 0.35 for c in cuts)
+        split = (
+            gap > gap_split
+            or at_cut
+            or abs(r1 - r0) > max(med * rate_frac, rate_floor)
+        )
+        if split:
+            segs.append([cur])
+        else:
+            segs[-1].append(cur)
+
+    raw = [(seg[0][0], seg[-1][1]) for seg in segs]
+    merged: list[list[float]] = []
+    for s, e in raw:
+        if merged and (e - s) < min_span and (merged[-1][1] - merged[-1][0]) < max_span:
+            merged[-1][1] = e
+        else:
+            merged.append([s, e])
+
+    final: list[tuple[float, float]] = []
+    for s, e in merged:
+        if e - s <= max_span:
+            final.append((round(s, 3), round(e, 3)))
+            continue
+        cands = [r for r in rows if s + min_span <= r[0] <= e - min_span]
+        if not cands:
+            final.append((round(s, 3), round(e, 3)))
+            continue
+        mid = (s + e) / 2.0
+        best = min(cands, key=lambda r: abs(r[0] - mid))
+        final.append((round(s, 3), round(best[0], 3)))
+        final.append((round(best[0], 3), round(e, 3)))
+
+    return [
+        {"role": "riff", "start": s, "end": e, "figure_id": "riff-%s" % _letter(i)}
+        for i, (s, e) in enumerate(final)
+        if e - s >= min_span * 0.5
+    ]
+
+
+def phrase_drafts_for_song(lab_root, album: str, track: str, *,
+                           min_span: float = 8.0) -> list[dict]:
+    """Stamped unheard phrase drafts for one pack song when sync_ok.
+
+    Primary Guess structure for pack-only tracks (no GP markers). Never a keeper.
+    """
+    if not _sync_ok(lab_root, album, track):
+        return []
+    try:
+        pack_path = tabnotes.discover_pack(lab_root, album, track)
+        if pack_path is None:
+            return []
+        pack = tabnotes.load_pack(pack_path)
+        spans = pack_phrase_spans(pack, min_span=min_span)
+    except Exception:
+        return []
+    from .schema import stamp_box
+
+    return [
+        stamp_box(s["start"], s["end"], s["role"], source=SOURCE_PHRASE,
+                  figure_id=s["figure_id"], heard=False,
+                  extra={"album": album, "track": track, "kind": "phrase"})
+        for s in spans
+    ]
 
 
 def pack_structure_spans(pack, *, min_span: float = 2.0) -> list[dict]:

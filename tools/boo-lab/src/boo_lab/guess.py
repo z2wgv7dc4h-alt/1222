@@ -315,7 +315,8 @@ MARKER_OVERLAP_TOL = 0.35
 # one exists it caps the figure-hash flood the same way. The list source is a
 # separate source string so Guess can tell a pack spine from a GP marker.
 PACK_STRUCTURE_SOURCE = "tabnotes-structure"
-SPINE_SOURCES = frozenset({"gp-marker", PACK_STRUCTURE_SOURCE})
+PACK_PHRASE_SOURCE = "tabnotes-phrase"
+SPINE_SOURCES = frozenset({"gp-marker", PACK_STRUCTURE_SOURCE, PACK_PHRASE_SOURCE})
 
 # Load-draft sources (`Load drafts`) are never Guess output -- Guess is the
 # tab+audio hybrid only.
@@ -662,21 +663,45 @@ def estimate_hybrid(
             pack_spine = len(spine)
             notes.append("pack structure x%d (tabnotes spine)" % pack_spine)
 
+    # Pack phrase boxes: mid-grain structure for pack-only songs (not the
+    # ~4 coverage spine, not unique 2-bar hash spam). Replaces pack spine when
+    # present. GP markers still win and stay primary for figure-hash suppress.
+    pack_phrases = 0
+    if (lab_root is not None and sync_rec is not None
+            and sync_rec.get("sync_ok") is True
+            and not any(s.get("source") == "gp-marker" for s in sections)):
+        try:
+            from .tabnotes_drafts import phrase_drafts_for_song
+
+            phrases = phrase_drafts_for_song(lab_root, lookup_album, lookup_track)
+        except Exception:
+            phrases = []
+        if phrases:
+            sections.extend(phrases)
+            pack_phrases = len(phrases)
+            notes.append("pack phrases x%d (tabnotes phrase)" % pack_phrases)
+            if pack_spine > 0:
+                sections[:] = [s for s in sections
+                               if s.get("source") != PACK_STRUCTURE_SOURCE]
+                notes.append("pack spine replaced by phrases x%d" % pack_phrases)
+                pack_spine = 0
+
     # Figure windows as unheard riff drafts -- only when the tab clock matched
-    # and the occurrence seconds are trusted. A tab whose own markers already
-    # spell out the song caps these: markers stay the primary source, and the
-    # figure-hash stream may only fill uncovered gaps with real phrases. A
-    # pack spine caps the same way (`_spine_spans` covers both).
+    # and the occurrence seconds are trusted. Prefer repeating clusters; skip
+    # unique one-shots when pack phrases already carry structure (avoids the
+    # Mindful 60-box flood). GP markers still primary-cap the rest.
     figures_drafts = 0
     if lab_root is not None and sync_rec is not None and sync_rec.get("sync_ok") is True:
         new_figs = _figure_drafts(lab_root, lookup_album, lookup_track, sections)
+        if pack_phrases > 0:
+            new_figs = [d for d in new_figs if not d.get("unique")]
         kept = _suppress_figure_flood(new_figs, sections, duration=real_duration)
         if len(kept) != len(new_figs):
             notes.append("figure drafts capped x%d (structure spine)"
                          % (len(new_figs) - len(kept)))
         sections.extend(kept)
         figures_drafts = len(kept)
-        if figures_drafts > 0 and pack_spine > 0:
+        if figures_drafts > 0 and pack_spine > 0 and pack_phrases == 0:
             sections[:] = [s for s in sections
                            if s.get("source") != PACK_STRUCTURE_SOURCE]
             notes.append(
@@ -690,8 +715,8 @@ def estimate_hybrid(
     # Skipped when the pack spine already supplied those phrases. Only when
     # sync_ok; never a box off an untrusted clock.
     density_drafts = 0
-    if (pack_spine == 0 and lab_root is not None and sync_rec is not None
-            and sync_rec.get("sync_ok") is True):
+    if (pack_spine == 0 and pack_phrases == 0 and lab_root is not None
+            and sync_rec is not None and sync_rec.get("sync_ok") is True):
         try:
             from .tabnotes_drafts import density_drafts_for_song
 
@@ -767,9 +792,10 @@ def estimate_hybrid(
     # span for that role (n>=2). n<2 keeps the current rules.
     breakdowns_used = _gate_breakdowns(sections, adapt_blob)
     blasts_used = _gate_blasts(sections, adapt_blob)
-    print("pack_spine=%d figures_drafts=%d density_drafts=%d breakdowns_used=%d "
-          "blasts_used=%d" % (pack_spine, figures_drafts, density_drafts,
-                              breakdowns_used, blasts_used))
+    print("pack_spine=%d pack_phrases=%d figures_drafts=%d density_drafts=%d "
+          "breakdowns_used=%d blasts_used=%d"
+          % (pack_spine, pack_phrases, figures_drafts, density_drafts,
+             breakdowns_used, blasts_used))
 
     sections = _merge_adjacent_same_figure(sections)
     sections = _clean(sections)

@@ -178,3 +178,4 @@ rows omit `start`/`end` seconds unless the song's `sync_ok` is true.
 
 Pytest proves wiring. It does not prove a riff.
 - Unique pack bar-runs now populate Guess (figures emit unique=true; pack spine yields to figure-hash).
+- Pack Guess uses tabnotes-phrase mid-grain boxes (~10), not unique 2-bar spam.

@@ -1,5 +1,12 @@
 ## 2026-09-21 — unique pack bar-runs → Guess
 
+## 2026-09-21 — pack Guess phrase boxes (not 60 crumbs)
+
+- `pack_phrase_spans` / `phrase_drafts_for_song` (`source=tabnotes-phrase`): mid-grain riff boxes from density jumps, gaps, meter cuts.
+- Guess prefers phrases over coverage spine; skips unique one-shot figure-hash boxes when phrases exist (Mindful ~11 phrases + blast/kick, not ~60).
+- Unique hashes stay in `figures.jsonl` for later identity work.
+
+
 ## 2026-09-21 — audio preview non-blocking
 
 - WAV preview convert no longer blocks `/api/audio` (first open of other songs was stalling Play). Cache hit → WAV; miss → FLAC immediately + background build.

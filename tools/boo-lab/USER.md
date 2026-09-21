@@ -70,7 +70,7 @@ The right-click edit panel closes on an outside click.
 
 One album per sitting is enough.
 
-**VAL:** do not use VAL songs to train or to vote `prefer=`. You may still pin them. Rebirth is VAL and is already pinned; leave it.
+**VAL:** may be pinned by ear; does not train; does not vote `prefer=`. Rebirth keepers were placeholders — wipe or re-pin. Guess is a stencil; do not Save a hash flood.
 
 **Keys:** Space play · 1 riff · 2 hook · 3 breakdown · **T blast** · 4 solo · I intro · B build · C chill · P pulse · S save · J / K songs · Delete box · Ctrl+Z undo · Esc stops box loop / closes right-click · ? help.
 
@@ -90,7 +90,7 @@ hide bars and rows — they never edit. synth is an instrument (inst), not a rol
 Guess, Load drafts, Lyrics, Pack, Snap, JSON, Drop, git, Remove album,
 More columns.
 
-**VAL** = holdout / exam song. Do not train on it or vote `prefer=` with it. Pinning is fine; Rebirth is already pinned.
+**VAL** = holdout / exam song. Do not train on it or vote `prefer=` with it. Pinning is fine; Rebirth keepers were placeholders — wipe or re-pin.
 
 Guess refuses a song that already has saved boxes.
 Selected song is highlighted in the left list.

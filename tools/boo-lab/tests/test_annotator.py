@@ -495,3 +495,28 @@ def test_tracks_payload_includes_prefer(tmp_path):
     lab = _lab(tmp_path)
     client = TestClient(ann.create_app(lab, None, None))
     assert client.get("/api/tracks").json()["prefer"] == "none"
+
+
+def test_tracks_badge_prefers_gp7_over_legacy_gp5(tmp_path):
+    flac = tmp_path / "audio" / "01 - Song.flac"
+    flac.parent.mkdir(parents=True)
+    flac.write_bytes(b"x")
+    gp_root = tmp_path / "gp"
+    legacy = gp_root / "gp5" / "Band" / "01 - Song.gp5"
+    legacy.parent.mkdir(parents=True)
+    legacy.write_bytes(b"x")
+    modern = gp_root / "gp7" / "Band" / "01 - Song.gp"
+    modern.parent.mkdir(parents=True)
+    modern.write_bytes(b"x")
+    lab = tmp_path / "lab"
+    (lab / "data").mkdir(parents=True)
+    save_map(lab / "data" / "map.csv", [{
+        "album": "Band", "track": "01 - Song", "year": "", "flac": str(flac),
+        "gp": str(legacy), "tuning": "drop_g_7", "match": "yes", "notes": ""}])
+
+    client = TestClient(ann.create_app(lab, None, gp_root))
+    t = client.get("/api/tracks").json()["tracks"][0]
+
+    assert t["has_gp"] is True
+    assert t["gp_kind"] == "gp7"         # display kind; not "gp5" -- GP7 sibling wins
+    assert t["gp_name"].endswith(".gp")

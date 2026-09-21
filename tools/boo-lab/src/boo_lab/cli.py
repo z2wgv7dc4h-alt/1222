@@ -127,6 +127,13 @@ def main(argv: list[str] | None = None) -> int:
     s = sub.add_parser("learn", help="rank the machine draft sources from keepers")
     s.add_argument("--album")
 
+    s = sub.add_parser("predict-train", help="train the keeper structure predictor (drafts only)")
+    s.add_argument("--album")
+
+    s = sub.add_parser("predict", help="keeper-model structure drafts -> data/drafts.jsonl")
+    s.add_argument("--album")
+    s.add_argument("--track")
+
     s = sub.add_parser("adapt", help="per-album calibration from accepted drafts (drafts only)")
     s.add_argument("--album")
 
@@ -152,12 +159,17 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("--album")
     s.add_argument("--track")
 
+    s = sub.add_parser("tabnotes-drafts",
+                       help="density drafts from a tab-notes pack -> drafts.jsonl (sync_ok only; never keepers)")
+    s.add_argument("--album")
+    s.add_argument("--track")
+
     s = sub.add_parser("annotate", help="local UI: listen to FLAC, click section bounds")
     s.add_argument("--port", type=int, default=8765)
 
-    s = sub.add_parser("ingest", help="copy a drop folder of zips/FLAC/GP into the corpus")
+    s = sub.add_parser("ingest", help="copy a drop (file, zip, or folder) into the corpus, then prep")
     s.add_argument("drop", type=Path)
-    s.add_argument("--band", required=True)
+    s.add_argument("--band", default="", help="optional; inferred from the file/folder name when blank")
 
     args = p.parse_args(argv)
     env_file = root() / ".env"
@@ -173,16 +185,18 @@ def main(argv: list[str] | None = None) -> int:
     map_path = data_dir() / "map.csv"
 
     if args.cmd == "ingest":
-        from .ingest import ingest
+        from .ingest import ingest, prep_after_ingest
 
         if not flac_root or not gp_root:
             print("set BOO_FLAC_ROOT and BOO_GP_ROOT")
             return 1
         report = ingest(args.drop, flac_root, gp_root, args.band, lab_root=root())
         print(report)
-        drafted = scan_roots(flac_root, gp_root)
-        save_map(map_path, drafted)
-        print("map.csv", len(drafted), "rows")
+        prep = prep_after_ingest(root(), flac_root, gp_root,
+                                 band=report.get("band") or args.band,
+                                 albums=report.get("albums") or [])
+        print("prep:", prep)
+        print("map.csv", prep.get("map_rows", 0), "rows")
         return 0
 
     if args.cmd == "scan":
@@ -386,6 +400,28 @@ def main(argv: list[str] | None = None) -> int:
               % (sr.get("rate", 0.0), sr.get("ok", 0), sr.get("total", 0)))
         return 0
 
+    if args.cmd == "predict-train":
+        from .predict import train
+
+        album = getattr(args, "album", None)
+        full = ([resolve(r, flac_root, gp_root) for r in load_map(map_path)]
+                if map_path.exists() else rows)
+        train(root(), album=album, rows=full)
+        return 0
+
+    if args.cmd == "predict":
+        from .predict import build_drafts
+
+        album = getattr(args, "album", None)
+        track = getattr(args, "track", None)
+        full = ([resolve(r, flac_root, gp_root) for r in load_map(map_path)]
+                if map_path.exists() else rows)
+        report = build_drafts(root(), full, album=album, track=track)
+        print("predict: %d draft(s) across %d track(s) -- %s"
+              % (report["written"], report["tracks"],
+                 report.get("out") or report.get("reason") or ""))
+        return 0
+
     if args.cmd == "adapt":
         from .adapt import albums_with_keepers, rebuild_album, rebuild_global
 
@@ -456,6 +492,21 @@ def main(argv: list[str] | None = None) -> int:
                 if map_path.exists() else rows)
         report = build_tempo_hints(root(), full, album=album, track=track)
         print("tempo-hints: %d song(s) processed, %d row(s) -> %s"
+              % (report["songs"], report["written"], report["out"]))
+        return 0
+
+    if args.cmd == "tabnotes-drafts":
+        from .tabnotes_drafts import build_density_drafts
+
+        album = getattr(args, "album", None)
+        track = getattr(args, "track", None)
+        if (album is None) != (track is None):
+            print("need --album and --track together")
+            return 1
+        full = ([resolve(r, flac_root, gp_root) for r in load_map(map_path)]
+                if map_path.exists() else rows)
+        report = build_density_drafts(root(), full, album=album, track=track)
+        print("tabnotes-drafts: %d song(s) processed, %d row(s) -> %s"
               % (report["songs"], report["written"], report["out"]))
         return 0
 

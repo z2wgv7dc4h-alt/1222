@@ -31,6 +31,9 @@
     #dropzone { margin:0; padding:10px; border:1px dashed #4a4030; border-radius:8px; color:var(--mute); font-size:12px; text-align:center; }
     #dropzone.hot { border-color:var(--gold); color:var(--gold); }
     #bandName { width:100%; margin-top:8px; padding:6px 8px; background:#111; color:var(--text); border:1px solid var(--line); }
+    .ingestbtns { display:flex; gap:6px; margin-top:8px; }
+    .ingestbtn { flex:1; cursor:pointer; padding:6px 8px; border:1px solid var(--line); border-radius:6px; color:var(--mute); font-size:11px; }
+    .ingestbtn:hover { border-color:var(--gold); color:var(--gold); }
     #q { width:calc(100% - 32px); margin:0 16px 8px; padding:6px 8px; background:#111; color:var(--text); border:1px solid var(--line); }
     .alb { padding:12px 16px 6px; font-size:11px; letter-spacing:.06em; text-transform:uppercase; color:var(--riff); cursor:pointer; user-select:none; }
     .alb:hover { color:var(--text); }
@@ -54,7 +57,7 @@
     header.now h2 { margin:0; font-family:"Instrument Serif", serif; font-size:21px; font-weight:400; letter-spacing:.01em; }
     header.now span { color:var(--mute); font-size:12px; display:block; margin-top:2px; }
     .alb img { width:28px; height:28px; object-fit:cover; border-radius:4px; margin-right:8px; vertical-align:middle; }
-    .workhead { position:sticky; top:0; z-index:6; background:var(--bg); padding:12px 0 6px; }
+    .workhead { position:sticky; top:0; z-index:50; background:var(--bg); padding:12px 0 6px; }
     .workhead:after { content:""; display:block; height:1px; margin-top:8px;
       background:linear-gradient(90deg,transparent,var(--line),transparent); }
     .lane { margin:10px 0 14px; }
@@ -83,9 +86,10 @@
     .menu > summary { list-style:none; cursor:pointer; color:var(--mute); font-size:12px; letter-spacing:.08em; text-transform:uppercase; padding:6px 10px; border:1px solid var(--line); border-radius:6px; }
     .menu > summary::-webkit-details-marker { display:none; }
     .menu[open] > summary { color:var(--text); border-color:#6a5a3a; }
-    .menu-panel { position:absolute; top:calc(100% + 6px); left:0; z-index:30; min-width:240px;
-      background:#14161c; border:1px solid var(--line); border-radius:8px; padding:10px;
-      display:flex; flex-direction:column; gap:8px; box-shadow:0 18px 40px #000a; }
+    .menu-panel { position:absolute; top:calc(100% + 6px); left:0; z-index:60; min-width:240px;
+      background:#0e1016; border:1px solid var(--line); border-radius:8px; padding:10px;
+      display:flex; flex-direction:column; gap:8px; isolation:isolate;
+      box-shadow:0 22px 60px #000f, 0 0 0 1px #000, 0 0 24px #000c; }
     .menu-panel button, .menu-panel label { text-align:left; }
     .menu-panel button.off { opacity:.45; }
     .menu > summary .mute { color:#6a625a; margin-left:6px; }
@@ -163,6 +167,7 @@
     .stembtns button.on { border-color:var(--riff); color:var(--riff); }
     .conf { margin-left:8px; text-transform:none; letter-spacing:0; font-size:11px; color:#c4a35a; }
     .conf.bad { color:var(--break); }
+    .conf.warn { color:#d4a257; }
     button.danger { color:var(--break); border-color:#5a2a26; }
     button.danger:hover { border-color:var(--break); color:#ffb0a6; }
     /* per-role lanes: a region sits only in its role's strip */
@@ -171,8 +176,8 @@
     .wavesurfer-region.sel { outline:2px solid #f4ead8 !important; box-shadow:0 0 0 1px #000c, 0 0 14px #f4ead866 !important; z-index:8 !important; }
     /* lane names once, in a left gutter -- never repeated on tiles */
     #lanegutter { position:absolute; left:0; top:0; right:0; bottom:0; pointer-events:none; z-index:9; }
-    #lanegutter .ll { position:absolute; left:0; width:44px; padding-left:6px; display:flex; align-items:center;
-      font-size:10px; letter-spacing:.04em; text-transform:uppercase; color:#cfc8bc; overflow:hidden;
+    #lanegutter .ll { position:absolute; left:0; width:72px; padding-left:6px; display:flex; align-items:center;
+      font-size:10px; letter-spacing:.04em; text-transform:uppercase; color:#cfc8bc; overflow:hidden; white-space:nowrap;
       background:linear-gradient(90deg,#0a0c10d9,#0a0c1000); }
     input[data-f='figure_id'] { min-width:9em; }
     /* right-click edit panel */
@@ -198,7 +203,7 @@
   <h4>Lanes and right-click</h4>
   <ul>
     <li>One lane per role, top to bottom Intro → Outro. A box sits only in its role's lane, so a Riff + Breakdown + Outro stack shows as three bars at once.</li>
-    <li>Click a bar to select its table row (or click a row to light its bar). Right-click a bar to edit role / figure / heard / unique / inst, <b>Play box</b>, <b>Split at playhead</b>, or <b>Delete</b>. Double-click a bar toggles heard.</li>
+    <li>Click a bar to select its table row (or click a row to light its bar). Right-click a bar to edit role / figure / heard / unique / inst, <b>Play box</b>, <b>Split at playhead</b>, or <b>Delete</b>. Double-click a bar to zoom to its box; tick heard in the row or right-click menu.</li>
     <li><b>synth</b> is an instrument (inst), not a role. All / Figures / Functions filters only hide bars and rows — Guess still drafts only, never a keeper.</li>
   </ul>
   <h4>What each table column means</h4>
@@ -253,7 +258,7 @@
     <input id="q" placeholder="filter songs" />
     <div class="filters">
       <button type="button" data-f="all" class="on">All</button>
-      <button type="button" data-f="gp">GP5</button>
+      <button type="button" data-f="gp">Tab</button>
       <button type="button" data-f="none">No tab</button>
     </div>
     <div id="list"></div>
@@ -293,8 +298,12 @@
         <details id="corpusMenu" class="menu">
           <summary>Corpus</summary>
           <div class="menu-panel">
-            <div id="dropzone">Ingest — zip or folder. Type the band first. No RAR.
-              <input id="bandName" placeholder="band name e.g. veil of maya" />
+            <div id="dropzone">Ingest — file, zip, or <b>folder</b>. Band optional (inferred from names). No RAR.
+              <input id="bandName" placeholder="band (optional)" />
+              <div class="ingestbtns">
+                <label class="ingestbtn">Add file(s)<input id="ingestFiles" type="file" multiple style="display:none" /></label>
+                <label class="ingestbtn">Add folder<input id="ingestFolder" type="file" webkitdirectory directory style="display:none" /></label>
+              </div>
             </div>
             <button type="button" id="btnGit">Push git</button>
             <button type="button" id="btnRemoveAlbum" class="danger">Remove album</button>
@@ -657,6 +666,8 @@ function setSpecMode(m){
   });
 })();
 function destroyWave(){
+  stopBoxLoop();
+  window._playUntil=null;
   if(ws){ try{ ws.destroy(); }catch(e){} ws=null; regionsPlug=null; }
   if(drumsWs){ try{ drumsWs.destroy(); }catch(e){} drumsWs=null; }
 }
@@ -666,7 +677,7 @@ function loadBeats(id){
     beatsData={beats:x.beats||[],downbeats:x.downbeats||[]};
     drawBeatGrid();
     if(beatsData.downbeats.length)
-      document.getElementById("sub").textContent += " · beats "+beatsData.downbeats.length;
+      document.getElementById("sub").textContent += " · downbeats "+beatsData.downbeats.length;
   }).catch(()=>{ beatsData={beats:[],downbeats:[]}; drawBeatGrid(); });
 }
 
@@ -853,8 +864,31 @@ function setRowInst(i,v){
   }
   s.value=v||"";
 }
-// Double-click (region or its table row) is the only detail jump: select,
-// seek to the box start, and zoom the spectrogram to the box.
+// Double-click: select, zoom spectrogram, and A-B loop that box so you can
+// nudge edges while it repeats. Esc / Space / Play box (once) stops the loop.
+function stopBoxLoop(){
+  window._boxLoop=null;
+}
+function syncBoxLoopBounds(){
+  const L=window._boxLoop; if(!L||L.idx==null||!regs[L.idx]) return;
+  const p=regs[L.idx];
+  L.a=+p.start||0;
+  L.b=Math.max(L.a+0.05, +p.end||0);
+}
+function startBoxLoop(i){
+  if(i<0||!regs[i]||!ws) return;
+  const p=regs[i];
+  const a=+p.start||0, b=Math.max(a+0.05, +p.end||0);
+  window._boxLoop={a:a,b:b,idx:i};
+  window._playUntil=null;  // loop owns the end, not one-shot play
+  showErr("looping box "+fmt(a)+" – "+fmt(b)+"  (Esc or Space to stop)");
+  try{ ws.setTime(a); }catch(e){}
+  try{
+    const hit=regionsPlug && regionsPlug.getRegions().find(r=>r._idx===i);
+    if(hit && typeof hit.play==="function"){ hit.play(); return; }
+  }catch(e){}
+  Promise.resolve(ws.play(a, b)).catch(()=>{ try{ ws.play(); }catch(e){} });
+}
 function selectAndZoomBox(i){
   if(i<0||!regs[i]) return;
   sel=i;
@@ -862,6 +896,7 @@ function selectAndZoomBox(i){
   const p=regs[i];
   if(ws) ws.setTime(Math.max(0, +p.start||0));
   zoomSpecToBox(p.start, p.end);
+  startBoxLoop(i);
 }
 function regionElementAt(cx, cy){
   const host=document.getElementById("wave"); if(!host) return -1;
@@ -914,6 +949,7 @@ function playBox(){
   pullRegions();
   if(sel<0 && regs.length) sel=0;
   if(sel<0||!regs[sel]){ showErr("click a coloured box or its table row first", true); return; }
+  stopBoxLoop();
   const a=+regs[sel].start, b=Math.max(a+0.05, +regs[sel].end);
   window._playUntil=b;
   showErr("box "+fmt(a)+" → "+fmt(b));
@@ -981,7 +1017,14 @@ function makeWave(url){
   ws.on("play",()=>{ try{ if(audioCtx&&audioCtx.state==="suspended") audioCtx.resume(); }catch(e){} });
   ws.on("timeupdate", t=>{
     document.getElementById("clock").textContent=fmt(t)+" / "+fmt(ws.getDuration()||0);
-    if(window._playUntil!=null && t>=window._playUntil-0.03){
+    if(window._boxLoop){
+      const L=window._boxLoop;
+      // live-follow drag/resize of the looping box
+      if(L.idx!=null && regs[L.idx]){ L.a=+regs[L.idx].start||0; L.b=Math.max(L.a+0.05, +regs[L.idx].end||0); }
+      if(t>=L.b-0.03 || t<L.a-0.05){
+        try{ ws.setTime(L.a); }catch(e){}
+      }
+    } else if(window._playUntil!=null && t>=window._playUntil-0.03){
       window._playUntil=null;
       try{ ws.pause(); }catch(e){}
     }
@@ -1014,8 +1057,7 @@ function makeWave(url){
     const p=(!isNaN(i))?regs[i]:null;
     applyRegionMeta(reg, p||{role:"riff"});
   });
-  regionsPlug.on("region-dblclicked",(reg)=>{ const i=reg&&reg._idx; if(i!=null) selectAndZoomBox(i); });
-  regionsPlug.on("region-dblclick",(reg)=>{ const i=reg&&reg._idx; if(i!=null) selectAndZoomBox(i); });
+  regionsPlug.on("region-double-clicked",(reg)=>{ const i=reg&&reg._idx; if(i!=null) selectAndZoomBox(i); });
   if(!window._booWaveUp){
     window._booWaveUp=true;
     document.getElementById("wave").addEventListener("pointerup",()=>{ if(!lock){ pullRegions(); table(); }});
@@ -1030,7 +1072,8 @@ function makeWave(url){
     });
     document.addEventListener("keydown",ev=>{
       if(ev.key!=="Escape") return;
-      if(ctxIdx>=0){ closeCtx(); ev.stopPropagation(); }
+      if(window._boxLoop){ stopBoxLoop(); try{ ws&&ws.pause(); }catch(e){} showErr("loop stopped"); ev.stopPropagation(); }
+      else if(ctxIdx>=0){ closeCtx(); ev.stopPropagation(); }
       else if(specView){ resetSpecView(); ev.stopPropagation(); }  // zoom reset
     }, true);
     window.addEventListener("resize",()=>{ drawBeatGrid(); closeCtx(); refreshRegionContent(); });
@@ -1092,8 +1135,8 @@ function loadAnalysis(id){
     if(!secs.length){ el.textContent=""; return; }
     const bad=secs.filter(s=>s.low_confidence);
     if(bad.length){
-      el.textContent="⚠ "+bad.length+"/"+secs.length+" drum sections low-confidence (snare undercount) — verify by ear";
-      el.className="conf bad";
+      el.textContent="drums: "+bad.length+"/"+secs.length+" low confidence — check by ear";
+      el.className="conf warn";
       el.title=bad.map(s=>s.role+": "+(s.confidence_reason||"")).join("\n");
     } else {
       el.textContent=secs.length+" drum sections classified";
@@ -1162,7 +1205,7 @@ function loadLyrics(id){
     if(lane) lane.classList.add("idle");
   }).catch(()=>{ box.textContent="lyrics failed"; });
 }
-function toggle(){ window._playUntil=null; if(!ws) return; ws.playPause(); }
+function toggle(){ window._playUntil=null; stopBoxLoop(); if(!ws) return; ws.playPause(); }
 
 setSpecMode("both");
 startSpecLoop();
@@ -1220,24 +1263,98 @@ document.getElementById("q").oninput=e=>{ listQ=e.target.value; renderList(); };
 (function(){
   const z=document.getElementById("dropzone");
   if(!z) return;
+  function readEntry(entry, prefix){
+    return new Promise((resolve,reject)=>{
+      if(entry.isFile){
+        entry.file(f=>{
+          const rel=(prefix?prefix+"/"+f.name:f.name).replace(/^\/+/,"");
+          resolve([{file:f, rel:rel}]);
+        }, reject);
+      } else if(entry.isDirectory){
+        const reader=entry.createReader();
+        const all=[];
+        const readBatch=()=>{
+          reader.readEntries(async ents=>{
+            if(!ents.length){ resolve(all); return; }
+            for(const ent of ents){
+              const kids=await readEntry(ent, prefix?prefix+"/"+entry.name:entry.name);
+              all.push(...kids);
+            }
+            readBatch();
+          }, reject);
+        };
+        readBatch();
+      } else resolve([]);
+    });
+  }
+  async function filesFromDrop(dt){
+    const out=[];
+    if(dt.items && dt.items.length){
+      const jobs=[];
+      for(const item of dt.items){
+        const entry=item.webkitGetAsEntry&&item.webkitGetAsEntry();
+        if(entry) jobs.push(readEntry(entry, ""));
+        else if(item.getAsFile){ const f=item.getAsFile(); if(f) out.push({file:f, rel:f.name}); }
+      }
+      for(const batch of await Promise.all(jobs)) out.push(...batch);
+    }
+    if(!out.length && dt.files && dt.files.length){
+      for(const f of dt.files){
+        const rel=(f.webkitRelativePath||f.name).replace(/^\/+/,"");
+        out.push({file:f, rel:rel||f.name});
+      }
+    }
+    return out;
+  }
+  function prepNote(x){
+    const p=x.prep||{}; const bits=[];
+    if(p.scan) bits.push("scan "+(p.scan.error?"fail":(p.scan.map_rows||0)+" rows"));
+    if(p.hash) bits.push("hash "+(p.hash.error?"fail":(p.hash.filled||0)+"/"+(p.hash.rows||0)));
+    if(p.interns){
+      bits.push("interns "+Object.keys(p.interns).map(k=>k+":"+(p.interns[k]&&p.interns[k].error?"fail":"ok")).join(","));
+    }
+    if(p.density) bits.push("density "+(p.density.error?"fail":(p.density.written||0)));
+    return bits.length?(" · prep "+bits.join(" · ")):"";
+  }
+  function sendItems(items, label){
+    if(!items.length){ showErr("nothing to ingest"+(label?" ("+label+")":""), true); return; }
+    const fd=new FormData();
+    const band=(document.getElementById("bandName").value||"").trim();
+    fd.append("band", band);
+    for(const it of items) fd.append("files", it.file, it.rel);
+    showErr("ingesting "+items.length+" file(s) — prep runs after…");
+    return fetch("/api/ingest",{method:"POST",body:fd}).then(async r=>{
+      const x=await r.json();
+      if(!r.ok) throw x.detail||JSON.stringify(x);
+      showErr("ingested flac="+(x.flac||0)+" gp5="+(x.gp5||0)+" gp7="+(x.gp7||0)+" tabnotes="+(x.tabnotes||0)+" map="+(x.map_rows||0)+" band="+(x.band||band||"—")+prepNote(x));
+      // refresh the song list without a full page reload when possible
+      try{
+        const d=await fetch("/api/tracks").then(r=>r.json());
+        tracks=d.tracks||d||[];
+        renderList();
+      }catch(e){ location.reload(); }
+    }).catch(err=>showErr("ingest: "+err,true));
+  }
   z.addEventListener("dragover",e=>{ e.preventDefault(); z.classList.add("hot"); });
   z.addEventListener("dragleave",()=>z.classList.remove("hot"));
   z.addEventListener("drop",e=>{
     e.preventDefault(); z.classList.remove("hot");
-    const files=e.dataTransfer&&e.dataTransfer.files;
-    if(!files||!files.length) return;
-    const fd=new FormData();
-    fd.append("band",(document.getElementById("bandName").value||"new_band").trim());
-    for(const f of files) fd.append("files", f, f.name);
-    showErr("ingesting "+files.length+" file(s)…");
-    fetch("/api/ingest",{method:"POST",body:fd}).then(async r=>{
-      const x=await r.json();
-      if(!r.ok) throw x.detail||JSON.stringify(x);
-      showErr("ingested "+(x.flac||0)+" flac · "+(x.gp5||0)+" gp5 · map "+(x.map_rows||0));
-      location.reload();
-    }).catch(err=>showErr("ingest: "+err,true));
+    filesFromDrop(e.dataTransfer||{}).then(items=>sendItems(items,"drop")).catch(err=>showErr("ingest: "+err,true));
+  });
+  const fileInput=document.getElementById("ingestFiles");
+  if(fileInput) fileInput.addEventListener("change",()=>{
+    const items=[...fileInput.files].map(f=>({file:f, rel:(f.webkitRelativePath||f.name).replace(/^\/+/,"")}));
+    fileInput.value="";
+    sendItems(items,"files");
+  });
+  const dirInput=document.getElementById("ingestFolder");
+  if(dirInput) dirInput.addEventListener("change",()=>{
+    const items=[...dirInput.files].map(f=>({file:f, rel:(f.webkitRelativePath||f.name).replace(/^\/+/,"")}));
+    dirInput.value="";
+    sendItems(items,"folder");
   });
 })();
+
 document.querySelectorAll(".filters button").forEach(b=>{
   b.onclick=()=>{
     listFilter=b.dataset.f;

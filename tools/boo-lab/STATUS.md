@@ -1,4 +1,4 @@
-# Status — 2026-09-18
+# Status — 2026-09-21
 
 Canonical detail: **CURRENT.md**; commands in **README.md**.
 
@@ -6,16 +6,20 @@ Canonical detail: **CURRENT.md**; commands in **README.md**.
 ## Counts (from disk)
 
 - keepers: 6 row(s) across 1 track(s)
-- drafts: 1450 row(s); sources: msa-draft, songformer-draft
-- sync: 14 ok / 52 row(s)
-- map.csv: 83 row(s)
+- drafts: 1451 row(s); sources: keeper-model, msa-draft, songformer-draft
+- sync: 19 ok / 52 row(s)
+- map.csv: 71 row(s)
 - figures: 477 row(s) across 40 track(s)
 - tempo hints: 0 row(s) across 0 track(s)
 <!-- status:counts:end -->
+Predictor v1 (2026-09-21): `predict-train`/`predict` live; Save fine-tunes; `keeper-model` drafts; Guess merge; frozen interns unchanged. Docs: LAW/USER/CURRENT/README/CHANGELOG aligned.
+
+Docs (2026-09-21): START full interns; structure **predictor** north star (keeper-trained drafts; frozen interns do not retrain). Uncommitted stack in CHANGELOG.
+
 
 Works: studio keeps pins (`human`/`guess-accepted` + `heard`) in `sections.jsonl`; mel
 spectrogram under the WaveSurfer waveform; 6-stem picker; drafts; `hear`/`sync`/`hash`;
-`agree`/`compare`/`export-jams`/`beats`/`audit`/`report`; **362 tests pass**.
+`agree`/`compare`/`export-jams`/`beats`/`audit`/`report`; **389 tests pass** (predict + suite; run `pytest -q`).
 Corpus-wide cold start (2026-09-21): `adapt.py` gains `rebuild_global` -- the same
 median-shift/role-remap/breakdown-span calibration `rebuild_album` already computes,
 pooled across every non-holdout album instead of one. `load_adapt` now falls back to
@@ -89,10 +93,10 @@ Matcher (2026-09-18): `catalogue._key` strips a space-numbered track prefix and 
 prefix in any punctuation; `_gp_candidates` scores each GP (exact > substring, lead-number
 bonus, GP7 `.gp`/`.gpx` bonus over `.gp5`, shorter name) and `scan_roots` assigns one GP
 file to one FLAC. The full GP7 packs for Discovery / A Higher Place / Eternal Reign live
-under `gp-tabs/gp7/<band>/<album>/` and win; `map.csv` is 83 rows / 66 `match=yes`.
+under `gp-tabs/gp7/<band>/<album>/` and win; `map.csv` is 71 rows / 52 `match=yes`.
 Interns pass (2026-09-18): `boo-lab interns [--album X] [--steps a,b,c]` runs the whole
 chain in order (`stems → beats → structure → drums → vocals → lyrics → sync → extract →
-figures → compare → learn → status`), cache-first and resumable — `structure` reuses
+figures → tempo_hints → compare → learn → predict → status`), cache-first and resumable — `structure` reuses
 `work/msa/<track>.json` / `.songformer.json`, `beats`/`sync`/`lyrics` skip finished rows —
 and each step is isolated so one failure never aborts the rest. Never writes `sections.jsonl`.
 Learn (2026-09-18): `boo-lab learn` ranks the draft sources from keepers (5-song vote, F@0.5 >= 0.50,
@@ -146,10 +150,10 @@ hide (Save still harvests hidden rows).
 
 On disk now:
 - `data/sections.jsonl` — 6 rows, 1 track (Rebirth), all `heard=true`. The whole keeper set.
-- `data/drafts.jsonl` — 1450 rows across all albums (`msa-draft` + `songformer-draft`, GPU).
+- `data/drafts.jsonl` — 1451 rows across all albums (`msa-draft` + `songformer-draft` + a `keeper-model` draft, GPU).
 - `data/beats.jsonl` — 58 tracks (`beat_this` preferred).
 - `data/compare.json` — drafts vs keepers. Rebirth (holdout): **F0.5=0.737 F3=0.800 role3=0.250**.
-- `data/sync.jsonl` — **14 `sync_ok` / 52 rows** across all albums. `sync`
+- `data/sync.jsonl` — **19 `sync_ok` / 52 rows** across all albums. `sync`
   prefers the cached **guitar** stem and **falls back to the mix per witness** (isolated guitar can
   mis-peak where the mix doesn't and vice versa). Two witnesses score alignment: a blurred (~120 ms)
   **onset** correlation, and **chroma** (tab pitches sustained vs `chroma_cqt`). `sync_ok` passes if
@@ -158,12 +162,11 @@ On disk now:
   passes: a peak outside the 0.35 s zero window but within 5 s, with score ≥0.15, **peak prominence**
   ≥0.05, and the other witness agreeing on the offset within 0.25 s. A `.gp`/`.gpx` is clocked from
   its parsed GPIF score (no conversion), and a `.gp5` row prefers a matching `.gp`/`.gpx` sibling.
-Read the live `sync_ok` count from `data/sync.jsonl` — never type 14/52 from memory.
+Read the live `sync_ok` count from `data/sync.jsonl` — never type 19/52 from memory.
 - `data/agree.jsonl` — Rebirth pass 1 (6 boxes). Pass 2 needs a human re-pin, then
   `boo-lab agree --album X --track Y --diff`.
-- `data/map.csv` — 83 rows, 66 `match=yes` (Discovery/AHP/Eternal Reign full GP7; no GP
-  matched to two tracks; the +12 are Veil of Maya `2015 - Matriarch` tracks from an ingest,
-  whose FLACs sit in `audio-corpus/01..12/`); `flac_sha256` only once `scan`/`hash` runs.
+- `data/map.csv` — 71 rows, 52 `match=yes` (Discovery/AHP/Eternal Reign full GP7; no GP
+  matched to two tracks); `flac_sha256` only once `scan`/`hash` runs.
 - `data/holdout.csv` — 7 songs reserved. `engine/data/riff_bank.json` is local/gitignored.
 
 Sync (2026-09-18): the existing `best_clock_fit` rate fit is wired into `sync_ok` — the resampled

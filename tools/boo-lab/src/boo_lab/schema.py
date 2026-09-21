@@ -13,7 +13,8 @@ ROLES = (
 )
 FIGURE_ROLES = frozenset({"riff", "hook", "solo", "pulse"})
 FUNCTION_ROLES = frozenset({"intro", "build", "breakdown", "chill", "outro"})
-SOURCES = frozenset({"human", "guess-accepted", "guess", "msa-draft", "songformer-draft"})
+SOURCES = frozenset({"human", "guess-accepted", "guess", "msa-draft", "songformer-draft",
+                     "keeper-model", "tabnotes-density"})
 KEEPER_SOURCES = frozenset({"human", "guess-accepted"})
 
 # Real instrument vocabulary for a box. Empty string is allowed (unknown/mixed).

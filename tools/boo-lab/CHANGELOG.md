@@ -1,5 +1,85 @@
 # Changelog
 
+## 2026-09-21
+
+### Ingest UX: single file/folder, inferred band, auto-prep
+
+- `ingest()` now takes a lone `.flac`/`.wav`, GP file, tab-notes `.zip`,
+  `notes.json`, or pack folder — not only a mixed archive. New `_from_pack_id`
+  reads `born_of_osiris__the_new_reign__s32187`; `_from_filename` reads
+  `Born_Of_Osiris-Elimination` / `Born Of Osiris - Song`. A blank / `new_band`
+  / `unknown` band is replaced by the inferred one and returned as
+  `report["band"]` (with `band_inferred` and `albums`).
+- New `prep_after_ingest()` runs after every `/api/ingest` and `boo-lab ingest`:
+  scan → album-scoped hash → `interns --steps beats,sync` → tab-notes density
+  drafts, each soft-fail. Studio Corpus drop accepts files/folders, keeps
+  relative paths, shows prep status, and reloads `/api/tracks` without a full
+  page reload. `--band` is now optional. 10 tests (`tests/test_ingest.py`).
+
+### Tab-notes utilization: density drafts, meter cuts, predict articulations
+
+- New `src/boo_lab/tabnotes_drafts.py`. When a song's `sync.jsonl` is
+  `sync_ok`, `pack_density_drafts` proposes high guitar-onset-density spans as
+  `role=riff` and reuses Guess's `_half_time_spans` on the pack's drum onsets
+  for `role=breakdown`; `build_density_drafts` merges them unheard
+  (`source="tabnotes-density"`, added to `schema.SOURCES`) into
+  `data/drafts.jsonl`, replacing only prior same-source rows for the songs
+  rebuilt and leaving the file untouched on zero rows. Caps: same-role spans
+  merge, min span 1 s. CLI `boo-lab tabnotes-drafts [--album] [--track]`;
+  `interns` gains a `tabnotes_drafts` step after `sync`; Guess merges the riff
+  spans read-only. `meter_cuts` reports measure boundaries where a pack's time
+  signature changes or its tempo automation jumps (GPIF `tempo_map`/
+  `time_sig_map` fallback); Guess notes `tempo/meter cuts at 12.3s, 45.1s` and
+  snaps its audio/density edges to them (0.75 s), no new boxes. Predict frame
+  features gain tab onset-density, palm-mute density, hammer density and a raw
+  onset count (`N_MELS + 6`, zeros without a trusted tab). New tests
+  (`tests/test_tabnotes_drafts.py` + Guess/predict additions); 407 pass.
+
+### Studio: double-click loops the box
+
+- Double-click a region or its table row: zoom spectrogram and **A-B loop** that span while you drag edges. Esc / Space / Play (toggle) stops; **Play box** still plays once.
+
+### Structure predictor v1 scaffold (keeper-trained, drafts only)
+
+- New `src/boo_lab/predict.py` + `boo-lab predict-train [--album X]` / `boo-lab predict
+  [--album X] [--track Y]`. Trains a small 2-layer Conv1d (role + boundary heads) from
+  heard keepers only: fixed 0.25s librosa log-mel + RMS + onset frames over the cached
+  guitar stem else the mix, + one tab-onset-density column when `sync.jsonl` is `sync_ok`.
+  Checkpoint `work/models/structure-v1/{weights.pt,config.json,label_map.json,metrics.json}`;
+  a rerun loads and fine-tunes. Writes `data/drafts.jsonl` rows with the new
+  `source=keeper-model` (`schema.SOURCES`, `heard=false`), replacing only prior
+  keeper-model rows for those songs — never `sections.jsonl`. Holdout never trains; a
+  holdout-only lab (today Rebirth) trains a flagged `holdout_fallback` overfit smoke.
+  Guess merges existing keeper-model drafts read-only; `interns` gains a `predict` step
+  that infers only when a model exists; Save fires a 3-epoch background fine-tune
+  (torch-gated daemon, `BOO_PREDICT_SAVE_TRAIN=0` off). 7 new tests (`tests/test_predict.py`).
+
+### Structure predictor north star (docs)
+
+- CURRENT.md / USER.md: real learning = a keeper-trained structure model (drafts only);
+  frozen interns do not retrain from Save; adapt/learn stay calibration. Thin v1 plan:
+  boundary+role heads, `predict-train` / `predict`, holdout eval, Guess draft source later.
+
+### START.bat: full interns prep before studio
+
+- `START.bat` runs `scan` → `hash` → full `boo-lab interns` before studio (cache-first;
+  never auto-Guess / never Save keepers). USER/README Open-Start aligned.
+
+### Guess prefers map/GP7 via GPIF (not sibling GP5)
+
+- `_prefer_tab` + `estimate_from_gpif`; sync_ok gate unchanged.
+
+### Studio GP badge honesty
+
+- `annotator.tracks()` resolves the `map.csv` gp path first, then upgrades a legacy `.gp5` to a matching GP7 via `sync._prefer_gpif_path` and the lab's own GP-root index (GP7-preferred), so a `.gp`/`.gpx` sibling in another `gp_root` subdir still wins; `.gp`/`.gpx` display as `GP7`, and a map path already pointing at GP7 is kept. Filter label is `Tab`. (`test_tracks_badge_prefers_gp7_over_legacy_gp5`.)
+
+### GPIF note_events tempo carry-forward + Elimination sync_ok
+
+- Mid-song tempo map on onsets; Elimination re-synced lead-in ok.
+
+### Lyrics WhisperX times + gp_chroma 4-tuple
+
+- Vocals stem → WhisperX times; GPIF 4-tuple onsets no longer null chroma.
 ## 2026-09-18
 
 ### Studio: lanes named once; tiles show figure_id not "Riff"

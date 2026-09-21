@@ -613,11 +613,21 @@ def note_events(score: GpifScore) -> list[tuple[float, int | None, float, bool]]
     by_bar: dict = {}
     for n in score.notes:
         by_bar.setdefault(n.bar, []).append(n)
+    starts = _bar_starts(score)
+    tmap = tempo_map(score)
     events: list[tuple[float, int | None, float, bool]] = []
     t = 0.0
     for bi in playback_bar_order(score):
         mb = score.masterbars[bi]
-        bpm = mb.tempo or score.tempo or 120.0
+        if tmap:
+            bpm = score.tempo or 120.0
+            for beat, value in tmap:
+                if beat <= starts[bi] + 1e-9:
+                    bpm = value
+                else:
+                    break
+        else:
+            bpm = mb.tempo or score.tempo or 120.0
         beat_sec = 60.0 / max(bpm, 1.0)
         for n in by_bar.get(bi, []):
             events.append((t + n.t_beat * beat_sec, n.midi,

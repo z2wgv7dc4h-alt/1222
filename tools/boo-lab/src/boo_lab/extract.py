@@ -383,3 +383,55 @@ def estimate_from_gp(gp_path: Path) -> dict:
             "unique": bool(token) and token_counts[token] == 1,
         })
     return {"bpm": bpm, "sections": sections, "duration": duration}
+
+
+def estimate_from_gpif(gp_path: Path) -> dict:
+    """GP7/GP6 twin of `estimate_from_gp` for a parsed GPIF score.
+
+    Walks the masterbars in **playback order** (`gpif.playback_bar_order`,
+    repeats expanded), turning each masterbar section into a second-based
+    section on the same tempo clock `gpif.duration_sec` uses. Returns the
+    identical dict shape (`role/start/end/source=gp-marker/raw/form/
+    figure_id/unique` + `bpm` + `duration`), so Guess can pick the reader on
+    suffix alone. Malformed/non-GPIF input raises, same as `estimate_from_gp`
+    fails closed."""
+    from . import gpif
+
+    score = gpif.load_score(gp_path)
+    song_bpm = float(score.tempo or 120.0)
+    bpm = song_bpm
+    duration = gpif.duration_sec(score)
+    t = 0.0
+    cuts = []  # (start, role, raw, form, token)
+    for idx in gpif.playback_bar_order(score):
+        mb = score.masterbars[idx]
+        if mb.tempo:
+            bpm = float(mb.tempo)
+        if (mb.section or "").strip():
+            marker = mb.section.strip()
+            role = infer_role(marker) or "riff"
+            form, token = _section_letter(marker)
+            cuts.append((round(t, 3), role, marker, form, token))
+        t += (mb.time_n * 4.0 / mb.time_d) * 60.0 / max(bpm, 1.0)
+    if not cuts:
+        return {"bpm": bpm, "sections": [], "reason": "no markers in tab", "duration": duration}
+
+    from collections import Counter
+
+    token_counts = Counter(c[4] for c in cuts if c[4])
+    sections = []
+    for i, (start, role, raw, form, token) in enumerate(cuts):
+        end = cuts[i + 1][0] if i + 1 < len(cuts) else duration
+        if end <= start:
+            end = start + 0.5
+        sections.append({
+            "role": role,
+            "start": start,
+            "end": round(end, 3),
+            "source": "gp-marker",
+            "raw": raw,
+            "form": form or "A",
+            "figure_id": "%s-%s" % (role, token or "A"),
+            "unique": bool(token) and token_counts[token] == 1,
+        })
+    return {"bpm": bpm, "sections": sections, "duration": duration}

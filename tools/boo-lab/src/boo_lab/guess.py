@@ -28,6 +28,10 @@ def _gp5_roots() -> list[Path]:
 
 GP5_ROOTS = _gp5_roots()
 
+# GP6/GP7 GPIF container suffixes; these are read by `gpif.load_score`, not
+# the guitarpro (GP3-5) parser.
+GP7_EXTS = (".gp", ".gpx")
+
 
 def _norm(s: str) -> str:
     s = (s or "").replace("∆", "A").replace("Δ", "A").replace("δ", "a").lower()
@@ -35,40 +39,59 @@ def _norm(s: str) -> str:
     return re.sub(r"[^a-z0-9]+", "", s)
 
 
-def _prefer_gp5(gp: Path | None, track: str) -> Path | None:
-    cands: list[Path] = []
-    if gp:
-        p = Path(gp)
-        if p.suffix.lower() == ".gp5" and p.exists():
-            return p
-        sib = p.with_suffix(".gp5")
-        if sib.exists():
-            cands.append(sib)
-        if p.exists() and p.suffix.lower() == ".gp5":
-            cands.append(p)
+def _prefer_tab(gp: Path | None, track: str) -> Path | None:
+    """Map-path tab preference: a GP7/GP6 score (`gpif.load_score`) outranks a
+    `.gp5`, the same priority sync uses. A `.gp`/`.gpx` path is returned as-is;
+    a `.gp5` is upgraded to its matching GP7 via `sync._prefer_gpif_path`;
+    otherwise roots are searched by normalized stem, GP7 before GP5."""
+    p = Path(gp) if gp else None
+    if p is not None and p.suffix.lower() in GP7_EXTS and p.exists():
+        return p
+    if p is not None and p.suffix.lower() == ".gp5":
+        try:
+            from .sync import _prefer_gpif_path
+
+            cand = Path(_prefer_gpif_path(p))
+        except Exception:
+            cand = p
+        if cand.suffix.lower() in GP7_EXTS and cand.exists():
+            return cand
     key = _norm(track)
-    if not key and gp:
+    if not key and p is not None:
         # "Born_Of_Osiris-Recreate-s77727" -> recreate
-        raw = _norm(Path(gp).stem)
+        raw = _norm(p.stem)
         raw = re.sub(r"^bornofosiris", "", raw)
         raw = re.sub(r"s\d+$", "", raw)
         key = raw
     if key:
-        for root in _gp5_roots():
-            if not root.exists():
-                continue
-            try:
-                hits = list(root.rglob("*.gp5"))
-            except Exception:
-                continue
-            for hit in hits:
-                n = _norm(hit.stem)
-                if n == key or key in n or n in key:
-                    cands.append(hit)
-    for c in cands:
-        if c.exists() and c.suffix.lower() == ".gp5":
-            return c
+        gp5_fallback = p if (p is not None and p.suffix.lower() == ".gp5"
+                             and p.exists()) else None
+        for want_gp7 in (True, False):
+            exts = GP7_EXTS if want_gp7 else (".gp5",)
+            for root in _gp5_roots():
+                if not root.exists():
+                    continue
+                for ext in exts:
+                    try:
+                        hits = root.rglob("*" + ext)
+                    except Exception:
+                        continue
+                    for hit in hits:
+                        n = _norm(hit.stem)
+                        if n == key or key in n or n in key:
+                            if want_gp7:
+                                return hit
+                            if gp5_fallback is None:
+                                gp5_fallback = hit
+        if gp5_fallback is not None:
+            return gp5_fallback
+    if p is not None and p.suffix.lower() in GP7_EXTS + (".gp5", ".gp4", ".gp3") and p.exists():
+        return p
     return None
+
+
+# Backward-compat alias; annotator.py still imports `_prefer_gp5`.
+_prefer_gp5 = _prefer_tab
 
 
 def _resolve_names(lab_root: Path, album: str, track: str) -> tuple[str, str]:
@@ -234,7 +257,7 @@ def estimate_hybrid(
     if lab_root is not None:
         lookup_album, lookup_track = _resolve_names(lab_root, album, track)
 
-    gp_use = _prefer_gp5(gp, track)
+    gp_use = _prefer_tab(gp, track)
     sync_rec = _sync_for(lab_root, lookup_album, lookup_track)
     key = _norm(track) or _norm(gp.stem if gp else "")
     seen = 0
@@ -245,9 +268,15 @@ def estimate_hybrid(
     if gp_use:
         notes.append("tab " + str(gp_use))
         try:
-            from .extract import estimate_from_gp
+            if Path(gp_use).suffix.lower() in GP7_EXTS:
+                # GP7/GP6 (.gp/.gpx): GPIF is the reader sync already uses.
+                from .extract import estimate_from_gpif
 
-            g = estimate_from_gp(gp_use)
+                g = estimate_from_gpif(gp_use)
+            else:
+                from .extract import estimate_from_gp
+
+                g = estimate_from_gp(gp_use)
             bpm = g.get("bpm") or bpm
             if g.get("sections"):
                 if sync_rec is not None and sync_rec.get("sync_ok") is False:
@@ -392,6 +421,62 @@ def estimate_hybrid(
         sections.extend(new_figs)
         figures_drafts = len(new_figs)
 
+    # Pack density drafts: high guitar-onset-density spans as unheard riff
+    # drafts from the pack's own audio-clock onsets. Riff only here -- the
+    # pack's drum breakdowns already come through `_tab_kick_spans` above.
+    # Only when sync_ok; never a box off an untrusted clock.
+    density_drafts = 0
+    if lab_root is not None and sync_rec is not None and sync_rec.get("sync_ok") is True:
+        try:
+            from .tabnotes_drafts import density_drafts_for_song
+
+            new_density = density_drafts_for_song(
+                lab_root, lookup_album, lookup_track, roles=("riff",))
+        except Exception:
+            new_density = []
+        if new_density:
+            sections.extend(new_density)
+            density_drafts = len(new_density)
+            notes.append("tabnotes density x%d" % density_drafts)
+
+    # Keeper-trained structure drafts already written by `boo-lab predict` for
+    # this song are merged unheard (read-only; Guess never runs the model here,
+    # so it stays fast). Skipped spans already covered keep it non-destructive.
+    keeper_model_drafts = 0
+    if lab_root is not None:
+        try:
+            from .predict import load_keeper_model_drafts
+
+            new_km = load_keeper_model_drafts(
+                lab_root, lookup_album, lookup_track, sections)
+            if new_km:
+                sections.extend(new_km)
+                keeper_model_drafts = len(new_km)
+                notes.append("keeper-model drafts x%d" % len(new_km))
+        except Exception:
+            keeper_model_drafts = 0
+
+    # Meter/tempo cuts: measure boundaries where the pack's time signature
+    # changes or its tempo automation jumps. Soft hints -- a note for the
+    # human plus an edge snap for the audio-derived/density spans, never a new
+    # box. Only when the clock matched.
+    meter_cuts: list[float] = []
+    if lab_root is not None and sync_rec is not None and sync_rec.get("sync_ok") is True:
+        try:
+            from .tabnotes_drafts import meter_cuts_for_song, snap_sections_to_cuts
+
+            meter_cuts = meter_cuts_for_song(
+                lab_root, lookup_album, lookup_track, gp_path=gp_use)
+        except Exception:
+            meter_cuts = []
+        if meter_cuts:
+            shown = ", ".join("%.1fs" % c for c in meter_cuts[:6]) + (
+                " ..." if len(meter_cuts) > 6 else "")
+            notes.append("tempo/meter cuts at %s" % shown)
+            snapped = snap_sections_to_cuts(sections, meter_cuts)
+            if snapped:
+                notes.append("snapped %d edge(s) to tempo/meter cuts" % snapped)
+
     # Tempo-automation boundaries: informational only, never a box -- a BPM
     # jump correlates with a section change in this genre but never implies
     # a role, so it's surfaced as a note for the human, not auto-applied.
@@ -415,7 +500,8 @@ def estimate_hybrid(
     # Breakdown gate: keep audio breakdown drafts near this album's median
     # heard breakdown span (n>=2). n<2 keeps the current rules.
     breakdowns_used = _gate_breakdowns(sections, adapt_blob)
-    print("figures_drafts=%d breakdowns_used=%d" % (figures_drafts, breakdowns_used))
+    print("figures_drafts=%d density_drafts=%d breakdowns_used=%d"
+          % (figures_drafts, density_drafts, breakdowns_used))
 
     sections = _clean(sections)
 

@@ -17,10 +17,16 @@ python -m boo_lab.cli scan
 echo Hashing new FLACs (skips already-hashed rows) ...
 python -m boo_lab.cli hash
 
-echo Beat grids + tab-vs-audio clocks (resumable; skips finished songs) ...
-python -m boo_lab.cli interns --steps beats,sync
+echo Full intern prep (stems, beats, structure/drafts, drums, vocals, lyrics, sync, extract, figures, tempo_hints, compare, learn, predict, status) ...
+echo Resumable and cache-first: skips work already on disk. Never Guess / never Save keepers.
+python -m boo_lab.cli interns
+if errorlevel 1 (
+  echo.
+  echo WARNING: interns exited with errors - studio still opens; check the log above.
+)
 
 echo.
 echo Studio: http://127.0.0.1:8765   (Ctrl+C to stop; restart after .py changes)
+echo Lab: Guess computes live; Load drafts / Lyrics use prep above. Heard+Save stays yours.
 python -m boo_lab.cli studio --port 8765
 pause

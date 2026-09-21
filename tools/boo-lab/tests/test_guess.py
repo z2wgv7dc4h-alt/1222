@@ -113,7 +113,7 @@ def _wire_estimate(monkeypatch, tmp_path, covered_end, real_duration=100.0):
     fake_info = types.SimpleNamespace(frames=int(22050 * real_duration), samplerate=22050)
     monkeypatch.setattr(soundfile, "info", lambda *a, **k: fake_info)
     monkeypatch.setattr(g, "GP5_ROOTS", [tmp_path / "no_gp5"])
-    monkeypatch.setattr(g, "_prefer_gp5", lambda gp, track: None)
+    monkeypatch.setattr(g, "_prefer_tab", lambda gp, track: None)
     monkeypatch.setattr(g, "_drum_stem", lambda flac: None)
     monkeypatch.setattr(g, "_librosa_beats", lambda wav: {"beats": [i * 0.5 for i in range(30)], "bpm": 120.0})
     monkeypatch.setattr(
@@ -159,7 +159,7 @@ def test_guess_snaps_audio_breakdown_spans_to_the_grid(tmp_path, monkeypatch):
     monkeypatch.setattr(soundfile, "info",
                         lambda *a, **k: types.SimpleNamespace(frames=int(22050 * 100), samplerate=22050))
     monkeypatch.setattr(g, "GP5_ROOTS", [tmp_path / "no_gp5"])
-    monkeypatch.setattr(g, "_prefer_gp5", lambda gp, track: None)
+    monkeypatch.setattr(g, "_prefer_tab", lambda gp, track: None)
     import boo_lab.stems as st
     monkeypatch.setattr(st, "ensure_drums", lambda f, c: (None, "none"))
     monkeypatch.setattr(g, "_librosa_beats", lambda wav: {"beats": [], "bpm": None})
@@ -190,7 +190,7 @@ def _wire_gp_estimate(tmp_path, monkeypatch, sync_ok):
     monkeypatch.setattr(soundfile, "info",
                         lambda *a, **k: types.SimpleNamespace(frames=int(22050 * 100), samplerate=22050))
     monkeypatch.setattr(g, "GP5_ROOTS", [tmp_path / "no_gp5"])
-    monkeypatch.setattr(g, "_prefer_gp5", lambda gp, track: tmp_path / "x.gp5")
+    monkeypatch.setattr(g, "_prefer_tab", lambda gp, track: tmp_path / "x.gp5")
     import boo_lab.extract as ex
     monkeypatch.setattr(ex, "estimate_from_gp", lambda p: {
         "bpm": 120, "duration": 10,
@@ -232,7 +232,7 @@ def _wire_gp_ratio(tmp_path, monkeypatch, *, sync_ok, ratio, markers=None):
     monkeypatch.setattr(soundfile, "info",
                         lambda *a, **k: types.SimpleNamespace(frames=int(22050 * 100), samplerate=22050))
     monkeypatch.setattr(g, "GP5_ROOTS", [tmp_path / "no_gp5"])
-    monkeypatch.setattr(g, "_prefer_gp5", lambda gp, track: tmp_path / "x.gp5")
+    monkeypatch.setattr(g, "_prefer_tab", lambda gp, track: tmp_path / "x.gp5")
     seed = markers if markers is not None else [
         {"role": "riff", "start": 10.0, "end": 14.0, "source": "gp-marker"}]
     import boo_lab.extract as ex
@@ -282,7 +282,7 @@ def test_audio_breakdown_draft_is_not_stretched(tmp_path, monkeypatch):
     monkeypatch.setattr(soundfile, "info",
                         lambda *a, **k: types.SimpleNamespace(frames=int(22050 * 100), samplerate=22050))
     monkeypatch.setattr(g, "GP5_ROOTS", [tmp_path / "no_gp5"])
-    monkeypatch.setattr(g, "_prefer_gp5", lambda gp, track: tmp_path / "x.gp5")
+    monkeypatch.setattr(g, "_prefer_tab", lambda gp, track: tmp_path / "x.gp5")
     import boo_lab.extract as ex
     monkeypatch.setattr(ex, "estimate_from_gp",
                         lambda p: {"bpm": 120, "duration": 100, "sections": []})
@@ -322,7 +322,7 @@ def _wire_figures(tmp_path, monkeypatch, *, sync_ok, times_trusted=True):
     monkeypatch.setattr(soundfile, "info",
                         lambda *a, **k: types.SimpleNamespace(frames=int(22050 * 100), samplerate=22050))
     monkeypatch.setattr(g, "GP5_ROOTS", [tmp_path / "no_gp5"])
-    monkeypatch.setattr(g, "_prefer_gp5", lambda gp, track: None)
+    monkeypatch.setattr(g, "_prefer_tab", lambda gp, track: None)
     import boo_lab.stems as st
     monkeypatch.setattr(st, "ensure_drums", lambda f, c: (None, "none"))
     monkeypatch.setattr(g, "_librosa_beats", lambda wav: {"beats": [], "bpm": None})
@@ -389,7 +389,7 @@ def _wire_tempo_hints(tmp_path, monkeypatch, rows):
     monkeypatch.setattr(soundfile, "info",
                         lambda *a, **k: types.SimpleNamespace(frames=int(22050 * 100), samplerate=22050))
     monkeypatch.setattr(g, "GP5_ROOTS", [tmp_path / "no_gp5"])
-    monkeypatch.setattr(g, "_prefer_gp5", lambda gp, track: None)
+    monkeypatch.setattr(g, "_prefer_tab", lambda gp, track: None)
     import boo_lab.stems as st
     monkeypatch.setattr(st, "ensure_drums", lambda f, c: (None, "none"))
     monkeypatch.setattr(g, "_librosa_beats", lambda wav: {"beats": [], "bpm": None})
@@ -458,7 +458,7 @@ def _wire_kick(tmp_path, monkeypatch, *, sync_ok, pack_found=True):
     monkeypatch.setattr(soundfile, "info",
                         lambda *a, **k: types.SimpleNamespace(frames=int(22050 * 100), samplerate=22050))
     monkeypatch.setattr(g, "GP5_ROOTS", [tmp_path / "no_gp5"])
-    monkeypatch.setattr(g, "_prefer_gp5", lambda gp, track: None)
+    monkeypatch.setattr(g, "_prefer_tab", lambda gp, track: None)
     import boo_lab.stems as st
     monkeypatch.setattr(st, "ensure_drums", lambda f, c: (None, "none"))
     monkeypatch.setattr(g, "_librosa_beats", lambda wav: {"beats": [], "bpm": None})
@@ -523,7 +523,7 @@ def _wire_breakdown(tmp_path, monkeypatch, album, med=8.0, blob_album=None):
     monkeypatch.setattr(soundfile, "info",
                         lambda *a, **k: types.SimpleNamespace(frames=int(22050 * 100), samplerate=22050))
     monkeypatch.setattr(g, "GP5_ROOTS", [tmp_path / "no_gp5"])
-    monkeypatch.setattr(g, "_prefer_gp5", lambda gp, track: None)
+    monkeypatch.setattr(g, "_prefer_tab", lambda gp, track: None)
     import boo_lab.stems as st
     monkeypatch.setattr(st, "ensure_drums", lambda f, c: (None, "none"))
     monkeypatch.setattr(g, "_librosa_beats", lambda wav: {"beats": [], "bpm": None})
@@ -556,3 +556,160 @@ def test_guess_never_writes_sections_jsonl(tmp_path, monkeypatch):
     _wire_figures(tmp_path, monkeypatch, sync_ok=True)
 
     assert sec.read_text(encoding="utf-8") == before
+
+
+# --- keeper-model drafts merged read-only ------------------------------------
+
+
+def test_guess_merges_keeper_model_drafts(tmp_path, monkeypatch):
+    lab = tmp_path / "lab"
+    (lab / "data").mkdir(parents=True, exist_ok=True)
+    (lab / "data" / "drafts.jsonl").write_text(
+        json.dumps({"album": "A", "track": "Fixture", "start": 5.0, "end": 9.0,
+                    "role": "hook", "source": "keeper-model", "heard": False}) + "\n",
+        encoding="utf-8",
+    )
+    flac = tmp_path / "song.flac"
+    flac.write_bytes(b"x")
+    monkeypatch.setattr(soundfile, "info",
+                        lambda *a, **k: types.SimpleNamespace(frames=int(22050 * 100), samplerate=22050))
+    monkeypatch.setattr(g, "GP5_ROOTS", [tmp_path / "no_gp5"])
+    monkeypatch.setattr(g, "_prefer_tab", lambda gp, track: None)
+    import boo_lab.stems as st
+    monkeypatch.setattr(st, "ensure_drums", lambda f, c: (None, "none"))
+    monkeypatch.setattr(g, "_librosa_beats", lambda wav: {"beats": [], "bpm": None})
+    monkeypatch.setattr(g, "_half_time_spans", lambda beats, min_len=6.0: [])
+    monkeypatch.setattr(g, "_kick_spans", lambda wav: [])
+
+    res = g.estimate_hybrid(flac, None, track="Fixture",
+                            cache=lab / "work" / "stems", album="A")
+
+    km = [s for s in res["sections"] if s.get("source") == "keeper-model"]
+    assert km and km[0]["role"] == "hook"
+    assert any("keeper-model drafts x1" in n for n in res["notes"])
+
+
+# --- tab-notes pack density drafts + meter/tempo cuts ------------------------
+
+
+def _wire_pack_drafts(tmp_path, monkeypatch, *, sync_ok):
+    lab = tmp_path / "lab"
+    (lab / "data").mkdir(parents=True, exist_ok=True)
+    (lab / "data" / "sync.jsonl").write_text(
+        json.dumps({"album": "A", "track": "Fixture", "sync_ok": sync_ok}) + "\n",
+        encoding="utf-8",
+    )
+    flac = tmp_path / "song.flac"
+    flac.write_bytes(b"x")
+    monkeypatch.setattr(soundfile, "info",
+                        lambda *a, **k: types.SimpleNamespace(frames=int(22050 * 100), samplerate=22050))
+    monkeypatch.setattr(g, "GP5_ROOTS", [tmp_path / "no_gp5"])
+    monkeypatch.setattr(g, "_prefer_tab", lambda gp, track: None)
+    import boo_lab.stems as st
+    monkeypatch.setattr(st, "ensure_drums", lambda f, c: (None, "none"))
+    monkeypatch.setattr(g, "_librosa_beats", lambda wav: {"beats": [], "bpm": None})
+    monkeypatch.setattr(g, "_half_time_spans", lambda beats, min_len=6.0: [])
+    monkeypatch.setattr(g, "_kick_spans", lambda wav: [])
+
+    from boo_lab import tabnotes_drafts as td
+    monkeypatch.setattr(
+        td, "density_drafts_for_song",
+        lambda lab_root, album, track, **k: [
+            {"role": "riff", "start": 1.0, "end": 2.0, "source": "tabnotes-density",
+             "heard": False, "album": album, "track": track}])
+    monkeypatch.setattr(
+        td, "meter_cuts_for_song",
+        lambda lab_root, album, track, **k: [12.3, 45.1])
+    return g.estimate_hybrid(flac, None, track="Fixture",
+                             cache=lab / "work" / "stems", album="A")
+
+
+def test_guess_merges_tabnotes_density_when_sync_ok(tmp_path, monkeypatch):
+    res = _wire_pack_drafts(tmp_path, monkeypatch, sync_ok=True)
+
+    density = [s for s in res["sections"] if s.get("source") == "tabnotes-density"]
+    assert density and density[0]["role"] == "riff"
+    assert all(s["heard"] is False for s in density)
+    assert any("tabnotes density x1" in n for n in res["notes"])
+
+
+def test_guess_no_tabnotes_density_when_not_sync_ok(tmp_path, monkeypatch):
+    res = _wire_pack_drafts(tmp_path, monkeypatch, sync_ok=False)
+
+    assert not [s for s in res["sections"] if s.get("source") == "tabnotes-density"]
+    assert not [n for n in res["notes"] if "tabnotes density" in n]
+
+
+def test_guess_surfaces_meter_cuts_as_a_note(tmp_path, monkeypatch):
+    res = _wire_pack_drafts(tmp_path, monkeypatch, sync_ok=True)
+
+    assert any("tempo/meter cuts at 12.3s, 45.1s" in n for n in res["notes"])
+
+
+def test_guess_no_meter_cuts_when_not_sync_ok(tmp_path, monkeypatch):
+    res = _wire_pack_drafts(tmp_path, monkeypatch, sync_ok=False)
+
+    assert not [n for n in res["notes"] if "tempo/meter cuts" in n]
+
+
+# --- GP7/GPIF tab preference (same priority as sync) -------------------------
+
+
+def test_prefer_tab_returns_gp7_even_with_a_sibling_gp5(tmp_path):
+    gp7 = tmp_path / "02 Elimination.gp"
+    gp5 = tmp_path / "02 Elimination.gp5"
+    gp7.write_bytes(b"x")
+    gp5.write_bytes(b"x")
+
+    assert g._prefer_tab(gp7, "02 Elimination") == gp7
+
+
+def test_prefer_tab_upgrades_a_gp5_to_its_gp7_sibling(tmp_path):
+    gp7 = tmp_path / "02 Elimination.gp"
+    gp5 = tmp_path / "02 Elimination.gp5"
+    gp7.write_bytes(b"x")
+    gp5.write_bytes(b"x")
+
+    assert g._prefer_tab(gp5, "02 Elimination") == gp7
+
+
+def test_prefer_gp5_is_a_backward_compat_alias(tmp_path):
+    gp7 = tmp_path / "02 Elimination.gp"
+    gp7.write_bytes(b"x")
+
+    assert g._prefer_gp5(gp7, "02 Elimination") == gp7
+
+
+def test_guess_uses_gpif_estimator_for_a_gp7_tab(tmp_path, monkeypatch):
+    lab = tmp_path / "lab"
+    (lab / "data").mkdir(parents=True)
+    (lab / "data" / "sync.jsonl").write_text(
+        json.dumps({"album": "A", "track": "Fixture", "sync_ok": True, "lag_sec": 0.05}) + "\n",
+        encoding="utf-8",
+    )
+    flac = tmp_path / "song.flac"
+    flac.write_bytes(b"x")
+    gp7 = tmp_path / "song.gp"
+    gp7.write_bytes(b"x")
+    monkeypatch.setattr(soundfile, "info",
+                        lambda *a, **k: types.SimpleNamespace(frames=int(22050 * 100), samplerate=22050))
+    monkeypatch.setattr(g, "GP5_ROOTS", [tmp_path / "no_gp5"])
+    import boo_lab.extract as ex
+    monkeypatch.setattr(ex, "estimate_from_gpif", lambda p: {
+        "bpm": 120, "duration": 10,
+        "sections": [{"role": "riff", "start": 2.0, "end": 6.0, "source": "gp-marker"}],
+    })
+    monkeypatch.setattr(ex, "estimate_from_gp",
+                        lambda p: (_ for _ in ()).throw(
+                            AssertionError("GP5 parser must not run for a GP7 tab")))
+    import boo_lab.stems as st
+    monkeypatch.setattr(st, "ensure_drums", lambda f, c: (None, "none"))
+    monkeypatch.setattr(g, "_librosa_beats", lambda wav: {"beats": [], "bpm": None})
+    monkeypatch.setattr(g, "_half_time_spans", lambda beats, min_len=6.0: [])
+    monkeypatch.setattr(g, "_kick_spans", lambda wav: [])
+
+    res = g.estimate_hybrid(flac, gp7, track="Fixture",
+                            cache=lab / "work" / "stems", album="A")
+
+    assert any(s.get("source") == "gp-marker" for s in res["sections"])
+    assert any(n == "tab " + str(gp7) for n in res["notes"])

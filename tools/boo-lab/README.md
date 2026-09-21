@@ -22,7 +22,7 @@ GP     C:\Users\RIGGUSPIG\Desktop\god-tier-metal\reference\gp-tabs
 
 ## Start
 
-New here? Read **USER.md** first. Easiest (scans, hashes, runs the resumable beat/sync pass, then serves): run `START.bat`.
+New here? Read **USER.md** first. Easiest (scans, hashes, full resumable `interns` prep, then serves): run `START.bat`. Prep never Guess/Saves; Lab clicks load drafts / lyrics / Guess.
 
 Manual equivalent (use the lab root under **This machine** above):
 
@@ -30,6 +30,8 @@ Manual equivalent (use the lab root under **This machine** above):
 cd <lab root from "This machine">
 .venv\Scripts\activate
 python -m boo_lab.cli scan
+python -m boo_lab.cli hash
+python -m boo_lab.cli interns
 python -m boo_lab.cli studio --port 8765
 ```
 
@@ -92,7 +94,7 @@ The intern stack is a minefield; each fix is now code or a hard pin, not a sessi
 | a machine draft / unknown role-sourced as human | fail-closed schema: `is_keeper`, `canonical_role`, `stamp_box`, and the one `load_section_rows` reader |
 
 Behavior is pinned by `tests/test_natten_compat.py`, `test_device.py`, `test_doctor.py`, plus bad-input
-tests for the keeper law and Save path. Lab: **342 tests**; engine: **820 passed, 1 skipped**. Generated
+tests for the keeper law and Save path. Lab: **389 tests**; engine: **820 passed, 1 skipped**. Generated
 outputs (`data/{drafts,beats,compare,sync,agree}.*`, `data/sections.jsonl.bak`, `*.tmp`) and
 `*.egg-info/` are gitignored; the tracked asset stays `data/sections.jsonl` (human pins).
 
@@ -121,13 +123,13 @@ Snap beats / JSON / Next GP live under **Lab**; Drop / Push git / Remove album l
 4. **Pack** once labels are good.
 5. Old pins without `heard`: `boo-lab hear --album X --track Y` (that track only).
 6. If the interns are installed: `boo-lab interns --album X` runs the whole chain in order
-   (structure, beats, drums, vocals, lyrics, sync, extract, figures, tempo_hints, compare, learn,
-   status), skipping what is already on disk. `sync` clocks a GP7 `.gp`/`.gpx` when one is present
+   (stems, beats, structure, drums, vocals, lyrics, sync, extract, figures, tempo_hints, compare, learn,
+   predict, status), skipping what is already on disk. `sync` clocks a GP7 `.gp`/`.gpx` when one is present
    (parsed natively, no conversion), else the `.gp5`. Or run one step: `boo-lab structure
    --album X`, then `boo-lab compare --album X`.
 
 Rules: skip **VAL** songs; never Guess a finished song; the interns (Guess / allin1 / SongFormer /
-beat_this / Demucs) are optional **stencils**, not truth; `learn` does not train anything.
+beat_this / Demucs) are optional **stencils**, not truth; `learn` only ranks draft sources; the structure **predictor** (`predict-train`) is what trains on keepers.
 
 ## The table columns
 
@@ -141,7 +143,7 @@ The secondary columns (`form` / `uniq` / `inst` / `bar0` / `bar1` / `source`) st
 - **inst** — which instrument leads (`rhythm`/`lead`/`bass`/`drums`/`synth`/`vocal`/`mix`); blank is fine.
 - **bar0 / bar1** — the tab's measures (1-based); auto-filled on Save **only** when a GP tab matches, else blank.
 - **start / end** — seconds in the audio.
-- **source** — `human`, or a draft (`guess` / `msa-draft` / `songformer-draft`).
+- **source** — `human`, or a draft (`guess` / `msa-draft` / `songformer-draft` / `keeper-model`).
 - **heard** — the save gate; unticked boxes are dropped.
 
 Figure roles (`riff`/`hook`/`solo`/`pulse`) may overlap function roles (`intro`/`build`/`breakdown`/`chill`/`outro`);
@@ -153,7 +155,7 @@ Type the band name. Drop a **zip or folder** (not RAR). FLACs + `cover.jpg` + `.
 
 A local **tab-notes pack** (`.zip` or folder with `notes.json` `format: tab-notes/1`) may be in the same drop: it is detected and unpacked into `data/tabnotes/<id>/`, indexed in `data/tabnotes_index.jsonl`, and never copied into the FLAC/GP roots. Put packs in the ingest drop folder or directly in `data/tabnotes/`.
 
-Then `python -m boo_lab.cli scan` and reload. Green GP5/GP7 = matched tab.
+Then `python -m boo_lab.cli scan` and reload. Green GP7/GP5 = matched tab: the badge follows `map.csv` but prefers a matching GP7 `.gp`/`.gpx` over a legacy `.gp5` (via `sync._prefer_gpif_path` and the `BOO_GP_ROOT` index), and `.gp`/`.gpx` display as `GP7`.
 
 ## Commands
 
@@ -166,7 +168,7 @@ Then `python -m boo_lab.cli scan` and reload. Green GP5/GP7 = matched tab.
 | `pack` | slice mix/drums/bass/other/guitar/piano/vocals/no-vox per keeper box |
 | `drums [--per-track]` | drum onsets + measured `low_confidence` per keeper section, or one whole-track row per song |
 | `vocals [--per-track]` | vocal melody (CREPE) per keeper section, or one whole-track row per song |
-| `lyrics` | LRCLIB + WhisperX force-aligned plain lyrics |
+| `lyrics` | LRCLIB text + WhisperX force-aligned times when a vocals stem is cached (WhisperX times win) |
 | `interns [--album X] [--steps a,b,c]` | run the whole analysis chain in order, cache-first and failure-isolated |
 | `structure` | MSA/SongFormer drafts → `data/drafts.jsonl` (allin1 optional; cache-first) |
 | `beats` | beat/downbeat grid → `data/beats.jsonl` (beat_this → allin1) |
@@ -174,6 +176,8 @@ Then `python -m boo_lab.cli scan` and reload. Green GP5/GP7 = matched tab.
 | `tabnotes --path F [--json] [--index]` | read a local tab-notes pack (`.zip`/folder): tracks, both clocks, raw tuplets/bends; `--index` → `data/tabnotes_index.jsonl` |
 | `gp-export` | probe `.gp`/`.gpx`: already parse (run `scan`) or record `gpx-unsupported`/`gp7-unsupported` (+ GPIF `converted`/`drops`) |
 | `learn` | rebuild `data/intern_rank.json`: rank draft sources from keepers (5-song vote, F@0.5) |
+| `predict-train [--album X]` | fine-tune structure predictor on heard keepers → `work/models/structure-v1/` |
+| `predict [--album X] [--track Y]` | keeper-model drafts → `data/drafts.jsonl` (never sections.jsonl) |
 | `status` | refresh the `STATUS.md` counts block from data files |
 | `adapt` | rebuild `data/adapt.json`: per-album edge/role/figure calibration from heard pairs |
 | `doctor` | torch/GPU + optional-intern check with install hints |

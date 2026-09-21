@@ -370,6 +370,29 @@ def test_chroma_lag_and_score_identical_matrices():
     assert abs(lag) < 1e-9 and score > 0.9
 
 
+def _gp_chroma_from(monkeypatch, events):
+    monkeypatch.setattr(sync, "_tab_notes", lambda p: list(events))
+    return sync.gp_chroma(Path("x.gp"), 0.01, 100)
+
+
+def test_gp_chroma_accepts_gpif_4_tuple(monkeypatch):
+    chroma = _gp_chroma_from(monkeypatch, [(0.0, 64, 0.5, False)])  # 64 % 12 == 4
+    assert chroma is not None
+    assert chroma[4].sum() > 0.0
+    assert chroma.sum() == chroma[4].sum()
+
+
+def test_gp_chroma_skips_none_midi(monkeypatch):
+    chroma = _gp_chroma_from(monkeypatch, [(0.0, None, 0.5, False)])
+    assert chroma is not None and chroma.sum() == 0.0
+
+
+def test_gp_chroma_still_accepts_gp5_3_tuple(monkeypatch):
+    chroma = _gp_chroma_from(monkeypatch, [(0.0, [60, 63], 0.5)])
+    assert chroma is not None
+    assert chroma[0].sum() > 0.0 and chroma[3].sum() > 0.0
+
+
 def test_chroma_co_witness_can_bless(tmp_path, monkeypatch):
     import numpy as np
 

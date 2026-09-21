@@ -84,20 +84,29 @@ def create_app(lab_root: Path, flac_root: Path | None, gp_root: Path | None) -> 
     def _norm_name(s: str) -> str:
         import re
         s = (s or "").replace("∆", "A").replace("Δ", "A").replace("δ", "a").lower()
-        s = re.sub(r"^\d+\s*[-_.]\s*", "", s)
+        # Strip leading track numbers: "02 - Foo", "02. Foo", or "02 Foo"
+        s = re.sub(r"^\d+(?:\s*[-_.]\s*|\s+)", "", s)
         return re.sub(r"[^a-z0-9]+", "", s)
 
     _gp5_cache: dict = {"t": None, "idx": {}}
 
     def _gp5_index() -> dict[str, Path]:
-        # Real GP root (BOO_GP_ROOT) -- no hardcoded absolute path. `.gp5`
-        # (and modern `.gp`) files are indexed by normalized stem so the
-        # sidebar can show a green match even when map.csv has no gp_path.
+        # Real GP root (BOO_GP_ROOT) -- no hardcoded absolute path. Prefer
+        # modern `.gp`/`.gpx` (GP7+) over legacy `.gp5/.gp4/.gp3` so a
+        # sibling never masks the better file (same preference as
+        # sync._prefer_gpif_path); the sidebar badge then reads GP7.
         roots = [gp_root] if gp_root and gp_root.exists() else []
         if not roots:
             return {}
+        rank = {".gp": 0, ".gpx": 1, ".gp5": 2, ".gp4": 3, ".gp3": 4}
         try:
-            stamp = tuple(p.stat().st_mtime for p in roots)
+            # Include nested file count so adding GP7 under gp7/ busts cache
+            # even when the root directory mtime stays put on Windows.
+            nfiles = 0
+            for root in roots:
+                for pat in ("*.gp", "*.gpx", "*.gp5", "*.gp4", "*.gp3"):
+                    nfiles += sum(1 for _ in root.rglob(pat))
+            stamp = (tuple(p.stat().st_mtime for p in roots), nfiles)
         except Exception:
             stamp = None
         if _gp5_cache["idx"] and _gp5_cache["t"] == stamp:
@@ -105,9 +114,15 @@ def create_app(lab_root: Path, flac_root: Path | None, gp_root: Path | None) -> 
         idx: dict[str, Path] = {}
         for root in roots:
             try:
-                for pattern in ("*.gp5", "*.gp4", "*.gp3", "*.gp"):
+                for pattern in ("*.gp", "*.gpx", "*.gp5", "*.gp4", "*.gp3"):
                     for p in root.rglob(pattern):
-                        idx.setdefault(_norm_name(p.stem), p)
+                        suf = p.suffix.lower()
+                        if suf not in rank:
+                            continue
+                        key = _norm_name(p.stem)
+                        cur = idx.get(key)
+                        if cur is None or rank[suf] < rank.get(cur.suffix.lower(), 99):
+                            idx[key] = p
             except Exception:
                 continue
         _gp5_cache["t"] = stamp
@@ -154,12 +169,39 @@ def create_app(lab_root: Path, flac_root: Path | None, gp_root: Path | None) -> 
         out = []
         for i, r in enumerate(rows):
             key = _norm_name(r.get("track") or "")
-            gp5 = idx.get(key)
+            # map.csv path first, then upgrade .gp5 -> matching GP7 (same as sync)
+            gp5 = None
+            raw_gp = r.get("gp_path") or r.get("gp") or ""
+            if raw_gp:
+                try:
+                    cand = Path(raw_gp)
+                    if cand.exists():
+                        from .sync import _prefer_gpif_path
+                        gp5 = _prefer_gpif_path(cand)
+                        # _prefer_gpif_path only searches the file's own dir or
+                        # BOO_GP_ROOT; the lab's own gp_root index (built above,
+                        # GP7-preferred) also knows `gp7/`-style siblings. Upgrade
+                        # a legacy map path when the index has a modern file;
+                        # keep the map path when it already points at GP7.
+                        if gp5.suffix.lower() not in (".gp", ".gpx"):
+                            better = idx.get(key)
+                            if better is not None and better.suffix.lower() in (".gp", ".gpx"):
+                                gp5 = better
+                except Exception:
+                    gp5 = None
+            if not gp5:
+                gp5 = idx.get(key)
             if not gp5 and key:
+                # Prefer exact-ish stem match; among fuzzy hits take modern format
+                rank = {".gp": 0, ".gpx": 1, ".gp5": 2, ".gp4": 3, ".gp3": 4}
+                best = None
+                best_r = 99
                 for k, p in idx.items():
                     if key in k or k in key:
-                        gp5 = p
-                        break
+                        rr = rank.get(p.suffix.lower(), 99)
+                        if rr < best_r:
+                            best, best_r = p, rr
+                gp5 = best
             notes = (r.get("notes") or "").lower()
             partial = False
             if gp5:
@@ -207,7 +249,14 @@ def create_app(lab_root: Path, flac_root: Path | None, gp_root: Path | None) -> 
                     "has_gp": bool(gp5),
                     "gp_partial": partial,
                     "gp_name": gp5.name if gp5 else "",
-                    "gp_kind": (gp5.suffix.lower().lstrip(".") if gp5 else ""),
+                    "gp_kind": (
+                        {"gp": "gp7", "gpx": "gp7"}.get(
+                            gp5.suffix.lower().lstrip("."),
+                            gp5.suffix.lower().lstrip("."),
+                        )
+                        if gp5
+                        else ""
+                    ),
                     "has_cover": bool(_cover_near(fp)),
                     "split": split_for(r.get("album"), r.get("track"), holdout),
                     "stems": stems,
@@ -644,6 +693,14 @@ def create_app(lab_root: Path, flac_root: Path | None, gp_root: Path | None) -> 
                    n_pairs=global_blob.get("n_pairs", 0))
         except Exception:
             pass
+        # Structure predictor: after keepers land, fire a low-epoch fine-tune
+        # in a daemon thread (torch-gated inside predict; never blocks Save).
+        try:
+            from .predict import maybe_train_on_save
+
+            maybe_train_on_save(lab_root, meta["album"], meta["track"])
+        except Exception:
+            pass
         body: dict = {"saved": len(keepers), "path": str(sec_path),
                       "dropped_unheard": dropped_unheard,
                       "backup": str(backup_path)}
@@ -653,26 +710,41 @@ def create_app(lab_root: Path, flac_root: Path | None, gp_root: Path | None) -> 
         return body
 
     @app.post("/api/ingest")
-    async def api_ingest(band: str = Form("new_band"), files: list[UploadFile] = File(...)):
+    async def api_ingest(band: str = Form(""), files: list[UploadFile] = File(...)):
         if not flac_root or not gp_root:
             return JSONResponse({"detail": "BOO_FLAC_ROOT / BOO_GP_ROOT missing"}, status_code=400)
-        drop = lab_root / "work" / "drop" / band.replace(" ", "_")
+        import time as _time
+
+        from .ingest import ingest, prep_after_ingest
+
+        # Fresh per-drop folder: a previous upload's `notes.json` can't turn a
+        # later audio drop into a "pack", and two drops never mix.
+        slug = (band or "drop").strip().replace(" ", "_") or "drop"
+        drop = lab_root / "work" / "drop" / ("%s-%d" % (slug, int(_time.time() * 1000)))
         drop.mkdir(parents=True, exist_ok=True)
         saved = []
         for up in files:
-            name = Path(up.filename or "file").name
-            dest = drop / name
+            # Preserve folder-relative paths from a directory drop
+            # (browser sends "Album/track.flac" or "pack/notes.json").
+            raw = (up.filename or "file").replace("\\", "/").lstrip("/")
+            parts = [p for p in Path(raw).parts if p not in ("", ".", "..")]
+            if not parts:
+                parts = ["file"]
+            rel = Path(*parts)
+            dest = drop / rel
+            dest.parent.mkdir(parents=True, exist_ok=True)
             data = await up.read()
             dest.write_bytes(data)
             saved.append(str(dest))
-        from .catalogue import save_map, scan_roots
-        from .ingest import ingest
-
         report = ingest(drop, flac_root, gp_root, band, lab_root=lab_root)
-        drafted = scan_roots(flac_root, gp_root)
-        save_map(lab_root / "data" / "map.csv", drafted)
+        # Prep what just landed so the studio needs no restart. Soft-fail:
+        # `prep` records any error and the copied files stay put.
+        report["prep"] = prep_after_ingest(
+            lab_root, flac_root, gp_root,
+            band=report.get("band") or band,
+            albums=report.get("albums") or [])
         report["saved_uploads"] = saved
-        report["map_rows"] = len(drafted)
+        report["map_rows"] = report["prep"].get("map_rows", 0)
         return report
 
     @app.get("/api/lyrics/{track_id}")

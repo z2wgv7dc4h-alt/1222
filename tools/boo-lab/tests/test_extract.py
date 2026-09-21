@@ -4,6 +4,7 @@ real copyrighted GP file)."""
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 import pytest
 
@@ -251,3 +252,29 @@ def test_estimate_from_gp_unparseable_file_fails_closed(tmp_path):
     bad.write_bytes(b"nope")
     with pytest.raises(Exception):
         ex.estimate_from_gp(bad)
+
+
+# --- estimate_from_gpif ------------------------------------------------------
+
+FIX_GP7 = Path(__file__).parent / "fixtures" / "tiny.gp"
+
+
+def test_estimate_from_gpif_uses_masterbar_sections_and_playback_order():
+    result = ex.estimate_from_gpif(FIX_GP7)
+
+    assert result["duration"] == pytest.approx(8.0)
+    assert [s["source"] for s in result["sections"]] == ["gp-marker", "gp-marker"]
+    # bar 1's section "A" plays at 2.0s and again at 6.0s (2x repeat)
+    assert [s["start"] for s in result["sections"]] == [2.0, 6.0]
+    assert result["sections"][0]["end"] == 6.0
+    assert result["sections"][1]["end"] == 8.0
+    assert result["sections"][0]["role"] == "riff"
+    assert result["sections"][0]["figure_id"] == "riff-A"
+    assert result["sections"][0]["unique"] is False
+
+
+def test_estimate_from_gpif_unparseable_file_fails_closed(tmp_path):
+    bad = tmp_path / "bad.gp"
+    bad.write_bytes(b"nope")
+    with pytest.raises(Exception):
+        ex.estimate_from_gpif(bad)

@@ -6,10 +6,13 @@ failure does not abort the rest; re-running resumes where it stopped. Never
 writes `sections.jsonl`.
 
 Steps (default order): stems -> beats -> structure -> drums -> vocals ->
-lyrics -> sync -> extract -> figures -> tempo_hints -> compare -> learn ->
-status. (Step id is `tempo_hints` with an underscore, matching this file's
-own `_step_<name>` dispatch convention; the CLI command it runs is the
-hyphenated `boo-lab tempo-hints`.)
+lyrics -> sync -> tabnotes_drafts -> extract -> figures -> tempo_hints ->
+compare -> learn -> predict -> status. (Step ids `tempo_hints` /
+`tabnotes_drafts` use an underscore, matching this file's own `_step_<name>`
+dispatch convention; the CLI commands are the hyphenated `boo-lab tempo-hints`
+and `boo-lab tabnotes-drafts`. `tabnotes_drafts` writes density drafts for
+packs whose song is `sync_ok`; `predict` infers keeper-model drafts only when
+a trained model exists, else it skips.)
 """
 from __future__ import annotations
 
@@ -19,7 +22,8 @@ import sys
 from pathlib import Path
 
 STEPS = ("stems", "beats", "structure", "drums", "vocals", "lyrics",
-         "sync", "extract", "figures", "tempo_hints", "compare", "learn", "status")
+         "sync", "tabnotes_drafts", "extract", "figures", "tempo_hints",
+         "compare", "learn", "predict", "status")
 
 
 def _read_jsonl(path: Path) -> list[dict]:
@@ -149,6 +153,12 @@ def _step_sync(lab_root, rows, cache):
     return {"sync_run": done}
 
 
+def _step_tabnotes_drafts(lab_root, rows, cache, album):
+    from .tabnotes_drafts import build_density_drafts
+
+    return build_density_drafts(lab_root, rows, album=album)
+
+
 def _step_extract(lab_root, rows, cache, album):
     cmd = [sys.executable, "-m", "boo_lab.cli", "extract"]
     if album:
@@ -192,6 +202,18 @@ def _step_learn(lab_root, rows, cache, album):
     return {"prefer": rank.get("prefer"), "n_voted": rank.get("n_voted")}
 
 
+def _step_predict(lab_root, rows, cache, album):
+    """Infer keeper-model drafts only when a trained model is on disk; else a
+    clean skip. Never trains (too slow for an interns pass)."""
+    from .predict import build_drafts, model_exists
+
+    if not model_exists(lab_root):
+        return {"skipped": "no model"}
+    report = build_drafts(lab_root, rows, album=album, cache=cache)
+    return {"written": report.get("written", 0), "tracks": report.get("tracks", 0),
+            "reason": report.get("reason")}
+
+
 def _step_status(lab_root, rows, cache):
     from .status import run_status
 
@@ -222,6 +244,8 @@ def run_interns(lab_root, flac_root=None, gp_root=None, *, album=None,
                 results[step] = _step_lyrics(lab_root, rows, cache)
             elif step == "sync":
                 results[step] = _step_sync(lab_root, rows, cache)
+            elif step == "tabnotes_drafts":
+                results[step] = _step_tabnotes_drafts(lab_root, rows, cache, album)
             elif step == "extract":
                 results[step] = _step_extract(lab_root, rows, cache, album)
             elif step == "figures":
@@ -232,6 +256,8 @@ def run_interns(lab_root, flac_root=None, gp_root=None, *, album=None,
                 results[step] = _step_compare(lab_root, rows, cache, album)
             elif step == "learn":
                 results[step] = _step_learn(lab_root, rows, cache, album)
+            elif step == "predict":
+                results[step] = _step_predict(lab_root, rows, cache, album)
             elif step == "status":
                 results[step] = _step_status(lab_root, rows, cache)
             else:

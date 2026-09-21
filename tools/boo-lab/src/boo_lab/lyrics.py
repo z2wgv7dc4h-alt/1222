@@ -198,7 +198,9 @@ def build_lyrics(lab_root: Path, track: str, flac: Path | None, vocals: Path | N
         if plain_lines
         else (hit.get("error") or "no lyrics")
     )
-    if (not lines) and vocals and vocals.exists() and plain:
+    # Prefer WhisperX times onto OUR vocals stem when available.
+    # LRCLIB supplies plain text (and LRC times only if align fails).
+    if vocals and vocals.exists() and plain:
         aligned = align_whisperx(vocals, plain)
         if aligned:
             lines = aligned

@@ -240,7 +240,12 @@ def gp_chroma(gp_path: Path, hop_s: float, n_frames: int):
     chroma = np.zeros((12, max(0, n_frames)), dtype=float)
     if hop_s <= 0:
         return chroma
-    for t, pitches, dur in events:
+    for ev in events:
+        # GP5 guitarpro yields (t, [pitches], dur); GPIF yields
+        # (t, midi|None, dur, palm_mute) -- tolerate both shapes here.
+        t, dur = ev[0], ev[2]
+        mid = ev[1]
+        pitches = mid if isinstance(mid, (list, tuple)) else ([] if mid is None else [mid])
         # Hold each note over its beat: audio chroma is sustained, so an
         # onset-only comb correlates poorly even when the pitches are right.
         start = int(round(t / hop_s))

@@ -28,7 +28,7 @@ Docs (2026-09-21): START full interns; structure **predictor** north star (keepe
 
 Works: studio keeps pins (`human`/`guess-accepted` + `heard`) in `sections.jsonl`; mel
 spectrogram under the WaveSurfer waveform; 6-stem picker; drafts; `hear`/`sync`/`hash`;
-`agree`/`compare`/`export-jams`/`beats`/`audit`/`report`; **389 tests pass** (predict + suite; run `pytest -q`).
+`agree`/`compare`/`export-jams`/`beats`/`audit`/`report`; **460 tests pass** (predict + suite; run `pytest -q`).
 Corpus-wide cold start (2026-09-21): `adapt.py` gains `rebuild_global` -- the same
 median-shift/role-remap/breakdown-span calibration `rebuild_album` already computes,
 pooled across every non-holdout album instead of one. `load_adapt` now falls back to

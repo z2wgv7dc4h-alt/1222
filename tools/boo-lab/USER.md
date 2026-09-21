@@ -1,4 +1,4 @@
-﻿# boo-lab
+# boo-lab
 
 This is the operator guide. LAW.md = rules. CURRENT.md = internals. README.md = install.
 
@@ -17,26 +17,29 @@ Audio and Guitar Pro files stay on this PC. Git only stores code and labels.
 
 ---
 
-# Part A â€” work
+# Part A — work
 
 ## Open
 
-Double-click START.bat (studio first; interns in a side window) / PREP.bat in the boo-lab folder.
-It rescans, hashes new FLACs, then runs the **full** interns prep
-(stems, beats, structure drafts, drums, vocals, lyrics, sync, extract,
-figures, tempo hints, compare, learn, predict, status) before opening the studio.
-That pass is resumable and cache-first; it only fills what is missing.
-(`predict` is a clean skip until a keeper-trained model exists â€” with zero keepers
+Double-click START.bat in the boo-lab folder.
+It rescans, hashes new FLACs, opens the **studio immediately**, and kicks full
+intern prep (stems, beats, structure drafts, drums, vocals, lyrics, sync,
+extract, figures, tempo hints, compare, learn, predict, status) in a **side
+window** so a SongFormer EMA hang cannot block labeling. That prep is
+resumable and cache-first; it only fills what is missing. Per-track SongFormer
+times out after 360s (BOO_SONGFORMER_TIMEOUT_SEC) and kills its process tree.
+(predict is a clean skip until a keeper-trained model exists — with zero keepers
 today, nothing to train yet.) It never runs Guess and never Saves keepers.
+Prep-only (no studio): PREP.bat.
 
-After prep: **Load drafts** and **Lyrics** have something waiting.
+After prep finishes in the side window: **Load drafts** and **Lyrics** have something waiting.
 **Guess** still computes when you click (uses sync/stems/tab on disk).
 **Heard + Save** stays yours.
 
 Browser: http://127.0.0.1:8765
 Old page: Ctrl+Shift+R.
 
-Thin studio-only (skips prep â€” use when prep already finished):
+Thin studio-only (skips prep — use when prep already finished):
 
     cd tools/boo-lab
     .venv/Scripts/activate
@@ -50,15 +53,15 @@ Manual full prep without opening the UI:
 
 ## Mark
 
-Double-click a box (or its table row) to zoom and **Aâ€“B loop** that part while you
+Double-click a box (or its table row) to zoom and **A–B loop** that part while you
 Click away from the looping box (or Esc / Space / Play box once) to stop. Right-click edit panel closes on outside click too.
 drag the edges. Esc or Space stops the loop. Play box still plays once.
 
 
 1. Click a song on the left. Skip anything tagged **VAL**.
-2. Wait until the clock shows the real song length. Not `0:00 / â€”`.
+2. Wait until the clock shows the real song length. Not `0:00 / —`.
 3. Press **1** (Riff) or another role button. A box appears.
-4. Drag the box to cover that part. Drag does not create a box â€” the button does.
+4. Drag the box to cover that part. Drag does not create a box — the button does.
 5. If the same idea comes back, reuse the same **figure** name (`riff-A`).
    A new idea gets a new name (`riff-B`).
 6. Tick **heard** only after you listened to that box.
@@ -66,8 +69,8 @@ drag the edges. Esc or Space stops the loop. Play box still plays once.
 
 One album per sitting is enough.
 
-**Keys:** Space play Â· 1 riff Â· 2 hook Â· 3 breakdown Â· **T blast** Â· 4 solo Â· I intro Â· B build Â· C chill Â· P pulse Â· S save Â· J / K songs Â· Delete box Â· Ctrl+Z undo Â· Esc stops box loop / closes right-click
-B build Â· C chill Â· P pulse Â· S save Â· J / K songs Â· Delete box Â· Ctrl+Z undo Â·
+**Keys:** Space play · 1 riff · 2 hook · 3 breakdown · **T blast** · 4 solo · I intro · B build · C chill · P pulse · S save · J / K songs · Delete box · Ctrl+Z undo · Esc stops box loop / closes right-click
+B build · C chill · P pulse · S save · J / K songs · Delete box · Ctrl+Z undo ·
 ? help.
 
 ## Lanes and right-click
@@ -78,7 +81,7 @@ shows as three bars at once. Click a bar to select its row; click a row to
 light its bar. Right-click a bar to edit role / figure / heard / unique / inst,
 Play box, Split at playhead (when the playhead is inside), or Delete.
 Double-click a bar to toggle heard. The All / Figures / Functions buttons only
-hide bars and rows â€” they never edit. synth is an instrument (inst), not a role.
+hide bars and rows — they never edit. synth is an instrument (inst), not a role.
 
 ## Ignore until you need them
 
@@ -92,14 +95,14 @@ Selected song is highlighted in the left list.
 
 ## Stuck
 
-Clock 0:00 / â€” means wait. Do not draw yet.
+Clock 0:00 / — means wait. Do not draw yet.
 Empty song list: run scan. Check .env roots in README.
 Save refused: read the status line (overlap, unheard, tiny box).
 Last Save was wrong: Undo / Ctrl+Z. Save also left data/sections.jsonl.bak.
 
 ---
 
-# Part B â€” the lab
+# Part B — the lab
 
 ## The rule
 
@@ -108,22 +111,22 @@ heard + Save is the only way a box becomes official.
 
 ## Two kinds of box
 
-Gold (keeper) â€” you heard it, you saved it. Lives in data/sections.jsonl.
+Gold (keeper) — you heard it, you saved it. Lives in data/sections.jsonl.
 Source is human or guess-accepted.
 
-Stencil (draft) â€” Guess or an intern drew it. Lives in data/drafts.jsonl.
+Stencil (draft) — Guess or an intern drew it. Lives in data/drafts.jsonl.
 Sources: guess, gp-marker, msa-draft, songformer-draft, keeper-model, tabnotes-density, tabnotes-structure, blast-hint.
 It appears on the wave unheard. It dies on Save unless you tick heard.
 
-Tick heard on a Guess box and Save â†’ gold, marked guess-accepted.
+Tick heard on a Guess box and Save → gold, marked guess-accepted.
 That is how you agree with a suggestion. Dragging it first is fine.
 Save may also fire a background fine-tune of the structure predictor (see
 Learning); it never retrains the frozen interns.
 
 ## Roles
 
-Ideas (figures): riff, hook, solo, pulse â€” a thing you can hum or play.
-Jobs (functions): intro, build, breakdown, **blast**, chill, outro â€” what
+Ideas (figures): riff, hook, solo, pulse — a thing you can hum or play.
+Jobs (functions): intro, build, breakdown, **blast**, chill, outro — what
 that part does in the song.
 
 - **Breakdown** = half-time / pit slam (drums).
@@ -134,7 +137,7 @@ that part does in the song.
 
 Two boxes of the same role may not overlap. Save will refuse.
 
-figure â€” name of the idea (`riff-A`, or tab letter `B`). Reuse it when the idea returns.
+figure — name of the idea (`riff-A`, or tab letter `B`). Reuse it when the idea returns.
 
 ## The page
 
@@ -145,32 +148,32 @@ heard: the gate.
 Lab: Guess, drafts, lyrics, Pack, Snap.
 Corpus: add files, git, delete an album.
 
-## Add music (Corpus â†’ Ingest)
+## Add music (Corpus → Ingest)
 
-Drop a **file, zip, or folder** on the Corpus â†’ Ingest box (or use
+Drop a **file, zip, or folder** on the Corpus → Ingest box (or use
 **Add file(s)** / **Add folder**). A lone `.flac` / `.wav`, GP tab, tab-notes
-`.zip`, `notes.json`, or a folder that is a pack all work â€” not only an
+`.zip`, `notes.json`, or a folder that is a pack all work — not only an
 archive of mixed stuff.
 
 Band is optional. Leave it blank and it is inferred from the file or pack name
 (`Born_Of_Osiris-Elimination`, `Born Of Osiris - Song`,
 `born_of_osiris__the_new_reign__s32187`). Type a band only to force one.
 
-Ingest then preps what landed â€” scan, hash, and `beats,sync` (scoped to the
-album when one is known) â€” and refreshes the song list. No studio restart. A
+Ingest then preps what landed — scan, hash, and `beats,sync` (scoped to the
+album when one is known) — and refreshes the song list. No studio restart. A
 prep error is shown in the status line; the copied files still stay.
 
 ## Guess, drafts, interns
 
 An intern is an optional helper that proposes structure or extra analysis.
 
-Guess â€” tab section markers if the clock matched, plus drum breakdowns.
-allin1 â€” mix cut into parts (msa-draft).
-SongFormer â€” newer mix cutter (songformer-draft).
-structure predictor â€” your own keeper-trained boxes (keeper-model); learns from Save.
-beat_this â€” beat grid for Snap.
-Demucs â€” split stems for Pack and some analysis.
-torchcrepe / whisperx â€” melody / lyrics.
+Guess — tab section markers if the clock matched, plus drum breakdowns.
+allin1 — mix cut into parts (msa-draft).
+SongFormer — newer mix cutter (songformer-draft).
+structure predictor — your own keeper-trained boxes (keeper-model); learns from Save.
+beat_this — beat grid for Snap.
+Demucs — split stems for Pack and some analysis.
+torchcrepe / whisperx — melody / lyrics.
 
 None of these are required to mark by ear.
 
@@ -185,14 +188,14 @@ Load drafts pulls intern boxes for this song. Still unheard.
 ## When the tab matches the recording
 
 sync checks whether the Guitar Pro timeline lines up with the FLAC.
-Match (sync_ok) â†’ Guess may use tab markers.
-No match â†’ those markers are dropped. You can still mark by ear.
+Match (sync_ok) → Guess may use tab markers.
+No match → those markers are dropped. You can still mark by ear.
 A small stretch (tempo a bit fast/slow) may be corrected.
 A missing intro or extra repeat will not be fixed. That is a tab problem.
 
-When the tab has real section markers (A, B, C, B-Solo, â€¦) and the clock matched,
+When the tab has real section markers (A, B, C, B-Solo, …) and the clock matched,
 those markers are the structure. Guess gives one box per marker and will not bury
-them under a pile of short 2-bar figure hashes â€” a `B-Solo` marker becomes a solo
+them under a pile of short 2-bar figure hashes — a `B-Solo` marker becomes a solo
 box named `solo-B`, repeats share the same figure. Only unmarked gaps may get a
 figure draft. Audio still adds breakdown/blast overlays on top.
 
@@ -209,7 +212,7 @@ It does not label and does not align clocks.
 
 The lab reads GP7 `.gp` / `.gpx` directly (parsed score, no conversion) and
 still reads `.gp5`. When a song has both, sync clocks the GP7. Drop the GP7
-beside the GP5 or under `gp-tabs/gp7/` â€” no TuxGuitar, no export step.
+beside the GP5 or under `gp-tabs/gp7/` — no TuxGuitar, no export step.
 Inspect one with `boo-lab gpif --path FILE` (duration, bars, notes, midi).
 
 A local tab-notes pack (`data/tabnotes/`) adds three helpers, all only when
@@ -227,19 +230,19 @@ updates `work/models/structure-v1/`. Run `boo-lab predict-train` / `boo-lab pred
 anytime. Drafts land as `source=keeper-model` (never keepers). Guess can merge them.
 Starts from your first Save; quality climbs with more songs. VAL never trains.
 With zero keepers today there is nothing to train yet, so `predict` is a clean skip
-until you Save a first song â€” mark by ear, Save, and the next `interns` run picks it up.
+until you Save a first song — mark by ear, Save, and the next `interns` run picks it up.
 
 **adapt / learn (calibration):** timing/role/breakdown nudges; after 5 songs, which
 stencil to trust. Not musical IQ.
 
-**Frozen interns never retrain** from your marks (Demucs, WhisperX, allin1, beat_this, â€¦).
+**Frozen interns never retrain** from your marks (Demucs, WhisperX, allin1, beat_this, …).
 
-Detail: CURRENT.md â†’ Structure predictor.
+Detail: CURRENT.md → Structure predictor.
 
 ## Figures and cells
 
-figures â€” from a GP5 or GP7 tab, suggest repeating-idea names. Dropdown only.
-cells â€” one short 2-4 bar example per figure name you kept, not a 40-second box.
+figures — from a GP5 or GP7 tab, suggest repeating-idea names. Dropdown only.
+cells — one short 2-4 bar example per figure name you kept, not a 40-second box.
 
 ## VAL / holdout
 
@@ -248,12 +251,12 @@ Do not mark them. They do not vote for prefer=.
 
 ## Pack, stems, lyrics
 
-**Pack badge** â€” song list shows Pack/TN when a local tab-notes pack matches (filter: Pack).
+**Pack badge** — song list shows Pack/TN when a local tab-notes pack matches (filter: Pack).
 
 
 Stem chips (drums / bass / guitar / piano / other / vocals) are now a real
-multi-toggle **listen**. Turn one or more on and the main Play / Play box / Aâ€“B
-loop plays the sum of exactly those stems â€” the full mix is muted for real. Turn
+multi-toggle **listen**. Turn one or more on and the main Play / Play box / A–B
+loop plays the sum of exactly those stems — the full mix is muted for real. Turn
 all off and you hear the full mix again. Chips for stems this song has not
 cached are greyed out. The lower lane still shows one stem's waveform; toggling
 a chip on shows that stem there.
@@ -265,7 +268,7 @@ stays under `data/tabnotes/`.
 
 
 Pack cuts each saved box to disk (mix + stems) so you can listen later.
-**JAMS** (Lab â†’ JAMS) writes your saved boxes as one `.jams` per song under `work/jams/` â€” an
+**JAMS** (Lab → JAMS) writes your saved boxes as one `.jams` per song under `work/jams/` — an
 interchange format for MIR tools. Keepers only; refuses when there are no keepers or the song is VAL.
 Lyrics are optional timed lines. They are not structure gold.
 When a vocals stem is cached, WhisperX force-aligns the LRCLIB words onto that
@@ -297,7 +300,7 @@ Expect unheard boxes to survive Save.
 Let a helper write sections.jsonl.
 Train a song model on raw mixed FLACs.
 Scrape tabs or commit audio / Guitar Pro files.
-Convert GP7 to GP5 â€” the lab reads GP7 directly.
+Convert GP7 to GP5 — the lab reads GP7 directly.
 
 ## Four lines
 

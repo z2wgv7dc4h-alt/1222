@@ -9,3 +9,16 @@ from . import _natten_compat
 _natten_compat.install()
 
 __version__ = "0.1.0"
+
+
+def _install_phrase_retune() -> None:
+    """Prefer retuned mid-grain pack_phrase_spans when the module is present."""
+    try:
+        from . import phrase_spans as _ps
+        from . import tabnotes_drafts as _td
+        _td.pack_phrase_spans = _ps.pack_phrase_spans
+    except Exception:
+        pass
+
+
+_install_phrase_retune()

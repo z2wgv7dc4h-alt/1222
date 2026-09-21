@@ -588,7 +588,10 @@ def sync_track(lab_root: Path, album: str | None, track: str | None) -> dict:
     rec["flac_sha256"] = row.get("flac_sha256") or ""
 
     # A local tab-notes pack is already on the AUDIO clock, so its guitar
-    # onsets win over any tab file (gp5, GPIF, or none).
+    # onsets win over any tab file (gp5, GPIF, or none) as sync's OWN witness.
+    # This is a different question from `precedence.resolve_precedence`'s
+    # spine/notes-source choice downstream (which runs after sync_ok is known)
+    # -- leave this witness precedence alone; don't invert it to match spine.
     gp = Path("")
     onsets = None
     used_pack = False

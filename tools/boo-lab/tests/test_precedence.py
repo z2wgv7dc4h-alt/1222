@@ -29,6 +29,16 @@ def test_sync_ok_with_pack_and_no_markers_spine_is_pack():
     assert d["clock"] == "pack-audio"
 
 
+def test_sync_ok_with_gp_and_pack_no_markers_spine_pack_notes_gp():
+    # Both a readable GP and a pack, but the GP carries no section markers:
+    # the pack is still the structure spine, but notes read from GP (item 4
+    # prefers gp over pack whenever a readable GP exists).
+    d = resolve_precedence(sync_ok=True, has_gp_markers=False,
+                            has_pack=True, has_gp=True)
+    assert d["spine"] == "pack"
+    assert d["notes_source"] == "gp"
+
+
 def test_sync_ok_with_no_markers_and_no_pack_spine_is_human():
     d = resolve_precedence(sync_ok=True, has_gp_markers=False,
                             has_pack=False, has_gp=False)

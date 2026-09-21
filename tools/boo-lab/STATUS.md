@@ -13,4 +13,4 @@ Canonical detail: **CURRENT.md**; commands in **README.md**.
 - tempo hints: 0 row(s) across 0 track(s)
 <!-- status:counts:end -->
 
-**Now:** Labelling repair pass is mid-queue — schema/Save/install/git hygiene + LAW/USER/CURRENT contracts are on main; STATUS/README docs and predictor honesty still open. **472 tests** last green (pytest -q).
+**Now:** Labelling repair queue cleared on main ? schema/Save/install/git/docs/predictor honesty/extract/save-hooks/P8 leftovers done. **473 tests** pass (`pytest -q`).

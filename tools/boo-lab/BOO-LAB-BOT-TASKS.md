@@ -173,12 +173,12 @@ Chrome stays. No new buttons. No layout pass.
 
 ## P9 â€” tests the bot must add (minimum)
 
-- [ ] `test_schema.py`: SOURCES contains `gp-marker` and `figure-hash`; blast in all-roles; empty figure_id on function roles.
-- [ ] `test_annotator.py` (or existing save tests): heard gp-marker â†’ guess-accepted; unknown source â†’ 400 whole save; other-track rows preserved.
-- [ ] `test_guess.py`: `_gp5_roots` does not contain `RIGGUSPIG` or a hardcoded Desktop path.
-- [ ] `test_gitutil.py`: `map.csv` not staged by `push_lab`.
-- [ ] `test_predict.py`: Save train skipped when only holdout keepers exist and fallback is off.
-- [ ] `test_extract.py`: load_human_sections goes through keeper law + role map.
+- [x] `test_schema.py`: SOURCES contains `gp-marker` and `figure-hash`; blast in all-roles; empty figure_id on function roles.
+- [x] `test_annotator.py` (or existing save tests): heard gp-marker â†’ guess-accepted; unknown source â†’ 400 whole save; other-track rows preserved.
+- [x] `test_guess.py`: `_gp5_roots` does not contain `RIGGUSPIG` or a hardcoded Desktop path.
+- [x] `test_gitutil.py`: `map.csv` not staged by `push_lab`.
+- [x] `test_predict.py`: Save train skipped when only holdout keepers exist and fallback is off.
+- [x] `test_extract.py`: load_human_sections goes through keeper law + role map.
 
 Run `pytest -q` at the end of every box that touches `src/` or `tests/`.
 

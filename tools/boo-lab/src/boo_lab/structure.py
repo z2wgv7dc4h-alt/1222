@@ -140,7 +140,35 @@ def _run_songformer_subprocess(repo: Path, py: str, flac: Path) -> dict:
         env["PYTHONPATH"] = os.pathsep.join([
             str(sf), str(Path(repo) / "src" / "third_party"), env.get("PYTHONPATH", ""),
         ])
-        subprocess.run(cmd, cwd=str(sf), check=True, env=env, timeout=1800)
+        # EMA load + one-track infer is usually <2 min on a 5080. A hung
+        # "Loading EMA" (CUDA wedge) used to block START forever because the
+        # old 1800s timeout still left orphan multiprocessing children on the
+        # GPU. Fail closed per track and kill the whole tree.
+        try:
+            timeout = float(os.environ.get("BOO_SONGFORMER_TIMEOUT_SEC") or "360")
+        except ValueError:
+            timeout = 360.0
+        kwargs = dict(cwd=str(sf), env=env)
+        if os.name == "nt":
+            kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP  # type: ignore[attr-defined]
+        proc = subprocess.Popen(cmd, **kwargs)
+        try:
+            rc = proc.wait(timeout=timeout)
+        except subprocess.TimeoutExpired:
+            if os.name == "nt":
+                subprocess.run(
+                    ["taskkill", "/F", "/T", "/PID", str(proc.pid)],
+                    check=False, capture_output=True,
+                )
+            else:
+                proc.kill()
+            proc.wait(timeout=30)
+            raise RuntimeError(
+                "SongFormer timed out after %.0fs (EMA/infer hang); "
+                "set BOO_SONGFORMER_TIMEOUT_SEC to raise" % timeout
+            )
+        if rc != 0:
+            raise RuntimeError("SongFormer exited with code %s" % rc)
         produced = list(out.glob("*.json"))
         if not produced:
             raise RuntimeError("SongFormer produced no output")

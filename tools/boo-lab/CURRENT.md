@@ -670,3 +670,6 @@ Label Elimination by ear. Do not wait on Guess. Scan after any ingest. Push docs
 
 - Guess merges adjacent same-letter GP markers (nested blast/breakdown ignored for adjacency).
 
+
+- START: studio no longer waits on interns/SongFormer; prep is a side window + 360s SongFormer timeout.
+

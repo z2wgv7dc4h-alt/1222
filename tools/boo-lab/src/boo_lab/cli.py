@@ -387,7 +387,7 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     if args.cmd == "adapt":
-        from .adapt import albums_with_keepers, rebuild_album
+        from .adapt import albums_with_keepers, rebuild_album, rebuild_global
 
         album = getattr(args, "album", None)
         targets = [album] if album else albums_with_keepers(root())
@@ -398,6 +398,10 @@ def main(argv: list[str] | None = None) -> int:
             obj = rebuild_album(root(), name)
             print("adapt: album=%s n_pairs=%d shift_start=%.3f shift_end=%.3f roles=%s"
                   % (name, obj["n_pairs"], obj["shift_start"], obj["shift_end"], obj["roles"]))
+        gobj = rebuild_global(root())
+        print("adapt: global n_pairs=%d shift_start=%.3f shift_end=%.3f roles=%s breakdowns=%s"
+              % (gobj["n_pairs"], gobj["shift_start"], gobj["shift_end"], gobj["roles"],
+                 gobj["breakdowns"]))
         return 0
 
     if args.cmd == "hear":

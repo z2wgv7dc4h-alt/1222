@@ -16,6 +16,20 @@ Canonical detail: **CURRENT.md**; commands in **README.md**.
 Works: studio keeps pins (`human`/`guess-accepted` + `heard`) in `sections.jsonl`; mel
 spectrogram under the WaveSurfer waveform; 6-stem picker; drafts; `hear`/`sync`/`hash`;
 `agree`/`compare`/`export-jams`/`beats`/`audit`/`report`; **362 tests pass**.
+Corpus-wide cold start (2026-09-21): `adapt.py` gains `rebuild_global` -- the same
+median-shift/role-remap/breakdown-span calibration `rebuild_album` already computes,
+pooled across every non-holdout album instead of one. `load_adapt` now falls back to
+this global blob when the requested album has nothing usable of its own (no armed
+`n_pairs` and no `breakdowns.n>=2`), so a brand-new album's very first Guess run
+already inherits your general timing/role/breakdown habits instead of getting zero
+calibration. `figures` (figure_id remap) is deliberately never pooled globally --
+a `riff-A` on one song and `riff-A` on an unrelated song aren't the same idea.
+Fires on every Save alongside the existing per-album rebuild. Caught a real
+regression in the same change via the existing test suite: an early version of
+`load_adapt`'s "armed" check required `n_pairs>=1`, which broke the breakdown gate
+for a blob built from breakdown keepers with zero matched shift-pairs (a real,
+pre-existing case `_gate_breakdowns` reads independently of `n_pairs`) --
+`test_breakdown_gate_is_per_album` failed and pointed straight at the bug.
 Status counts (2026-09-21): `boo-lab status` now also counts `data/figures.jsonl`
 and `data/tempo_hints.jsonl` (rows + distinct tracks) — real disk numbers as of this
 refresh: **477 figure rows across 40 tracks**, **0 tempo-hint rows** (expected --

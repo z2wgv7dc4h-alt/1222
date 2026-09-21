@@ -1,12 +1,25 @@
-"""Per-album calibration from the first accepted drafts.
+"""Per-album calibration from the first accepted drafts, plus a corpus-wide
+cold-start fallback for an album that has none of its own yet.
 
 When the human Saves keepers, remember how those boxes differ from the drafts
 that were on that song: a median edge shift (seconds), an intern-role ->
-saved-role map, and a draft/suggested figure_id -> saved figure_id map. The
-NEXT Guess on that album applies those to its draft boxes. This is calibration,
-not electing an intern (learn.py still uses its 5-song vote) and not training.
-Drafts only: keepers are detected and skipped, `heard` is never ticked, and
-`sections.jsonl` is never written. `data/adapt.json` is generated/local.
+saved-role map, a draft/suggested figure_id -> saved figure_id map, and the
+median heard-breakdown span. The NEXT Guess on that album applies those to
+its draft boxes. This is calibration, not electing an intern (learn.py still
+uses its 5-song vote) and not training. Drafts only: keepers are detected and
+skipped, `heard` is never ticked, and `sections.jsonl` is never written.
+`data/adapt.json` is generated/local.
+
+A brand-new album has zero keeper-vs-draft pairs of its own, so its
+per-album blob never arms (`n_pairs < 1`) -- `rebuild_global` pools every
+non-holdout album's pairs into one blob under `GLOBAL_KEY`, and `load_adapt`
+falls back to it only when the requested album has no armed blob of its own.
+Shift/role/breakdown-span are real personal habits that plausibly generalize
+across albums (timing feel, what you call a Hook, how long a real breakdown
+runs); `figures` is deliberately NEVER pooled globally -- a figure_id like
+`riff-A` is a per-song identifier, and remapping it across unrelated songs
+would inject noise, not signal. Once an album earns its own armed blob, that
+takes over completely; the global blob is a cold-start prior, not a blend.
 """
 from __future__ import annotations
 
@@ -18,6 +31,7 @@ from pathlib import Path
 PAIR_TOL = 3.0
 CLAMP = 0.50
 DRAFT_SOURCES = frozenset({"guess", "msa-draft", "songformer-draft"})
+GLOBAL_KEY = "__global__"
 
 
 def _read_jsonl(path: Path) -> list[dict]:
@@ -176,7 +190,89 @@ def rebuild_album(lab_root, album) -> dict:
     return obj
 
 
+def rebuild_global(lab_root) -> dict:
+    """Rebuild the corpus-wide cold-start blob from every non-holdout album's
+    heard keeper-vs-draft pairs, pooled together. Same pairing/shift/role
+    logic as `rebuild_album`; `figures` is always empty here (see module
+    docstring -- a figure_id is a per-song identifier, never pooled)."""
+    from .holdout import load_holdout
+    from .schema import canonical_role, is_keeper, write_jsonl_atomic
+
+    lab_root = Path(lab_root)
+    section_rows = _read_jsonl(lab_root / "data" / "sections.jsonl")
+    draft_rows = _read_jsonl(lab_root / "data" / "drafts.jsonl")
+    held = {(a, t) for (a, t) in load_holdout(lab_root)}
+
+    keepers = [
+        r for r in section_rows
+        if is_keeper(r.get("source")) and r.get("heard") is True
+        and (r.get("album"), r.get("track")) not in held
+    ]
+    drafts = [r for r in draft_rows if (r.get("album"), r.get("track")) not in held]
+
+    k_by: dict[tuple, list[dict]] = defaultdict(list)
+    d_by: dict[tuple, list[dict]] = defaultdict(list)
+    for r in keepers:
+        k_by[(r.get("album") or "", r.get("track") or "")].append(r)
+    for r in drafts:
+        d_by[(r.get("album") or "", r.get("track") or "")].append(r)
+
+    pairs: list[tuple[dict, dict]] = []
+    for key in sorted(k_by):
+        pairs.extend(_pair(k_by[key], d_by.get(key, [])))
+
+    shift_start = _clamp(_median([float(k.get("start", 0.0)) - float(d.get("start", 0.0))
+                                  for k, d in pairs]))
+    shift_end = _clamp(_median([float(k.get("end", 0.0)) - float(d.get("end", 0.0))
+                                for k, d in pairs]))
+
+    min_count = 2 if len(pairs) >= 3 else 1
+    by_drole: dict[str, list[str]] = defaultdict(list)
+    for k, d in pairs:
+        dr, kr = d.get("role"), k.get("role")
+        if dr and kr:
+            by_drole[dr].append(kr)
+    roles = {dr: Counter(kr).most_common(1)[0][0]
+             for dr, kr in by_drole.items() if len(kr) >= min_count}
+
+    bd_spans = sorted(
+        float(r.get("end", 0.0)) - float(r.get("start", 0.0))
+        for r in keepers if canonical_role(r.get("role")) == "breakdown"
+    )
+    bd_spans = [s for s in bd_spans if s > 0]
+
+    obj = {
+        "n_pairs": len(pairs),
+        "shift_start": round(shift_start, 4),
+        "shift_end": round(shift_end, 4),
+        "roles": roles,
+        "figures": {},
+        "breakdowns": {"n": len(bd_spans), "median_span_sec": round(_median(bd_spans), 4)},
+        "ts": round(time.time(), 3),
+    }
+    path = lab_root / "data" / "adapt.json"
+    existing: dict = {}
+    try:
+        existing = json.loads(path.read_text(encoding="utf-8"))
+        if not isinstance(existing, dict):
+            existing = {}
+    except Exception:
+        existing = {}
+    existing[GLOBAL_KEY] = obj
+    write_jsonl_atomic(path, [existing])
+    return obj
+
+
 def load_adapt(lab_root, album) -> dict | None:
+    """The album's own calibration blob if it has anything a consumer could
+    use; else the corpus-wide `GLOBAL_KEY` blob if that does; else `None`.
+    A brand-new album with no keepers of its own therefore still gets a real
+    cold-start correction once any other album has taught the global blob.
+
+    "Has anything usable" is `n_pairs >= 1` (shift/role, what `apply_adapt`
+    itself re-checks) OR `breakdowns.n >= 2` (what `_gate_breakdowns` reads
+    on its own, independent of pairing) -- a blob built from breakdown
+    keepers with no matched draft pairs is real and must not be skipped."""
     path = Path(lab_root) / "data" / "adapt.json"
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
@@ -184,8 +280,19 @@ def load_adapt(lab_root, album) -> dict | None:
         return None
     if not isinstance(data, dict):
         return None
+
+    def _armed(blob):
+        if not isinstance(blob, dict):
+            return False
+        if int(blob.get("n_pairs") or 0) >= 1:
+            return True
+        return int((blob.get("breakdowns") or {}).get("n") or 0) >= 2
+
     blob = data.get(album)
-    return blob if isinstance(blob, dict) else None
+    if _armed(blob):
+        return blob
+    global_blob = data.get(GLOBAL_KEY)
+    return global_blob if _armed(global_blob) else None
 
 
 def apply_adapt(sections: list[dict], blob: dict | None) -> list[dict]:

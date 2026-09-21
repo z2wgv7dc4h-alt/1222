@@ -634,11 +634,14 @@ def create_app(lab_root: Path, flac_root: Path | None, gp_root: Path | None) -> 
             from .learn import record
 
             record(lab_root, "save_snapshot", meta["album"], meta["track"], n=len(keepers))
-            from .adapt import rebuild_album
+            from .adapt import rebuild_album, rebuild_global
 
             blob = rebuild_album(lab_root, meta["album"])
             record(lab_root, "adapt", meta["album"], meta["track"],
                    n_pairs=blob.get("n_pairs", 0))
+            global_blob = rebuild_global(lab_root)
+            record(lab_root, "adapt_global", meta["album"], meta["track"],
+                   n_pairs=global_blob.get("n_pairs", 0))
         except Exception:
             pass
         body: dict = {"saved": len(keepers), "path": str(sec_path),

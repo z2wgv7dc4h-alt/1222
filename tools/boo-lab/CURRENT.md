@@ -367,15 +367,26 @@ Save appends a `save_snapshot` event, `compare` refreshes the rank, and `structu
 `prefer=<source>` only when they emit that source. `data/learn.jsonl` and `data/intern_rank.json`
 stay local (gitignored).
 
-## Adapt (per-album calibration)
+## Adapt (per-album calibration + corpus-wide cold start)
 
 `data/adapt.json` is per-album calibration from the first **heard** keeper pairs (greedy nearest
 start <= 3.0 s): a median edge shift (`shift_start`/`shift_end`, each clamped to +/-0.50 s), an
-intern-role -> saved-role map, and a draft/suggested `figure_id` -> saved map. Guess applies it to
-its draft boxes (later Guess on that album), drafts only — keepers are skipped, `heard` is never
-ticked, `sections.jsonl` is never written, and intern_rank's 5-song vote is untouched. Holdout
-tracks never teach a mixed album (a holdout-only album may build for itself); Save rebuilds the
-album's blob, and `boo-lab adapt [--album X]` prints it. Generated/local (gitignored).
+intern-role -> saved-role map, a draft/suggested `figure_id` -> saved map, and a breakdown median
+span. Guess applies it to its draft boxes (later Guess on that album), drafts only — keepers are
+skipped, `heard` is never ticked, `sections.jsonl` is never written, and intern_rank's 5-song vote
+is untouched. Holdout tracks never teach a mixed album (a holdout-only album may build for itself);
+Save rebuilds the album's blob, and `boo-lab adapt [--album X]` prints it.
+
+`rebuild_global` (2026-09-21) pools the same shift/role/breakdown-span calibration across **every**
+non-holdout album into one blob under `adapt.json`'s `"__global__"` key, also rebuilt on every Save.
+`load_adapt` returns an album's own blob whenever it has anything usable (`n_pairs>=1` or
+`breakdowns.n>=2` — the two are independent, since `_gate_breakdowns` reads `breakdowns` without
+caring about pairing at all); only when an album has **neither** does it fall back to the global
+blob, so a brand-new album's very first Guess still inherits your general timing/role/breakdown
+habits. `figures` (the figure_id remap) is never pooled globally — a `riff-A` on one song and
+`riff-A` on an unrelated song aren't the same idea, so pooling that mapping would inject noise.
+Once an album earns its own usable blob, that takes over completely; the global blob is a
+cold-start prior, never a blend. Generated/local (gitignored).
 
 ## Detect (figure drafts + breakdown gate)
 

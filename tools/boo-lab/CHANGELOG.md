@@ -1,5 +1,12 @@
 ## 2026-09-21 — pack_id on Save + live note join (not dense aggregates)
 
+## 2026-09-21 — CURRENT.md cut to contract (P2.3)
+
+Moved out of CURRENT.md into history (this file): Local 2026-09-21 docs-pass callouts, newest-commit hash lists, absolute machine paths, Rebirth energy diary, Guess pipeline novel, tab-notes / Pack badge / bar_fp essays, structure-predictor "north star" manifesto + ramp, learn/adapt/detect deep dives, HTTP/CLI encyclopedias, research-output novels, decision logs, regression diaries, pack excellence roadmap, and "what to do next" checklists.
+
+CURRENT.md is now a short contract: keepers/drafts/writers, box fields, placeholder paths, start commands, data-written table, roles/overlap, machines-never-label.
+
+
 - Save stamps `pack_id` + `pack_note_source` (+ pack timeline bars if missing) when `sync_ok`.
 - Dense palm/pitch `pack_*` frac stats removed from keepers — pack stays source of truth.
 - `boo-lab pack-notes` joins keeper spans to live note sequences → `work/pack-notes/keepers-notes.jsonl`.

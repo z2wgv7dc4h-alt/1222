@@ -65,7 +65,7 @@ Living docs after this pass: `USER.md` (operator), `LAW.md` (rules), `CURRENT.md
   - VAL: â€œdo not use VAL songs to train or to vote `prefer=`. You may still pin them. Rebirth is VAL and is already pinned; leave it.â€
   - Do not tell a new operator that VAL songs must never be opened. That contradicts the only gold file.
 
-- [ ] **P2.3 CURRENT.md â€” cut to a contract.** Move dated session notes (â€œLocal 2026-09-21 docs passâ€, commit hashes, pixel widths, Guess novel, predictor manifesto) into `CHANGELOG.md`. What stays in CURRENT:
+- [x] **P2.3 CURRENT.md â€” cut to a contract.** Move dated session notes (â€œLocal 2026-09-21 docs passâ€, commit hashes, pixel widths, Guess novel, predictor manifesto) into `CHANGELOG.md`. What stays in CURRENT:
   - keepers / drafts / writers
   - box fields
   - roles + overlap law

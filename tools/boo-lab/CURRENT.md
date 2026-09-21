@@ -1,688 +1,76 @@
-# CURRENT — read this first (2026-09-21)
+# CURRENT — contract
 
-Single source of truth for humans and later bots. If README/STATUS/LAW disagree with this file, this file wins. Then fix the others.
+Living docs: USER.md (operator), LAW.md (rules), this file (short contract), README.md (install + commands), STATUS.md (counts), CHANGELOG.md (dated history). If they disagree, LAW + this file win; then fix the others.
 
-Operators start at `USER.md` (Part A to work, Part B for every button and file).
+## Keepers / drafts / writers
 
-Living docs are `USER.md` / `LAW.md` / `CURRENT.md` / `README.md` / `STATUS.md` / `CHANGELOG.md` only.
+- **Keepers** = data/sections.jsonl with source in human / guess-accepted and heard=true.
+- **Drafts** = data/drafts.jsonl (msa-draft, songformer-draft, guess, gp-marker, igure-hash, last-hint, 	abnotes-density, 	abnotes-structure, 	abnotes-phrase, keeper-model). Never keepers.
+- **Writers of sections.jsonl:** studio **Save**, oo-lab hear, album-remove. Save drops unheard boxes and replaces that track's rows only.
+- Machines may draft. **They never label.**
 
-
-> **Local 2026-09-21 (docs pass):** intern cache footguns (beats merge + work/beats cache, START single interns window, structure quiet CACHE); Pack badge title-match; real bar_fp + structure-track phrases; Save `pack_id` + `boo-lab pack-notes` live join; GP markers beat pack for Guess. See CHANGELOG.
-
-
-> **Read this first.**
-> Keepers = `data/sections.jsonl` (`source=human`/`guess-accepted` **and** `heard=true`).
-> Drafts = `data/drafts.jsonl` (`msa-draft` / `songformer-draft` / `guess` / `gp-marker` / `keeper-model` / `tabnotes-density` / `tabnotes-structure` / `tabnotes-phrase` / `blast-hint` / `figure-hash`) — **never keepers**.
-> Box fields: `start end role layer form figure_id on_figure unique instrument start_bar end_bar source heard` (+ optional `pack_id` / `pack_note_source` when a trusted pack matched on Save)..
-> Studio table columns match those; waveform is WaveSurfer, with a real mel spectrogram below it (Wave / Spec / Both).
-> `structure` writes `drafts.jsonl` only. `hear` and `sync` require **both** `--album` and `--track`.
-> `hash` fills `flac_sha256`; `sync` writes `data/sync.jsonl` (`sync_ok`/`lag_sec`); `beats` → `data/beats.jsonl`.
-> Every `sections.jsonl` write is atomic; Save keeps `data/sections.jsonl.bak`, reports `dropped_unheard`, and rejects bad boxes/roles/sources (fail closed).
-> Holdout songs stay unpinned. GP7 `.gp`/`.gpx` is read natively (parsed GPIF) and preferred over `.gp5`; no conversion.
-> One album side per session. Default install is thin; interns (allin1 / beat-this / SongFormer) are optional.
-> Machines may draft. They never label.
-> Interns run on **GPU when present** (`boo_lab/device.py`); `boo-lab doctor` must print `cuda=True`.
-> New machine: `setup.bat --flac <CORPUS> --gp <GP_ROOT>` then `boo-lab doctor` (green).
-
-## What this is
-
-A **section lab** for metal FLACs (Born of Osiris first, other bands via ingest). Human output is `data/sections.jsonl` — **keeper pins only** (`source=human`/`guess-accepted`, `heard=true`), each with a figure/function `layer` and a `figure_id` — plus optional Pack clips under `work/` (gitignored). Machines write `data/drafts.jsonl` (MSA/SongFormer/Guess/keeper-model) and never keepers. It is not God Tier Metal, not a DAW, not a tab reader, not an auto-songwriter.
-
-GitHub: `https://github.com/z2wgv7dc4h-alt/1222` path `tools/boo-lab`.  
-Newest lab commit: `2f09ee7` (Save pack_id + pack-notes export); before it real bar_fp `9a15c3c`/`ad0d84e`, badge title-match `b169b69`, intern footguns `9ec74bc`.
+Box fields: start end role layer form figure_id on_figure unique instrument start_bar end_bar source heard (+ optional pack_id / pack_note_source when a trusted pack matched on Save).
 
 ## Paths
 
-```
-LAB     C:\Users\RIGGUSPIG\Desktop\god-tier-metal\tools\boo-lab
-CORPUS  C:\Users\RIGGUSPIG\Desktop\god-tier-metal\reference\audio-corpus
-BOO     ...\audio-corpus\born_of_osiris
-GP      C:\Users\RIGGUSPIG\Desktop\god-tier-metal\reference\gp-tabs
-        gp5\<band>\   GP4/GP5 / old GP text header
-        gp7\<band>\   .gpx / modern .gp
-```
+`
+<LAB>     tools/boo-lab
+<CORPUS>  audio-corpus          (env BOO_FLAC_ROOT)
+<GP>      gp-tabs               (env BOO_GP_ROOT)
+          gp5/<band>/           GP4/GP5
+          gp7/<band>/           .gp / .gpx
+`
 
-`BOO_FLAC_ROOT` = **CORPUS** (`audio-corpus`).  
-If it is set to `born_of_osiris`, ingest puts Veil of Maya at `born_of_osiris\new_band\...`. That already happened once. Move it.
+BOO_FLAC_ROOT must be the **corpus** root, not a single band folder (ingest footgun).
 
 ## Start
 
-```
-cd C:\Users\RIGGUSPIG\Desktop\god-tier-metal\tools\boo-lab
+`
+cd <LAB>
 .venv\Scripts\activate
-set BOO_FLAC_ROOT=C:\Users\RIGGUSPIG\Desktop\god-tier-metal\reference\audio-corpus
-set BOO_GP_ROOT=C:\Users\RIGGUSPIG\Desktop\god-tier-metal\reference\gp-tabs
+set BOO_FLAC_ROOT=<CORPUS>
+set BOO_GP_ROOT=<GP>
 python -m boo_lab.cli scan
 python -m boo_lab.cli hash
 python -m boo_lab.cli interns
 python -m boo_lab.cli studio --port 8765
-```
+`
 
-`START.bat` = scan → hash → **full** `interns` (including the `predict` step) → studio (cache-first; never auto-Guess / never Save keepers).
-Studio-only: `python -m boo_lab.cli studio`. Guess computes on click; Load drafts / Lyrics use prep on disk.
-
-http://127.0.0.1:8765 — Ctrl+Shift+R after HTML. Restart the process after `.py` changes. One server.
-
-GPU check (do this before trusting any intern): `python -m boo_lab.cli doctor` — it must print
-`cuda=True` + the GPU name. `doctor` also names any missing intern/extra and the exact install.
-Interns (allin1 / beat_this / torchcrepe) read `boo_lab/device.py`; they never hardcode CPU.
+START.bat = scan → hash → full interns (side window) → studio. Studio-only: python -m boo_lab.cli studio. http://127.0.0.1:8765 — Ctrl+Shift+R after HTML. oo-lab doctor must print cuda=True when a GPU is expected.
 
 ## Data written
 
 | path | what |
 |---|---|
-| `data/map.csv` | scan result: album, track, flac path, gp path, match, `flac_sha256` |
-| `data/sections.jsonl` | **keeper** boxes only. Save **replaces** that track’s rows, keeps other tracks; one-step undo copy at `data/sections.jsonl.bak` |
-| `data/drafts.jsonl` | machine drafts (`msa-draft`, `songformer-draft`, `guess`, `gp-marker`, `keeper-model`, `tabnotes-density`, `tabnotes-structure`, `tabnotes-phrase`, `blast-hint`, `figure-hash`). Never keepers |
-| `data/holdout.csv` | fixed whole-song train/val reservation (`ensure_holdout`) |
-| `data/agree.jsonl` | two-pass keeper snapshots (`boo-lab agree --write`), pass 1/2 |
-| `data/compare.json` | drafts-vs-keepers report (`boo-lab compare`) |
-| `data/beats.jsonl` | beat/downbeat grid (`boo-lab beats`) |
-| `data/sync.jsonl` | tab-vs-audio witness (`boo-lab sync`): `sync_ok`, `lag_sec`, `score` |
-| `work/models/structure-v1/` | keeper-trained structure predictor: `weights.pt`, `config.json`, `label_map.json`, `metrics.json` (gitignored) |
-| `data/corpus_health.json` | pipeline state (`boo-lab report`) |
-| `data/rebirth-sections.jsonl` | reference labels for Rebirth |
-| `work/stems/` | Demucs cache, 6-stem `htdemucs_6s` preferred (gitignored) |
-| `work/msa/` | raw allin1/SongFormer payloads (gitignored) |
-| `work/drop/`, `work/pack/`, `work/jams/`, `work/lyrics/` | outputs (gitignored) |
-
-Never commit FLACs, GP, stems, zips, tokens, `.venv`.
-
-## Roles
-
-intro, build, riff, hook, breakdown, **blast**, solo, chill, pulse, outro.
-
-- Different roles **may overlap**. Same role on the same span = merge or split.
-- **Breakdown** = function (usually drums half-time / pit). Can sit on the **same** guitar as a Riff.
-- **Blast** = function (full-speed / blastbeat). Opposite of Breakdown. Stack on a Riff the same way. Never `riff-blast-A`.
-- **`on_figure`** (optional on function boxes) = the `figure_id` this function rides.
-- **Pulse** = a *named* synth/keyboard loop (hummable). Not "keys are in the mix." New figure = new Pulse. Repeats of that figure keep the id.
-- Figure roles (`riff hook solo pulse`) and function roles (`intro build breakdown blast chill outro`) **may overlap each other**; two boxes of the **same** role must not.
-- `figure_id` defaults to `"{role}-A"` or a tab letter (`B`); a returning figure keeps the same id.
-- Guess with `sync_ok` + GP markers: **markers are the spine**; figure-hash micro-cells are capped/suppressed.
-
-
-## Rebirth (A Higher Place, 86.63s)
-
-Energy + flux from the user’s FLAC (not a published piano score — none exists). Joe Buras keys; comments compare it to Final Fantasy / *The Takeover* ending.
-
-```
-intro  0.00–86.63
-pulse  13.00–27.80     first theme; hits ~every 3.25s. Do not start at 20.
-pulse  33.00–41.50
-pulse  46.20–51.00
-build  52.80–66.50     dense, not spaced loops
-outro  69.50–86.63
-```
-
-Leave 28–33, 51–53, 66.5–69.5 empty. No Breakdown. No Guess after these are saved.
-
-If Save ever wrote six `0.00–0.25` rows, the pins fired before duration loaded — only possible on an old build, since the current Save **refuses** `end <= start`. Recover via `data/sections.jsonl.bak`, or paste the lines above into `sections.jsonl` and reload.
-
-## UI contract
-
-- Left: albums collapse, cover thumb if `cover.jpg` / `folder.jpg` / `Cover/` / Cyrillic `Сover.jpg` sits next to FLACs.
-- Green GP7/GP5 = matched tab. The badge resolves `map.csv` first, then prefers a GP7 `.gp`/`.gpx` over a legacy `.gp5` (the lab's own `BOO_GP_ROOT` index is the fallback when the map path is legacy); `.gp`/`.gpx` display as `GP7`. Partial only if notes/name say stub/fragment/bass-only.
-- Mix lane: drag boxes. Click empty wave to seek. Clicking a box edge should not steal the next pin — leave a gap or seek first.
-- Single-click a box or its table row **selects only** (region marked, row `.on`) — no zoom/fit/pxPerSec, no seek, no page scroll; **double-click** selects, seeks to the box start, and zooms the spectrogram to the box (~10% padding each side), with Esc restoring the previous or full-song view. Never auto-zooms on load or Guess.
-- Lane = role: the role name shows **once** in a 44px left gutter (`#lanegutter`), never on a tile; a tile labels only its `figure_id`, and only when it is wider than ~48px (short boxes keep colour, no text). No free-floating role text in the wave; function names live in a tile or the table. Layer pills hide the gutter label with the lane.
-- Spectrogram: real mel spectrogram of the already-decoded buffer under the mix; **Wave / Spec / Both** toggle (default Both), click to seek, current boxes overlaid. Waveform stays WaveSurfer.
-- Stem lane: chips for the six cached Demucs stems (drums/bass/guitar/piano/other/vocals). They are a **multi-select audition**: one or more on → the main transport plays the sum of exactly those stems through a lazily-created `AudioContext` while the mix is muted (`ws.setVolume(0)`); all off → the full mix. Playback is anchored to WaveSurfer's playhead and re-anchored on drift/seek/A-B wrap. Chips for uncached stems are greyed/disabled; the lower lane still shows one stem's waveform (the chip you toggled on). The drum-confidence note flags sections the classifier is unsure about.
-- Beat grid: `GET /api/beats/{id}` (from `data/beats.jsonl`); the studio draws faint beat / brighter downbeat ticks over the waveform, and with **Snap beats** on, a dragged box edge snaps to the nearest downbeat (≤250 ms) else nearest beat (≤120 ms). Run `boo-lab beats` first, else no ticks/snap.
-- Chrome: 280px rail | main; work header is one strip (48px art, title, album, VAL badge) over a two-row transport. Primary row is Play · clock · Play box · Save (filled gold) · Undo · How; the quiet row holds **Lab** and **Corpus** `<details>` — Lab = Guess, Load drafts, Lyrics, Pack, Snap beats, JSON, Next GP; Corpus = drop zone + band name, Push git, Remove album. Role pins are a separate equal-width row (coloured border only, 12% fill on hover). The 104px spectrogram dock has a gold hairline; the How drawer is 400px.
-- At a glance: song rows read `FLAC · GP7` / `GP5` / `no tab` / `partial GP7` — plus `Pack` when a local tab-notes pack is the only tab, or `TN` when it supplements a GP tab (`/api/tracks` `has_pack`/`pack_source`, from `discover_pack` or an ingested `data/tabnotes_index.jsonl` row); plus a tiny `VAL` when the split is val. Filter pills are a segmented All / Tab / No tab / Pack. With no boxes and the duration loaded, the mix lane shows a ghost "Press 1 for Riff" (gone after the first box). The Lab summary counts draft/guess rows; **Pack** is greyed at zero boxes (`aria-disabled`) and tells you to Save keepers first. Hover hints on Save / Guess / heard / Snap beats / VAL. `tab off-clock` appears only if a track row exposes `sync_ok===false` (not on `/api/tracks` today).
-- Coach: with no explicit message, `#err` becomes the next-step coach — wait-for-clock (`ws` duration <2), `VAL — leave unpinned`, "Press a role pin (or 1 for Riff) — pins create boxes; drag fits them.", "N not heard — Save will drop them", else "N boxes. Save writes keepers." Explicit errors are never overwritten. `add()` refuses before the clock shows the full length; the clock placeholder is `0:00 / —`; the How drawer auto-opens once (Close/scrim writes `boo-lab-how-v1`).
-- Role pins / keys create boxes; drag only moves or resizes. In-app **Undo** (button or Ctrl+Z) plus `data/sections.jsonl.bak` on Save.
-- Table is source of truth on Save (`harvestTable`); columns role / figure / form / uniq / inst / bar0 / bar1 / start / end / source / heard. `form` / `uniq` / `inst` / `bar0` / `bar1` / `source` start hidden; **More columns** (`#btnMoreCols`) toggles `show-extra`. Every column and `data-f` still harvests. Blur number fields before Save.
-- **Heard** gates the save: untick it and the box is dropped. A heard draft saves as `guess-accepted`.
-- **Every write to `sections.jsonl` is atomic** (`schema.write_jsonl_atomic`): Save, `boo-lab hear`, and album-remove all use temp + `fsync` + `os.replace`, so a crash/full disk/aborted write leaves the file intact. Album-remove parses the file *before* deleting anything and aborts (400, nothing removed) on a malformed line; `hear` likewise refuses rather than drop a malformed line.
-- **A bad box rejects the whole save** with 400: `end <= start`, non-numeric/non-finite `start`/`end`, a non-object row, a box whose role maps to none, or an unknown/missing `source`. Never repaired into a `0.25s` box (Bugs #2), never defaulted to a human keeper.
-- **Fail closed**: `schema.is_keeper` is true only for `human`/`guess-accepted` (missing/empty source is NOT a keeper); `schema.canonical_role` returns `None` for unmappable input; and `schema.load_section_rows` (the one reader for pack/drums/vocals/holdout) keeps a row only when `role` + keeper `source` + `heard is True` — the full keeper law. Every non-keeper source promotes to `guess-accepted` once Heard (derived from `SOURCES - KEEPER_SOURCES`).
-- A **malformed line already in `sections.jsonl`** is skipped and counted, not fatal: the response carries `malformed_lines_skipped` and `malformed_line_numbers`.
-- Save is **not silent about drops**: the response carries `dropped_unheard` (unheard boxes discarded) and `malformed_lines_skipped`, and the studio shows both.
-- **One-step undo**: before each Save the previous file is kept as `data/sections.jsonl.bak` (`*.bak` is gitignored). The studio refuses a box with `end <= start` (never auto-repairs it to `0.25s`).
-- **Load drafts** appends `data/drafts.jsonl` rows unheard; **VAL** badge marks holdout songs.
-- Play = whole track. Play box = selected region only.
-- Guess merges drafts if boxes already exist; do not Guess a finished song. The "N guessed" counter (`#sub`) carries a hover tooltip with the full `notes` line from `/api/estimate` (sync status, tempo-automation hints, which kick source was used) — `#err` only shows those notes when Guess added zero new boxes, so the tooltip is the only place to see them on a normal successful run. A figure draft's `inst` is prefilled from `figures.jsonl`'s own `instrument` field where the mapping is unambiguous (`bass`→bass, a Pulse track's `other`→synth); a `guitar` row is left blank on purpose.
-- Lyrics: click line to seek (incl. force-aligned plain lyrics); ±0.2 nudge; Save lyrics. When a cached vocals stem exists, WhisperX force-aligns the LRCLIB **plain** text onto that stem and those real times replace LRCLIB's synced times (a gibberish-free path for screamed vocals); without a stem the LRCLIB LRC/plain lines stand.
-- Remove album: deletes one album's FLAC/GP under the configured roots, drops its pins/holdout, rescans. Confirm required.
-- Drop zone: zip or folder. Type band first. No RAR.
-- Push git: best-effort. Cmd is the real backup.
-
-Shortcuts that exist in the page (also shown under How): pins I/R/H/B/S/C etc. as wired; Space play. If `C` fires Chill, that is the pin, not a secret mode.
-
-## Guess pipeline (order)
-
-1. Prefer a GP7/GP6 score on disk (`_prefer_tab`): a map path that already points at `.gp`/`.gpx` wins; a `.gp5` is upgraded to a matching GP7 via `sync._prefer_gpif_path`; otherwise the GP roots are searched GP7-before-GP5 by normalized stem.
-2. `extract.estimate_from_gp` walks a `.gp5` tab in **playback order** (repeats expanded): one box per marker, and it carries the tab's own **section identity** — `form` = the marker letter (`A`/`B`/`C1`), `figure_id` = `role-token` (`riff-B`), `unique` when that letter occurs once. A GP7 `.gp`/`.gpx` goes through `extract.estimate_from_gpif`, the parsed-GPIF twin. A repeated letter (e.g. `02`'s `B`, `10`'s `A/B/F`) is therefore the **same returning section**, not a new riff. The last box reaches the tab's repeat-aware length (`_playback_duration`).
-3. Markers name a section letter, not a semantic role, so the role comes from `infer_role(marker)` and otherwise stays `riff` (`C1 - Solo` → solo). The human still picks hooks/breakdowns/etc.
-4. Demucs drums stem into `work/stems/` (first time slow).
-5. librosa beat_track on that stem. Tempo must go through `_scalar` (numpy 2 `float(array)` crash used to abort here).
-6. Half-time IOI (~1.65× median, ≥6s) → breakdown drafts.
-7. Kick band <140 Hz IOI ≥5s → breakdown drafts.
-8. Audio-derived spans snap to the beat grid (nearest downbeat ≤250 ms else beat ≤120 ms) when `data/beats.jsonl` has the song.
-9. `_clean` short/overlap junk.
-
-Audio can only ever propose **breakdowns** (half-time/kick); everything else is tab-marker or the human.
-
-**Marker-first cap.** When the tab has `gp-marker` sections and `sync_ok`, those markers outrank the
-figure-hash stream. A figure draft shorter than 4 s is dropped; once markers reach `GP_MARKER_MIN=4`
-or cover half the known duration (`_markers_primary`), a figure draft that overlaps a marker is
-dropped too, so only uncovered gaps are filled (`_suppress_figure_flood`). A returning marker letter
-already carries the same `figure_id`, so a marker-perfect tab (Starved) yields one box per marker,
-not 30 short hashes. Function overlays (halftime/kick/blast) are untouched and still link to the
-overlapping marker figure via `on_figure`. Guess never emits `msa-draft`/`songformer-draft` — those
-are Load drafts.
-
-**Pack spine (no GP).** When a song has no `gp-marker` boxes but `sync_ok` and `discover_pack` finds
-a tab-notes pack (Mindful), the pack is the spine: `tabnotes_drafts.structure_drafts_for_song`
-turns its high-density guitar phrases into `riff` boxes with simple `riff-A`/`riff-B`/`riff-C` ids
-by order (`source=tabnotes-structure`, added to `schema.SOURCES`), and the existing kick-notation/blast
-functions ride on top. No GP-style A1/B letters are invented. `_spine_spans`/`_spine_primary` treat
-this spine like `gp-marker`, so `_suppress_figure_flood` caps the figure-hash stream against it; a
-GP marker tab (Starved) still wins because the spine is only built with no `gp-marker` present.
-
-If it says `librosa beats, no half-time`, drums ran and found no slam — correct on Rebirth, common on mid-tempo grooves.
-
-Guess is **not** a BoO brain. It carries the tab's section letters and repeats, but a letter is not a role — the human paints hooks/breakdowns and the tail the tab doesn't notate.
-
-**Rate-aware markers.** When the song's `data/sync.jsonl` row is `sync_ok` with `clock_ratio` off 1.0
-by ≥0.002, Guess scales every tab-marker `start`/`end` by that ratio before the rest of the pipeline
-(the existing beat snap still applies afterwards), and prints
-`guess: clock_ratio=1.027 stretched N markers`. `clock_ratio` None/~1.0 (±0.002) leaves times
-unchanged; `sync_ok` false (or no row) still drops the markers. Audio-derived breakdown drafts are
-never stretched — they already live on the FLAC clock.
-
-Guess refuses a **finished** song (any heard keeper already on the track → `409`, no new drafts);
-a draft changed by `apply_adapt` carries an `adapt` stamp (`shift`/`role`/`figure`, never a keeper
-source), the Lab summary shows `prefer=…` from `intern_rank.json`, and the selected `#list` row gets
-`.on` + `aria-current="true"` on every render (gold rule, warm wash, focus ring).
-
-## Figures (riff identity, never keepers)
-
-`boo-lab figures [--album X --track Y]` fingerprints each bar (`bar_fp`:
-quantized 1/8 onsets + `deltas` + pitch-class sets) and windows are **runs** —
-a maximal run of equal bars is ONE ostinato window, never sliding 2/4-bar
-windows. Windows cluster by exact fingerprint and are named by a consistent GP
-marker letter (`{role}-{letter}`) else `riff-A/B` by first start; a letter that
-maps to two fingerprints is flagged `conflict=true`. It names bars that already
-exist as measures — identity, not segmentation; it never cuts new boxes and
-never invents boundaries. Rows land in `data/figures.jsonl` with
-`source="figure-hash"` — a draft that never writes `sections.jsonl`/
-`drafts.jsonl` and never ticks `heard`. `--album` and `--track` must be passed
-together. The studio reads it at `GET /api/figures/{track_id}` to fill a
-`figure` datalist (no auto-fill, no Save of hashes); a conflict raises one coach
-line, "Tab letter maps to two figures — pick in the box."
-
-## Ingest
-
-Copies:
-
-- audio `.flac/.wav` → `audio-corpus/<band>/<album>/`
-- art `.jpg/.jpeg/.png/.webp/.gif` → same album folder
-- GP5/GP4/GP3 / old `.gp` with `FICHIER GUITAR` header → `gp-tabs/gp5/<band>/<album>/`
-- `.gpx` / other `.gp` → `gp-tabs/gp7/<band>/`
-
-Band inference:
-
-- Typed box wins unless it is `new_band`.
-- Folder `Veil Of Maya - Matriarch - 2015` → band `veil_of_maya`, album `2015 - Matriarch`.
-- File `Veil_Of_Maya-Mikasa.gp5` → band + title.
-- If `BOO_FLAC_ROOT` is a single-band folder and the inferred band differs, write to **parent**/`<band>` (sibling of BoO).
-
-Then `scan` rebuilds `map.csv`.
-
-## Scan / matching
-
-- Do **not** rename FLACs.
-- Strip a leading track number (separator **or** space: `07 - Exist` / `07 Exist`
-  → `exist`), the `Born Of Osiris` band prefix however it is punctuated,
-  Songsterr `s12345`, words like official/tab/guitarpro.
-- Split `Band-Song` / `Band_Song`.
-- **Scored candidates, unique**: `_gp_candidates` ranks a GP by exact key match
-  (`1000`), else a meaningful substring (both keys ≥5 chars, `500 + overlap`),
-  plus a lead-track-number bonus when the GP filename's number matches the
-  song's, then a small **GP7 `.gp`/`.gpx` bonus** over `.gp5` (GP7-native),
-  then the shorter name. `scan_roots` walks FLACs in order and skips a GP
-  already claimed — **one GP file → one FLAC** (no more one tab matched to
-  four songs).
-- Keep the full GP7 packs for Discovery / A Higher Place / Eternal Reign under
-  `gp-tabs/gp7/<band>/<album>/` (local, gitignored); scan prefers them.
-- Short titles (`XIV`, `Exist`) need a high score.
-- `no tab` = no file, or title is `track02`. Rename the **tab**.
-
-BoO rip folders that lie (Discovery living under “Soul Sphere”, Simulation under “FYE Discovery”) — `data/CATALOG.md`. Skip Misha mix FLACs for the bank.
-
-## Extract / cell layer
-
-`boo-lab extract` writes **one representative cell per `figure_id`** to `data/riffs.jsonl` — the
-shortest repeating cell inside that figure (2, 3, or 4 bars), preferring the hashed window in
-`data/figures.jsonl` when `n_hits>=2`; every other hit is only a pointer (`occurrences` bars,
-seconds only when `times_trusted`). An 8-bar human `riff-A` box becomes a 2-bar cell, never an 8-bar
-bank fragment. Zero cells never blanks an existing file.
-
-## Interns pass (one command)
-
-`boo-lab interns [--album X] [--steps a,b,c]` runs the whole chain in order —
-`stems beats structure drums vocals lyrics sync tabnotes_drafts extract figures tempo_hints compare learn
-predict status` — over the `map.csv` rows (album-filtered). Every step is independent:
-a failure is recorded as `{"error": …}` and the rest still run, so a re-run
-resumes. It skips finished work (`beats` / `sync` / `lyrics` already on disk;
-`structure` reuses cached `work/msa/<track>.json` + `.songformer.json` instead
-of re-running allin1/SongFormer). `compare` writes `data/compare.json` then
-`learn`; `extract` shells `boo-lab extract --album`; `predict` runs keeper-model
-inference only when `work/models/structure-v1/weights.pt` exists (else a clean
-`{"skipped": "no model"}` — it never trains). It never writes
-`sections.jsonl`/keepers. Step functions live in `src/boo_lab/interns.py`;
-`structure.build_drafts` reads its cache first.
-
-## GPIF reader
-
-`boo_lab/gpif.py` reads a GP7/GP6 `.gp`/`.gpx` **score** from the zip without
-converting (`open_gp` needs `Content/score.gpif`; flat GP8/alphaTab and the
-nested fixture both parse). `GpifScore`: `title`/`artist`/`album`/`tempo`,
-`tracks` (name, `tuning_midi`, instrument, capo), `masterbars` (time sig,
-repeat map, section, tempo), `beats` (dynamic/chord/text) and `notes` — **every
-Voice** in a Bar, with string/fret/duration/`voice`, `midi = tuning_midi[string-1]
-+ fret` (None out of range), `palm_mute`/`dead`/`accent`/`hammer`/`slide` +
-`articulations`. Helpers: `tempo_map` (`(unexpanded beat, bpm)`, drives
-`duration_sec`), `time_sig_map`, `section_list`, `playback_bar_order`,
-`playback_beats`, `note_events` (`(seconds, midi, duration_sec, palm_mute)`;
-seconds first so `sync`'s GPIF clock keeps working, and each onset carries the
-mid-song `tempo_map` forward so a tempo change does not drift the clock). CLI `gpif` adds
-`n_with_midi`. No `sections.jsonl`; fixture `tiny.gp` is hand-made.
-
-## Sync clocks GP7 (GPIF) first
-
-When a row's `gp` is a `.gp5`, `sync_track` looks for a matching `.gp`/`.gpx`
-(same normalized stem, ignoring `07 -` vs `07 `) beside it or under
-`BOO_GP_ROOT/gp7`, clocks that path, and records it in the sync dict `gp`
-(the note gains `· gpif`). `_tab_notes` / `_tab_play_seconds` read a
-`.gp`/`.gpx` via `gpif.load_score` + `note_events` / `duration_sec` FIRST
-(never `guitarpro.parse` first, never a conversion); `.gp5` still goes through
-`guitarpro.parse`. LAG 0.35 / SCORE 0.15 and the rate path are unchanged; no
-GP5 files are deleted and `map.csv` is not rewritten. `gpif_to_gp5` stays
-unused. `sync.gp_chroma` tolerates both event shapes it is handed: GP5
-guitarpro's `(t, [pitches], dur)` 3-tuple and GPIF's `(t, midi|None, dur,
-palm_mute)` 4-tuple, so the GPIF clock no longer yields a null/empty chroma
-column. No `sections.jsonl`.
-
-## Tab-notes packs (local zip/folder)
-
-`boo_lab/tabnotes.py` reads an operator-provided pack — a `.zip`, an unpacked
-folder, or its `notes.json` — with no HTTP fetch and no required unzip. Layout
-`<id>/{manifest,notes,timeline}.json` + `raw/{song,video_points}.json` +
-`raw/parts/N.json`. `notes.json` (format `tab-notes/1`) is flat events on the
-notated clock; `timeline.json` gives each measure's `start_sec_audio` /
-`audio_duration_sec` (the AUDIO clock); `raw/song.json` gives tracks
-(tuning/capo/volume/balance/tempo automations); `raw/parts/` gives raw beats
-(duration, dotted, rest, tuplet, tuplet_start/stop, velocity, tempo) and notes
-(string, fret, hp, slide, harmonic, bend_points). When notes/timeline and `raw/`
-both exist, both are parsed.
-
-`TabNotesPack.audio_sec(event)` = `start_sec_audio + (onset_ms-start_ms)/1000`,
-else `video_points[measure] + in-bar`, else `onset_ms/1000`. Helpers: `events_for`,
-`onsets_audio` (category/track), `onsets_audio_by_track`, `tempo_map` (raw
-automations first, else timeline), `tuning_of`, `bar_events`, `bar_fp_tab`
-(duration→1/8, `pitch%12`, palm_mute/dead/hammer). `clock_ratio` + both totals
-are recorded; `video_sec` comes from `raw/video_points.json` when lengths match.
-
-Ingest: a tab-notes `.zip` or folder in the ingest drop is detected by
-`tabnotes.is_pack` (`notes.json` `format: tab-notes/1`; a GP/FLAC zip is not),
-unpacked (zip `<id>/` prefix stripped) into `data/tabnotes/<safe_id>/`,
-`load_pack`ed, and upserted into `data/tabnotes_index.jsonl` — never copied to
-`BOO_FLAC_ROOT`/`BOO_GP_ROOT`, never written to `map.csv` or `sections.jsonl`.
-`ingest.py` still copies FLAC/GP as before; the studio drop and
-`boo-lab ingest <drop> --band NAME` use the same detect path. Put a pack in the
-ingest drop folder or directly in `data/tabnotes/`.
-
-CLI `boo-lab tabnotes --path F [--json] [--index]` prints title/artist/
-clock_ratio/both totals, every track (category, instrument, tuning, volume,
-n_events), signatures, tempo min/max + automations, guitar/drums/other counts,
-raw tuplets/bends, and the first 3 guitar audio onsets; `--index` appends
-`data/tabnotes_index.jsonl` only. `sync` discovers a pack under `data/tabnotes/**`
-(fuzzy title/artist), clocks **guitar onsets on the audio grid** (else drums),
-records `tabnotes`/`tabnotes_tracks`, and prefers it over any sibling
-`.gp5`/GPIF. No keepers, no roles; machines never write `sections.jsonl`.
-
-`figures.py` (2026-09-21) also discovers a pack (same precedence as `sync`, pack
-wins over any matched GP) and clusters two of its tracks: the `guitar`-category
-track (rhythm-register pick, lowest mean pitch) into ordinary `riff-*` figure
-rows, and the `bass`-category track the same way into `bass-riff-*` rows
-(`instrument: "bass"`, prefixed so a bass figure can never collide with a guitar
-one sharing a letter) — both tabnotes-only, `_engine_riff_bank`'s bass extractor
-is never called from here. A pack's `other`-category track (a named synth/
-keyboard — LAW.md's Pulse) becomes `role: "pulse"` rows via `_tab_pulse_windows`,
-decoupled from whether the guitar/bass clustering found anything, so a song whose
-guitar yields no riffs still gets Pulse. `guess.py`'s `_figure_drafts` already
-turns any `figures.jsonl` row into a draft box, so guitar/bass/pulse rows all
-reach Guess for free once `sync_ok` is true.
-
-A pack can carry more than one `guitar`-category track (checked on a real corpus
-song: three, all landing in the same 46-52 mean-pitch band — too close to be a
-real rhythm/lead split, so this deliberately never guesses "lead" from register).
-`build_figures` clusters every guitar track *other* than the primary one
-separately too, prefixed `guitar<index>-` (e.g. `guitar1-riff-A`) and carrying a
-`track_index` field, so a second/third guitar part is clustered on its own
-instead of being silently discarded.
-
-`tempo_hints.py`/`data/tempo_hints.jsonl` (`boo-lab tempo-hints`, 2026-09-21):
-one row per BPM change in a pack's tempo automation (`tabnotes.tempo_map`).
-Deliberately informational, never a box — a tempo jump correlates with a section
-change in this genre but never implies a role. `guess.py` reads it and appends a
-plain-text note ("tempo changes x2: 10.5s 135->141, ..."), nothing more.
-
-`tabnotes_drafts.py` (2026-09-21) turns a pack into unheard drafts, gated on
-`sync_ok`. `pack_density_drafts` marks high guitar-onset-density spans as
-`role=riff` and reuses Guess's `_half_time_spans` on the pack's own drum
-onsets for `role=breakdown`; rows are stamped `source="tabnotes-density"`
-(`schema.SOURCES`), `heard=false`, merged into `data/drafts.jsonl` by
-`build_density_drafts` replacing only prior same-source rows for the songs
-rebuilt (zero rows leaves the file untouched). Caps: `_merge_spans` merges
-overlapping same-role spans, min span 1 s. CLI `boo-lab tabnotes-drafts
-[--album] [--track]`; `interns` gains a `tabnotes_drafts` step right after
-`sync`. `meter_cuts` reports measure boundaries where the pack's time
-signature changes or its tempo automation jumps (`gpif.tempo_map`/
-`time_sig_map` when there is no pack); Guess surfaces them as a
-`tempo/meter cuts at 12.3s, 45.1s` note and snaps its audio-derived/density
-edges to them (`snap_sections_to_cuts`, 0.75 s) -- no box is invented. Only
-when `sync_ok`.
-
-`guess.py` also merges the pack's riff-density spans read-only when `sync_ok`
-(`density_drafts_for_song`); the pack's drum breakdowns still come through
-`_tab_kick_spans`, so Guess asks for `roles=("riff",)` only.
-
-`predict.py` frame features gain three pack/GPIF columns when `sync_ok`:
-`_tab_signals` returns `(onset density, palm-mute density, hammer density,
-raw onset count)` from a pack's guitar events (falling back to a GP7 GPIF
-`note_events` for onset + `palm_mute`), always the same width
-(`N_MELS + 6`), all zeros with no trusted tab (soft-fail). A stale
-`weights.pt` with the old width simply fails to load and trains fresh.
-
-`guess.py`'s breakdown detector (2026-09-21) prefers a pack's own kick notation
-(`_tab_kick_spans`, GM percussion pitch 36 — verified against a real corpus pack,
-not assumed) over the spectral-guess `_kick_spans` whenever `sync_ok` is true,
-same "tab data outranks an audio heuristic" precedent as GP markers; falls back
-to the audio heuristic when there's no pack or the clock isn't trusted.
-
-## Structure predictor (north star — trains on keepers)
-
-> **Status: v1 scaffold landed (local).** `boo-lab predict-train` / `predict`; `source=keeper-model`; Save calls `maybe_train_on_save` (3 epochs, daemon); model dir `work/models/structure-v1/`; Guess merges keeper-model drafts; interns step `predict` (infer if model exists). Empty non-holdout keepers no-op; holdout-only labs may cold-start smoke with `holdout_fallback` (VAL still not mixed train).
-
-**Goal:** a boo-lab model that learns from the **first** heard keepers and gets better
-as you Save more — so Guess (and a new intern step) can draft structure on a cold
-album from *your* labels, not only frozen third-party models.
-
-**Law (unchanged):** predictor writes **drafts only** (`source=keeper-model` or similar).
-Never writes `sections.jsonl`. You still tick heard + Save. VAL / holdout never train.
-
-### What gets smarter vs what does not
-
-| Surface | Learns from keepers? |
-|---|---|
-| **Structure predictor** (new) | **Yes** — boundaries, roles, later figures. Retrain / fine-tune on every Save batch or `boo-lab predict-train`. |
-| **adapt** / **learn** rank | Small — timing/role/breakdown habits; which stencil to trust. Not musical IQ. |
-| **Frozen interns** (allin1, Demucs, WhisperX, beat_this, SongFormer) | **No** — fixed weights. We do not pretend Save retrains them. |
-| **Guess today** | Tab markers + audio cues + adapt. Gains a **new draft source** once the predictor exists and wins `learn` rank. |
-
-“Exponentially smarter for ALL interns” = **not** retraining Demucs/WhisperX.
-It means: (1) the structure model compounds with keepers, (2) Guess prefers it when
-F@0.5 wins, (3) frozen interns stay tools; optional later: distill their drafts as
-*features* into the predictor, still not their weights.
-
-### Thin v1 (ship next)
-
-**Status (2026-09-21, local):** v1 scaffold landed. `src/boo_lab/predict.py` +
-`boo-lab predict-train [--album X]` / `boo-lab predict [--album X] [--track Y]`.
-Fixed-hop (0.25 s) librosa log-mel + RMS + onset frames over the guitar stem
-(when cached) else the mix, plus one tab-onset-density column when the song's
-`sync.jsonl` is `sync_ok`; a 2-layer Conv1d with a role head + boundary head
-(CPU or `device.py` CUDA). Per-frame labels from keeper boxes (`none` for
-uncovered frames). Checkpoint at `work/models/structure-v1/`; a rerun loads and
-fine-tunes. Drafts land in `data/drafts.jsonl` as `source=keeper-model`
-(`heard=false`), replacing only prior `keeper-model` rows for those songs; Guess
-merges them read-only. Holdout songs never train — a lab whose only keepers are
-holdout (today: Rebirth) trains in an explicitly flagged `holdout_fallback`
-overfit smoke. Save fires a 3-epoch background fine-tune (torch-gated, daemon;
-`BOO_PREDICT_SAVE_TRAIN=0` disables). No `sections.jsonl`, no frozen-intern
-retraining.
-
-1. **Data:** keepers (`heard` + human/guess-accepted) → per-track frame labels from
-   guitar (+ drums) stems; optional GPIF onset/chroma when `sync_ok`.
-2. **Heads:** boundary (cut / no-cut) + role (intro/riff/hook/breakdown/solo/…).
-   Figures later (needs more `figure_id` keepers).
-3. **Train:** `boo-lab predict-train` from keepers only; skip VAL; save
-   `work/models/structure-v1/`. Incremental fine-tune when new keepers land (Save
-   hook or explicit command) — **learning starts at keeper #1**, quality is weak
-   until ~album scale.
-4. **Infer:** `boo-lab predict [--album] [--track]` → `data/drafts.jsonl`
-   (`source=keeper-model`). Studio **Load drafts** / Guess hybrid can merge it.
-5. **Eval:** holdout F@0.5 / role agree vs keepers; never auto-promote to gold.
-
-### Honest ramp
-
-- 1–few songs: prior + heavy adapt; drafts noisy — still useful as stencils.
-- ~1 album keepers: roles/breakdowns start transferring to siblings.
-- Multi-album: cold album drafts become the default Guess spine when sync/tab thin.
-
-Downstream music generator eats the same keepers; this predictor is the mid brain
-that makes “new album mostly nails structure” real inside the lab.
-
-## Learn (intern rank)
-
-`boo-lab learn [--album X]` rebuilds `data/intern_rank.json` from `compare.compare()` (never a
-second F@0.5) and appends events to `data/learn.jsonl`. A draft source (`guess` / `msa-draft` /
-`songformer-draft` / `keeper-model`) is preferred only with **>= 5 non-holdout songs** that carry both keepers and
-drafts, **F@0.5 >= 0.50**, and a **>= 0.03** lead over the next source; holdout songs are scored but
-never vote. Rank only chooses a draft intern — it never labels, never writes `sections.jsonl`, never
-trains torch, never fits a model on mixed FLACs. The old `enough_to_train`/`role_prior` gate is gone;
-Save appends a `save_snapshot` event, `compare` refreshes the rank, and `structure`/`guess` print
-`prefer=<source>` only when they emit that source. `data/learn.jsonl` and `data/intern_rank.json`
-stay local (gitignored).
-
-## Adapt (per-album calibration + corpus-wide cold start)
-
-`data/adapt.json` is per-album calibration from the first **heard** keeper pairs (greedy nearest
-start <= 3.0 s): a median edge shift (`shift_start`/`shift_end`, each clamped to +/-0.50 s), an
-intern-role -> saved-role map, a draft/suggested `figure_id` -> saved map, and a breakdown median
-span. Guess applies it to its draft boxes (later Guess on that album), drafts only — keepers are
-skipped, `heard` is never ticked, `sections.jsonl` is never written, and intern_rank's 5-song vote
-is untouched. Holdout tracks never teach a mixed album (a holdout-only album may build for itself);
-Save rebuilds the album's blob, and `boo-lab adapt [--album X]` prints it.
-
-`rebuild_global` (2026-09-21) pools the same shift/role/breakdown-span calibration across **every**
-non-holdout album into one blob under `adapt.json`'s `"__global__"` key, also rebuilt on every Save.
-`load_adapt` returns an album's own blob whenever it has anything usable (`n_pairs>=1` or
-`breakdowns.n>=2` — the two are independent, since `_gate_breakdowns` reads `breakdowns` without
-caring about pairing at all); only when an album has **neither** does it fall back to the global
-blob, so a brand-new album's very first Guess still inherits your general timing/role/breakdown
-habits. `figures` (the figure_id remap) is never pooled globally — a `riff-A` on one song and
-`riff-A` on an unrelated song aren't the same idea, so pooling that mapping would inject noise.
-Once an album earns its own usable blob, that takes over completely; the global blob is a
-cold-start prior, never a blend. Generated/local (gitignored).
-
-## Detect (figure drafts + breakdown gate)
-
-Guess proposes **figure windows** as unheard riff drafts when the song's `sync.jsonl` is `sync_ok`
-and `data/figures.jsonl` occurrences are `times_trusted` (`source=guess`, `heard=false`; a marker
-already covering the span within 0.35 s with the same `figure_id` is skipped). No sync or untrusted
-times ⇒ zero figure drafts. Audio half-time/kick breakdowns obey a **per-album gate** built from
-heard `breakdown` keepers on that album excluding holdout (`breakdowns {n, median_span_sec}` in the
-album's `data/adapt.json` blob): with `n>=2`, only spans 0.5–1.5× the median are kept; `n<2` keeps
-the current rules. Guess prints `figures_drafts=M breakdowns_used=N`. VAL never teaches another
-album. Never writes `sections.jsonl`.
-
-## Pack / learning
-
-For each **keeper** box: mix clip + drums/bass/guitar/piano/other/vocals + no-vox (6-stem where cached) + `meta.json` (times, role, `figure_id`, source, split, gp path). Default Demucs model is 6-stem `htdemucs_6s`; guitar/piano are isolated, no-vox is mixed from the six. A track cached only under the old 4-stem model still packs (guitar/piano simply absent). That is enough until 20 labelled songs.
-
-## Git
-
-- Remote `origin` = `https://github.com/z2wgv7dc4h-alt/1222.git`.
-- `.git` root is `god-tier-metal`. `cd tools\boo-lab` still uses that repo (`tools/boo-lab/...` paths).
-- UI button runs `git add src+data`, commit, push. `work/` is ignored — adding it used to abort the button.
-- CRLF warnings are not failure.
-- Button cannot type a GitHub password. One successful `git push` in cmd stores creds.
-- Verify a file:  
-  `https://github.com/z2wgv7dc4h-alt/1222/blob/main/tools/boo-lab/src/boo_lab/<file>`  
-  gitutil lives in **`src/boo_lab/`**, not the `tools/boo-lab/` listing.
-
-```
-cd C:\Users\RIGGUSPIG\Desktop\god-tier-metal
-git add tools/boo-lab/src tools/boo-lab/data tools/boo-lab/*.md tools/boo-lab/.env.example
-git commit -m "…"
-git push
-```
-
-## HTTP (studio)
-
-`GET /` HTML  
-`GET /api/tracks`  
-`GET /api/audio/{id}` range FLAC  
-`GET /api/drums/{id}`  
-`GET /api/cover/{id}`  
-`GET /api/tab/{id}`  
-`GET|POST /api/sections/{id}`  
-`GET /api/estimate/{id}` Guess  
-`GET /api/stem/{id}/{name}` any cached stem  
-`GET /api/analysis/{id}` drum onsets/confidence for the song  
-`POST /api/album/remove` `{album, confirm}`  
-`GET /api/drafts?album=&track=` machine drafts  
-`POST /api/ingest` multipart `band` + `files`  
-`GET|POST|PUT /api/lyrics/{id}`  
-`POST /api/pack/{id}`  
-`POST /api/jams/{id}` keepers → `work/jams/<album>/<track>.jams` (409 when no keepers / VAL)  
-`POST /api/git/push`
-
-Track id is **map row index after album sort**; audio/cover/tab/drums/stem/lyrics/pack resolve by
-album+track so “Rebirth” cannot stream “Machine.”
-
-## CLI
-
-`init-map` `scan` `hash` `studio`/`annotate` `ingest` `stems` `pack` `drums` `vocals` `holdout`
-`lyrics` `structure` `beats` `audit` `extract` `gate` `report` `export-bank` `agree` `compare`
-`hear` `sync` `figures` `gp-export` `learn` `adapt` `predict-train` `predict` `export-jams`
-`interns` `gpif` `tabnotes` `tabnotes-drafts` `status` `doctor`
-
-`drums`/`vocals` default to keeper-section rows; `--per-track` adds one whole-track
-row per song (`role=None`, `mode="track"`) from the cached 6-stem, no keeper needed —
-drafts only, and the two modes coexist in `data/drum_patterns.jsonl` / `data/vocal_melody.jsonl`.
-
-`structure` writes `data/drafts.jsonl` only (allin1 → `msa-draft`; SongFormer when
-`SONGFORMER_HOME`/import → `songformer-draft`). `agree` snapshots keeper pins (pass 1/2) and diffs
-them; `compare` scores drafts vs keepers per source; `export-jams` writes JAMS 0.3 figure/function
-layers; `beats` writes `beat_this`/allin1 beat grids; `hear` flips `heard` on one song's keepers;
-`predict-train` fits the keeper structure model and `predict` writes its `keeper-model` drafts.
-None of them writes `sections.jsonl` except the studio Save.
-
-`boo-lab status` rewrites only the marker block in `STATUS.md` from disk: keeper rows/tracks via
-`load_section_rows`, drafts + sources, `sync_ok`/total, and `map.csv` rows (reusing
-`data/corpus_health.json` when fresh). It never runs pytest and never touches the test-count line.
-
-Album/track arguments resolve the way the studio names them: `catalogue.resolve_row` ignores a
-leading `YYYY` / `YYYY - ` album prefix and track-number punctuation, so
-`--album "A Higher Place" --track "07 - Exist"` hits the map row `2009 - A Higher Place` / `07 - Exist`
-(exact → casefold → core-key; a different album sharing only a year never matches). `sync` / `hear` /
-`figures` / `agree` / `compare` use it. A map miss is `no-row`, distinct from a matched row whose gp
-is missing (`no-gp`, which still prints the real path); a genuine failed `sync` appends
-`tab_play=Xs flac=Ys dly=Zs` to its note.
-
-Optional interns: `pip install -e ".[intern]"` (allin1, beat-this, natten, jams, mir_eval, madmom);
-`.[pitch]` torchcrepe; `.[align]` whisperx. Never default dependencies. Pins: `constraints.txt`.
-`madmom` is listed explicitly because allin1 imports it but its own metadata omits it.
-GPU torch must be installed from the CUDA index (`setup.bat` does it); a plain `pip install torch`
-on Windows is CPU-only. allin1's removed NATTEN API, madmom's py2/numpy-2 breakage, and the
-`collections` ABC aliases are repaired at runtime by `boo_lab/_natten_compat.install()` — which runs
-at `import boo_lab` (so `doctor`/CLI/structure get it first). No old natten build is needed.
-
-## Research outputs (machines may draft, not label)
-
-- `data/drafts.jsonl` — allin1 `msa-draft`, SongFormer `songformer-draft`, Guess `guess`, `gp-marker`, keeper structure predictor `keeper-model`, `tabnotes-density`, `tabnotes-structure`, `tabnotes-phrase`, `blast-hint`, `figure-hash`.
-- `boo-lab agree --album X --track Y --write` — snapshot keepers as pass 1 (first) or pass 2 (re-pin); `--diff` gives role-agnostic boundary hit-rate @0.5s/@3.0s plus role/figure agreement. Never a pass 3.
-- `boo-lab compare [--album X]` — drafts vs keepers per song **and per source**: precision/recall/F @0.5/@3 plus role agreement; marks `split=holdout` (never skipped). Writes `data/compare.json`.
-- `boo-lab export-jams --out DIR` — one `.jams` per keeper song, `segment_lab_figure` + `segment_lab_function`; holdout skipped.
-- `boo-lab beats [--album X]` — `data/beats.jsonl` (`beat_this` preferred, allin1 fallback).
-- `boo-lab sync --album X --track Y` — GP clock vs the audio through **two** co-witnesses: a blurred (~120 ms) onset correlation and a chroma correlation (tab pitches held over each beat vs `chroma_cqt`), preferring the cached guitar stem with a per-witness mix fallback. `sync_ok` if either is within 350 ms at score ≥ 0.15, or an **aligned-with-offset** lead-in (within 5 s, peak prominence ≥ 0.05, other witness agreeing ≤ 0.25 s). Records `used_stem`/`lag_sec`/`score`/`clock_ratio`/`chroma_lag`/`chroma_score`/`offset_sec`. `|lag|` alone is not the rule.
-- `boo-lab hash [--album X]` — fills `flac_sha256` in `map.csv` for rows whose FLAC exists (atomic write; never rehashes a valid 64-hex digest).
-
-**Sync clock rate.** `boo-lab sync` now wires the existing `best_clock_fit` (span ±0.08, step 0.01)
-into `sync_ok`: the rate-adjusted onset lag must pass `decide` (still `|lag| < 0.35 s`, score ≥ 0.15)
-and the chroma witness must agree at that same ratio within 0.25 s (a lone onset rate-fit may stand
-when no chroma exists). So the ~2.7% uniform-drift class can pass; 20% still fails. `clock_ratio` is
-always recorded (1.0 when no stretch) and a pass reads `ok (rate 1.027)`. No threshold was loosened.
-Figure hashes (`data/figures.jsonl`) publish `start`/`end` seconds only when that song's `sync_ok`
-is true (`times_trusted`); otherwise bars/hashes only.
-- `boo-lab audit` — sources/overlaps/heard/short-box hygiene.
-
-Reading: **F3 high + role agreement low = the intern finds the edges but names them wrong.**
-
-## Decisions (do not reopen without a new fact)
-- Structure predictor trains on keepers (drafts only); frozen interns do not retrain from Save; learning compounds in the predictor + adapt/rank.
-
-
-- Sparse human structure + stems pack beats “learn 10k FLACs end-to-end” for form.
-- No DAW, no RoFormer tonight, no AlphaTab as a product (tabs are not a product surface).
-- No madmom as a hard dependency (Python 3.12 / numpy war). Librosa + Demucs only.
-- allin1 optional; now works via `_natten_compat` (legacy NATTEN API + madmom py2 / numpy-2 shim). Guess must still work without it.
-- GPU when present: `boo_lab/device.py` `torch_device()` is the only switch; interns never hardcode `"cpu"`.
-- Fragile pins live in `constraints.txt`; `setup.bat` + `doctor` are the onboarding path.
-- No tab scraping.
-- Overlaps are layered roles, not two riffs of the same name.
-- Guess never overwrites a careful Save if the user does not press Guess.
-- Art is local files next to FLACs, not MusicBrainz.
-- **A keeper is heard.** Machines write drafts; they never write keepers.
-- allin1 / SongFormer / beat_this / jams / mir_eval are optional **intern** extras, never default deps.
-- 6-stem Demucs (`htdemucs_6s`) is the default; old 4-stem caches stay valid.
-- `boo-lab hear` is per-track only; never blanket `heard=true` over the catalog.
-- **One reader for `sections.jsonl`**: `schema.load_section_rows` (keepers = truthy `role` + keeper `source` + `heard is True`). No twin readers.
-- **Every write is atomic** (`schema.write_jsonl_atomic`); a zero-row/failed run must never blank a prior file.
-- **Fail closed**: a missing/unknown source is never a keeper; an unmappable role is rejected at Save, never defaulted to `riff`.
-- **Labyrinth hard-fails on an uncovered bank role** (`RiffBankCoverageError`); tests encode that, not a silent Markov fallback.
-- **`interns` is a CLI pass, not a studio button.** It is a long, GPU-bound job; run `boo-lab interns [--album/--steps]` from cmd (resumable, so re-run is cheap). No SSE/progress endpoint, no blocking request.
-
-## Bugs that already bit us (regressions to refuse)
-
-1. `UnboundLocalError: os` / `scan_roots` — inner import shadowing. Do not nest those imports inside branches.
-2. Save sending wave regions at t=0, duration 0 → six `0.25s` boxes. Table wins; refuse all-tiny saves.
-3. `float(tempo)` on a 1-d ndarray kills drums Guess.
-4. Riff fill same colour as the waveform.
-5. Ingest default `new_band` inside `born_of_osiris`.
-6. Drop using `f.name` only, dropping folder structure and covers.
-7. Git add `work/` + safecrlf warnings treated as fatal.
-8. Play box calling `play()` with no end.
-9. Audio id = list index without album+track resolve.
-10. One GP file matching every similarly named track.
-11. `torch+cpu` venv + allin1's `device='cpu'` default → every intern ran on CPU with a GPU idle. Use `device.py`; check `doctor`.
-12. natten ≥0.17 dropped the pre-0.17 API allin1 imports (`natten1dav`/`1dqkrpb`/`2dav`/`2dqkrpb`) → `ImportError`. Fixed by `_natten_compat` (exact `get_window_start`/`get_pb_start` ports). Do not "fix" by pinning old natten — no Windows/py3.12 wheel exists.
-13. madmom on py3.12 + numpy2: `NameError: integer`, `np.int`, and ragged `asarray` in downbeat tracking. All repaired by `_natten_compat.install()`.
-14. GP clock ignored `song.tempo` and defaulted to 120 BPM, stretching every tab ~1.6× — `sync` could never match. Read `song.tempo` (per-measure `header.tempo` only when set).
-15. Repeat unroll reset a group's pass count on re-entry (`isRepeatOpen`) → infinite loop (2M onsets) on 02/04/06. Use `setdefault`; the unroll is now unit-tested.
-16. Scan GP keys didn't strip a space-form track number, so `07 Exist.gp5` keyed as `07exist` and silently never matched `07 - Exist.flac` (read as "no tab"). Space-numbered keys are added; both the match and the no-overmatch case are tested.
-17. `drums_extract`/`vocal_melody` read `sections.jsonl` with `if rec.get("source") == "human" or rec.get("role")` — precedence made the source test dead, so every row (including machine drafts) counted as human. One shared `schema.load_section_rows` now enforces the keeper law.
-18. `beats`/`structure.build_drafts`/`drums_extract`/`vocal_melody` opened their output with mode `"w"` and truncated it before writing — a failed/zero-row run blanked the whole file (this actually wiped `drafts.jsonl` once). All buffer + `write_jsonl_atomic`, and only replace when a row was produced.
-19. `sections.jsonl` was also rewritten non-atomically by `hear` and album-remove; a crash mid-write destroyed every label. Both now use `write_jsonl_atomic`; album-remove parses (and aborts on a malformed line, deleting nothing) first.
-20. `is_keeper(None)`/missing source returned `True` and `canonical_role` defaulted to `"riff"` — fail-open, so unstamped/unmappable rows became trusted human truth. Both fail closed now (`None` role rejects the Save).
-21. madmom does `from collections import MutableSequence`; on some py3.12 builds that name is gone. `_natten_compat.install()` aliases the `collections` ABCs and now runs at `import boo_lab`.
-
-## What to do next (human)
-
-Label Elimination by ear. Do not wait on Guess. Scan after any ingest. Push docs+code from cmd when a chunk of work is done.
-
-- Guess merges adjacent same-letter GP markers (nested blast/breakdown ignored for adjacency).
-
-
-- START: studio no longer waits on interns/SongFormer; prep is a side window + 360s SongFormer timeout.
-
-- Pack spine (no GP): measure-grid guitar activity, not peak-relative density — full-song coverage; warn if <45%.
-- Unique pack bar-runs now populate Guess (figures emit unique=true; pack spine yields to figure-hash).
-- Pack Guess uses tabnotes-phrase mid-grain boxes (~10), not unique 2-bar spam.
-
-## Pack excellence roadmap (in flight)
-
-1. Pitch/contour splits inside dense runs — **now**
-2. Returning figure_id via fuzzy bar-fp identity — **now**
-3. Multi-track lead/rhythm/bass tags
-4. Articulation draft hints
-5. Pack lyrics / section labels
-6. Heard keepers teach phrase splits
-
+| data/map.csv | scan: album, track, flac/gp paths, match, lac_sha256 (local-only; see .gitignore) |
+| data/sections.jsonl | **keepers** only; Save keeps sections.jsonl.bak |
+| data/drafts.jsonl | machine drafts; never keepers |
+| data/holdout.csv | whole-song train/val reservation |
+| data/beats.jsonl | beat/downbeat grid |
+| data/sync.jsonl | tab-vs-audio: sync_ok, lag_sec, score |
+| data/figures.jsonl | figure-hash drafts |
+| data/adapt.json | per-album calibration (local) |
+| work/ | stems, models, pack outputs (gitignored) |
+
+Never commit FLACs, GP, stems, zips, tokens, .venv.
+
+## Roles + overlap
+
+Roles: intro, build, riff, hook, breakdown, blast, solo, chill, pulse, outro.
+
+- Different roles **may** overlap. Two boxes of the **same** role on the same seconds → Save refuses.
+- Breakdown / blast = functions (may sit on the same guitar as a riff). Never invent 
+iff-blast-A.
+- Pulse = named synth/keyboard figure, not “keys are audible.”
+- Optional on_figure on a function box links the igure_id it rides.
+- Figure roles default igure_id to {role}-A (or a tab letter); function roles may leave igure_id blank.
+
+## Short law echoes
+
+- Prefer GP7 .gp/.gpx (parsed GPIF) over .gp5; no GP7→GP5 conversion.
+- Do not rename FLACs; match tabs in map.csv.
+- Guess / structure / predict (keeper-model) write **drafts only**. Predictor v1 is an optional scaffold — needs non-holdout keepers; holdout-only labs skip Save train unless holdout_fallback is explicit.
+- VAL / holdout songs do not train or vote prefer=; pinning is fine (Rebirth is already pinned).
+- gpif_to_gp5 stays unused.
+
+Dated session notes, commit hashes, UI pixel novels, and predictor manifesto live in CHANGELOG.md.

@@ -6,10 +6,10 @@ Canonical detail: **CURRENT.md**; commands in **README.md**.
 ## Counts (from disk)
 
 - keepers: 6 row(s) across 1 track(s)
-- drafts: 1451 row(s); sources: keeper-model, msa-draft, songformer-draft
-- sync: 19 ok / 52 row(s)
-- map.csv: 71 row(s)
-- figures: 477 row(s) across 40 track(s)
+- drafts: 1642 row(s); sources: msa-draft, songformer-draft
+- sync: 20 ok / 53 row(s)
+- map.csv: 72 row(s)
+- figures: 610 row(s) across 41 track(s)
 - tempo hints: 0 row(s) across 0 track(s)
 <!-- status:counts:end -->
 

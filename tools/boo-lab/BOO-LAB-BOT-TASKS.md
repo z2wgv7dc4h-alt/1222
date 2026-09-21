@@ -101,7 +101,7 @@ Living docs after this pass: `USER.md` (operator), `LAW.md` (rules), `CURRENT.md
 
 - [x] **P3.2 `[project.scripts]`** `boo-lab = "boo_lab.cli:main"` so docs that say `boo-lab doctor` are not prose.
 
-- [ ] **P3.3 `.env.example` placeholders only.**
+- [x] **P3.3 `.env.example` placeholders only.**
   ```
   BOO_FLAC_ROOT=
   BOO_GP_ROOT=

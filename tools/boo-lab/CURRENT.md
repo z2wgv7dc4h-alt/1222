@@ -1,4 +1,4 @@
-# CURRENT — read this first (2026-09-21)
+﻿# CURRENT — read this first (2026-09-21)
 
 Single source of truth for humans and later bots. If README/STATUS/LAW disagree with this file, this file wins. Then fix the others.
 
@@ -7,13 +7,13 @@ Operators start at `USER.md` (Part A to work, Part B for every button and file).
 Living docs are `USER.md` / `LAW.md` / `CURRENT.md` / `README.md` / `STATUS.md` / `CHANGELOG.md` only.
 
 
-> **Local 2026-09-21 (docs pass):** blast + on_figure + blast-hint; Guess marker-first + tabnotes-structure spine; ingest manifest/pack-only sync; Pack badge; multi-stem audition; box-loop/ctx outside-click. See CHANGELOG.
+> **Local 2026-09-21 (docs pass):** intern cache footguns (beats merge + work/beats cache, START single interns window, structure quiet CACHE); Pack badge title-match; real bar_fp + structure-track phrases; Save `pack_id` + `boo-lab pack-notes` live join; GP markers beat pack for Guess. See CHANGELOG.
 
 
 > **Read this first.**
 > Keepers = `data/sections.jsonl` (`source=human`/`guess-accepted` **and** `heard=true`).
 > Drafts = `data/drafts.jsonl` (`msa-draft` / `songformer-draft` / `guess` / `gp-marker` / `keeper-model` / `tabnotes-density` / `blast-hint`) — **never keepers**.
-> Box fields: `start end role layer form figure_id on_figure unique instrument start_bar end_bar source heard`.
+> Box fields: `start end role layer form figure_id on_figure unique instrument start_bar end_bar source heard` (+ optional `pack_id` / `pack_note_source` when a trusted pack matched on Save)..
 > Studio table columns match those; waveform is WaveSurfer, with a real mel spectrogram below it (Wave / Spec / Both).
 > `structure` writes `drafts.jsonl` only. `hear` and `sync` require **both** `--album` and `--track`.
 > `hash` fills `flac_sha256`; `sync` writes `data/sync.jsonl` (`sync_ok`/`lag_sec`); `beats` → `data/beats.jsonl`.
@@ -29,7 +29,7 @@ Living docs are `USER.md` / `LAW.md` / `CURRENT.md` / `README.md` / `STATUS.md` 
 A **section lab** for metal FLACs (Born of Osiris first, other bands via ingest). Human output is `data/sections.jsonl` — **keeper pins only** (`source=human`/`guess-accepted`, `heard=true`), each with a figure/function `layer` and a `figure_id` — plus optional Pack clips under `work/` (gitignored). Machines write `data/drafts.jsonl` (MSA/SongFormer/Guess/keeper-model) and never keepers. It is not God Tier Metal, not a DAW, not a tab reader, not an auto-songwriter.
 
 GitHub: `https://github.com/z2wgv7dc4h-alt/1222` path `tools/boo-lab`.  
-Newest lab commit: `37e5d96` (studio lanes named once; tiles show `figure_id` not "Riff"); before it `4e3d283` (GP rematch — scored unique assignment, GP7 packs win: Discovery/AHP/Eternal Reign now full GP7), `c851856` (ingest detects tab-notes zips into `data/tabnotes`), `3449785` (tab-notes pack reader), `ced52ad` (per-track drums/vocals), `0a98c31` (sync clocks GP7 via GPIF), `e2a5dee` (GPIF notes: midi/voices/articulations/tempo map), `42d47f6` (GPIF→GP5 writer + fallback), `7dfdfe1` (parse `score.gpif`), `9fca6e6` (START.bat hash + beats/sync — later superseded by the full `interns` prep), `5df12ab` (one resumable `interns` pass).
+Newest lab commit: `2f09ee7` (Save pack_id + pack-notes export); before it real bar_fp `9a15c3c`/`ad0d84e`, badge title-match `b169b69`, intern footguns `9ec74bc`.
 
 ## Paths
 
@@ -685,3 +685,4 @@ Label Elimination by ear. Do not wait on Guess. Scan after any ingest. Push docs
 4. Articulation draft hints
 5. Pack lyrics / section labels
 6. Heard keepers teach phrase splits
+

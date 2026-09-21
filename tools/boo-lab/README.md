@@ -1,4 +1,4 @@
-**Read CURRENT.md first.** Then LAW.md.
+﻿**Read CURRENT.md first.** Then LAW.md.
 
 # boo-lab
 
@@ -194,6 +194,7 @@ Then `python -m boo_lab.cli scan` and reload. Green GP7/GP5 = matched tab: the b
 | `agree --album X --track Y [--write\|--diff]` | two-pass keeper agreement |
 | `compare [--album X]` | machine drafts vs human keepers |
 | `export-jams --out DIR` | JAMS 0.3 (figure/function layers) |
+| `pack-notes` | join keeper spans → live pack note JSONL (`work/pack-notes/`) |
 
 ## Outputs (all local-first)
 
@@ -209,3 +210,4 @@ Optional extras: `pip install -e ".[intern]"` adds allin1, beat-this, jams, mir_
 ## Do not
 
 Commit FLACs, GP files, `work/stems`, `.venv`, tokens. Treat Guess as a draft. Do not Guess over a finished human Save.
+

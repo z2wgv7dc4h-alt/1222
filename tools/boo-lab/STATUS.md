@@ -1,3 +1,10 @@
+﻿# Status — 2026-09-21
+
+**Interns (fixed on disk):** beats merge + `work/beats/` cache; START refuses a second `boo-lab interns` window; structure quiet-skip when drafts unchanged (`9ec74bc`).
+
+**Packs (2026-09-21 tip `2f09ee7`):** title-only badge; real `bar_fp` Guess phrases; Save `pack_id`; `boo-lab pack-notes` live join. GP markers still preferred for Guess when present.
+
+Canonical detail: **CURRENT.md**; commands in **README.md**.
 # Status — 2026-09-21
 
 Canonical detail: **CURRENT.md**; commands in **README.md**.
@@ -179,3 +186,4 @@ rows omit `start`/`end` seconds unless the song's `sync_ok` is true.
 Pytest proves wiring. It does not prove a riff.
 - Unique pack bar-runs now populate Guess (figures emit unique=true; pack spine yields to figure-hash).
 - Pack Guess uses tabnotes-phrase mid-grain boxes (~10), not unique 2-bar spam.
+

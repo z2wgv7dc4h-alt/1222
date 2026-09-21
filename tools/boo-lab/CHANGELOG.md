@@ -1,3 +1,20 @@
+﻿## 2026-09-21 — pack_id on Save + live note join (not dense aggregates)
+
+- Save stamps `pack_id` + `pack_note_source` (+ pack timeline bars if missing) when `sync_ok`.
+- Dense palm/pitch `pack_*` frac stats removed from keepers — pack stays source of truth.
+- `boo-lab pack-notes` joins keeper spans to live note sequences → `work/pack-notes/keepers-notes.jsonl`.
+- Guess: GP markers still win; pack phrases only when no markers.
+
+## 2026-09-21 — real pack bar_fp + structure-track phrases
+
+- `bar_fp_tab`: in-bar 16th onset/duration + full MIDI pitch (not pitch-class sludge that zeroed 16ths).
+- Phrase Guess picks guitar track with most unique nonempty fingerprints; stamps `arts_hint` / `palm_frac`.
+- Mindful ~11 mid-grain phrases with returning figure_ids. Prior "bar_fp" commits that only touched tests/marker were superseded.
+
+## 2026-09-21 — Pack badge title-required
+
+- `discover_pack` / index match require a real **title** hit. Artist-in-album alone no longer badges every Born of Osiris folder as Mindful (was 48/72 false Pack).
+
 ## 2026-09-21 — unique pack bar-runs → Guess
 
 ## 2026-09-21 — intern cache footguns + pack phrase identity
@@ -476,3 +493,4 @@
 
 - Studio UI, Demucs-on-demand drums, lyrics LRC, Pack, ingest endpoint, album grouping.
 - Commit `6482c30` on `z2wgv7dc4h-alt/1222`: guess BPM fix, save harvest, riff colours.
+

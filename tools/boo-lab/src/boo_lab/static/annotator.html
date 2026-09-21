@@ -237,7 +237,7 @@
     <li>Delete — remove selected box · Ctrl+Z undo · ? this panel</li>
   </ul>
   <h4>Guess, drafts and the rest</h4>
-  <p><b>Guess</b> — proposes boxes from the Guitar Pro tab's markers plus simple audio cues (half-time / kick) on the isolated drums. They arrive as unheard <code>source=guess</code> rows. It labels only what it can justify; the status line tells you how far it got — paint the rest by hand.</p>
+  <p><b>Guess</b> — proposes boxes from the Guitar Pro tab's markers (or a local tab-notes pack's own riff/bass/pulse figures, when one exists) plus audio cues (half-time / kick) on the isolated drums — a pack's own kick notation wins over the audio guess when its clock matches. They arrive as unheard <code>source=guess</code> rows. It labels only what it can justify; the status line tells you how far it got — paint the rest by hand. Hover the "N guessed" count for details (sync status, tempo-automation changes worth checking for a boundary, which kick source was used).</p>
   <p><b>Load drafts</b> — pulls machine drafts (allin1 <code>msa-draft</code>, etc.) for this song and appends them unheard. Tick heard to keep one. Drafts are never saved by themselves, and Save never rewrites them.</p>
   <p><b>Stem picker</b> — listen to any cached demucs stem (drums / bass / guitar / piano / other / vocals); the playhead stays linked to the mix.</p>
   <p><b>Drum confidence</b> — if the classifier suspects it undercounted snares on a dense mix, it says so; treat those as "verify by ear".</p>
@@ -1426,7 +1426,13 @@ function estimate(){
     sel=regs.length?0:-1;
     table(); paintRegions();
     loadStem(tracks[trackId].id, curStem);
-    document.getElementById("sub").textContent=(x.sections||[]).length+" guessed";
+    const sub=document.getElementById("sub");
+    sub.textContent=(x.sections||[]).length+" guessed";
+    // Notes (sync status, tempo-automation hints, tab-vs-audio kick source,
+    // etc.) always land here on hover -- draftNudge below claims the #err
+    // coach line on a successful run, so notes would otherwise be shown
+    // only when Guess added nothing.
+    sub.title=(x.notes||[]).join(" · ");
     if(added>0) draftNudge(added, adapted);
     else showErr((x.notes||[]).join(" · "));
   }).catch(e=>showErr("guess: "+e, true)).finally(()=>{ document.getElementById("btnEst").disabled=false; });

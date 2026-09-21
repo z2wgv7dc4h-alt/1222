@@ -152,6 +152,16 @@ def _snap_to_grid(t: float, downbeats, beats) -> float:
     return best if (best is not None and bd <= 0.12) else t
 
 
+# figures.jsonl's own `instrument` vocabulary (guitar/bass/other -- see
+# figures.py) is internal bookkeeping, not the studio's `inst` dropdown
+# vocabulary (rhythm/lead/bass/drums/synth/vocal/mix, annotator.html
+# INSTRUMENTS). `bass` and `other` (a Pulse track) map cleanly; a `guitar`
+# row is deliberately left blank -- checked on a real corpus song that mean
+# pitch alone doesn't reliably separate rhythm from lead, so this never
+# guesses which one a guitar figure is.
+_FIGURE_INSTRUMENT_TO_UI = {"bass": "bass", "other": "synth"}
+
+
 def _figure_drafts(lab_root, album: str, track: str, existing: list[dict],
                    tol: float = 0.35) -> list[dict]:
     """Unheard riff drafts from `figures.jsonl` trusted occurrences. Skips a
@@ -164,6 +174,7 @@ def _figure_drafts(lab_root, album: str, track: str, existing: list[dict],
             continue
         fid = row.get("figure_id")
         role = row.get("role") or "riff"
+        inst = _FIGURE_INSTRUMENT_TO_UI.get(row.get("instrument") or "", "")
         for occ in row.get("occurrences") or []:
             start, end = occ.get("start"), occ.get("end")
             if start is None or end is None:
@@ -180,7 +191,7 @@ def _figure_drafts(lab_root, album: str, track: str, existing: list[dict],
             out.append({
                 "role": role, "start": round(start, 3), "end": round(end, 3),
                 "figure_id": fid, "form": row.get("form") or "A",
-                "unique": bool(row.get("unique")), "instrument": "",
+                "unique": bool(row.get("unique")), "instrument": inst,
                 "start_bar": occ.get("start_bar"), "end_bar": occ.get("end_bar"),
                 "source": "guess", "heard": False,
             })

@@ -13,7 +13,18 @@ Canonical detail: **CURRENT.md**; commands in **README.md**.
 
 Works: studio keeps pins (`human`/`guess-accepted` + `heard`) in `sections.jsonl`; mel
 spectrogram under the WaveSurfer waveform; 6-stem picker; drafts; `hear`/`sync`/`hash`;
-`agree`/`compare`/`export-jams`/`beats`/`audit`/`report`; **361 tests pass**.
+`agree`/`compare`/`export-jams`/`beats`/`audit`/`report`; **362 tests pass**.
+UI catch-up (2026-09-21): the new tabnotes drafting (bass/pulse/tempo-hints/kick-
+notation) was backend-only until now. `_figure_drafts` (`guess.py`) prefills a draft
+box's `inst` from `figures.jsonl`'s own `instrument` field (`bass`→`bass`,
+`other`→`synth`; a `guitar` row is left blank on purpose, same register-ambiguity
+reason multi-guitar-track clustering doesn't guess "lead"). The studio's Guess
+button ("N guessed") now carries a hover tooltip with the full `notes` line (sync
+status, tempo-automation hints, which kick source was used) — previously that text
+was only shown when Guess added zero boxes, so it was invisible on every normal
+successful run. The How panel's Guess paragraph now describes the tab-notes-pack
+path. Verified live in a browser against the real studio server (not just read),
+no new console errors, `node --check` on the extracted inline script is clean.
 Multi-guitar tracks (2026-09-21): a tab-notes pack can carry more than one
 `guitar`-category track (checked on a real corpus song: three, mean pitches 51.7/
 50.1/46.6 — too close together to be a real rhythm/lead register split, so no

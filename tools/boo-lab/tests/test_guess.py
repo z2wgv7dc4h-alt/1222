@@ -351,6 +351,31 @@ def test_guess_no_figure_drafts_when_times_not_trusted(tmp_path, monkeypatch):
     assert not [s for s in res["sections"] if s.get("source") == "guess"]
 
 
+def test_figure_drafts_prefill_inst_from_figures_instrument(tmp_path):
+    lab = tmp_path / "lab"
+    (lab / "data").mkdir(parents=True, exist_ok=True)
+    rows = [
+        {"album": "A", "track": "T", "figure_id": "bass-riff-A", "instrument": "bass",
+         "times_trusted": True, "occurrences": [{"start": 1.0, "end": 3.0}]},
+        {"album": "A", "track": "T", "figure_id": "pulse-A", "instrument": "other",
+         "role": "pulse", "times_trusted": True, "occurrences": [{"start": 5.0, "end": 7.0}]},
+        {"album": "A", "track": "T", "figure_id": "riff-A", "instrument": "guitar",
+         "times_trusted": True, "occurrences": [{"start": 9.0, "end": 11.0}]},
+        {"album": "A", "track": "T", "figure_id": "riff-B",  # no instrument at all (older row)
+         "times_trusted": True, "occurrences": [{"start": 13.0, "end": 15.0}]},
+    ]
+    (lab / "data" / "figures.jsonl").write_text(
+        "".join(json.dumps(r) + "\n" for r in rows), encoding="utf-8")
+
+    drafts = g._figure_drafts(lab, "A", "T", existing=[])
+
+    by_fig = {d["figure_id"]: d["instrument"] for d in drafts}
+    assert by_fig["bass-riff-A"] == "bass"
+    assert by_fig["pulse-A"] == "synth"
+    assert by_fig["riff-A"] == ""
+    assert by_fig["riff-B"] == ""
+
+
 # --- tempo-automation hints (informational note, never a box) ---------------
 
 

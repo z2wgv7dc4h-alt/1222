@@ -143,7 +143,7 @@ If Save ever wrote six `0.00–0.25` rows, the pins fired before duration loaded
 - **One-step undo**: before each Save the previous file is kept as `data/sections.jsonl.bak` (`*.bak` is gitignored). The studio refuses a box with `end <= start` (never auto-repairs it to `0.25s`).
 - **Load drafts** appends `data/drafts.jsonl` rows unheard; **VAL** badge marks holdout songs.
 - Play = whole track. Play box = selected region only.
-- Guess merges drafts if boxes already exist; do not Guess a finished song.
+- Guess merges drafts if boxes already exist; do not Guess a finished song. The "N guessed" counter (`#sub`) carries a hover tooltip with the full `notes` line from `/api/estimate` (sync status, tempo-automation hints, which kick source was used) — `#err` only shows those notes when Guess added zero new boxes, so the tooltip is the only place to see them on a normal successful run. A figure draft's `inst` is prefilled from `figures.jsonl`'s own `instrument` field where the mapping is unambiguous (`bass`→bass, a Pulse track's `other`→synth); a `guitar` row is left blank on purpose.
 - Lyrics: click line to seek (incl. force-aligned plain lyrics); ±0.2 nudge; Save lyrics.
 - Remove album: deletes one album's FLAC/GP under the configured roots, drops its pins/holdout, rescans. Confirm required.
 - Drop zone: zip or folder. Type band first. No RAR.

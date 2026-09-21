@@ -116,9 +116,25 @@ def test_stamp_box_carries_the_optional_on_figure_link():
 def test_stamp_box_identity_defaults():
     b = stamp_box(0, 4, "riff")
     assert b["form"] == "A"
+    assert b["figure_id"] == "riff-A"
     assert b["unique"] is False
     assert b["instrument"] == ""
     assert b["start_bar"] is None and b["end_bar"] is None
+
+
+def test_stamp_box_function_role_keeps_blank_figure_id():
+    for role in ("intro", "build", "breakdown", "blast", "chill", "outro"):
+        b = stamp_box(0, 4, role)
+        assert b["figure_id"] == "", role
+    # human-typed figure_id is kept even on a function role
+    typed = stamp_box(0, 4, "breakdown", figure_id="custom-A")
+    assert typed["figure_id"] == "custom-A"
+
+
+def test_stamp_box_figure_roles_default_figure_id_when_blank():
+    for role in ("riff", "hook", "solo", "pulse"):
+        assert stamp_box(0, 4, role)["figure_id"] == f"{role}-A"
+        assert stamp_box(0, 4, role, figure_id="X")["figure_id"] == "X"
 
 
 def test_stamp_box_identity_round_trip():

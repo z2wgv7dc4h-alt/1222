@@ -190,7 +190,12 @@ def stamp_box(start: float, end: float, role: str | None, *, source: str = "huma
         "start": float(start), "end": float(end), "role": role,
         "layer": layer_for(role),
         "form": (form or "A").strip().upper() or "A",
-        "figure_id": (figure_id or "").strip() or f"{role}-A",
+        # Figure roles may default "{role}-A" when blank; function roles
+        # keep an empty figure_id unless the human typed one.
+        "figure_id": (
+            (figure_id or "").strip()
+            or (f"{role}-A" if role in FIGURE_ROLES else "")
+        ),
         "unique": bool(unique),
         "instrument": inst if inst in INSTRUMENTS else "",
         "start_bar": _bars(start_bar),

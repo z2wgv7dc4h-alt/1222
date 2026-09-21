@@ -105,11 +105,32 @@ def ensure_drums(flac: Path, cache: Path) -> tuple[Path | None, str]:
     return hit, "demucs drums" if hit else "demucs wrote nothing"
 
 
-def ensure_preview_wav(flac: Path, preview_root: Path) -> Path | None:
+_preview_building: set[str] = set()
+
+
+def preview_wav_path(flac: Path, preview_root: Path) -> Path | None:
+    """Return cached WAV preview path if it already exists and is fresh."""
+    try:
+        flac = Path(flac)
+        if not flac.is_file():
+            return None
+        preview_root = Path(preview_root)
+        key = "%s_%s" % (flac.stem, flac.stat().st_size)
+        out = preview_root / (key + ".wav")
+        if out.is_file() and out.stat().st_mtime >= flac.stat().st_mtime:
+            return out
+    except Exception:
+        return None
+    return None
+
+
+def ensure_preview_wav(flac: Path, preview_root: Path, *, build: bool = True) -> Path | None:
     """Browser WaveSurfer often silent-fails on FLAC; cache a WAV sibling.
 
-    Returns the wav path when ready, else None (caller may fall back to FLAC).
-    Never raises — studio audio must stay best-effort.
+    Returns the wav when already cached. If missing and `build`, starts a
+    background convert and returns None so `/api/audio` can fall back to FLAC
+    without blocking the request (blocking made other songs look dead).
+    Never raises.
     """
     try:
         flac = Path(flac)
@@ -121,14 +142,27 @@ def ensure_preview_wav(flac: Path, preview_root: Path) -> Path | None:
         out = preview_root / (key + ".wav")
         if out.is_file() and out.stat().st_mtime >= flac.stat().st_mtime:
             return out
-        import soundfile as sf
-        import numpy as np
-        data, sr = sf.read(str(flac), always_2d=True)
-        # downsample long files a bit for faster first paint (keep <= 48k)
-        if sr > 48000:
-            # rare; leave as-is
-            pass
-        sf.write(str(out), data, sr, subtype="PCM_16")
-        return out
+        if not build:
+            return None
+        token = str(out)
+        if token in _preview_building:
+            return None
+
+        def _build() -> None:
+            try:
+                import soundfile as sf
+                data, sr = sf.read(str(flac), always_2d=True)
+                tmp = out.with_suffix(".wav.tmp")
+                sf.write(str(tmp), data, sr, subtype="PCM_16")
+                tmp.replace(out)
+            except Exception:
+                pass
+            finally:
+                _preview_building.discard(token)
+
+        _preview_building.add(token)
+        import threading
+        threading.Thread(target=_build, name="preview-wav", daemon=True).start()
+        return None
     except Exception:
         return None

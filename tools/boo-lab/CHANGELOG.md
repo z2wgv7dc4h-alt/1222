@@ -1,5 +1,10 @@
 ## 2026-09-21 — unique pack bar-runs → Guess
 
+## 2026-09-21 — audio preview non-blocking
+
+- WAV preview convert no longer blocks `/api/audio` (first open of other songs was stalling Play). Cache hit → WAV; miss → FLAC immediately + background build.
+
+
 ## 2026-09-21 — studio WAV preview for Play
 
 - `/api/audio` serves a cached WAV preview (WaveSurfer was silent-failing on FLAC → clock `—`, nothing plays).

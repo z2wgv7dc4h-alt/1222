@@ -1,4 +1,4 @@
-﻿"""Pack pointers on Save + live note join for export/train.
+"""Pack pointers on Save + live note join for export/train.
 
 Keepers stay human labels (album/track/start/end/role/...). When a trusted
 tab-notes pack exists (`sync_ok`), Save only stamps a soft-fail `pack_id`

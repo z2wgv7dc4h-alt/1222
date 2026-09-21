@@ -1,4 +1,4 @@
-﻿# Hard pins for the fragile optional-intern stack. Pass to pip with
+# Hard pins for the fragile optional-intern stack. Pass to pip with
 #   python -m pip install -c constraints.txt -e ".[intern,pitch,align]"
 # (setup.bat already does; pyproject.toml cannot express -c itself.)
 # Each line is here because a different version broke a real run:

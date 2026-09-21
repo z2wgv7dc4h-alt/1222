@@ -86,7 +86,7 @@ Living docs after this pass: `USER.md` (operator), `LAW.md` (rules), `CURRENT.md
   - Command table matches `cli.py` subparsers (no ghost commands, no missing ones).
   - Thin install vs studio extras stated honestly (see P3.1).
 
-- [ ] **P2.6 Strip UTF-8 BOM** from `CURRENT.md`, `STATUS.md`, `README.md`, `CHANGELOG.md`, `constraints.txt`, `src/boo_lab/pack_snapshot.py`. Files stay UTF-8.
+- [x] **P2.6 Strip UTF-8 BOM** from `CURRENT.md`, `STATUS.md`, `README.md`, `CHANGELOG.md`, `constraints.txt`, `src/boo_lab/pack_snapshot.py`. Files stay UTF-8.
 
 ---
 

@@ -1,4 +1,4 @@
-﻿# CURRENT — read this first (2026-09-21)
+# CURRENT — read this first (2026-09-21)
 
 Single source of truth for humans and later bots. If README/STATUS/LAW disagree with this file, this file wins. Then fix the others.
 

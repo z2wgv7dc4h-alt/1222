@@ -1,4 +1,4 @@
-﻿**Read CURRENT.md first.** Then LAW.md.
+**Read CURRENT.md first.** Then LAW.md.
 
 # boo-lab
 

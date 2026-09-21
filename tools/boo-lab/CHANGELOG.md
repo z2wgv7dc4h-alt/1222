@@ -1,4 +1,4 @@
-﻿## 2026-09-21 — pack_id on Save + live note join (not dense aggregates)
+## 2026-09-21 — pack_id on Save + live note join (not dense aggregates)
 
 - Save stamps `pack_id` + `pack_note_source` (+ pack timeline bars if missing) when `sync_ok`.
 - Dense palm/pitch `pack_*` frac stats removed from keepers — pack stays source of truth.

@@ -1,4 +1,4 @@
-﻿# Status — 2026-09-21
+# Status — 2026-09-21
 
 **Interns (fixed on disk):** beats merge + `work/beats/` cache; START refuses a second `boo-lab interns` window; structure quiet-skip when drafts unchanged (`9ec74bc`).
 

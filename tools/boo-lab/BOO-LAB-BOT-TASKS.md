@@ -54,7 +54,7 @@ The live bug: Guess/extract emit `gp-marker` and figures emit `figure-hash`, but
 
 Living docs after this pass: `USER.md` (operator), `LAW.md` (rules), `CURRENT.md` (short contract), `README.md` (install + commands), `STATUS.md` (generated counts), `CHANGELOG.md` (dated history). Nothing else claims to be source of truth.
 
-- [ ] **P2.1 LAW.md â€” fix false rules.**
+- [x] **P2.1 LAW.md â€” fix false rules.**
   - â€œStudio Save is the only writer of `sections.jsonl`â€ is false. Writers are: studio Save, `boo-lab hear`, album-remove. List them. Machines still never write keepers.
   - Sources list = P1.1.
   - Keep: machines never label; GP7 native; no FLAC rename; no audio/GP/tokens in git.

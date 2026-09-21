@@ -4,16 +4,18 @@ Labelling lab. Not the generator.
 
 - Roles: intro, build, riff, hook, breakdown, blast, solo, chill, pulse, outro.
 - Human `sections.jsonl` beats Guess, GP markers, Demucs, librosa.
-- Keepers are `heard`. Machines may draft (`data/drafts.jsonl`: `msa-draft` / `songformer-draft` / `guess` / `keeper-model` / `tabnotes-density` / `tabnotes-structure` / `tabnotes-phrase` / `blast-hint` / `gp-marker` / `figure-hash`); they never label.
-- `boo-lab structure` never writes `sections.jsonl` — drafts only.
+- Keepers are `heard`. Machines may draft (`data/drafts.jsonl`); they never label.
+- Exact `source` values (schema `SOURCES`): `human`, `guess`, `guess-accepted`, `msa-draft`, `songformer-draft`, `gp-marker`, `figure-hash`, `blast-hint`, `tabnotes-density`, `tabnotes-structure`, `tabnotes-phrase`, `keeper-model`.
+- Writers of `sections.jsonl`: studio **Save**, `boo-lab hear`, album-remove. Machines still never invent keepers; Save drops unheard boxes.
+- `boo-lab structure` never writes `sections.jsonl` ? drafts only.
 - Figure hashes (`figures.jsonl`, `source=figure-hash`) are drafts; they never write `sections.jsonl`.
 - Learn/rank may choose a draft intern; it still never labels (never writes `sections.jsonl`).
-- Structure predictor (`predict-train` / `predict`, `source=keeper-model`) trains on heard keepers and writes **drafts only**; Save may fine-tune it. Frozen interns (Demucs/WhisperX/allin1/…) do not retrain from Save.
+- Structure predictor (`predict-train` / `predict`, `source=keeper-model`) trains on heard keepers and writes **drafts only**; Save may fine-tune it. Frozen interns (Demucs/WhisperX/allin1/?) do not retrain from Save.
 - `boo-lab interns` only orchestrates the existing intern steps (stems/beats/structure/drums/vocals/lyrics/sync/extract/figures/tempo_hints/compare/learn/predict/status); it inherits their law and never writes `sections.jsonl`.
-- Pin layer vs cell layer: human boxes + `figure_id` are the pin layer (a repeat may be one box or many boxes sharing an id). Extract/bank stores the shortest repeating cell inside that figure (2–4 bars). Pack slices the human box for listening. Do not dump a 40 s riff box into the bank as one fragment.
+- Pin layer vs cell layer: human boxes + `figure_id` are the pin layer (a repeat may be one box or many boxes sharing an id). Extract/bank stores the shortest repeating cell inside that figure (2?4 bars). Pack slices the human box for listening. Do not dump a 40 s riff box into the bank as one fragment.
 - GP7 `.gp`/`.gpx` is read natively via its parsed GPIF score (`gpif.py`), never a GP5 conversion. Prefer the GP7 score for sync/extract/figure hashes when present; Guess may use markers only from the parsed score, never invention. Guess still drops markers when `sync_ok` is false.
 - Overlap **different** roles. Do not stack the same role on the same seconds.
-- Pulse = named synth/keyboard figure, not “keys are audible.”
+- Pulse = named synth/keyboard figure, not "keys are audible."
 - Breakdown = function (usually drums half-time), may sit on the same guitar as Riff.
 - Blast = function (full-speed / blastbeat drums), the opposite of Breakdown; may sit on the same guitar as Riff. Never invent figure names like `riff-blast-A`.
 - `on_figure` (optional) on a function box links the figure_id it rides (e.g. blast on `riff-B`). Empty is fine.
@@ -21,17 +23,16 @@ Labelling lab. Not the generator.
 - Do not rename FLACs. Match tabs in `map.csv` instead.
 - Do not put audio, Guitar Pro, or tokens in git. `data/` labels are fine.
 
-
 New bands go in `audio-corpus/<band>/`, legacy tabs in `gp-tabs/gp5/<band>/`, GP7 `.gp`/`.gpx` in `gp-tabs/gp7/<band>/`.
 
 ## Quality bar
 
 - A keeper is a **heard**, human or `guess-accepted` box a person can defend out loud: this
   figure/function, this `role` + `figure_id`, these seconds, on this mix.
-- The studio **Save** is the only writer of `sections.jsonl`; it drops unheard boxes.
+- Writers of `sections.jsonl`: studio **Save**, `boo-lab hear`, album-remove. Save drops unheard boxes. Machines never invent keepers.
 - Two boxes of the **same** role overlapping on the same seconds refuse the whole Save.
-- Machines never write `sections.jsonl` (`structure`, Guess, `predict`/keeper-model, learn/adapt and Pack are drafts or reads).
+- Draft-only paths never write keepers (`structure`, Guess, `predict`/keeper-model, learn/adapt, Pack).
 - Holdout / **VAL** songs do not vote for `prefer=` and are not training data.
-- Rebirth is labelled holdout by design — its keepers are real but held out of training and `prefer=`.
-- Prefer GP7 `.gp`/`.gpx` (parsed GPIF) over `.gp5` when both exist; no GP7→GP5 conversion.
+- Rebirth is labelled holdout by design ? its keepers are real but held out of training and `prefer=`.
+- Prefer GP7 `.gp`/`.gpx` (parsed GPIF) over `.gp5` when both exist; no GP7?GP5 conversion.
 - A returning figure keeps its `figure_id`; a new idea gets a new id.

@@ -64,9 +64,38 @@ def test_tempo_map_and_bar_fingerprint():
     pack = tn.load_pack(FIX_DIR)
 
     assert tn.tempo_map(pack) == [(1.0, 120.0)]
-    # palm_mute (p) vs hammer (h) vs dead (d) are encoded, so muted != open
-    assert tn.bar_fp_tab(pack, 0, 0) == "2p4|2h6"
-    assert tn.bar_fp_tab(pack, 1, 0) == "2-9|2d11"
+    # Full MIDI pitch + in-bar 16th onset/dur + articulation (not pitch-class sludge)
+    assert tn.bar_fp_tab(pack, 0, 0) == "0:4:40:p|4:4:42:h"
+    assert tn.bar_fp_tab(pack, 1, 0) == "0:4:45:-|4:4:47:d"
+
+
+def test_bar_fp_tab_onset_pitch_chord_collapse():
+    """Same-onset chord notes collapse; duration floors at 1 sixteenth."""
+    from types import SimpleNamespace
+
+    pack = SimpleNamespace(
+        measures=[SimpleNamespace(measure=0, time_signature="4/4", length_beats=4.0)],
+        events=[
+            SimpleNamespace(
+                measure=0, track=0, category="guitar",
+                onset_beat=0.0, onset_ms=0.0, duration_beats=0.5,
+                pitch=40, palm_mute=True, dead=False, hammer=False,
+            ),
+            SimpleNamespace(
+                measure=0, track=0, category="guitar",
+                onset_beat=0.0, onset_ms=0.0, duration_beats=0.5,
+                pitch=47, palm_mute=True, dead=False, hammer=False,
+            ),
+            SimpleNamespace(
+                measure=0, track=0, category="guitar",
+                onset_beat=0.25, onset_ms=125.0, duration_beats=0.125,
+                pitch=42, palm_mute=False, dead=False, hammer=False,
+            ),
+        ],
+        tracks=[],
+    )
+    fp = tn.bar_fp_tab(pack, 0, 0)
+    assert fp == "0:2:40,47:p,p|1:1:42:-"
 
 
 def test_cli_prints_summary(capsys):
@@ -179,7 +208,7 @@ def test_bar_events_accepts_tabmeasure_object():
                         duration_beats=1.0, palm_mute=False, dead=False, hammer=False,
                         onset_beat=0, onset_ms=0),
     ])
-    # monkeypatch events_for used inside bar_events — call with patched module
+    # monkeypatch events_for used inside bar_events
     import boo_lab.tabnotes as tn
 
     def fake_events_for(pack, category=None, track=None):

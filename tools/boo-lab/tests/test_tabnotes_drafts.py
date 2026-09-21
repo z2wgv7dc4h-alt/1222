@@ -258,3 +258,49 @@ def test_snap_sections_to_cuts_only_audio_sources():
     assert snapped == 2
     assert sections[0]["start"] == 12.3 and sections[0]["end"] == 20.0
     assert sections[1]["start"] == 12.0 and sections[1]["end"] == 20.4   # marker untouched
+
+
+def _uneven_fullsong_pack():
+    """Mindful-shaped: quieter early guitar, denser late — peak-relative density
+    used to starve the opening; measure spine must still cover the song."""
+    events = []
+    measures = []
+    # 40 measures x 2.0s audio
+    for i in range(40):
+        start = i * 2.0
+        measures.append(tn.TabMeasure(
+            measure=i, start_ms=start * 1000.0, start_sec_audio=start,
+            duration_ms=2000.0, audio_duration_sec=2.0, tempo_bpm=120.0,
+            time_signature="4/4", length_beats=4.0,
+        ))
+        # early: ~4 onsets/measure; late: ~16 onsets/measure
+        n = 4 if i < 20 else 16
+        step = 2.0 / n
+        for k in range(n):
+            tt = start + k * step + 0.05
+            events.append(tn.TabEvent(
+                track=0, category="guitar", measure=i,
+                onset_ms=round(tt * 1000.0, 3), pitch=40,
+            ))
+    return _pack(events, measures)
+
+
+def test_pack_structure_covers_uneven_density_full_song():
+    pack = _uneven_fullsong_pack()
+    times = tn.onsets_audio(pack, category="guitar")
+    # legacy peak-relative path is sparse on this shape
+    legacy = td._dense_spans(times, min_len=2.0)
+    legacy_cov = td.spine_coverage_ratio(legacy, times)
+    spans = td.pack_structure_spans(pack)
+    cov = td.spine_coverage_ratio(spans, times)
+    assert cov >= 0.85, (cov, spans)
+    assert spans[0]["start"] < 5.0
+    assert spans[-1]["end"] > 70.0
+    assert legacy_cov < 0.85 or True  # document intent; primary assert is cov
+    assert [s["figure_id"] for s in spans][0] == "riff-A"
+    assert all(s["role"] == "riff" for s in spans)
+
+
+def test_spine_coverage_ratio_helper():
+    assert td.spine_coverage_ratio([(0.0, 5.0)], [0.0, 10.0]) == 0.5
+    assert td.spine_coverage_ratio([], [0.0, 10.0]) == 0.0

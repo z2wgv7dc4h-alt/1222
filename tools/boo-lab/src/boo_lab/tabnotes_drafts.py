@@ -190,16 +190,172 @@ def _letter(i: int) -> str:
     return s
 
 
-def pack_structure_spans(pack, *, min_span: float = 1.0) -> list[dict]:
-    """The pack's own structure spine: high guitar-onset-density phrases as
-    `role=riff` boxes, each with a simple order-assigned `riff-A` / `riff-B` /
-    `riff-C` id. A pack has no GP section letters, so none are invented; only
-    the role the real note density supports is used. No stamping, no sync
-    check -- `structure_drafts_for_song` gates and stamps. `[]` when the pack
-    yields no phrase."""
+def _measure_audio_end(m) -> float:
+    """Audio-clock end of a TabMeasure (seconds)."""
+    start = float(getattr(m, "start_sec_audio", 0.0) or 0.0)
+    dur = getattr(m, "audio_duration_sec", None)
+    if dur is None or float(dur) <= 0:
+        ms = float(getattr(m, "duration_ms", 0.0) or 0.0)
+        dur = ms / 1000.0 if ms > 0 else 0.0
+    return start + float(dur)
+
+
+def _guitar_onset_spans_from_measures(
+    pack, times: list[float], *, min_span: float = 2.0, gap_split: float = 1.5,
+) -> list[tuple[float, float]]:
+    """Full-song riff runs from per-measure guitar activity.
+
+    Peak-relative density (`_dense_spans`) starves quieter openings when a
+    later section is denser (Mindful: 621 early onsets, zero spine boxes until
+    ~1:24). Measure activity covers every bar that actually has guitar, then
+    splits on silence gaps or sharp density changes so Guess gets a continuous
+    spine instead of three late crumbs.
+    """
+    import bisect
+    import statistics
+
+    measures = list(getattr(pack, "measures", None) or [])
+    if len(measures) < 4 or len(times) < 8:
+        return []
+
+    rows: list[tuple[float, float, int, float]] = []
+    for m in measures:
+        a = float(getattr(m, "start_sec_audio", 0.0) or 0.0)
+        b = _measure_audio_end(m)
+        if b <= a:
+            continue
+        lo = bisect.bisect_left(times, a)
+        hi = bisect.bisect_left(times, b)
+        n = hi - lo
+        if n < 2:
+            continue
+        rows.append((a, b, n, n / (b - a)))
+    if not rows:
+        return []
+
+    rates = [r for *_, r in rows]
+    med = statistics.median(rates) if rates else 0.0
+
+    segs: list[list[tuple[float, float, int, float]]] = [[rows[0]]]
+    for prev, cur in zip(rows, rows[1:]):
+        gap = cur[0] - prev[1]
+        r0, r1 = prev[3], cur[3]
+        split = gap > gap_split or (
+            abs(r1 - r0) > max(med * 0.9, 4.0) and min(r0, r1) < med * 0.7
+        )
+        if split:
+            segs.append([cur])
+        else:
+            segs[-1].append(cur)
+
+    out: list[tuple[float, float]] = []
+    for seg in segs:
+        start, end = seg[0][0], seg[-1][1]
+        if end - start >= min_span:
+            out.append((round(start, 3), round(end, 3)))
+    return out
+
+
+def _guitar_onset_spans_from_windows(
+    times: list[float], *, min_span: float = 2.0, win: float = 2.0,
+    min_onsets: int = 3, merge_gap: float = 2.0, valley_ratio: float = 0.45,
+) -> list[tuple[float, float]]:
+    """Fallback spine when the pack has no usable measure grid: cover active
+    guitar time, then split on density valleys so one blob is not the whole song.
+    """
+    import bisect
+    import statistics
+
+    if len(times) < 8:
+        return []
+    t0, t1 = float(times[0]), float(times[-1])
+    if t1 <= t0:
+        return []
+    step = 0.25
+    samples: list[tuple[float, int]] = []
+    t = t0
+    while t < t1:
+        lo = bisect.bisect_left(times, t)
+        hi = bisect.bisect_left(times, t + win)
+        samples.append((t, hi - lo))
+        t += step
+    if not samples:
+        return []
+    counts = [c for _, c in samples]
+    med = statistics.median(counts) if counts else 0.0
+    floor = max(min_onsets, int(med * valley_ratio) if med else min_onsets)
+
+    raw: list[list[float]] = []
+    cur: list[float] | None = None
+    for t, c in samples:
+        if c >= floor:
+            if cur is None:
+                cur = [t, t + win]
+            else:
+                cur[1] = t + win
+        else:
+            if cur is not None:
+                raw.append(cur)
+                cur = None
+    if cur is not None:
+        raw.append(cur)
+
+    if not raw:
+        return []
+    merged: list[list[float]] = [list(raw[0])]
+    for s, e in raw[1:]:
+        if s <= merged[-1][1] + merge_gap:
+            merged[-1][1] = max(merged[-1][1], e)
+        else:
+            merged.append([s, e])
+    return [
+        (round(s, 3), round(e, 3))
+        for s, e in merged
+        if e - s >= min_span
+    ]
+
+
+def spine_coverage_ratio(spans: list[tuple[float, float]] | list[dict],
+                         times: list[float]) -> float:
+    """Fraction of guitar onset span covered by spine boxes. Used as a
+    regression guard so Quiet-open / Busy-close packs cannot silently starve."""
+    if not times or len(times) < 2:
+        return 0.0
+    total = float(times[-1]) - float(times[0])
+    if total <= 0:
+        return 0.0
+    covered = 0.0
+    for s in spans:
+        if isinstance(s, dict):
+            a, b = float(s["start"]), float(s["end"])
+        else:
+            a, b = float(s[0]), float(s[1])
+        a = max(a, float(times[0]))
+        b = min(b, float(times[-1]))
+        if b > a:
+            covered += b - a
+    return min(1.0, covered / total)
+
+
+def pack_structure_spans(pack, *, min_span: float = 2.0) -> list[dict]:
+    """The pack's own structure spine: guitar-active runs as `role=riff`
+    boxes with order-assigned `riff-A` / `riff-B` / ... ids.
+
+    Prefer the measure grid (full-song coverage). Fall back to windowed
+    activity, then legacy peak-density spans. A pack has no GP section
+    letters, so none are invented. No stamping / sync check here --
+    `structure_drafts_for_song` gates and stamps. `[]` when no phrase.
+    """
+    times = tabnotes.onsets_audio(pack, category="guitar")
+    pairs = _guitar_onset_spans_from_measures(pack, times, min_span=min_span)
+    if not pairs:
+        pairs = _guitar_onset_spans_from_windows(times, min_span=min_span)
+    if not pairs:
+        # last resort: old peak-relative density (may be sparse on uneven songs)
+        pairs = riff_density_spans(pack, min_span=min_span)
     return [
         {"role": "riff", "start": s, "end": e, "figure_id": "riff-%s" % _letter(i)}
-        for i, (s, e) in enumerate(riff_density_spans(pack, min_span=min_span))
+        for i, (s, e) in enumerate(pairs)
     ]
 
 
@@ -216,6 +372,13 @@ def structure_drafts_for_song(lab_root, album: str, track: str, *,
             return []
         pack = tabnotes.load_pack(pack_path)
         spans = pack_structure_spans(pack, min_span=min_span)
+        times = tabnotes.onsets_audio(pack, category="guitar")
+        cov = spine_coverage_ratio(spans, times)
+        if times and cov < 0.45:
+            print(
+                "WARN pack spine coverage %.0f%% for %s / %s (want >=45%%) -- check tabnotes"
+                % (100.0 * cov, album, track)
+            )
     except Exception:
         return []
     from .schema import stamp_box
@@ -223,7 +386,8 @@ def structure_drafts_for_song(lab_root, album: str, track: str, *,
     return [
         stamp_box(s["start"], s["end"], s["role"], source=SOURCE_STRUCTURE,
                   figure_id=s["figure_id"], heard=False,
-                  extra={"album": album, "track": track, "kind": "structure"})
+                  extra={"album": album, "track": track, "kind": "structure",
+                         "spine_coverage": round(cov, 3)})
         for s in spans
     ]
 

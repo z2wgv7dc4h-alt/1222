@@ -1,4 +1,5 @@
 ﻿## Unreleased
+- Guess pack spine: measure-grid guitar activity covers the full song (Mindful no longer starves until 1:24). Coverage warn <45%; regression test for uneven density.
 - START opens studio after scan/hash; interns run in a side window. SongFormer per-track timeout 360s + process-tree kill (was 1800s hang that blocked studio). `PREP.bat` for prep-only.
 - constraints: pin `setuptools>=45,<81` so madmom/allin1 keep `pkg_resources` (fixes TWDA structure SKIP).
 - Guess: merge adjacent same-letter GP markers into one continuous box; nested blast/breakdown drafts no longer split those runs. Later returns of the same figure stay separate.

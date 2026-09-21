@@ -724,6 +724,14 @@ def create_app(lab_root: Path, flac_root: Path | None, gp_root: Path | None) -> 
                     if end_bar is not None and rec.get("end_bar") is None:
                         rec["end_bar"] = end_bar
 
+        # Pack span snapshot (arts/pitch/track counts) when sync_ok + pack.
+        # Soft-fail: never blocks Save. GP bars above stay preferred when set.
+        try:
+            from .pack_snapshot import attach_pack_snapshots
+            attach_pack_snapshots(lab_root, meta["album"], meta["track"], keepers)
+        except Exception:
+            pass
+
         overlaps = same_role_overlaps(keepers)
         if overlaps:
             i, j, role = overlaps[0]

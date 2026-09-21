@@ -167,6 +167,15 @@ def rebuild_album(lab_root, album) -> dict:
     )
     bd_spans = [s for s in bd_spans if s > 0]
 
+    # Same per-album span gate for the full-speed Blast function (opposite of
+    # Breakdown); Guess's `_gate_blasts` reads it.
+    bl_spans = sorted(
+        float(r.get("end", 0.0)) - float(r.get("start", 0.0))
+        for r in keepers
+        if canonical_role(r.get("role")) == "blast" and (r.get("track") or "") not in held
+    )
+    bl_spans = [s for s in bl_spans if s > 0]
+
     obj = {
         "album": album,
         "n_pairs": len(pairs),
@@ -175,6 +184,7 @@ def rebuild_album(lab_root, album) -> dict:
         "roles": roles,
         "figures": figures,
         "breakdowns": {"n": len(bd_spans), "median_span_sec": round(_median(bd_spans), 4)},
+        "blasts": {"n": len(bl_spans), "median_span_sec": round(_median(bl_spans), 4)},
         "ts": round(time.time(), 3),
     }
     path = lab_root / "data" / "adapt.json"
@@ -240,6 +250,11 @@ def rebuild_global(lab_root) -> dict:
         for r in keepers if canonical_role(r.get("role")) == "breakdown"
     )
     bd_spans = [s for s in bd_spans if s > 0]
+    bl_spans = sorted(
+        float(r.get("end", 0.0)) - float(r.get("start", 0.0))
+        for r in keepers if canonical_role(r.get("role")) == "blast"
+    )
+    bl_spans = [s for s in bl_spans if s > 0]
 
     obj = {
         "n_pairs": len(pairs),
@@ -248,6 +263,7 @@ def rebuild_global(lab_root) -> dict:
         "roles": roles,
         "figures": {},
         "breakdowns": {"n": len(bd_spans), "median_span_sec": round(_median(bd_spans), 4)},
+        "blasts": {"n": len(bl_spans), "median_span_sec": round(_median(bl_spans), 4)},
         "ts": round(time.time(), 3),
     }
     path = lab_root / "data" / "adapt.json"
@@ -286,7 +302,9 @@ def load_adapt(lab_root, album) -> dict | None:
             return False
         if int(blob.get("n_pairs") or 0) >= 1:
             return True
-        return int((blob.get("breakdowns") or {}).get("n") or 0) >= 2
+        if int((blob.get("breakdowns") or {}).get("n") or 0) >= 2:
+            return True
+        return int((blob.get("blasts") or {}).get("n") or 0) >= 2
 
     blob = data.get(album)
     if _armed(blob):

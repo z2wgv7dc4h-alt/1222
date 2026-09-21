@@ -43,6 +43,10 @@ _BOO_LAB_TO_ENGINE_ROLE: dict[str, str | None] = {
     "riff": "verse",
     "hook": "chorus",
     "breakdown": "breakdown",
+    # "blast" (full-speed drums) is Breakdown's opposite, not the same job;
+    # like "pulse" it has NO real engine equivalent, so it is mapped to
+    # `None` deliberately rather than forced onto "breakdown".
+    "blast": None,
     "solo": "solo",
     "chill": "chill",
     "pulse": None,

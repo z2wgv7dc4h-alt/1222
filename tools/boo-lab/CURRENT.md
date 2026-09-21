@@ -7,12 +7,13 @@ Operators start at `USER.md` (Part A to work, Part B for every button and file).
 Living docs are `USER.md` / `LAW.md` / `CURRENT.md` / `README.md` / `STATUS.md` / `CHANGELOG.md` only.
 
 
-> **Uncommitted 2026-09-21 (local, not pushed):** START full interns; Guess→GP7/GPIF; GP badge honesty; GPIF tempo carry-forward; lyrics WhisperX; gp_chroma 4-tuple; Elimination sync_ok; structure-predictor north star + v1 scaffold (below); tab-notes utilization (density drafts, meter/tempo cuts, predict articulations). See CHANGELOG 2026-09-21.
+> **Local 2026-09-21 (docs pass):** blast + on_figure + blast-hint; Guess marker-first + tabnotes-structure spine; ingest manifest/pack-only sync; Pack badge; multi-stem audition; box-loop/ctx outside-click. See CHANGELOG.
+
 
 > **Read this first.**
 > Keepers = `data/sections.jsonl` (`source=human`/`guess-accepted` **and** `heard=true`).
-> Drafts = `data/drafts.jsonl` (`msa-draft` / `songformer-draft` / `guess` / `keeper-model`) — **never keepers**.
-> Box fields: `start end role layer form figure_id unique instrument start_bar end_bar source heard`.
+> Drafts = `data/drafts.jsonl` (`msa-draft` / `songformer-draft` / `guess` / `gp-marker` / `keeper-model` / `tabnotes-density` / `blast-hint`) — **never keepers**.
+> Box fields: `start end role layer form figure_id on_figure unique instrument start_bar end_bar source heard`.
 > Studio table columns match those; waveform is WaveSurfer, with a real mel spectrogram below it (Wave / Spec / Both).
 > `structure` writes `drafts.jsonl` only. `hear` and `sync` require **both** `--album` and `--track`.
 > `hash` fills `flac_sha256`; `sync` writes `data/sync.jsonl` (`sync_ok`/`lag_sec`); `beats` → `data/beats.jsonl`.
@@ -89,22 +90,17 @@ Never commit FLACs, GP, stems, zips, tokens, `.venv`.
 
 ## Roles
 
-intro, build, riff, hook, breakdown, solo, chill, pulse, outro.
+intro, build, riff, hook, breakdown, **blast**, solo, chill, pulse, outro.
 
 - Different roles **may overlap**. Same role on the same span = merge or split.
-- **Riff** = guitar figure. Repeats stay one box unless the figure changes.
 - **Breakdown** = function (usually drums half-time / pit). Can sit on the **same** guitar as a Riff.
-- **Pulse** = a *named* synth/keyboard loop (hummable). Not “keys are in the mix.” New figure = new Pulse. Repeats of that figure stay one box. Do not paint Pulse over Build/Outro just because pads continue.
-- **Chill** = energy sit-down, not “quiet intro.”
-- **Build** = rise that is not the hook itself.
-- **Intro** on an instrumental album door (Rebirth) may span the whole file; Pulse/Build/Outro layer on top.
+- **Blast** = function (full-speed / blastbeat). Opposite of Breakdown. Stack on a Riff the same way. Never `riff-blast-A`.
+- **`on_figure`** (optional on function boxes) = the `figure_id` this function rides.
+- **Pulse** = a *named* synth/keyboard loop (hummable). Not "keys are in the mix." New figure = new Pulse. Repeats of that figure keep the id.
+- Figure roles (`riff hook solo pulse`) and function roles (`intro build breakdown blast chill outro`) **may overlap each other**; two boxes of the **same** role must not.
+- `figure_id` defaults to `"{role}-A"` or a tab letter (`B`); a returning figure keeps the same id.
+- Guess with `sync_ok` + GP markers: **markers are the spine**; figure-hash micro-cells are capped/suppressed.
 
-Layers and provenance:
-
-- Figure roles (`riff hook solo pulse`) and function roles (`intro build breakdown chill outro`) **may overlap each other**; two boxes of the **same** role overlapping by more than 50 ms is rejected on Save.
-- `figure_id` defaults to `"{role}-A"`; a returning figure keeps the same `figure_id`.
-- `source`: `human` / `guess-accepted` are keepers; `guess` / `msa-draft` / `songformer-draft` / `keeper-model` are drafts.
-- `heard`: only boxes you actually listened to. Save writes keepers only (`source` keeper **and** `heard=true`); unheard boxes are dropped. This is why old pins need `boo-lab hear` first.
 
 ## Rebirth (A Higher Place, 86.63s)
 
@@ -131,10 +127,10 @@ If Save ever wrote six `0.00–0.25` rows, the pins fired before duration loaded
 - Single-click a box or its table row **selects only** (region marked, row `.on`) — no zoom/fit/pxPerSec, no seek, no page scroll; **double-click** selects, seeks to the box start, and zooms the spectrogram to the box (~10% padding each side), with Esc restoring the previous or full-song view. Never auto-zooms on load or Guess.
 - Lane = role: the role name shows **once** in a 44px left gutter (`#lanegutter`), never on a tile; a tile labels only its `figure_id`, and only when it is wider than ~48px (short boxes keep colour, no text). No free-floating role text in the wave; function names live in a tile or the table. Layer pills hide the gutter label with the lane.
 - Spectrogram: real mel spectrogram of the already-decoded buffer under the mix; **Wave / Spec / Both** toggle (default Both), click to seek, current boxes overlaid. Waveform stays WaveSurfer.
-- Stem lane: pick any cached Demucs stem (drums/bass/guitar/piano/other/vocals); the drum-confidence note flags sections the classifier is unsure about.
+- Stem lane: chips for the six cached Demucs stems (drums/bass/guitar/piano/other/vocals). They are a **multi-select audition**: one or more on → the main transport plays the sum of exactly those stems through a lazily-created `AudioContext` while the mix is muted (`ws.setVolume(0)`); all off → the full mix. Playback is anchored to WaveSurfer's playhead and re-anchored on drift/seek/A-B wrap. Chips for uncached stems are greyed/disabled; the lower lane still shows one stem's waveform (the chip you toggled on). The drum-confidence note flags sections the classifier is unsure about.
 - Beat grid: `GET /api/beats/{id}` (from `data/beats.jsonl`); the studio draws faint beat / brighter downbeat ticks over the waveform, and with **Snap beats** on, a dragged box edge snaps to the nearest downbeat (≤250 ms) else nearest beat (≤120 ms). Run `boo-lab beats` first, else no ticks/snap.
 - Chrome: 280px rail | main; work header is one strip (48px art, title, album, VAL badge) over a two-row transport. Primary row is Play · clock · Play box · Save (filled gold) · Undo · How; the quiet row holds **Lab** and **Corpus** `<details>` — Lab = Guess, Load drafts, Lyrics, Pack, Snap beats, JSON, Next GP; Corpus = drop zone + band name, Push git, Remove album. Role pins are a separate equal-width row (coloured border only, 12% fill on hover). The 104px spectrogram dock has a gold hairline; the How drawer is 400px.
-- At a glance: song rows read `FLAC · GP7` / `GP5` / `no tab` / `partial GP7` (plus a tiny `VAL` when the split is val); filter pills are a segmented All / Tab / No tab. With no boxes and the duration loaded, the mix lane shows a ghost "Press 1 for Riff" (gone after the first box). The Lab summary counts draft/guess rows; **Pack** is greyed at zero boxes (`aria-disabled`) and tells you to Save keepers first. Hover hints on Save / Guess / heard / Snap beats / VAL. `tab off-clock` appears only if a track row exposes `sync_ok===false` (not on `/api/tracks` today).
+- At a glance: song rows read `FLAC · GP7` / `GP5` / `no tab` / `partial GP7` — plus `Pack` when a local tab-notes pack is the only tab, or `TN` when it supplements a GP tab (`/api/tracks` `has_pack`/`pack_source`, from `discover_pack` or an ingested `data/tabnotes_index.jsonl` row); plus a tiny `VAL` when the split is val. Filter pills are a segmented All / Tab / No tab / Pack. With no boxes and the duration loaded, the mix lane shows a ghost "Press 1 for Riff" (gone after the first box). The Lab summary counts draft/guess rows; **Pack** is greyed at zero boxes (`aria-disabled`) and tells you to Save keepers first. Hover hints on Save / Guess / heard / Snap beats / VAL. `tab off-clock` appears only if a track row exposes `sync_ok===false` (not on `/api/tracks` today).
 - Coach: with no explicit message, `#err` becomes the next-step coach — wait-for-clock (`ws` duration <2), `VAL — leave unpinned`, "Press a role pin (or 1 for Riff) — pins create boxes; drag fits them.", "N not heard — Save will drop them", else "N boxes. Save writes keepers." Explicit errors are never overwritten. `add()` refuses before the clock shows the full length; the clock placeholder is `0:00 / —`; the How drawer auto-opens once (Close/scrim writes `boo-lab-how-v1`).
 - Role pins / keys create boxes; drag only moves or resizes. In-app **Undo** (button or Ctrl+Z) plus `data/sections.jsonl.bak` on Save.
 - Table is source of truth on Save (`harvestTable`); columns role / figure / form / uniq / inst / bar0 / bar1 / start / end / source / heard. `form` / `uniq` / `inst` / `bar0` / `bar1` / `source` start hidden; **More columns** (`#btnMoreCols`) toggles `show-extra`. Every column and `data-f` still harvests. Blur number fields before Save.
@@ -168,6 +164,23 @@ Shortcuts that exist in the page (also shown under How): pins I/R/H/B/S/C etc. a
 9. `_clean` short/overlap junk.
 
 Audio can only ever propose **breakdowns** (half-time/kick); everything else is tab-marker or the human.
+
+**Marker-first cap.** When the tab has `gp-marker` sections and `sync_ok`, those markers outrank the
+figure-hash stream. A figure draft shorter than 4 s is dropped; once markers reach `GP_MARKER_MIN=4`
+or cover half the known duration (`_markers_primary`), a figure draft that overlaps a marker is
+dropped too, so only uncovered gaps are filled (`_suppress_figure_flood`). A returning marker letter
+already carries the same `figure_id`, so a marker-perfect tab (Starved) yields one box per marker,
+not 30 short hashes. Function overlays (halftime/kick/blast) are untouched and still link to the
+overlapping marker figure via `on_figure`. Guess never emits `msa-draft`/`songformer-draft` — those
+are Load drafts.
+
+**Pack spine (no GP).** When a song has no `gp-marker` boxes but `sync_ok` and `discover_pack` finds
+a tab-notes pack (Mindful), the pack is the spine: `tabnotes_drafts.structure_drafts_for_song`
+turns its high-density guitar phrases into `riff` boxes with simple `riff-A`/`riff-B`/`riff-C` ids
+by order (`source=tabnotes-structure`, added to `schema.SOURCES`), and the existing kick-notation/blast
+functions ride on top. No GP-style A1/B letters are invented. `_spine_spans`/`_spine_primary` treat
+this spine like `gp-marker`, so `_suppress_figure_flood` caps the figure-hash stream against it; a
+GP marker tab (Starved) still wins because the spine is only built with no `gp-marker` present.
 
 If it says `librosa beats, no half-time`, drums ran and found no slam — correct on Rebirth, common on mid-tempo grooves.
 

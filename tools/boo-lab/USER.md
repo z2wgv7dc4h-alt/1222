@@ -50,7 +50,8 @@ Manual full prep without opening the UI:
 
 ## Mark
 
-Double-click a box (or its table row) to zoom and **loop** that part while you
+Double-click a box (or its table row) to zoom and **A–B loop** that part while you
+Click away from the looping box (or Esc / Space / Play box once) to stop. Right-click edit panel closes on outside click too.
 drag the edges. Esc or Space stops the loop. Play box still plays once.
 
 
@@ -65,7 +66,7 @@ drag the edges. Esc or Space stops the loop. Play box still plays once.
 
 One album per sitting is enough.
 
-**Keys:** Space play · 1 riff · 2 hook · 3 breakdown · 4 solo · I intro ·
+**Keys:** Space play · 1 riff · 2 hook · 3 breakdown · **T blast** · 4 solo · I intro · B build · C chill · P pulse · S save · J / K songs · Delete box · Ctrl+Z undo · Esc stops box loop / closes right-click
 B build · C chill · P pulse · S save · J / K songs · Delete box · Ctrl+Z undo ·
 ? help.
 
@@ -111,7 +112,7 @@ Gold (keeper) — you heard it, you saved it. Lives in data/sections.jsonl.
 Source is human or guess-accepted.
 
 Stencil (draft) — Guess or an intern drew it. Lives in data/drafts.jsonl.
-Sources: guess, msa-draft, songformer-draft, keeper-model.
+Sources: guess, gp-marker, msa-draft, songformer-draft, keeper-model, tabnotes-density, tabnotes-structure, blast-hint.
 It appears on the wave unheard. It dies on Save unless you tick heard.
 
 Tick heard on a Guess box and Save → gold, marked guess-accepted.
@@ -122,18 +123,22 @@ Learning); it never retrains the frozen interns.
 ## Roles
 
 Ideas (figures): riff, hook, solo, pulse — a thing you can hum or play.
-Jobs (functions): intro, build, breakdown, chill, outro — what that
-stretch is doing in the song.
+Jobs (functions): intro, build, breakdown, **blast**, chill, outro — what
+that part does in the song.
 
-A breakdown may sit on the same guitar as a riff (two boxes, two roles).
+- **Breakdown** = half-time / pit slam (drums).
+- **Blast** = full-speed / blastbeat drums (opposite of breakdown). Pin **T**.
+- Both may sit on the same guitar as a riff (two boxes, two roles).
+- **on figure** (optional, on a function box) = the figure_id it rides
+  (e.g. blast on `B` / `riff-B`). Do not invent names like `riff-blast-A`.
+
 Two boxes of the same role may not overlap. Save will refuse.
 
-figure — name of the idea (riff-A). Reuse it when the idea returns.
-form — optional A/B/C for the large shape of the song. Under More columns.
+figure — name of the idea (`riff-A`, or tab letter `B`). Reuse it when the idea returns.
 
 ## The page
 
-Left: songs. Tags: FLAC, GP7/GP5/Tab, no tab, tab off-clock, VAL.
+Left: songs. Tags: FLAC, GP7/GP5/Tab, no tab, Pack/TN, tab off-clock, VAL.
 Middle: waveform (and optional spectrogram). Boxes live here.
 Role pins: create a box.
 heard: the gate.
@@ -185,6 +190,20 @@ No match → those markers are dropped. You can still mark by ear.
 A small stretch (tempo a bit fast/slow) may be corrected.
 A missing intro or extra repeat will not be fixed. That is a tab problem.
 
+When the tab has real section markers (A, B, C, B-Solo, …) and the clock matched,
+those markers are the structure. Guess gives one box per marker and will not bury
+them under a pile of short 2-bar figure hashes — a `B-Solo` marker becomes a solo
+box named `solo-B`, repeats share the same figure. Only unmarked gaps may get a
+figure draft. Audio still adds breakdown/blast overlays on top.
+
+When there is **no GP at all** (a FLAC + a tab-notes pack, like Mindful), a
+matched pack is the spine instead. Guess reads the pack's own guitar phrases and
+proposes real `riff` boxes with simple `riff-A` / `riff-B` / `riff-C` ids by
+order (`source=tabnotes-structure`), plus the drum breakdown/blast overlays. It
+does **not** invent GP-style A1/B letters the pack never had, and it still caps
+the figure-hash flood against that spine. A GP marker tab always wins when it
+exists.
+
 scan only rebuilds the list of files after you add FLACs or GP tabs.
 It does not label and does not align clocks.
 
@@ -228,6 +247,22 @@ Some songs are reserved to test helpers later. The UI marks them VAL.
 Do not mark them. They do not vote for prefer=.
 
 ## Pack, stems, lyrics
+
+**Pack badge** — song list shows Pack/TN when a local tab-notes pack matches (filter: Pack).
+
+
+Stem chips (drums / bass / guitar / piano / other / vocals) are now a real
+multi-toggle **listen**. Turn one or more on and the main Play / Play box / A–B
+loop plays the sum of exactly those stems — the full mix is muted for real. Turn
+all off and you hear the full mix again. Chips for stems this song has not
+cached are greyed out. The lower lane still shows one stem's waveform; toggling
+a chip on shows that stem there.
+
+The song list badges a local tab-notes pack: **Pack** when the pack is the only
+tab (a FLAC + pack, like Mindful), **TN** when it supplements a GP tab. The
+**Pack** filter shows only those songs. Nothing is committed; the pack itself
+stays under `data/tabnotes/`.
+
 
 Pack cuts each saved box to disk (mix + stems) so you can listen later.
 **JAMS** (Lab → JAMS) writes your saved boxes as one `.jams` per song under `work/jams/` — an

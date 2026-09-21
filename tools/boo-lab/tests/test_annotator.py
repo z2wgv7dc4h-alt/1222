@@ -301,6 +301,24 @@ def test_save_allows_figure_over_function_overlap(tmp_path):
     assert resp.status_code == 200 and resp.json()["saved"] == 2
 
 
+def test_save_accepts_blast_and_round_trips_on_figure(tmp_path):
+    lab = _lab(tmp_path)
+    client = TestClient(ann.create_app(lab, None, None))
+    tid = client.get("/api/tracks").json()["tracks"][0]["id"]
+    resp = client.post("/api/sections/%d" % tid, json={"sections": [
+        {"role": "riff", "start": 0, "end": 4, "source": "human", "heard": True,
+         "figure_id": "riff-A"},
+        {"role": "blast", "start": 1, "end": 3, "source": "human", "heard": True,
+         "figure_id": "blast-A", "on_figure": "riff-A"},
+    ]})
+    assert resp.status_code == 200 and resp.json()["saved"] == 2
+    rows = _sections_rows(lab)
+    blast = [r for r in rows if r["role"] == "blast"][0]
+    assert blast["layer"] == "function"
+    assert blast["on_figure"] == "riff-A"
+    assert [r for r in rows if r["role"] == "riff"][0]["on_figure"] == ""
+
+
 def test_save_never_overwrites_drafts(tmp_path):
     lab = _lab(tmp_path)
     draft = lab / "data" / "drafts.jsonl"
@@ -520,3 +538,42 @@ def test_tracks_badge_prefers_gp7_over_legacy_gp5(tmp_path):
     assert t["has_gp"] is True
     assert t["gp_kind"] == "gp7"         # display kind; not "gp5" -- GP7 sibling wins
     assert t["gp_name"].endswith(".gp")
+
+
+def _pack_fixture(lab, title="T", artist="A", pid="mindful"):
+    pack = lab / "data" / "tabnotes" / pid
+    pack.mkdir(parents=True)
+    (pack / "manifest.json").write_text(
+        json.dumps({"id": pid, "title": title, "artist": artist}), encoding="utf-8")
+    (pack / "notes.json").write_text(
+        json.dumps({"format": "tab-notes/1", "id": pid, "title": title, "artist": artist}),
+        encoding="utf-8")
+    return pack
+
+
+def test_tracks_report_has_pack_from_discovery(tmp_path):
+    lab = _lab(tmp_path)
+    _pack_fixture(lab)  # Mindful-like: FLAC + tab-notes pack, no .gp
+    client = TestClient(ann.create_app(lab, None, None))
+    t = client.get("/api/tracks").json()["tracks"][0]
+    assert t["has_pack"] is True
+    assert t["pack_source"] == "pack"
+
+
+def test_tracks_report_has_pack_from_ingested_index(tmp_path):
+    lab = _lab(tmp_path)
+    (lab / "data" / "tabnotes_index.jsonl").write_text(
+        json.dumps({"id": "mindful", "title": "T", "artist": "A"}) + "\n",
+        encoding="utf-8")
+    client = TestClient(ann.create_app(lab, None, None))
+    t = client.get("/api/tracks").json()["tracks"][0]
+    assert t["has_pack"] is True
+    assert t["pack_source"] == "tn"
+
+
+def test_tracks_has_pack_false_without_pack(tmp_path):
+    lab = _lab(tmp_path)
+    client = TestClient(ann.create_app(lab, None, None))
+    t = client.get("/api/tracks").json()["tracks"][0]
+    assert t["has_pack"] is False
+    assert t["pack_source"] == ""

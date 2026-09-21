@@ -153,6 +153,85 @@ def create_app(lab_root: Path, flac_root: Path | None, gp_root: Path | None) -> 
                 return pics[0]
         return None
 
+    _tn_index_cache: dict = {"t": None, "rows": []}
+
+    def _tabnotes_index_rows() -> list[dict]:
+        """Rows from `data/tabnotes_index.jsonl` (one per ingested pack).
+        Cheap title/artist match source for the Pack badge -- a pack whose
+        zip/folder was ingested is known here even before a full discovery
+        walk. Never touches map.csv/sections.jsonl."""
+        path = lab_root / "data" / "tabnotes_index.jsonl"
+        try:
+            stamp = path.stat().st_mtime if path.exists() else None
+        except Exception:
+            stamp = None
+        if _tn_index_cache["t"] == stamp:
+            return _tn_index_cache["rows"]
+        rows: list[dict] = []
+        if path.exists():
+            try:
+                for line in path.read_text(encoding="utf-8").splitlines():
+                    if not line.strip():
+                        continue
+                    try:
+                        rows.append(json.loads(line))
+                    except json.JSONDecodeError:
+                        continue
+            except Exception:
+                rows = []
+        _tn_index_cache["t"] = stamp
+        _tn_index_cache["rows"] = rows
+        return rows
+
+    _pack_memo: dict = {"stamp": None, "by": {}}
+
+    def _discover_pack(album, track):
+        """`tabnotes.discover_pack`, memoized for the life of the candidate
+        set. `_meta`/`_resolved` rebuild `tracks()` on every request, so an
+        uncached discovery walk per row would tax every API call."""
+        try:
+            from .tabnotes import _pack_candidates, discover_pack
+
+            stamp = tuple(str(p) for p in _pack_candidates(lab_root))
+        except Exception:
+            discover_pack = None
+            stamp = ()
+        if _pack_memo["stamp"] != stamp:
+            _pack_memo["stamp"] = stamp
+            _pack_memo["by"] = {}
+        key = (album or "", track or "")
+        if key in _pack_memo["by"]:
+            return _pack_memo["by"][key]
+        val = None
+        if discover_pack is not None:
+            try:
+                val = discover_pack(lab_root, album, track)
+            except Exception:
+                val = None
+        _pack_memo["by"][key] = val
+        return val
+
+    def _tabnotes_index_match(track, album, rows) -> bool:
+        """Same fuzzy title/artist rule `tabnotes.discover_pack` uses, run
+        against the ingested index instead of the pack files on disk."""
+        from .tabnotes import _norm
+
+        want = _norm(track)
+        alb = _norm(album)
+        for rec in rows:
+            title = _norm(rec.get("title"))
+            artist = _norm(rec.get("artist"))
+            score = 0
+            if title and want and title == want:
+                score += 2
+            elif title and want and (title in want or want in title):
+                score += 1
+            if artist and alb and (artist in alb or alb in artist):
+                score += 1
+            if score:
+                return True
+        return False
+
     def tracks():
         if not map_path.exists():
             return []
@@ -166,6 +245,7 @@ def create_app(lab_root: Path, flac_root: Path | None, gp_root: Path | None) -> 
         holdout = ensure_holdout(lab_root, rows)
         stem_cache = lab_root / "work" / "stems"
         idx = _gp5_index()
+        tn_index = _tabnotes_index_rows()
         out = []
         for i, r in enumerate(rows):
             key = _norm_name(r.get("track") or "")
@@ -233,6 +313,16 @@ def create_app(lab_root: Path, flac_root: Path | None, gp_root: Path | None) -> 
                             break
                 except Exception:
                     pass
+            # A local tab-notes pack (zip/folder under data/tabnotes, or a row
+            # in the ingested index) is a tab the sidebar can badge even with
+            # no `.gp` on disk. Only meaningful once there is audio to listen to.
+            has_pack = False
+            pack_source = ""
+            if flac_ok:
+                if _discover_pack(r.get("album"), r.get("track")) is not None:
+                    has_pack, pack_source = True, "pack"
+                if not has_pack and _tabnotes_index_match(r.get("track"), r.get("album"), tn_index):
+                    has_pack, pack_source = True, "tn"
             stems = []
             if flac_ok and fp:
                 try:
@@ -258,6 +348,8 @@ def create_app(lab_root: Path, flac_root: Path | None, gp_root: Path | None) -> 
                         else ""
                     ),
                     "has_cover": bool(_cover_near(fp)),
+                    "has_pack": has_pack,
+                    "pack_source": pack_source,
                     "split": split_for(r.get("album"), r.get("track"), holdout),
                     "stems": stems,
                 }
@@ -540,7 +632,8 @@ def create_app(lab_root: Path, flac_root: Path | None, gp_root: Path | None) -> 
             return JSONResponse({"detail": "need sections list", "saved": 0}, status_code=400)
 
         known = {"start", "end", "role", "layer", "form", "figure_id", "unique",
-                 "instrument", "start_bar", "end_bar", "source", "heard", "album", "track"}
+                 "instrument", "start_bar", "end_bar", "on_figure", "source",
+                 "heard", "album", "track"}
         keepers: list[dict] = []
         dropped_unheard = 0
         for idx, s in enumerate(sections):
@@ -593,6 +686,7 @@ def create_app(lab_root: Path, flac_root: Path | None, gp_root: Path | None) -> 
                     form=s.get("form"), unique=bool(s.get("unique")),
                     instrument=s.get("instrument"),
                     start_bar=s.get("start_bar"), end_bar=s.get("end_bar"),
+                    on_figure=s.get("on_figure"),
                     extra={k: v for k, v in s.items() if k not in known},
                 )
             except ValueError as exc:

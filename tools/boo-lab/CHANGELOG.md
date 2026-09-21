@@ -1,6 +1,98 @@
 # Changelog
 
+## 2026-09-21 (later)
+
+### Guess builds a structure spine from a tab-notes pack (no GP)
+
+- A FLAC + tab-notes pack with **no `.gp`** (Mindful) used to fall through to
+  audio-only half-time breakdowns. When `sync_ok` and `discover_pack` finds a
+  pack, Guess now builds a real spine from the pack: high-density guitar
+  phrases become `riff` boxes with simple `riff-A` / `riff-B` / `riff-C` ids by
+  order (`source=tabnotes-structure`, new in `SOURCES`), on top of the existing
+  kick-notation breakdowns and blast hints. No GP-style `A1`/`B` letters are
+  invented -- the pack has none.
+- The pack spine is **primary like `gp-marker`**: `_suppress_figure_flood` now
+  caps figure-hash drafts against both sources (`_spine_spans` /
+  `_spine_primary`), so a pack song is not buried under short 2-bar hashes. A
+  GP marker tab still wins (the pack spine is only built when no `gp-marker`
+  boxes exist), so Starved is unregressed. The `tabnotes-density` riff merge is
+  skipped when the spine already supplied those phrases.
+- New `tabnotes_drafts.pack_structure_spans` / `structure_drafts_for_song`;
+  tests in `tests/test_guess.py` + `tests/test_tabnotes_drafts.py`; 445 pass.
+
+### Ingest prep syncs pack-only tracks
+
+- interns._step_sync used to require a GP path, so FLAC + tab-notes (no .gp)
+  skips — Mindful never auto-synced after ingest. Now syncs when GP **or**
+  discover_pack finds a pack. Tests in 	ests/test_interns_sync_pack.py.
+
+### Blast role, on_figure, drum-feel drafts
+
+- New function role **`blast`** (full-speed / blastbeat), opposite of breakdown;
+  pin **T**, lane + docs. Stackable on a riff like breakdown.
+- Optional box field **`on_figure`**: function → figure_id it rides (no `riff-blast-A` names).
+- Guess may propose `source=blast-hint` from dense drum stems; gated like breakdowns.
+- Schema/SOURCES/LAW/USER updated; tests green on guess/schema/annotator blast path.
+
+### Guess marker-first (Starved fix)
+
+- When `sync_ok` and the GP has measure markers, **gp-marker sections are the spine**.
+- Figure-hash / density micro-cells are **suppressed or capped** (≥ ~4 s) so Guess
+  does not flood 30 short riffs on top of A1…H.
+- `B - Solo`-style markers map to solo with figure letter / `on_figure`, not solo-B crumbs.
+- MSA/Songformer remain **Load drafts**, not merged into the Guess button flood.
+
+### Ingest discover + pack hygiene
+
+- `read_manifest` enriches title/artist/id from `notes.json` (Songsterr thin manifests).
+- `unpack_pack` skips sibling `.zip` / `_unpacked` junk in a reused drop folder.
+- Fresh per-drop folder in `/api/ingest`; Mindful-style packs discover after ingest.
+- Studio: outside-click closes right-click `#ctx` (capture) and stops A–B box loop.
+
+### Track-list Pack / TN badge
+
+- `/api/tracks` rows now carry `has_pack` + `pack_source`: true when
+  `tabnotes.discover_pack` matches the song **or** a row in the ingested
+  `data/tabnotes_index.jsonl` matches (same fuzzy title/artist rule, index is
+  the cheap fallback). Never writes keepers.
+- Sidebar meta shows `Pack` (pack is the only tab) or `TN` (pack supplements a
+  GP tab); new **Pack** filter pill shows only songs with a pack. Help drawer
+  gains one line. Tests in `tests/test_annotator.py`.
+
+### Multi-select stem listen (real)
+
+- The stem chips are now an **audition mixer**, not a waveform swap. Toggle any
+  cached demucs stem (drums / bass / guitar / piano / other / vocals); with one
+  or more on, the main transport plays the **sum of exactly those stems** via a
+  lazily-created `AudioContext` (no new deps), and the full mix is muted
+  (`ws.setVolume(0)`). All off → full mix as before.
+- Stems are decoded once per track and cached; playback is anchored to
+  WaveSurfer's playhead and re-anchored on drift / seek / A–B loop wrap, so Play
+  box and the box loop keep working. Chips for stems the song has not cached are
+  greyed out and disabled. Track switch clears the selection back to the mix.
+- Lower stem lane still shows one stem's waveform (the chip you toggled on).
+
+### Still pending (honest)
+
+- Nothing on this ticket; the two "later" items above are done.
+
 ## 2026-09-21
+
+### Guess marker-first: no more figure-hash flood on a well-marked tab
+
+- When a song's `sync_ok` tab carries measure markers, the `gp-marker`
+  sections are the spine and the figure-hash stream is capped against them.
+  Any figure draft shorter than 4 s is dropped (`FIGURE_DRAFT_MIN_SPAN`); once
+  markers hit `GP_MARKER_MIN=4` or cover half the duration
+  (`_markers_primary`), a draft that overlaps any marker is dropped too, so
+  only uncovered gaps get filled. A returning marker letter already carries
+  the same `figure_id`, so the `riff-D x4` / `solo-B` crumb pile is gone.
+- A marker like `B-Solo` still emits `role=solo` / `figure_id=solo-B` from
+  the letter; function overlays (halftime/kick/blast) are untouched and link
+  to the overlapping marker figure via `on_figure`.
+- Guess drops any `msa-draft`/`songformer-draft` source defensively -- those
+  belong to Load drafts. New helpers `_marker_spans`/`_markers_primary`/
+  `_suppress_figure_flood`; 6 new tests (`tests/test_guess.py`); 436 pass.
 
 ### Ingest UX: single file/folder, inferred band, auto-prep
 

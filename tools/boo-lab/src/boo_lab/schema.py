@@ -8,13 +8,17 @@ from pathlib import Path
 from typing import Any
 
 ROLES = (
-    "intro", "build", "riff", "hook", "breakdown",
+    "intro", "build", "riff", "hook", "breakdown", "blast",
     "solo", "chill", "pulse", "outro",
 )
 FIGURE_ROLES = frozenset({"riff", "hook", "solo", "pulse"})
-FUNCTION_ROLES = frozenset({"intro", "build", "breakdown", "chill", "outro"})
+# `blast` is a FUNCTION (like breakdown), not a figure: a full-speed drum
+# passage that may sit on the same guitar as a Riff. It is the opposite of a
+# half-time Breakdown, so it never gets its own `riff-blast-A` figure names.
+FUNCTION_ROLES = frozenset({"intro", "build", "breakdown", "blast", "chill", "outro"})
 SOURCES = frozenset({"human", "guess-accepted", "guess", "msa-draft", "songformer-draft",
-                     "keeper-model", "tabnotes-density"})
+                     "keeper-model", "tabnotes-density", "tabnotes-structure",
+                     "blast-hint"})
 KEEPER_SOURCES = frozenset({"human", "guess-accepted"})
 
 # Real instrument vocabulary for a box. Empty string is allowed (unknown/mixed).
@@ -29,10 +33,12 @@ MSA_TO_LAB = {
     "inst": "solo", "instrumental": "solo", "solo": "solo",
     "outro": "outro", "end": "outro",
     "silence": "chill", "break": "breakdown", "breakdown": "breakdown",
+    "blast": "blast",
 }
 _ALIASES = {
     "verse": "riff", "chorus": "hook", "interlude": "chill",
     "lead": "solo", "inst": "solo", "instrumental": "solo",
+    "blastbeat": "blast", "blast-beat": "blast", "blast_beat": "blast",
 }
 
 
@@ -151,7 +157,14 @@ def stamp_box(start: float, end: float, role: str | None, *, source: str = "huma
               form: str | None = None, unique: bool = False,
               instrument: str | None = None,
               start_bar: Any = None, end_bar: Any = None,
+              on_figure: str | None = None,
               extra: dict[str, Any] | None = None) -> dict[str, Any]:
+    """One pin box.
+
+    `on_figure` is an OPTIONAL link from a FUNCTION box (breakdown/blast/build/
+    chill/intro/outro) to the `figure_id` of the FIGURE box (riff/hook/solo/
+    pulse) it sits on -- e.g. a Blast riding a Riff's guitar. It is a plain
+    string and empty is fine; it never invents a name like `riff-blast-A`."""
     canon = canonical_role(role)
     if canon is None:
         raise ValueError(
@@ -172,6 +185,7 @@ def stamp_box(start: float, end: float, role: str | None, *, source: str = "huma
         "instrument": inst if inst in INSTRUMENTS else "",
         "start_bar": _bars(start_bar),
         "end_bar": _bars(end_bar),
+        "on_figure": (on_figure or "").strip(),
         "source": source,
         "heard": bool(heard),
     }

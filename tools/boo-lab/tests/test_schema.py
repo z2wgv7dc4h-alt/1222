@@ -4,8 +4,11 @@ import pytest
 
 from boo_lab.audit import audit_lab
 from boo_lab.schema import (
+    FIGURE_ROLES,
+    FUNCTION_ROLES,
     canonical_role,
     is_keeper,
+    layer_for,
     load_section_rows,
     msa_label_to_lab,
     same_role_overlaps,
@@ -79,6 +82,22 @@ def test_same_role_overlap_detected():
 def test_stamp_box():
     b = stamp_box(0, 1, "hook", source="msa-draft")
     assert b["layer"] == "figure" and b["source"] == "msa-draft"
+
+
+def test_blast_is_a_function_role_not_a_figure():
+    assert canonical_role("blast") == "blast"
+    assert canonical_role("Blast") == "blast"
+    assert canonical_role("blast-beat") == "blast"
+    assert canonical_role("blastbeat") == "blast"
+    assert "blast" in FUNCTION_ROLES and "blast" not in FIGURE_ROLES
+    assert layer_for("blast") == "function"
+
+
+def test_stamp_box_carries_the_optional_on_figure_link():
+    b = stamp_box(0, 4, "blast", source="guess", on_figure=" riff-A ")
+    assert b["on_figure"] == "riff-A"
+    assert b["layer"] == "function"
+    assert stamp_box(0, 4, "riff")["on_figure"] == ""
 
 
 def test_stamp_box_identity_defaults():

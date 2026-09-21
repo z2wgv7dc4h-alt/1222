@@ -25,7 +25,9 @@ from pathlib import Path
 from . import tabnotes
 
 SOURCE_DENSITY = "tabnotes-density"
-AUDIO_SOURCES = frozenset({"halftime", "kick", "kick-notation", SOURCE_DENSITY})
+SOURCE_STRUCTURE = "tabnotes-structure"
+AUDIO_SOURCES = frozenset({"halftime", "kick", "kick-notation", "blast-hint",
+                           SOURCE_DENSITY, SOURCE_STRUCTURE})
 
 
 def _read_jsonl(path: Path) -> list[dict]:
@@ -173,6 +175,55 @@ def density_drafts_for_song(lab_root, album: str, track: str, *,
         stamp_box(s["start"], s["end"], s["role"], source=SOURCE_DENSITY,
                   heard=False,
                   extra={"album": album, "track": track, "kind": "density"})
+        for s in spans
+    ]
+
+
+# --- pack structure spine -------------------------------------------------
+def _letter(i: int) -> str:
+    """`A`, `B`, ... `Z`, `AA`, `AB` for a 0-based index (figure suffix)."""
+    s = ""
+    i += 1
+    while i:
+        i, r = divmod(i - 1, 26)
+        s = chr(65 + r) + s
+    return s
+
+
+def pack_structure_spans(pack, *, min_span: float = 1.0) -> list[dict]:
+    """The pack's own structure spine: high guitar-onset-density phrases as
+    `role=riff` boxes, each with a simple order-assigned `riff-A` / `riff-B` /
+    `riff-C` id. A pack has no GP section letters, so none are invented; only
+    the role the real note density supports is used. No stamping, no sync
+    check -- `structure_drafts_for_song` gates and stamps. `[]` when the pack
+    yields no phrase."""
+    return [
+        {"role": "riff", "start": s, "end": e, "figure_id": "riff-%s" % _letter(i)}
+        for i, (s, e) in enumerate(riff_density_spans(pack, min_span=min_span))
+    ]
+
+
+def structure_drafts_for_song(lab_root, album: str, track: str, *,
+                              min_span: float = 1.0) -> list[dict]:
+    """Stamped unheard pack-spine drafts for one song, or `[]` unless the pack
+    is found AND the song's `sync_ok` is true. It is the spine the same way
+    `gp-marker` is, just without a GP. Never raises, never a keeper."""
+    if not _sync_ok(lab_root, album, track):
+        return []
+    try:
+        pack_path = tabnotes.discover_pack(lab_root, album, track)
+        if pack_path is None:
+            return []
+        pack = tabnotes.load_pack(pack_path)
+        spans = pack_structure_spans(pack, min_span=min_span)
+    except Exception:
+        return []
+    from .schema import stamp_box
+
+    return [
+        stamp_box(s["start"], s["end"], s["role"], source=SOURCE_STRUCTURE,
+                  figure_id=s["figure_id"], heard=False,
+                  extra={"album": album, "track": track, "kind": "structure"})
         for s in spans
     ]
 

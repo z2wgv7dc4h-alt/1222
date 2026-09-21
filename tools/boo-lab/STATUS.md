@@ -12,6 +12,8 @@ Canonical detail: **CURRENT.md**; commands in **README.md**.
 - figures: 477 row(s) across 40 track(s)
 - tempo hints: 0 row(s) across 0 track(s)
 <!-- status:counts:end -->
+
+Studio/data (2026-09-21 later): blast + on_figure + blast-hint; Guess marker-first + tabnotes-structure; ingest pack-only sync; **Pack badge** + **multi-stem audition**; box-loop/ctx dismiss. Docs aligned.
 Predictor v1 (2026-09-21): `predict-train`/`predict` live; Save fine-tunes; `keeper-model` drafts; Guess merge; frozen interns unchanged. Docs: LAW/USER/CURRENT/README/CHANGELOG aligned.
 
 Docs (2026-09-21): START full interns; structure **predictor** north star (keeper-trained drafts; frozen interns do not retrain). Uncommitted stack in CHANGELOG.

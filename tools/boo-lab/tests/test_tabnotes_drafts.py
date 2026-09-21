@@ -163,6 +163,57 @@ def test_build_density_drafts_zero_row_leaves_file_untouched(tmp_path, monkeypat
     assert draft.read_text(encoding="utf-8") == before
 
 
+# --- pack structure spine --------------------------------------------------
+
+
+def _spine_pack():
+    """Three denser guitar phrases separated by sparse runs -> three riffs."""
+    times = []
+    for c in range(3):
+        base = c * 12.0
+        times += [base + i * 0.1 for i in range(24)]   # dense phrase
+        times += [base + 2.6 + i * 1.0 for i in range(8)]  # sparse gap
+    events = [tn.TabEvent(track=0, category="guitar", measure=0,
+                          onset_ms=round(t * 1000.0, 3), pitch=40)
+              for t in sorted(times)]
+    return _pack(events, [_measure(0, 0.0, 0.0, tempo=120.0)])
+
+
+def test_pack_structure_spans_orders_figure_ids_and_roles():
+    spans = td.pack_structure_spans(_spine_pack())
+
+    assert [s["role"] for s in spans] == ["riff", "riff", "riff"]
+    assert [s["figure_id"] for s in spans] == ["riff-A", "riff-B", "riff-C"]
+    assert all(s["end"] > s["start"] for s in spans)
+
+
+def test_pack_structure_spans_never_invents_gp_letters():
+    spans = td.pack_structure_spans(_spine_pack())
+
+    assert all(not any(ch.isdigit() for ch in s["figure_id"]) for s in spans)
+
+
+def test_structure_drafts_for_song_gated_on_sync_ok(tmp_path, monkeypatch):
+    lab = tmp_path / "lab"
+    (lab / "data").mkdir(parents=True)
+    _wire_pack(monkeypatch, _spine_pack())
+
+    assert td.structure_drafts_for_song(lab, "A", "T") == []   # no sync.jsonl
+    (lab / "data" / "sync.jsonl").write_text(
+        json.dumps({"album": "A", "track": "T", "sync_ok": False}) + "\n",
+        encoding="utf-8")
+    assert td.structure_drafts_for_song(lab, "A", "T") == []
+
+    (lab / "data" / "sync.jsonl").write_text(
+        json.dumps({"album": "A", "track": "T", "sync_ok": True}) + "\n",
+        encoding="utf-8")
+    drafts = td.structure_drafts_for_song(lab, "A", "T")
+    assert [d["figure_id"] for d in drafts] == ["riff-A", "riff-B", "riff-C"]
+    assert all(d["source"] == td.SOURCE_STRUCTURE for d in drafts)
+    assert all(d["heard"] is False for d in drafts)
+    assert not (lab / "data" / "sections.jsonl").exists()
+
+
 # --- meter / tempo cuts ----------------------------------------------------
 
 

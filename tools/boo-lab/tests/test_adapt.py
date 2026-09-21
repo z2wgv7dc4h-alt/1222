@@ -176,6 +176,30 @@ def test_rebuild_global_pools_breakdown_spans_across_albums(tmp_path):
     assert blob["breakdowns"]["median_span_sec"] == pytest.approx(9.0, abs=1e-3)
 
 
+def test_rebuild_global_pools_blast_spans_across_albums(tmp_path):
+    lab = _lab(tmp_path)
+    _write(lab,
+           [_keeper("A", "T", 0.0, 4.0, role="blast"),
+            _keeper("B", "U", 0.0, 6.0, role="blast")],
+           [])
+
+    blob = adapt.rebuild_global(lab)
+
+    assert blob["blasts"]["n"] == 2
+    assert blob["blasts"]["median_span_sec"] == pytest.approx(5.0, abs=1e-3)
+
+
+def test_load_adapt_arms_on_blasts_alone(tmp_path):
+    lab = _lab(tmp_path)
+    _write(lab, [_keeper("A", "T", 0.0, 4.0, role="blast"),
+                 _keeper("A", "T", 10.0, 14.0, role="blast")], [])
+    adapt.rebuild_album(lab, "A")
+
+    blob = adapt.load_adapt(lab, "A")
+
+    assert blob is not None and blob["blasts"]["n"] == 2
+
+
 def test_load_adapt_prefers_the_albums_own_armed_blob(tmp_path):
     lab = _lab(tmp_path)
     _write(lab,

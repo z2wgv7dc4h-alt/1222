@@ -6,6 +6,8 @@ Local studio: listen to FLACs, mark structure, pack clips for later learning. No
 
 Using it: [USER.md](USER.md) first (Part A to work, Part B for every button and file). This README is the developer/operator reference.
 
+Roles include **blast** (function, opposite of breakdown) and optional **`on_figure`**. Guess prefers GP markers when `sync_ok`. Ingest: file/zip/folder, inferred band, auto-prep; tab-notes manifests enrich from `notes.json`. Studio: Pack badge + multi-stem audition. See CHANGELOG 2026-09-21.
+
 Repo on GitHub: `z2wgv7dc4h-alt/1222` under `tools/boo-lab`.
 
 ## This machine

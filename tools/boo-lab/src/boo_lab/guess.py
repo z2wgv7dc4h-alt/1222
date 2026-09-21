@@ -241,6 +241,217 @@ def _gate_breakdowns(sections: list[dict], blob: dict | None) -> int:
     return kept
 
 
+def _gate_blasts(sections: list[dict], blob: dict | None) -> int:
+    """Keep blast-hint drafts whose span is 0.5-1.5x the album's median heard
+    blast span (n>=2), the same per-album gate as `_gate_breakdowns`. n<2
+    leaves the current rules. Returns kept."""
+    bd = (blob or {}).get("blasts") or {}
+    n = int(bd.get("n") or 0)
+    median = float(bd.get("median_span_sec") or 0.0)
+    audio = [s for s in sections
+             if s.get("role") == "blast" and s.get("source") == "blast-hint"]
+    if n < 2 or median <= 0:
+        return len(audio)
+    kept = 0
+    for s in list(audio):
+        span = float(s.get("end", 0.0)) - float(s.get("start", 0.0))
+        if 0.5 * median <= span <= 1.5 * median:
+            kept += 1
+        else:
+            sections.remove(s)
+    return kept
+
+
+def _blast_spans(drum, *, min_len: float = 1.0) -> list[dict]:
+    """Full-speed ('blast') spans from a REAL isolated drum stem. Each onset is
+    classified by the engine's own `classify_drum_onsets` (through
+    `drums_extract.classify_drums`, never a second classifier), then the
+    kick+snare hits are grouped by the existing onset-density detector
+    (`tabnotes_drafts._dense_spans`) -- a blast is a stretch whose local
+    kick+snare rate is far above the song's average, the strict opposite of a
+    half-time breakdown. `[]` when there is no stem, the classifier is
+    unavailable, or nothing stands out. `source="blast-hint"`, FLAC clock."""
+    if drum is None:
+        return []
+    try:
+        from .drums_extract import classify_drums
+
+        onsets = classify_drums(Path(drum))
+    except Exception:
+        return []
+    times = sorted(float(o["time"]) for o in onsets
+                   if o.get("role") in ("kick", "snare"))
+    if len(times) < 24:
+        return []
+    try:
+        from .tabnotes_drafts import _dense_spans
+    except Exception:
+        return []
+    return [
+        {"role": "blast", "start": round(s, 3), "end": round(e, 3),
+         "source": "blast-hint"}
+        for s, e in _dense_spans(times, min_len=min_len)
+    ]
+
+
+def _overlap(a0: float, a1: float, b0: float, b1: float) -> float:
+    return max(0.0, min(a1, b1) - max(a0, b0))
+
+
+# A tab whose own markers spell out the song already carries the section
+# spine. These bound how much figure-hash material Guess may still pile on
+# top: N markers or half the duration makes markers PRIMARY; then no draft
+# shorter than 4 s, and nothing that overlaps a marker at all.
+GP_MARKER_MIN = 4
+GP_MARKER_COVER_FRAC = 0.5
+FIGURE_DRAFT_MIN_SPAN = 4.0
+MARKER_OVERLAP_TOL = 0.35
+
+# A tab-notes pack with no GP still carries a structure spine
+# (`tabnotes-structure`). It is the structural equal of `gp-marker`: whenever
+# one exists it caps the figure-hash flood the same way. The list source is a
+# separate source string so Guess can tell a pack spine from a GP marker.
+PACK_STRUCTURE_SOURCE = "tabnotes-structure"
+SPINE_SOURCES = frozenset({"gp-marker", PACK_STRUCTURE_SOURCE})
+
+# Load-draft sources (`Load drafts`) are never Guess output -- Guess is the
+# tab+audio hybrid only.
+LOAD_DRAFT_SOURCES = frozenset({"msa-draft", "songformer-draft"})
+
+
+def _positive_span(s: dict) -> tuple[float, float] | None:
+    try:
+        start, end = float(s.get("start")), float(s.get("end"))
+    except (TypeError, ValueError):
+        return None
+    return (start, end) if end > start else None
+
+
+def _merge_spans(spans) -> list[tuple[float, float]]:
+    merged: list[tuple[float, float]] = []
+    for start, end in sorted(spans):
+        if merged and start <= merged[-1][1] + 1e-6:
+            merged[-1] = (merged[-1][0], max(merged[-1][1], end))
+        else:
+            merged.append((start, end))
+    return merged
+
+
+def _span_list(sections: list[dict], sources) -> list[tuple[float, float]]:
+    out: list[tuple[float, float]] = []
+    for s in sections:
+        if s.get("source") in sources:
+            p = _positive_span(s)
+            if p is not None:
+                out.append(p)
+    return _merge_spans(out)
+
+
+def _spine_spans(sections: list[dict]) -> list[tuple[float, float]]:
+    """Merged `(start, end)` spans of the structural spine: the tab's own
+    `gp-marker` boxes and/or a tab-notes pack's `tabnotes-structure` boxes."""
+    return _span_list(sections, SPINE_SOURCES)
+
+
+def _marker_spans(sections: list[dict]) -> list[tuple[float, float]]:
+    """Merged `(start, end)` spans of the tab's own `gp-marker` boxes."""
+    return _span_list(sections, {"gp-marker"})
+
+
+def _markers_primary(sections: list[dict], duration: float | None = None) -> bool:
+    """True when the tab's own markers are the spine of the song: at least
+    `GP_MARKER_MIN` of them, or they cover `GP_MARKER_COVER_FRAC` of the
+    known duration. Markers then outrank figure-hash drafts."""
+    n = sum(1 for s in sections if s.get("source") == "gp-marker")
+    if n == 0:
+        return False
+    if n >= GP_MARKER_MIN:
+        return True
+    if duration and duration > 0:
+        covered = sum(e - s for s, e in _marker_spans(sections))
+        if covered / float(duration) >= GP_MARKER_COVER_FRAC:
+            return True
+    return False
+
+
+def _spine_primary(sections: list[dict], duration: float | None = None) -> bool:
+    """True when the structural spine outranks the figure-hash stream: any
+    pack-spine box, or the tab's own markers reaching `_markers_primary`."""
+    if any(s.get("source") == PACK_STRUCTURE_SOURCE for s in sections):
+        return True
+    return _markers_primary(sections, duration)
+
+
+def _in_marker_gap(start: float, end: float, spans, tol: float) -> bool:
+    return all(_overlap(start, end, s, e) <= tol for s, e in spans)
+
+
+def _suppress_figure_flood(drafts: list[dict], sections: list[dict], *,
+                           duration: float | None = None,
+                           min_span: float = FIGURE_DRAFT_MIN_SPAN,
+                           tol: float = MARKER_OVERLAP_TOL) -> list[dict]:
+    """Cap figure-hash drafts against the structural spine.
+
+    With any spine box present (`gp-marker` or a tab-notes pack's
+    `tabnotes-structure`), a figure draft shorter than `min_span` (a 2-bar
+    crumb) is dropped. When the spine is primary (`_spine_primary`), a draft
+    that overlaps it is dropped too, so only uncovered gaps get filled. A
+    returning marker letter is already the same `figure_id`, so the pile of
+    short hashes is noise. Function overlays (breakdown/blast/kick) are not
+    figure drafts and pass through untouched."""
+    spans = _spine_spans(sections)
+    if not spans:
+        return drafts
+    primary = _spine_primary(sections, duration)
+    out: list[dict] = []
+    for d in drafts:
+        try:
+            start, end = float(d["start"]), float(d["end"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        if end - start < min_span:
+            continue
+        if primary and not _in_marker_gap(start, end, spans, tol):
+            continue
+        out.append(d)
+    return out
+
+
+def _link_on_figure(sections: list[dict]) -> int:
+    """Light figure<->function link: every FUNCTION box (breakdown/blast/build/
+    chill/intro/outro) that overlaps a FIGURE box (riff/hook/solo/pulse) gets
+    `on_figure` = that figure's `figure_id`, best overlap by duration. Only
+    fills an empty link (never overwrites a human's) and never invents a
+    figure name. Returns how many boxes were linked."""
+    from .schema import FIGURE_ROLES, FUNCTION_ROLES, canonical_role
+
+    figures = [s for s in sections
+               if canonical_role(s.get("role")) in FIGURE_ROLES and s.get("figure_id")]
+    linked = 0
+    for s in sections:
+        if canonical_role(s.get("role")) not in FUNCTION_ROLES:
+            continue
+        if (s.get("on_figure") or "").strip():
+            continue
+        try:
+            a0, a1 = float(s.get("start")), float(s.get("end"))
+        except (TypeError, ValueError):
+            continue
+        best_id, best_ov = None, 0.0
+        for f in figures:
+            try:
+                f0, f1 = float(f.get("start")), float(f.get("end"))
+            except (TypeError, ValueError):
+                continue
+            ov = _overlap(a0, a1, f0, f1)
+            if ov > best_ov:
+                best_id, best_ov = f.get("figure_id"), ov
+        if best_id:
+            s["on_figure"] = best_id
+            linked += 1
+    return linked
+
+
 def estimate_hybrid(
     flac: Path | None,
     gp: Path | None,
@@ -380,6 +591,15 @@ def estimate_hybrid(
                 pass
             except Exception as e:
                 notes.append("kick: %s" % e)
+        # Blast hint: the strict opposite of the half-time breakdown -- a
+        # stretch whose kick+snare onsets (engine classifier, not a second
+        # one) are far denser than the song's average. On the FLAC clock, so
+        # no sync gate, exactly like the audio kick/half-time breakdowns;
+        # only a real isolated drum stem is trusted. Drafts only.
+        blast_drafts = _blast_spans(drum) if drum else []
+        if blast_drafts:
+            sections.extend(blast_drafts)
+            notes.append("blast hint x%d" % len(blast_drafts))
 
     if cache:
         try:
@@ -390,12 +610,12 @@ def estimate_hybrid(
         except Exception:
             pass
 
-    # Snap the audio-derived spans (halftime/kick) to the recorded beat grid.
+    # Snap the audio-derived spans (halftime/kick/blast) to the recorded grid.
     grid = _beats_for(lab_root, lookup_album, lookup_track)
     if grid and grid.get("beats"):
         snapped = 0
         for s in sections:
-            if s.get("source") in {"halftime", "kick"}:
+            if s.get("source") in {"halftime", "kick", "blast-hint"}:
                 for key in ("start", "end"):
                     nt = _snap_to_grid(float(s[key]), grid.get("downbeats"), grid.get("beats"))
                     if abs(nt - s[key]) > 1e-6:
@@ -413,20 +633,52 @@ def estimate_hybrid(
     except Exception:
         adapt_blob = None
 
+    # Pack structure spine: when the map has no GP markers but a tab-notes
+    # pack is discovered and its clock matched (`sync_ok`), the pack's own
+    # high-density guitar phrases are the spine -- the structural equal of
+    # `gp-marker`, just without a GP. Roles come from the pack's real note
+    # density (`riff`), figure ids are simple `riff-A/B/C` by order; no
+    # GP-style A1/B letters are invented because the pack has none. Drum
+    # functions already ride on top through `_tab_kick_spans`/`_blast_spans`.
+    # Marker songs are untouched: markers stay the spine.
+    pack_spine = 0
+    if (lab_root is not None and sync_rec is not None
+            and sync_rec.get("sync_ok") is True
+            and not any(s.get("source") == "gp-marker" for s in sections)):
+        try:
+            from .tabnotes_drafts import structure_drafts_for_song
+
+            spine = structure_drafts_for_song(lab_root, lookup_album, lookup_track)
+        except Exception:
+            spine = []
+        if spine:
+            sections.extend(spine)
+            pack_spine = len(spine)
+            notes.append("pack structure x%d (tabnotes spine)" % pack_spine)
+
     # Figure windows as unheard riff drafts -- only when the tab clock matched
-    # and the occurrence seconds are trusted.
+    # and the occurrence seconds are trusted. A tab whose own markers already
+    # spell out the song caps these: markers stay the primary source, and the
+    # figure-hash stream may only fill uncovered gaps with real phrases. A
+    # pack spine caps the same way (`_spine_spans` covers both).
     figures_drafts = 0
     if lab_root is not None and sync_rec is not None and sync_rec.get("sync_ok") is True:
         new_figs = _figure_drafts(lab_root, lookup_album, lookup_track, sections)
-        sections.extend(new_figs)
-        figures_drafts = len(new_figs)
+        kept = _suppress_figure_flood(new_figs, sections, duration=real_duration)
+        if len(kept) != len(new_figs):
+            notes.append("figure drafts capped x%d (structure spine)"
+                         % (len(new_figs) - len(kept)))
+        sections.extend(kept)
+        figures_drafts = len(kept)
 
     # Pack density drafts: high guitar-onset-density spans as unheard riff
     # drafts from the pack's own audio-clock onsets. Riff only here -- the
     # pack's drum breakdowns already come through `_tab_kick_spans` above.
-    # Only when sync_ok; never a box off an untrusted clock.
+    # Skipped when the pack spine already supplied those phrases. Only when
+    # sync_ok; never a box off an untrusted clock.
     density_drafts = 0
-    if lab_root is not None and sync_rec is not None and sync_rec.get("sync_ok") is True:
+    if (pack_spine == 0 and lab_root is not None and sync_rec is not None
+            and sync_rec.get("sync_ok") is True):
         try:
             from .tabnotes_drafts import density_drafts_for_song
 
@@ -434,6 +686,7 @@ def estimate_hybrid(
                 lab_root, lookup_album, lookup_track, roles=("riff",))
         except Exception:
             new_density = []
+        new_density = _suppress_figure_flood(new_density, sections, duration=real_duration)
         if new_density:
             sections.extend(new_density)
             density_drafts = len(new_density)
@@ -497,13 +750,23 @@ def estimate_hybrid(
             notes.append("tempo changes x%d%s: %s" % (
                 len(hints), "" if trusted_hint else " (sec untrusted; sync not ok)", shown))
 
-    # Breakdown gate: keep audio breakdown drafts near this album's median
-    # heard breakdown span (n>=2). n<2 keeps the current rules.
+    # Breakdown/blast gates: keep audio drafts near this album's median heard
+    # span for that role (n>=2). n<2 keeps the current rules.
     breakdowns_used = _gate_breakdowns(sections, adapt_blob)
-    print("figures_drafts=%d density_drafts=%d breakdowns_used=%d"
-          % (figures_drafts, density_drafts, breakdowns_used))
+    blasts_used = _gate_blasts(sections, adapt_blob)
+    print("pack_spine=%d figures_drafts=%d density_drafts=%d breakdowns_used=%d "
+          "blasts_used=%d" % (pack_spine, figures_drafts, density_drafts,
+                              breakdowns_used, blasts_used))
 
     sections = _clean(sections)
+
+    # Load-draft sources belong to the Load drafts button, never to Guess.
+    # Defense in depth: if a future merge ever leaks one in, drop it here.
+    stray = [s for s in sections if s.get("source") in LOAD_DRAFT_SOURCES]
+    if stray:
+        sections = [s for s in sections if s.get("source") not in LOAD_DRAFT_SOURCES]
+        notes.append("dropped %d load-draft box(es) (msa/songformer) from Guess"
+                     % len(stray))
 
     # Per-album calibration: shift/map draft boxes from the first accepted
     # pairs on this album. Keepers are never touched; silent when no blob.
@@ -517,6 +780,14 @@ def estimate_hybrid(
                      float(adapt_blob.get("shift_start") or 0.0)))
         except Exception:
             pass
+
+    # Light figure<->function link: a function draft (breakdown/blast/...) that
+    # sits on a figure draft (riff/hook/...) carries that figure's id as
+    # `on_figure`, so the pair survives into the human's review together.
+    # Never overwrites a link and never invents a figure name.
+    linked = _link_on_figure(sections)
+    if linked:
+        notes.append("on_figure links x%d" % linked)
 
     # Real, honest coverage report -- librosa's beat/onset detectors can
     # (and do, confirmed on a real BoO track: a quiet outro with too

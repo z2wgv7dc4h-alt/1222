@@ -131,7 +131,11 @@ def _step_lyrics(lab_root, rows, cache):
 
 
 def _step_sync(lab_root, rows, cache):
+    """Clock each row that has audio plus a tab (GP file *or* discoverable
+    tab-notes pack). Pack-only songs (FLAC + Songsterr pack, no .gp) used to
+    be skipped here, so ingest prep never synced Mindful-style drops."""
     from .sync import sync_track
+    from .tabnotes import discover_pack
 
     have = _keys(Path(lab_root) / "data" / "sync.jsonl")
     done = 0
@@ -140,14 +144,23 @@ def _step_sync(lab_root, rows, cache):
         track = r.get("track") or ""
         if (album, track) in have:
             continue
-        gp = r.get("gp_path") or r.get("gp") or ""
         fp = r.get("flac_path") or r.get("flac") or ""
-        if not gp or not Path(gp).exists() or not fp or not Path(fp).exists():
+        if not fp or not Path(fp).exists():
+            continue
+        gp = r.get("gp_path") or r.get("gp") or ""
+        has_gp = bool(gp) and Path(gp).exists()
+        has_pack = False
+        if not has_gp:
+            try:
+                has_pack = discover_pack(lab_root, album, track) is not None
+            except Exception:  # noqa: BLE001
+                has_pack = False
+        if not has_gp and not has_pack:
             continue
         try:
             sync_track(lab_root, album, track)
             done += 1
-            print("SYNC", track)
+            print("SYNC", track, "pack" if (has_pack and not has_gp) else "gp")
         except Exception as exc:  # noqa: BLE001
             print("SKIP sync", track, exc)
     return {"sync_run": done}

@@ -291,17 +291,38 @@ def load_pack(path) -> TabNotesPack:
 
 
 def read_manifest(path) -> dict:
-    """Cheap title/artist/id read for discovery (no full pack parse)."""
+    """Cheap title/artist/id read for discovery (no full pack parse).
+
+    Songsterr packs often ship a thin `manifest.json` (files + event_count only).
+    Fall back to `notes.json` for title/artist/id so discover_pack can match
+    map rows after ingest.
+    """
     path = Path(path)
+
+    def _enrich(man: dict, src) -> dict:
+        man = dict(man or {})
+        if man.get("title") and man.get("artist") and man.get("id"):
+            return man
+        try:
+            notes = _json(src.read("notes.json")) or {}
+        except Exception:
+            notes = {}
+        for k in ("title", "artist", "id", "format", "event_count"):
+            if not man.get(k) and notes.get(k) is not None:
+                man[k] = notes[k]
+        return man
+
     if path.is_file() and path.suffix.lower() == ".zip":
         with zipfile.ZipFile(path) as zf:
             prefix = _zip_prefix(zf)
             if prefix is None:
                 return {}
-            return _json(_ZipSrc(zf, prefix).read("manifest.json")) or {}
+            src = _ZipSrc(zf, prefix)
+            return _enrich(_json(src.read("manifest.json")) or {}, src)
     if path.is_dir():
         root = _find_pack_root_dir(path)
-        return _json(_DirSrc(root).read("manifest.json")) or {}
+        src = _DirSrc(root)
+        return _enrich(_json(src.read("manifest.json")) or {}, src)
     return {}
 
 
@@ -659,11 +680,20 @@ def unpack_pack(src, dest) -> Path:
                 with zf.open(name) as f, target.open("wb") as out:
                     shutil.copyfileobj(f, out)
     elif src.is_dir():
+        # Pack folders only — never pull sibling .zips / scratch unpack trees
+        # that lived next to notes.json in a reused drop directory.
+        skip_parts = {"_unpacked", "__MACOSX"}
         for p in src.rglob("*"):
-            if p.is_file():
-                target = dest / p.relative_to(src)
-                target.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(p, target)
+            if not p.is_file():
+                continue
+            rel = p.relative_to(src)
+            if any(part in skip_parts for part in rel.parts):
+                continue
+            if p.suffix.lower() == ".zip":
+                continue
+            target = dest / rel
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(p, target)
     return dest
 
 

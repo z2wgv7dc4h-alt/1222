@@ -724,7 +724,7 @@ def create_app(lab_root: Path, flac_root: Path | None, gp_root: Path | None) -> 
                     if end_bar is not None and rec.get("end_bar") is None:
                         rec["end_bar"] = end_bar
 
-        # Pack span snapshot (arts/pitch/track counts) when sync_ok + pack.
+        # Pack pointer only (`pack_id`); note sequences joined at export.
         # Soft-fail: never blocks Save. GP bars above stay preferred when set.
         try:
             from .pack_snapshot import attach_pack_snapshots

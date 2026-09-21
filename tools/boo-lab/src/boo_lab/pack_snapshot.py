@@ -1,12 +1,16 @@
-﻿"""Pack span snapshots for Save keepers.
+﻿"""Pack pointers on Save + live note join for export/train.
 
-When a song has a trusted tab-notes pack (`sync_ok`), each heard keeper can
-carry soft-fail `pack_*` stats for its [start, end) window — arts, pitch,
-per-category note counts, active tracks. Never blocks Save; never invents
-keepers. Machines draft; humans Save heard boxes.
+Keepers stay human labels (album/track/start/end/role/...). When a trusted
+tab-notes pack exists (`sync_ok`), Save only stamps a soft-fail `pack_id`
+pointer (+ pack timeline bars if missing). Dense arts/pitch aggregates are
+NOT copied onto keepers — recompute from the live pack at export/train time
+via `notes_for_span` / `export_pack_notes`.
+
+Never blocks Save. Never invents keepers. Machines draft; humans Save heard.
 """
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Any
 
@@ -30,6 +34,29 @@ def _load_trusted_pack(lab_root, album: str, track: str):
         return None
 
 
+def load_pack_by_id(lab_root, pack_id: str):
+    """Load a pack by id from data/tabnotes, or None."""
+    if not pack_id:
+        return None
+    try:
+        from . import tabnotes
+        root = Path(lab_root) / "data" / "tabnotes"
+        # exact folder or zip stem
+        for cand in (root / pack_id, root / (pack_id + ".zip")):
+            if cand.exists() and tabnotes.is_pack(cand):
+                return tabnotes.load_pack(cand)
+        for cand in tabnotes._pack_candidates(lab_root):
+            try:
+                pack = tabnotes.load_pack(cand)
+            except Exception:
+                continue
+            if getattr(pack, "id", None) == pack_id:
+                return pack
+    except Exception:
+        return None
+    return None
+
+
 def _cat(e) -> str:
     c = (getattr(e, "category", None) or "").lower()
     if c:
@@ -44,74 +71,6 @@ def _cat(e) -> str:
     if "guitar" in name:
         return "guitar"
     return c or "other"
-
-
-def span_pack_stats(pack, start: float, end: float) -> dict[str, Any]:
-    """Soft stats for events with audio onset in [start, end)."""
-    from . import tabnotes
-
-    start = float(start)
-    end = float(end)
-    if end <= start:
-        return {}
-
-    evs = []
-    for e in getattr(pack, "events", None) or []:
-        try:
-            t = float(pack.audio_sec(e))
-        except Exception:
-            continue
-        if start <= t < end:
-            evs.append(e)
-
-    if not evs:
-        return {
-            "pack_note_source": "tabnotes",
-            "pack_n_notes": 0,
-            "pack_n_guitar_notes": 0,
-            "pack_n_bass_notes": 0,
-            "pack_n_drum_notes": 0,
-            "pack_tracks_active": [],
-        }
-
-    by_cat = {"guitar": [], "bass": [], "drums": [], "other": []}
-    tracks_active = sorted({int(getattr(e, "track", 0) or 0) for e in evs})
-    for e in evs:
-        by_cat.setdefault(_cat(e), []).append(e)
-
-    guitar = by_cat.get("guitar") or []
-    # Primary guitar track = most notes in span among guitar tracks
-    g_by_tr: dict[int, list] = {}
-    for e in guitar:
-        g_by_tr.setdefault(int(getattr(e, "track", 0) or 0), []).append(e)
-    guitar_track = max(g_by_tr, key=lambda k: len(g_by_tr[k])) if g_by_tr else None
-
-    pitches = [int(e.pitch) for e in guitar if e.pitch is not None]
-    n_g = len(guitar)
-    palm = sum(1 for e in guitar if getattr(e, "palm_mute", False))
-    dead = sum(1 for e in guitar if getattr(e, "dead", False))
-    hammer = sum(1 for e in guitar if getattr(e, "hammer", False))
-
-    out: dict[str, Any] = {
-        "pack_note_source": "tabnotes",
-        "pack_n_notes": len(evs),
-        "pack_n_guitar_notes": n_g,
-        "pack_n_bass_notes": len(by_cat.get("bass") or []),
-        "pack_n_drum_notes": len(by_cat.get("drums") or []),
-        "pack_tracks_active": tracks_active,
-    }
-    if guitar_track is not None:
-        out["pack_guitar_track"] = int(guitar_track)
-    if n_g:
-        out["pack_palm_frac"] = round(palm / n_g, 4)
-        out["pack_dead_frac"] = round(dead / n_g, 4)
-        out["pack_hammer_frac"] = round(hammer / n_g, 4)
-    if pitches:
-        out["pack_pitch_min"] = min(pitches)
-        out["pack_pitch_max"] = max(pitches)
-        out["pack_pitch_mean"] = round(sum(pitches) / len(pitches), 2)
-        out["pack_unique_pitches"] = len(set(pitches))
-    return out
 
 
 def bars_for_pack_span(pack, start: float, end: float) -> tuple[int | None, int | None]:
@@ -133,28 +92,29 @@ def bars_for_pack_span(pack, start: float, end: float) -> tuple[int | None, int 
 
 
 def attach_pack_snapshots(lab_root, album: str, track: str, keepers: list[dict]) -> int:
-    """Mutate keepers in place with pack_* fields. Returns how many got a snapshot.
-
-    Soft-fail: missing pack / bad sync / load errors → 0, keepers unchanged.
-    """
+    """Stamp `pack_id` (+ bars) on keepers. Soft-fail. No dense aggregates."""
     pack = _load_trusted_pack(lab_root, album, track)
     if pack is None or not keepers:
         return 0
+    pack_id = getattr(pack, "id", None) or ""
+    if not pack_id:
+        # fall back to folder name
+        try:
+            pack_id = Path(getattr(pack, "source_path", "") or "").name
+        except Exception:
+            pack_id = ""
+    if not pack_id:
+        return 0
     n = 0
     for rec in keepers:
+        rec.setdefault("pack_note_source", "tabnotes")
+        rec.setdefault("pack_id", pack_id)
         try:
             start = float(rec["start"])
             end = float(rec["end"])
         except (KeyError, TypeError, ValueError):
+            n += 1
             continue
-        try:
-            stats = span_pack_stats(pack, start, end)
-        except Exception:
-            continue
-        if not stats:
-            continue
-        for k, v in stats.items():
-            rec.setdefault(k, v)
         if rec.get("start_bar") is None or rec.get("end_bar") is None:
             try:
                 sb, eb = bars_for_pack_span(pack, start, end)
@@ -166,3 +126,126 @@ def attach_pack_snapshots(lab_root, album: str, track: str, keepers: list[dict])
                 rec["end_bar"] = eb
         n += 1
     return n
+
+
+def _event_to_dict(pack, e) -> dict[str, Any]:
+    try:
+        t = float(pack.audio_sec(e))
+    except Exception:
+        t = None
+    return {
+        "t": round(t, 4) if t is not None else None,
+        "track": int(getattr(e, "track", 0) or 0),
+        "category": _cat(e),
+        "measure": getattr(e, "measure", None),
+        "onset_beat": getattr(e, "onset_beat", None),
+        "duration_beats": getattr(e, "duration_beats", None),
+        "pitch": getattr(e, "pitch", None),
+        "string": getattr(e, "string", None),
+        "fret": getattr(e, "fret", None),
+        "palm_mute": bool(getattr(e, "palm_mute", False)),
+        "dead": bool(getattr(e, "dead", False)),
+        "hammer": bool(getattr(e, "hammer", False)),
+        "bend": bool(getattr(e, "bend", False)),
+        "slide": getattr(e, "slide", None),
+        "harmonic": bool(getattr(e, "harmonic", False)),
+        "instrument": getattr(e, "instrument_name", None) or "",
+    }
+
+
+def notes_for_span(pack, start: float, end: float, *,
+                   category: str | None = None,
+                   track: int | None = None) -> list[dict[str, Any]]:
+    """Live note sequence for [start, end) from the pack (source of truth)."""
+    start = float(start)
+    end = float(end)
+    if end <= start:
+        return []
+    out = []
+    for e in getattr(pack, "events", None) or []:
+        if track is not None and int(getattr(e, "track", -1)) != int(track):
+            continue
+        if category is not None and _cat(e) != category.lower():
+            continue
+        try:
+            t = float(pack.audio_sec(e))
+        except Exception:
+            continue
+        if start <= t < end:
+            out.append(_event_to_dict(pack, e))
+    out.sort(key=lambda r: (r.get("t") is None, r.get("t") or 0.0, r.get("track") or 0))
+    return out
+
+
+def join_keeper_notes(lab_root, keeper: dict) -> dict[str, Any]:
+    """Join one keeper to live pack notes. Soft-fail empty notes list."""
+    album = keeper.get("album") or ""
+    track = keeper.get("track") or ""
+    pack_id = keeper.get("pack_id") or ""
+    pack = None
+    if pack_id:
+        pack = load_pack_by_id(lab_root, pack_id)
+    if pack is None:
+        pack = _load_trusted_pack(lab_root, album, track)
+    try:
+        start = float(keeper["start"])
+        end = float(keeper["end"])
+    except (KeyError, TypeError, ValueError):
+        return {"keeper": keeper, "pack_id": pack_id or None, "notes": [], "error": "bad span"}
+    if pack is None:
+        return {"keeper": {
+            "album": album, "track": track, "start": start, "end": end,
+            "role": keeper.get("role"), "figure_id": keeper.get("figure_id"),
+            "pack_id": pack_id or None,
+        }, "notes": [], "error": "no pack"}
+    notes = notes_for_span(pack, start, end)
+    return {
+        "album": album,
+        "track": track,
+        "start": start,
+        "end": end,
+        "role": keeper.get("role"),
+        "figure_id": keeper.get("figure_id"),
+        "pack_id": getattr(pack, "id", None) or pack_id,
+        "n_notes": len(notes),
+        "notes": notes,
+    }
+
+
+def export_pack_notes(lab_root, out_path=None) -> dict:
+    """Write one JSONL row per keeper with live-joined pack notes.
+
+    Default: `work/pack-notes/keepers-notes.jsonl`. Skips songs with no pack.
+    Never writes sections.jsonl.
+    """
+    from .schema import is_keeper
+
+    lab_root = Path(lab_root)
+    sec = lab_root / "data" / "sections.jsonl"
+    out = Path(out_path) if out_path else lab_root / "work" / "pack-notes" / "keepers-notes.jsonl"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    rows = []
+    if sec.exists():
+        for line in sec.read_text(encoding="utf-8").splitlines():
+            if not line.strip():
+                continue
+            try:
+                rec = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if not is_keeper(rec.get("source")) or not rec.get("heard"):
+                continue
+            rows.append(rec)
+    written = 0
+    skipped = 0
+    with out.open("w", encoding="utf-8") as f:
+        for rec in rows:
+            joined = join_keeper_notes(lab_root, rec)
+            if joined.get("error") == "no pack" or not joined.get("notes"):
+                skipped += 1
+                # still write pointer rows with empty notes? skip empty for train purity
+                if joined.get("error") == "no pack":
+                    continue
+            f.write(json.dumps(joined, ensure_ascii=False) + "\n")
+            written += 1
+    return {"written": written, "skipped": skipped, "path": str(out)}

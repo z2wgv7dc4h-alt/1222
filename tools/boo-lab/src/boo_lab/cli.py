@@ -144,6 +144,8 @@ def main(argv: list[str] | None = None) -> int:
     s = sub.add_parser("beats", help="write beat/downbeat grid (beat_this or allin1)")
     s.add_argument("--album")
 
+    s = sub.add_parser("pack-notes", help="join keeper spans to live pack note sequences (train/export)")
+    s.add_argument("--out", default=None, help="jsonl path (default work/pack-notes/keepers-notes.jsonl)")
     s = sub.add_parser("gp-export", help="probe .gp/.gpx: already usable by scan, or record why not")
     s.add_argument("--gp-root", type=Path, default=None)
 
@@ -361,6 +363,12 @@ def main(argv: list[str] | None = None) -> int:
         if not (args.write or args.diff):
             passes = load_passes(root(), album, track)
             print("agree passes for %s / %s: %s" % (album, track, [p.get("pass") for p in passes]))
+        return 0
+
+    if args.cmd == "pack-notes":
+        from .pack_snapshot import export_pack_notes
+        report = export_pack_notes(root(), getattr(args, "out", None))
+        print("pack-notes", report)
         return 0
 
     if args.cmd == "export-jams":

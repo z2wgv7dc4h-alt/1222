@@ -75,7 +75,7 @@ Living docs after this pass: `USER.md` (operator), `LAW.md` (rules), `CURRENT.md
   - â€œmachines never labelâ€
   Target: well under 200 lines.
 
-- [ ] **P2.4 STATUS.md â€” counts only + one â€œnowâ€ paragraph.**
+- [x] **P2.4 STATUS.md â€” counts only + one â€œnowâ€ paragraph.**
   - Delete the duplicated `# Status â€” 2026-09-21` header.
   - Counts block is whatever `boo-lab status` writes.
   - One short â€œnowâ€ blurb. Historical intern novels belong in CHANGELOG.

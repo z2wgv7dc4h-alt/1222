@@ -12,13 +12,17 @@ __version__ = "0.1.0"
 
 
 def _install_phrase_retune() -> None:
-    """Prefer retuned mid-grain pack_phrase_spans when the module is present."""
+    """Prefer retuned mid-grain pack_phrase_spans when the module is present.
+
+    Optional: a missing or broken `phrase_spans` leaves the stock
+    `tabnotes_drafts.pack_phrase_spans` in place.
+    """
     try:
         from . import phrase_spans as _ps
         from . import tabnotes_drafts as _td
         _td.pack_phrase_spans = _ps.pack_phrase_spans
-    except Exception:
-        pass
+    except Exception as exc:  # noqa: BLE001 ? optional monkeypatch
+        print("phrase_retune skipped: %s" % exc)
 
 
 _install_phrase_retune()

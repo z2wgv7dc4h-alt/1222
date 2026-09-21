@@ -137,9 +137,9 @@ Chrome stays. No new buttons. No layout pass.
 
 - [x] **P5.2 Save side-effects stay non-fatal and logged.** `learn.record`, `adapt.rebuild_*`, `predict.maybe_train_on_save` are already `except Exception: pass`. Print a one-line `save-hook failed: adapt: ...` on failure so a silent no-op is visible in the studio process log. Do not fail the Save. Do not start training if `BOO_PREDICT_SAVE_TRAIN=0`.
 
-- [ ] **P5.3 `__init__._install_phrase_retune`.** Bare `except Exception: pass` hides a failed monkeypatch. Log the exception. If `phrase_spans` is required, fail import. If optional, say so in CURRENT one line.
+- [x] **P5.3 `__init__._install_phrase_retune`.** Bare `except Exception: pass` hides a failed monkeypatch. Log the exception. If `phrase_spans` is required, fail import. If optional, say so in CURRENT one line.
 
-- [ ] **P5.4 USER / How copy already matches pin-then-drag.** Do not restyle `#wave` / pins / How drawer.
+- [x] **P5.4 USER / How copy already matches pin-then-drag.** Do not restyle `#wave` / pins / How drawer.
 
 ---
 

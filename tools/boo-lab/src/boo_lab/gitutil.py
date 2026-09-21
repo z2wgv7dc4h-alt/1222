@@ -4,6 +4,13 @@ import os
 import subprocess
 from pathlib import Path
 
+# Label files that may be pushed. Never stage the whole data/ tree.
+_LABEL_FILES = (
+    "data/sections.jsonl",
+    "data/holdout.csv",
+    "data/CATALOG.md",
+)
+
 
 def _git_root(start: Path) -> Path | None:
     for p in [start, *start.parents]:
@@ -23,20 +30,36 @@ def _run(cmd: list[str], cwd: Path, capture: bool, timeout: int = 180) -> subpro
     return subprocess.run(cmd, **kw)
 
 
+def _stage_paths(lab_root: Path, root: Path) -> list[str]:
+    """Paths relative to git root to stage (never git add -A data/)."""
+    lab_root = lab_root.resolve()
+    root = root.resolve()
+    if (root / "tools" / "boo-lab").exists() and lab_root == (root / "tools" / "boo-lab").resolve():
+        prefix = "tools/boo-lab/"
+    elif lab_root == root:
+        prefix = ""
+    else:
+        try:
+            prefix = lab_root.relative_to(root).as_posix().rstrip("/") + "/"
+        except ValueError:
+            prefix = ""
+
+    candidates = [f"{prefix}src"]
+    candidates.extend(f"{prefix}{rel}" for rel in _LABEL_FILES)
+    return [p for p in candidates if (root / p).exists()]
+
+
 def push_lab(lab_root: Path, message: str | None = None) -> dict:
     root = _git_root(lab_root)
     if not root:
         return {"ok": False, "error": "no .git above boo-lab"}
-    # 1222 repo root is god-tier-metal; lab-only clone uses "."
-    paths = ["tools/boo-lab/src", "tools/boo-lab/data"]
-    exist = [p for p in paths if (root / p).exists()]
+    exist = _stage_paths(Path(lab_root), root)
     if not exist:
-        exist = ["src", "data"]
-        exist = [p for p in exist if (root / p).exists()] or ["."]
+        return {"ok": False, "error": "nothing to stage under boo-lab", "root": str(root)}
     msg = message or "boo-lab: labels, lyrics, source"
     logs: list[str] = []
     steps = [
-        (["git", "-c", "core.safecrlf=false", "add", "-A", "--", *exist], True),
+        (["git", "-c", "core.safecrlf=false", "add", "--", *exist], True),
         (["git", "status", "--short"], True),
         (["git", "commit", "-m", msg], True),
         (["git", "push"], False),

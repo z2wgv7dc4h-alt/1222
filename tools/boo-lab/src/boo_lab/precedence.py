@@ -45,3 +45,62 @@ def resolve_precedence(*, sync_ok: bool | None, has_gp_markers: bool,
         "notes_source": notes_source,
         "clock": clock,
     }
+
+
+def tab_plan(lab_root, album, track, gp_path=None) -> dict:
+    """One read-only resolution of a song's tab/pack precedence: which
+    GP/pack files exist, the structure spine, the notes source, and
+    which pack overlays (kicks/pulse/meter_cuts) may run. Wraps
+    resolve_precedence (the pure spine/notes decision) with the actual
+    file discovery, marker counting, and sync-row lookup that Guess and
+    figures each used to redo inline. Never writes sections.jsonl."""
+    from pathlib import Path as _Path
+
+    from .guess import _prefer_tab, _sync_for
+    from .tabnotes import discover_pack
+
+    lab_root = _Path(lab_root) if lab_root is not None else None
+    gp_use = _prefer_tab(_Path(gp_path) if gp_path else None, track)
+
+    has_markers = False
+    if gp_use is not None:
+        try:
+            if gp_use.suffix.lower() in (".gp", ".gpx"):
+                from .extract import estimate_from_gpif
+
+                g = estimate_from_gpif(gp_use)
+            else:
+                from .extract import estimate_from_gp
+
+                g = estimate_from_gp(gp_use)
+            has_markers = len(g.get("sections") or []) >= 1
+        except Exception:
+            has_markers = False
+
+    pack_path = None
+    if lab_root is not None:
+        try:
+            pack_path = discover_pack(lab_root, album, track)
+        except Exception:
+            pack_path = None
+
+    sync_rec = _sync_for(lab_root, album, track) if lab_root is not None else None
+    sync_ok_raw = sync_rec.get("sync_ok") if sync_rec is not None else None
+
+    decision = resolve_precedence(
+        sync_ok=sync_ok_raw, has_gp_markers=has_markers,
+        has_pack=pack_path is not None, has_gp=gp_use is not None,
+    )
+
+    overlays_ok = decision["sync_ok"]
+    return {
+        "spine": decision["spine"],
+        "notes": decision["notes_source"],
+        "gp_path": str(gp_use) if gp_use is not None else None,
+        "pack_path": str(pack_path) if pack_path is not None else None,
+        "markers": has_markers,
+        "sync_ok": decision["sync_ok"],
+        "kicks": overlays_ok,
+        "pulse": overlays_ok,
+        "meter_cuts": overlays_ok,
+    }

@@ -494,9 +494,6 @@ def build_figures(lab_root, rows, *, album=None, track=None) -> dict:
     from .schema import write_jsonl_atomic
     from .tabnotes import discover_pack, load_pack
 
-    sync_by = {(s.get("album"), s.get("track")): s
-               for s in _read_jsonl(lab_root / "data" / "sync.jsonl")}
-
     for r in rows:
         ra = r.get("album") or ""
         rt = r.get("track") or ""
@@ -505,11 +502,18 @@ def build_figures(lab_root, rows, *, album=None, track=None) -> dict:
         if tkey is not None and rt.casefold() != tkey:
             continue
 
-        # A local tab-notes pack wins over any GP file for riff identity --
-        # same precedence `sync.py` already uses. Pack discovery is kept
-        # separate from fragment-extraction success so a song whose guitar
-        # track yields no usable riff windows still gets Pulse detection
-        # below (which reads a different track on the same pack).
+        # A local tab-notes pack normally wins over any GP file for riff
+        # identity (`sync.py`'s own precedence). But when the song's spine is
+        # the tab's own GP markers, the pack must not bury it: go straight to
+        # GP fragments for identity (Pulse detection below is untouched; it
+        # reads a different track on the same pack).
+        gp_raw = r.get("gp_path") or r.get("gp") or ""
+        gp_row_path = Path(gp_raw) if gp_raw else None
+        matched = (r.get("match") or "").lower() in {"yes", "y", "1", "true"}
+
+        from .precedence import tab_plan
+        plan = tab_plan(lab_root, ra, rt, gp_path=gp_row_path)
+
         pack = None
         try:
             pack_path = discover_pack(lab_root, ra, rt)
@@ -522,7 +526,7 @@ def build_figures(lab_root, rows, *, album=None, track=None) -> dict:
         fragments = slots = None
         note_source = None
         primary_guitar = _tab_track_by_category(pack, "guitar") if pack is not None else None
-        if pack is not None:
+        if pack is not None and plan["spine"] != "gp-marker":
             try:
                 fragments, slots = _tab_fragments_and_slots(pack, track=primary_guitar)
             except Exception as exc:
@@ -534,13 +538,10 @@ def build_figures(lab_root, rows, *, album=None, track=None) -> dict:
                 fragments = slots = None
 
         if fragments is None:
-            matched = (r.get("match") or "").lower() in {"yes", "y", "1", "true"}
-            gp_raw = r.get("gp_path") or r.get("gp") or ""
-            gp = Path(gp_raw) if gp_raw else None
-            if matched and gp is not None and gp.exists():
+            if matched and gp_row_path is not None and gp_row_path.exists():
                 try:
-                    fragments = _engine_riff_bank().extract_fragments_from_file(gp, song_title=rt)
-                    slots = _playback_slots(gp)
+                    fragments = _engine_riff_bank().extract_fragments_from_file(gp_row_path, song_title=rt)
+                    slots = _playback_slots(gp_row_path)
                     note_source = "gp"
                 except Exception as exc:  # real unparseable GP files exist in this corpus
                     print("SKIP figures", rt, exc)
@@ -557,15 +558,8 @@ def build_figures(lab_root, rows, *, album=None, track=None) -> dict:
         rebuilt.add((ra, rt))
         songs += 1
         # Seconds are only trustworthy when the tab clock actually matched the
-        # audio (sync_ok) -- the same trust gate `precedence.resolve_precedence`
-        # uses for the tab/pack spine decision. Otherwise keep bars/hashes and
-        # publish no times.
-        from .precedence import resolve_precedence
-
-        sync_ok_val = (sync_by.get((ra, rt)) or {}).get("sync_ok")
-        trusted = resolve_precedence(
-            sync_ok=sync_ok_val, has_gp_markers=False, has_pack=False, has_gp=False,
-        )["sync_ok"]
+        # audio (sync_ok) -- from the shared tab/pack precedence plan.
+        trusted = plan["sync_ok"]
 
         windows = _song_windows(fragments, slots) if fragments and slots else []
         if not windows:

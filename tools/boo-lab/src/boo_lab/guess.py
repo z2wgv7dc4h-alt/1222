@@ -474,6 +474,11 @@ def estimate_hybrid(
 
     gp_use = _prefer_tab(gp, track)
     sync_rec = _sync_for(lab_root, lookup_album, lookup_track)
+
+    from .precedence import tab_plan
+
+    plan = tab_plan(lab_root, lookup_album, lookup_track, gp_path=gp)
+
     key = _norm(track) or _norm(gp.stem if gp else "")
     seen = 0
     roots = _gp5_roots()
@@ -495,7 +500,7 @@ def estimate_hybrid(
                 g = estimate_from_gp(gp_use)
             bpm = g.get("bpm") or bpm
             if g.get("sections"):
-                if sync_rec is not None and sync_rec.get("sync_ok") is False:
+                if plan["spine"] != "gp-marker":
                     # Gate: don't propose times from a tab measured as misaligned.
                     lag = sync_rec.get("lag_sec")
                     notes.append(
@@ -574,7 +579,7 @@ def estimate_hybrid(
         # markers -- only when the audio clock actually matched (sync_ok),
         # since the spans are seconds off that pack's own clock.
         tab_kicks: list[dict] = []
-        if lab_root is not None and sync_rec is not None and sync_rec.get("sync_ok") is True:
+        if plan["kicks"]:
             try:
                 from .tabnotes import discover_pack, load_pack
 
@@ -639,19 +644,9 @@ def estimate_hybrid(
         adapt_blob = None
 
     # Pack structure/phrase spine eligibility is the shared tab/pack
-    # precedence decision (`precedence.resolve_precedence`): trusted sync and
-    # no GP markers already on the board -> pack may be the spine. `has_pack`
-    # is passed `True` here because eligibility (may Guess try a pack spine
-    # at all?) doesn't need the pack to already be loaded -- the calls below
-    # already handle "no pack found" by getting an empty list back.
-    from .precedence import resolve_precedence
-
-    has_gp_markers = any(s.get("source") == "gp-marker" for s in sections)
-    sync_ok_val = sync_rec.get("sync_ok") if sync_rec is not None else None
-    pack_spine_eligible = lab_root is not None and resolve_precedence(
-        sync_ok=sync_ok_val, has_gp_markers=has_gp_markers,
-        has_pack=True, has_gp=bool(gp_use),
-    )["spine"] == "pack"
+    # precedence decision (`precedence.tab_plan`, which discovers the real
+    # files): trusted sync and no GP markers -> pack may be the spine.
+    pack_spine_eligible = lab_root is not None and plan["spine"] == "pack"
 
     # Pack structure spine: when the map has no GP markers but a tab-notes
     # pack is discovered and its clock matched (`sync_ok`), the pack's own
@@ -700,7 +695,7 @@ def estimate_hybrid(
     # unique one-shots when pack phrases already carry structure (avoids the
     # Mindful 60-box flood). GP markers still primary-cap the rest.
     figures_drafts = 0
-    if lab_root is not None and sync_rec is not None and sync_rec.get("sync_ok") is True:
+    if plan["sync_ok"]:
         new_figs = _figure_drafts(lab_root, lookup_album, lookup_track, sections)
         if pack_phrases > 0:
             new_figs = [d for d in new_figs if not d.get("unique")]
@@ -724,8 +719,7 @@ def estimate_hybrid(
     # Skipped when the pack spine already supplied those phrases. Only when
     # sync_ok; never a box off an untrusted clock.
     density_drafts = 0
-    if (pack_spine == 0 and pack_phrases == 0 and lab_root is not None
-            and sync_rec is not None and sync_rec.get("sync_ok") is True):
+    if pack_spine == 0 and pack_phrases == 0 and plan["sync_ok"]:
         try:
             from .tabnotes_drafts import density_drafts_for_song
 
@@ -761,7 +755,7 @@ def estimate_hybrid(
     # human plus an edge snap for the audio-derived/density spans, never a new
     # box. Only when the clock matched.
     meter_cuts: list[float] = []
-    if lab_root is not None and sync_rec is not None and sync_rec.get("sync_ok") is True:
+    if plan["meter_cuts"]:
         try:
             from .tabnotes_drafts import meter_cuts_for_song, snap_sections_to_cuts
 

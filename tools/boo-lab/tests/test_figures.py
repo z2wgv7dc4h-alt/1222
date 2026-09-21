@@ -2,6 +2,7 @@
 No guitarpro, no FLAC, no network."""
 from __future__ import annotations
 
+import json
 import shutil
 from pathlib import Path
 
@@ -387,6 +388,35 @@ def test_build_figures_prefers_tabnotes_pack_over_gp(tmp_path, monkeypatch):
     rows = figures.load_figures(lab, "Synthetic Album", "Tiny Pack")
     assert report["written"] > 0
     assert rows and all(r["note_source"] == "tabnotes" for r in rows)
+
+
+def test_build_figures_gp_marker_spine_beats_a_discovered_pack(tmp_path, monkeypatch):
+    guitarpro = pytest.importorskip("guitarpro")
+    from gp_fixtures import make_song, make_track
+
+    from boo_lab import guess as g
+
+    lab = tmp_path / "lab"
+    (lab / "data" / "tabnotes").mkdir(parents=True)
+    shutil.copytree(FIX_DIR, lab / "data" / "tabnotes" / "tabnotes_tiny")
+    (lab / "data" / "sync.jsonl").write_text(
+        json.dumps({"album": "A", "track": "Tiny Pack", "sync_ok": True}) + "\n",
+        encoding="utf-8")
+
+    song = make_song(4, markers={0: "Verse"}, title="Fixture")
+    track = make_track(song, 1, {0: [40], 1: [45], 2: [40], 3: [45]}, instrument=30)
+    song.tracks = [track]
+    gp = tmp_path / "fixture.gp5"
+    guitarpro.write(song, str(gp))
+
+    monkeypatch.setattr(g, "_prefer_tab", lambda p, track: p)
+
+    report = figures.build_figures(lab, [{"album": "A", "track": "Tiny Pack",
+                                          "gp_path": str(gp), "match": "yes"}])
+
+    rows = figures.load_figures(lab, "A", "Tiny Pack")
+    assert report["written"] > 0
+    assert rows and all(r["note_source"] == "gp" for r in rows)
 
 
 def test_api_figures_returns_rows_for_selected_song(tmp_path):

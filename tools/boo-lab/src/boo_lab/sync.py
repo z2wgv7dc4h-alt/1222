@@ -592,6 +592,8 @@ def sync_track(lab_root: Path, album: str | None, track: str | None) -> dict:
     # This is a different question from `precedence.resolve_precedence`'s
     # spine/notes-source choice downstream (which runs after sync_ok is known)
     # -- leave this witness precedence alone; don't invert it to match spine.
+    # `precedence.tab_plan` now wraps that pure decision for the actual
+    # file-discovery call sites (Guess/figures); it still runs after this.
     gp = Path("")
     onsets = None
     used_pack = False

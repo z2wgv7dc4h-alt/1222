@@ -758,6 +758,7 @@ def estimate_hybrid(
           "blasts_used=%d" % (pack_spine, figures_drafts, density_drafts,
                               breakdowns_used, blasts_used))
 
+    sections = _merge_adjacent_same_figure(sections)
     sections = _clean(sections)
 
     # Load-draft sources belong to the Load drafts button, never to Guess.
@@ -926,6 +927,65 @@ def _tab_kick_spans(pack) -> list[dict]:
         s["source"] = "kick-notation"
         s["role"] = "breakdown"
     return spans
+
+
+
+def _merge_adjacent_same_figure(sections: list[dict], *, gap: float = 0.15) -> list[dict]:
+    """Collapse contiguous same-figure runs into one box.
+
+    GP markers often emit riff-A1 / riff-D once per few bars. Adjacent
+    slices with the same role + figure_id and a gap <= gap are one
+    continuous pin, not three returns. Later returns after other material
+    (gap > gap) stay separate boxes sharing the id.
+
+    Function drafts (blast/breakdown without figure_id) are ignored for
+    adjacency so a nested blast cannot split a continuous riff run.
+    """
+    if not sections:
+        return []
+    figs = [
+        {**s, "start": float(s["start"]), "end": float(s["end"])}
+        for s in sections
+        if s.get("figure_id")
+        and s.get("start") is not None
+        and s.get("end") is not None
+        and float(s["end"]) > float(s["start"])
+    ]
+    funcs = [
+        dict(s)
+        for s in sections
+        if not s.get("figure_id")
+        and s.get("start") is not None
+        and s.get("end") is not None
+        and float(s["end"]) > float(s["start"])
+    ]
+    if not figs:
+        return list(sections)
+    ordered = sorted(figs, key=lambda x: (x["start"], x["end"]))
+    merged: list[dict] = []
+    for s in ordered:
+        fid = (s.get("figure_id") or "").strip()
+        role = s.get("role")
+        if merged and fid and role:
+            prev = merged[-1]
+            same = (
+                (prev.get("figure_id") or "").strip() == fid
+                and prev.get("role") == role
+            )
+            abut = float(s["start"]) <= float(prev["end"]) + gap
+            if same and abut:
+                prev["end"] = max(float(prev["end"]), float(s["end"]))
+                if s.get("end_bar") is not None:
+                    prev["end_bar"] = s.get("end_bar")
+                if prev.get("start_bar") is None and s.get("start_bar") is not None:
+                    prev["start_bar"] = s.get("start_bar")
+                continue
+        merged.append(dict(s))
+    return sorted(
+        merged + funcs,
+        key=lambda x: (float(x["start"]), float(x["end"])),
+    )
+
 
 
 def _clean(sections: list[dict]) -> list[dict]:

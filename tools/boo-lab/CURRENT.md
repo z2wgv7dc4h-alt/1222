@@ -667,3 +667,6 @@ Reading: **F3 high + role agreement low = the intern finds the edges but names t
 ## What to do next (human)
 
 Label Elimination by ear. Do not wait on Guess. Scan after any ingest. Push docs+code from cmd when a chunk of work is done.
+
+- Guess merges adjacent same-letter GP markers (nested blast/breakdown ignored for adjacency).
+

@@ -1103,3 +1103,24 @@ def test_spine_primary_true_for_a_pack_spine_box():
                  "source": "tabnotes-structure", "figure_id": "riff-A"}]
     assert g._spine_primary(sections, duration=200.0) is True
     assert g._spine_primary([], duration=200.0) is False
+
+def test_merge_adjacent_same_figure_collapses_starved_style_slices():
+    from boo_lab import guess as g
+    slices = [
+        {"role": "riff", "figure_id": "riff-A1", "start": 11.52, "end": 13.94, "source": "gp-marker"},
+        {"role": "riff", "figure_id": "riff-A1", "start": 13.94, "end": 16.36, "source": "gp-marker"},
+        {"role": "riff", "figure_id": "riff-A1", "start": 16.36, "end": 21.21, "source": "gp-marker"},
+        {"role": "riff", "figure_id": "riff-D", "start": 49.09, "end": 51.52, "source": "gp-marker"},
+        {"role": "blast", "figure_id": None, "start": 50.0, "end": 51.0, "source": "blast-hint"},
+        {"role": "riff", "figure_id": "riff-D", "start": 51.52, "end": 53.94, "source": "gp-marker"},
+        # later return of D after a gap — keep separate
+        {"role": "riff", "figure_id": "riff-D", "start": 80.0, "end": 82.0, "source": "gp-marker"},
+        {"role": "solo", "figure_id": "solo-B", "start": 74.55, "end": 93.94, "source": "gp-marker"},
+    ]
+    out = g._merge_adjacent_same_figure(slices)
+    a1 = [s for s in out if s["figure_id"] == "riff-A1"]
+    d = [s for s in out if s["figure_id"] == "riff-D"]
+    assert len(a1) == 1 and a1[0]["start"] == 11.52 and a1[0]["end"] == 21.21
+    assert len(d) == 2  # adjacent merge + later return
+    assert d[0]["start"] == 49.09 and d[0]["end"] == 53.94
+    assert d[1]["start"] == 80.0

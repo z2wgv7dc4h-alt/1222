@@ -789,6 +789,10 @@ def create_app(lab_root: Path, flac_root: Path | None, gp_root: Path | None) -> 
             from .learn import record
 
             record(lab_root, "save_snapshot", meta["album"], meta["track"], n=len(keepers))
+        except Exception as exc:  # noqa: BLE001 ? Save must not fail
+            print("save-hook failed: learn: %s" % exc)
+        try:
+            from .learn import record
             from .adapt import rebuild_album, rebuild_global
 
             blob = rebuild_album(lab_root, meta["album"])
@@ -797,16 +801,17 @@ def create_app(lab_root: Path, flac_root: Path | None, gp_root: Path | None) -> 
             global_blob = rebuild_global(lab_root)
             record(lab_root, "adapt_global", meta["album"], meta["track"],
                    n_pairs=global_blob.get("n_pairs", 0))
-        except Exception:
-            pass
+        except Exception as exc:  # noqa: BLE001 ? Save must not fail
+            print("save-hook failed: adapt: %s" % exc)
         # Structure predictor: after keepers land, fire a low-epoch fine-tune
         # in a daemon thread (torch-gated inside predict; never blocks Save).
+        # Skips when BOO_PREDICT_SAVE_TRAIN=0 (handled inside maybe_train_on_save).
         try:
             from .predict import maybe_train_on_save
 
             maybe_train_on_save(lab_root, meta["album"], meta["track"])
-        except Exception:
-            pass
+        except Exception as exc:  # noqa: BLE001 ? Save must not fail
+            print("save-hook failed: predict: %s" % exc)
         body: dict = {"saved": len(keepers), "path": str(sec_path),
                       "dropped_unheard": dropped_unheard,
                       "backup": str(backup_path)}

@@ -135,7 +135,7 @@ Chrome stays. No new buttons. No layout pass.
 
 - [ ] **P5.1 Heard `gp-marker` / `figure-hash` round-trip in the studio API tests** (ties to P1.2). `POST /api/sections/{id}` with those sources + `heard=true` â†’ 200, `guess-accepted`, other tracks untouched.
 
-- [ ] **P5.2 Save side-effects stay non-fatal and logged.** `learn.record`, `adapt.rebuild_*`, `predict.maybe_train_on_save` are already `except Exception: pass`. Print a one-line `save-hook failed: adapt: ...` on failure so a silent no-op is visible in the studio process log. Do not fail the Save. Do not start training if `BOO_PREDICT_SAVE_TRAIN=0`.
+- [x] **P5.2 Save side-effects stay non-fatal and logged.** `learn.record`, `adapt.rebuild_*`, `predict.maybe_train_on_save` are already `except Exception: pass`. Print a one-line `save-hook failed: adapt: ...` on failure so a silent no-op is visible in the studio process log. Do not fail the Save. Do not start training if `BOO_PREDICT_SAVE_TRAIN=0`.
 
 - [ ] **P5.3 `__init__._install_phrase_retune`.** Bare `except Exception: pass` hides a failed monkeypatch. Log the exception. If `phrase_spans` is required, fail import. If optional, say so in CURRENT one line.
 

@@ -1034,6 +1034,10 @@ function makeWave(url){
     buildSpec();
     showErr("");
   });
+  ws.on("error", (e)=>{
+    const msg=(e && (e.message||e)) ? String(e.message||e) : "audio decode failed";
+    showErr("Waveform: "+msg+" — try refresh; studio serves WAV preview when possible", true);
+  });
   ws.on("play",()=>{
     try{ if(audioCtx&&audioCtx.state==="suspended") audioCtx.resume(); }catch(e){}
     if(stemSel.size) startStemSources();

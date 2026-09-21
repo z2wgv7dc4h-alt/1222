@@ -408,6 +408,15 @@ def create_app(lab_root: Path, flac_root: Path | None, gp_root: Path | None) -> 
         path = row.get("flac_path") or row.get("flac")
         if not path or not Path(path).exists():
             raise HTTPException(404, "flac missing — set BOO_FLAC_ROOT and map.csv")
+        # WaveSurfer in Chromium often never fires ready on FLAC (clock stays
+        # "—", Play does nothing). Prefer a cached WAV preview when we can.
+        try:
+            from .stems import ensure_preview_wav
+            wav = ensure_preview_wav(Path(path), lab_root / "work" / "preview")
+            if wav is not None and wav.is_file():
+                return FileResponse(wav, media_type="audio/wav")
+        except Exception:
+            pass
         return FileResponse(path, media_type="audio/flac")
 
     @app.get("/api/tab/{track_id}")

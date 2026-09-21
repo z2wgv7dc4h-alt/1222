@@ -103,3 +103,32 @@ def ensure_drums(flac: Path, cache: Path) -> tuple[Path | None, str]:
         return None, "demucs: %s" % e
     hit = find_drums(flac, cache)
     return hit, "demucs drums" if hit else "demucs wrote nothing"
+
+
+def ensure_preview_wav(flac: Path, preview_root: Path) -> Path | None:
+    """Browser WaveSurfer often silent-fails on FLAC; cache a WAV sibling.
+
+    Returns the wav path when ready, else None (caller may fall back to FLAC).
+    Never raises — studio audio must stay best-effort.
+    """
+    try:
+        flac = Path(flac)
+        if not flac.is_file():
+            return None
+        preview_root = Path(preview_root)
+        preview_root.mkdir(parents=True, exist_ok=True)
+        key = "%s_%s" % (flac.stem, flac.stat().st_size)
+        out = preview_root / (key + ".wav")
+        if out.is_file() and out.stat().st_mtime >= flac.stat().st_mtime:
+            return out
+        import soundfile as sf
+        import numpy as np
+        data, sr = sf.read(str(flac), always_2d=True)
+        # downsample long files a bit for faster first paint (keep <= 48k)
+        if sr > 48000:
+            # rare; leave as-is
+            pass
+        sf.write(str(out), data, sr, subtype="PCM_16")
+        return out
+    except Exception:
+        return None

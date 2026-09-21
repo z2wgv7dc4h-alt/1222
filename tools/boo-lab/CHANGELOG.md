@@ -1,5 +1,11 @@
 ## 2026-09-21 — unique pack bar-runs → Guess
 
+## 2026-09-21 — studio WAV preview for Play
+
+- `/api/audio` serves a cached WAV preview (WaveSurfer was silent-failing on FLAC → clock `—`, nothing plays).
+- WaveSurfer `error` handler surfaces decode failures in the coach banner.
+
+
 - `figures._emit_clusters` now writes **unique** (one-shot) bar-run clusters, not only repeats — Mindful-like through-composed packs were writing 0 rows.
 - Guess: pack `tabnotes-structure` is coverage only (not spine-primary); when figure drafts exist they **replace** the activity blobs. Unique runs may be as short as 2s.
 - Mindful after re-extract: ~130 figure rows → Guess ~50+ riff boxes instead of 4 giant spine blobs.

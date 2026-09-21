@@ -1,4 +1,4 @@
-# boo-lab
+﻿# boo-lab
 
 This is the operator guide. LAW.md = rules. CURRENT.md = internals. README.md = install.
 
@@ -165,6 +165,9 @@ prep error is shown in the status line; the copied files still stay.
 
 ## Guess, drafts, interns
 
+START will not open a **second** `boo-lab interns` window if one is already running. Beats merge into `beats.jsonl` and cache under `work/beats/`; structure can print `CACHE structure (drafts unchanged)` when prep is already done.
+
+
 An intern is an optional helper that proposes structure or extra analysis.
 
 Guess — tab section markers if the clock matched, plus drum breakdowns.
@@ -308,3 +311,4 @@ Clock must show the length.
 Buttons create boxes; drag only fits them.
 heard + Save is truth.
 Guess is a stencil.
+

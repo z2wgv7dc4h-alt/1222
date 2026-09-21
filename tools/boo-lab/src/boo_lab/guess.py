@@ -7,18 +7,15 @@ from pathlib import Path
 
 
 def _gp5_roots() -> list[Path]:
-    roots: list[Path] = []
+    """GP search roots from `BOO_GP_ROOT` only (`gp5/`, `gp7/`, then root).
+
+    No machine-local path fallbacks. Empty env yields an empty list.
+    """
     env = os.environ.get("BOO_GP_ROOT")
-    if env:
-        p = Path(env)
-        roots.extend([p / "gp5", p])
-    roots.extend(
-        [
-            Path(r"C:\Users\RIGGUSPIG\Desktop\god-tier-metal\reference\gp-tabs\gp5"),
-            Path(r"C:\Users\RIGGUSPIG\Desktop\god-tier-metal\reference\gp-tabs"),
-            Path(r"C:\Users\RIGGUSPIG\Desktop\god-tier-metal\reference"),
-        ]
-    )
+    if not env:
+        return []
+    p = Path(env)
+    roots = [p / "gp5", p / "gp7", p]
     seen: list[Path] = []
     for r in roots:
         if r not in seen:
@@ -479,10 +476,11 @@ def estimate_hybrid(
     sync_rec = _sync_for(lab_root, lookup_album, lookup_track)
     key = _norm(track) or _norm(gp.stem if gp else "")
     seen = 0
-    root0 = _gp5_roots()[0]
-    if root0.exists():
+    roots = _gp5_roots()
+    root0 = roots[0] if roots else Path(".")
+    if roots and root0.exists():
         seen = sum(1 for _ in root0.rglob("*.gp5"))
-    notes.append("key=%s gp5=%s files=%s" % (key or "?", root0, seen))
+    notes.append("key=%s gp5=%s files=%s" % (key or "?", root0 if roots else "(no BOO_GP_ROOT)", seen))
     if gp_use:
         notes.append("tab " + str(gp_use))
         try:

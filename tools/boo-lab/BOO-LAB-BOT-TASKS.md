@@ -113,7 +113,7 @@ Living docs after this pass: `USER.md` (operator), `LAW.md` (rules), `CURRENT.md
   - `src/boo_lab/INSTALL.bat` — delete (root `INSTALL.bat` + `setup.bat` are enough) or make it call `setup.bat` with no hardcoded user path.
   - Grep `RIGGUSPIG` under `tools/boo-lab`. After this box the only hits should be CHANGELOG history if you insist on leaving old notes; prefer zero hits in code and operator docs.
 
-- [ ] **P3.5 `guess._gp5_roots()` — env only.** Remove the hardcoded `C:\Users\RIGGUSPIG\Desktop\god-tier-metal\...` fallbacks. Roots come from `BOO_GP_ROOT` (+ `gp5/` and `gp7/` children). Test with a fake env path. No Desktop walk.
+- [x] **P3.5 `guess._gp5_roots()` — env only.** Remove the hardcoded `C:\Users\RIGGUSPIG\Desktop\god-tier-metal\...` fallbacks. Roots come from `BOO_GP_ROOT` (+ `gp5/` and `gp7/` children). Test with a fake env path. No Desktop walk.
 
 ---
 

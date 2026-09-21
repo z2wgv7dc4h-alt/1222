@@ -1151,3 +1151,23 @@ def test_suppress_keeps_short_unique_pack_runs_when_not_primary():
     ids = {d["figure_id"] for d in kept}
     assert "riff-A" in ids  # unique 3.3s kept
     assert "riff-B" not in ids  # non-unique 2s < 4s min_span
+
+
+def test_gp5_roots_uses_boo_gp_root_only(monkeypatch, tmp_path):
+    import boo_lab.guess as g
+    import inspect
+    fake = tmp_path / "gp-root"
+    (fake / "gp5").mkdir(parents=True)
+    (fake / "gp7").mkdir(parents=True)
+    monkeypatch.setenv("BOO_GP_ROOT", str(fake))
+    roots = g._gp5_roots()
+    assert roots == [fake / "gp5", fake / "gp7", fake]
+    src = inspect.getsource(g._gp5_roots)
+    assert "C:\\\\Users\\\\" not in src
+    assert "Users/RIGGUSPIG" not in src
+
+
+def test_gp5_roots_empty_without_env(monkeypatch):
+    import boo_lab.guess as g
+    monkeypatch.delenv("BOO_GP_ROOT", raising=False)
+    assert g._gp5_roots() == []

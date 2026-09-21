@@ -6,7 +6,7 @@ import re
 import sys
 from pathlib import Path
 
-ROOT = Path(r"C:\Users\RIGGUSPIG\Desktop\god-tier-metal")
+ROOT = Path(__file__).resolve().parents[3]  # god-tier-metal
 MAP = ROOT / "tools" / "boo-lab" / "data" / "map.csv"
 GP_ROOT = ROOT / "reference" / "gp-tabs"
 

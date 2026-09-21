@@ -16,11 +16,11 @@ Stop after each P0 box. Commit that box only. Do not invent a new intern / draft
 
 ## P0 â€” stop the bot from making it worse
 
-- [ ] **P0.1 Freeze surface.** Do not add draft sources, intern steps, CLI commands, or studio buttons in this pass unless a P0/P1 box names that file. Kill any in-progress â€œanother internâ€ branch.
+- [x] **P0.1 Freeze surface.** Do not add draft sources, intern steps, CLI commands, or studio buttons in this pass unless a P0/P1 box names that file. Kill any in-progress â€œanother internâ€ branch.
 
 - [x] **P0.2 Confirm pytest count from disk.** `cd tools/boo-lab && .venv/Scripts/python -m pytest -q`. Write the real number into `STATUS.md` counts only after it runs. Do not type a remembered â€œ389â€.
 
-- [ ] **P0.3 Do not relabel Rebirth.** `data/sections.jsonl` (6 Rebirth rows) and `data/holdout.csv` stay as-is unless a later human box says otherwise.
+- [x] **P0.3 Do not relabel Rebirth.** `data/sections.jsonl` (6 Rebirth rows) and `data/holdout.csv` stay as-is unless a later human box says otherwise.
 
 ---
 
@@ -149,7 +149,7 @@ Chrome stays. No new buttons. No layout pass.
 
 - [x] **P6.2 Default: do not train on holdout-only gold.** `holdout_fallback` stays opt-in (flag or env). A lab whose only keepers are VAL does not fine-tune on Save. Test that.
 
-- [ ] **P6.3 No new heads, features, or intern steps.** Do not widen the Conv1d. Do not add columns.
+- [x] **P6.3 No new heads, features, or intern steps.** Do not widen the Conv1d. Do not add columns.
 
 ---
 
@@ -163,11 +163,11 @@ Chrome stays. No new buttons. No layout pass.
 
 ## P8 â€” leftover code to delete, not wrap
 
-- [ ] **P8.1 `gpif_to_gp5` remains unused.** Do not wire it. If CURRENT still says â€œstays unused,â€ that is enough. Do not add a CLI flag that writes GP5 from GP7.
+- [x] **P8.1 `gpif_to_gp5` remains unused.** Do not wire it. If CURRENT still says â€œstays unused,â€ that is enough. Do not add a CLI flag that writes GP5 from GP7.
 
-- [ ] **P8.2 `data/remap_gp5.py`.** If unused by CLI/tests, delete or move under `tools/boo-lab/scripts/` and do not import it.
+- [x] **P8.2 `data/remap_gp5.py`.** If unused by CLI/tests, delete or move under `tools/boo-lab/scripts/` and do not import it.
 
-- [ ] **P8.3 Duplicate rebirth file.** `data/rebirth-sections.jsonl` vs `data/sections.jsonl` â€” if identical, document â€œreference snapshot, not the writer path.â€ Do not let any command write both.
+- [x] **P8.3 Duplicate rebirth file.** `data/rebirth-sections.jsonl` vs `data/sections.jsonl` â€” if identical, document â€œreference snapshot, not the writer path.â€ Do not let any command write both.
 
 ---
 

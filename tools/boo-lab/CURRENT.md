@@ -67,6 +67,8 @@ iff-blast-A.
 
 ## Short law echoes
 
+- `data/rebirth-sections.jsonl` is a **reference snapshot** of the Rebirth pins, not the writer path. Live keepers are only `data/sections.jsonl` (Save / hear / album-remove). Do not teach any command to write both.
+
 - `phrase_spans` retune on import is **optional**; failure logs `phrase_retune skipped:` and keeps stock `tabnotes_drafts.pack_phrase_spans`.
 
 - Prefer GP7 .gp/.gpx (parsed GPIF) over .gp5; no GP7→GP5 conversion.

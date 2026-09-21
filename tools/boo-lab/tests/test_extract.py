@@ -4,6 +4,7 @@ real copyrighted GP file)."""
 from __future__ import annotations
 
 import json
+import zipfile
 from pathlib import Path
 
 import pytest
@@ -271,6 +272,62 @@ def test_extract_riffs_from_pack_no_guitar_track_is_empty():
                         tracks=[TabTrack(index=0, name="Synth", category="other")])
 
     assert ex.extract_riffs_from_pack(pack, "P") == []
+
+
+# --- GPIF fallback extraction ------------------------------------------------
+
+BASS_ONLY_XML = """<GPIF><Score><Title>Bass Only</Title></Score>
+  <Tracks><Track id="0"><Name>Bass</Name><InstrumentSet><Type>bass</Type></InstrumentSet></Track></Tracks>
+  <MasterBars><MasterBar><Time>4/4</Time></MasterBar></MasterBars>
+</GPIF>"""
+
+
+def _write_gpif(tmp_path, xml=None, name="fixture.gp"):
+    from test_gpif import FLAT_XML
+
+    path = tmp_path / name
+    with zipfile.ZipFile(path, "w") as z:
+        z.writestr("VERSION", "7.0")
+        z.writestr("Content/score.gpif", FLAT_XML if xml is None else xml)
+    return path
+
+
+def test_extract_fragments_from_gpif_reads_written_bars(tmp_path):
+    path = _write_gpif(tmp_path)
+
+    frags = ex.extract_fragments_from_gpif(path, song_title="Gpif Tune")
+
+    assert len(frags) == 2
+    assert [f.measure_index for f in frags] == [0, 1]
+    assert all(f.track == "Gtr" and f.instrument == "guitar" for f in frags)
+    assert frags[0].cell and frags[0].deltas and frags[0].chord_notes
+    assert frags[0].chord_frets == [[(1, 3), (2, 5)], [(1, 0)]]
+    assert frags[1].chord_notes == [[45]]
+    assert frags[0].role is None and frags[0].raw_marker is None
+
+
+def test_extract_fragments_from_gpif_no_guitar_track_fails_closed(tmp_path):
+    path = _write_gpif(tmp_path, xml=BASS_ONLY_XML)
+
+    with pytest.raises(ValueError):
+        ex.extract_fragments_from_gpif(path, song_title="Bass Only")
+
+
+def test_extract_riffs_falls_back_to_gpif_when_pyguitarpro_raises(tmp_path, monkeypatch):
+    path = _write_gpif(tmp_path)
+    rb = ex._engine_riff_bank()
+    monkeypatch.setattr(rb, "extract_fragments_from_file",
+                        lambda *a, **k: (_ for _ in ()).throw(RuntimeError("no pyguitarpro")))
+
+    # human label covers bar 0 (0.0s) only -- proves the override used the
+    # GPIF-written clock, not a pyguitarpro re-parse that would crash.
+    frags = ex.extract_riffs(path, "Gpif Tune", human_sections=[(0.0, 1.5, "breakdown")])
+
+    assert len(frags) == 2
+    assert frags[0]["measure_index"] == 0
+    assert frags[0]["role"] == "breakdown"
+    assert frags[0]["raw_marker"] == "human:sections.jsonl"
+    assert frags[1]["role"] is None
 
 
 # --- estimate_from_gp --------------------------------------------------------

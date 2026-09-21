@@ -203,6 +203,155 @@ def infer_role(marker: str | None) -> str | None:
     return None
 
 
+def _bar_start_seconds_written(score) -> list[float]:
+    """Written-order (unexpanded) bar-start seconds, one per masterbar,
+    0-indexed to match RiffFragment.measure_index -- the GPIF mirror of
+    _measure_start_times. Deliberately NOT gpif.note_events's playback-
+    expanded clock (that's for sync onsets, not fragment indexing)."""
+    from . import gpif as _gpif
+
+    starts_beats = _gpif._bar_starts(score)
+    tmap = _gpif.tempo_map(score)
+    out: list[float] = []
+    t = 0.0
+    bpm = score.tempo or 120.0
+    for i, mb in enumerate(score.masterbars):
+        out.append(t)
+        if tmap:
+            for beat, value in tmap:
+                if beat <= starts_beats[i] + 1e-9:
+                    bpm = value
+                else:
+                    break
+        else:
+            bpm = mb.tempo or score.tempo or 120.0
+        t += (mb.time_n * 4.0 / mb.time_d) * 60.0 / max(bpm, 1.0)
+    return out
+
+
+def _gpif_primary_guitar_track(score) -> int | None:
+    """0-based index of the lowest-mean-pitch guitar-family track (same
+    idea as figures._tab_track_by_category, adapted -- GpifTrack has no
+    controlled category, just a free-text instrument string like
+    "electricGuitar"/"bass"). None when no candidate has any notes."""
+    candidates = [
+        i for i, t in enumerate(score.tracks)
+        if "guitar" in (t.instrument or "").lower()
+        and "bass" not in (t.instrument or "").lower()
+    ]
+    if not candidates:
+        return None
+    best, best_mean = None, None
+    for ti in candidates:
+        pitches = [n.midi for n in score.notes if n.track == ti and n.midi is not None]
+        if not pitches:
+            continue
+        mean = sum(pitches) / len(pitches)
+        if best_mean is None or mean < best_mean:
+            best, best_mean = ti, mean
+    return best
+
+
+def _measure_cell_and_deltas_gpif(notes, length_beats):
+    """(cell, deltas, chord_notes, chord_frets) for one bar's GpifNote
+    list, grouped by shared t_beat into chord hits, gaps become explicit
+    rests. Mirrors figures._measure_cell_and_deltas_tab's algorithm;
+    additionally fills chord_frets from real (string, fret) since GPIF
+    has it (the tab-notes pack path does not)."""
+    by_onset: dict[float, list] = {}
+    for n in notes:
+        by_onset.setdefault(round(n.t_beat, 6), []).append(n)
+
+    cell: list[dict] = []
+    deltas: list[int] = []
+    chord_notes: list[list[int]] = []
+    chord_frets: list[list[tuple[int, int]]] = []
+    prev_pitch = None
+    cursor = 0.0
+    for onset in sorted(by_onset):
+        if onset > cursor + 1e-6:
+            cell.append({"duration": round(onset - cursor, 6), "is_rest": True})
+            cursor = onset
+        hit_notes = by_onset[onset]
+        dur = max((n.duration or 0.0) for n in hit_notes) or 0.5
+        hit = {"duration": round(dur, 6), "is_rest": False}
+        if any(n.palm_mute for n in hit_notes):
+            hit["palm_mute"] = True
+        if any("harmonic" in (n.articulations or []) for n in hit_notes):
+            hit["harmonic"] = True
+        if any("vibrato" in (n.articulations or []) for n in hit_notes):
+            hit["vibrato"] = True
+        if any("tremolo" in (n.articulations or []) for n in hit_notes):
+            hit["tremolo"] = True
+        if any(n.accent for n in hit_notes):
+            hit["accent"] = True
+        if any(n.slide for n in hit_notes):
+            hit["slide"] = True
+        cell.append(hit)
+        pitches = [n.midi for n in hit_notes if n.midi is not None]
+        chord_notes.append(pitches)
+        chord_frets.append([(n.string, n.fret) for n in hit_notes])
+        if pitches:
+            pitch = max(pitches)
+            deltas.append(0 if prev_pitch is None else pitch - prev_pitch)
+            prev_pitch = pitch
+        cursor = onset + dur
+    if length_beats and length_beats > cursor + 1e-6:
+        cell.append({"duration": round(length_beats - cursor, 6), "is_rest": True})
+    return cell, deltas, chord_notes, chord_frets
+
+
+def extract_fragments_from_gpif(gp_path, song_title=None) -> list:
+    """GPIF-native fallback for a GP7/GP6 (.gp/.gpx) file pyguitarpro
+    can't read (or reads empty). Returns real engine RiffFragment
+    objects (via _engine_riff_bank(), same dataclass the pyguitarpro
+    path uses -- no second schema), one per WRITTEN bar that has notes
+    on the primary guitar track (no repeat expansion, matching
+    extract_fragments_from_file's own measure_index convention).
+    Raises ValueError when no guitar-family track has any notes (fails
+    closed, same contract as the pyguitarpro path)."""
+    from . import gpif as _gpif
+
+    riff_bank = _engine_riff_bank()
+    gp_path = Path(gp_path)
+    score = _gpif.load_score(gp_path)
+    title = song_title if song_title is not None else (score.title or gp_path.stem)
+
+    track_idx = _gpif_primary_guitar_track(score)
+    if track_idx is None:
+        raise ValueError("no real guitar-family track found (GPIF instrument scan)")
+    track_name = score.tracks[track_idx].name or "gpif"
+
+    by_bar: dict[int, list] = {}
+    for n in score.notes:
+        if n.track == track_idx:
+            by_bar.setdefault(n.bar, []).append(n)
+
+    fragments = []
+    for bar_idx, mb in enumerate(score.masterbars):
+        notes = by_bar.get(bar_idx)
+        if not notes:
+            continue
+        length_beats = mb.time_n * 4.0 / mb.time_d
+        cell, deltas, chord_notes, chord_frets = _measure_cell_and_deltas_gpif(
+            notes, length_beats)
+        if not cell or not deltas:
+            continue
+        fragments.append(riff_bank.RiffFragment(
+            source_song=title,
+            source_file=gp_path.name,
+            measure_index=bar_idx,
+            track=track_name,
+            cell=cell,
+            deltas=deltas,
+            chord_notes=chord_notes,
+            chord_frets=chord_frets,
+            role=None,
+            raw_marker=None,
+        ))
+    return fragments
+
+
 def extract_riffs(
     gp_path: Path,
     source_song: str,
@@ -226,16 +375,36 @@ def extract_riffs(
     needs its own adapter.
     """
     riff_bank = _engine_riff_bank()
-    fragments = riff_bank.extract_fragments_from_file(gp_path, song_title=source_song)
+    gp_path = Path(gp_path)
+    is_gp7 = gp_path.suffix.lower() in (".gp", ".gpx")
+    via_gpif = False
+
+    if is_gp7:
+        try:
+            fragments = riff_bank.extract_fragments_from_file(gp_path, song_title=source_song)
+        except Exception:
+            fragments = None
+        if not fragments:
+            fragments = extract_fragments_from_gpif(gp_path, song_title=source_song)
+            via_gpif = bool(fragments)
+    else:
+        fragments = riff_bank.extract_fragments_from_file(gp_path, song_title=source_song)
+
     if not fragments:
         return []
 
     if human_sections:
-        import guitarpro as gp
+        if via_gpif:
+            from . import gpif as _gpif
 
-        song = gp.parse(str(gp_path))
-        track = _rhythm_track(song)
-        times = _measure_start_times(track) if track is not None else []
+            score = _gpif.load_score(gp_path)
+            times = _bar_start_seconds_written(score)
+        else:
+            import guitarpro as gp
+
+            song = gp.parse(str(gp_path))
+            track = _rhythm_track(song)
+            times = _measure_start_times(track) if track is not None else []
         aligned = []
         for f in fragments:
             t = times[f.measure_index] if f.measure_index < len(times) else None

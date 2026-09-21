@@ -645,17 +645,44 @@ def main(argv: list[str] | None = None) -> int:
             flac_val = r.get("flac_path") or r.get("flac") or ""
             flac = Path(flac_val) if flac_val else None
 
+            from .precedence import tab_plan
+            from .tabnotes import discover_pack, load_pack
+
+            gp_row_path = Path(gp) if gp else None
+            pack = None
+            pack_path = None
+            try:
+                pack_path = discover_pack(root(), album, track)
+                if pack_path is not None:
+                    pack = load_pack(pack_path)
+            except Exception:
+                pack = None
+            plan = tab_plan(root(), album, track, gp_path=gp_row_path)
+
             tab_fragments = None
-            if matched and gp and Path(gp).exists():
+            if plan["notes"] == "gp" and matched and gp and Path(gp).exists():
                 try:
                     tab_fragments = extract_riffs(Path(gp), song, human_sections=sections)
                 except Exception as e:  # noqa: BLE001 - real unparseable-GP files exist in this corpus
                     print("TAB FAILED", track, e)
                     tab_fragments = None
+            elif plan["notes"] == "pack" and pack is not None:
+                try:
+                    from .extract import extract_riffs_from_pack
+
+                    tab_fragments = extract_riffs_from_pack(pack, song, human_sections=sections)
+                except Exception as e:  # noqa: BLE001
+                    print("PACK TAB FAILED", track, e)
+                    tab_fragments = None
+            # plan["notes"] is None -> tab_fragments stays None, falls through
+            # to the existing audio-transcription fallback below unchanged.
             if tab_fragments:
                 # Cell layer: one representative 2-4 bar cell per figure_id
                 # (never one fragment per bar, never a whole long pin).
-                cells, long_spans = song_cells(root(), r, fragments=tab_fragments)
+                cells, long_spans = song_cells(
+                    root(), r, fragments=tab_fragments,
+                    notes_source=plan["notes"] if plan["notes"] in ("gp", "pack") else "gp",
+                    pack=pack if plan["notes"] == "pack" else None)
                 for cell in cells:
                     cell["tuning"] = r.get("tuning")
                     cell["split"] = split_for(album, track, holdout)

@@ -15,7 +15,10 @@ from pathlib import Path
 from .holdout import load_holdout, split_for
 from .schema import canonical_role, is_keeper, load_section_rows, msa_label_to_lab
 
-DRAFT_SOURCES = frozenset({"msa-draft", "guess", "songformer-draft", "keeper-model"})
+DRAFT_SOURCES = frozenset({
+    "msa-draft", "guess", "songformer-draft", "keeper-model",
+    "gp-marker", "tabnotes-density", "tabnotes-structure", "tabnotes-phrase",
+})
 
 
 def _read_jsonl(path: Path) -> list[dict]:

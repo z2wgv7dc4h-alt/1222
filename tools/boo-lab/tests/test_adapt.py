@@ -122,6 +122,36 @@ def test_holdout_only_album_may_build_for_itself(tmp_path):
     assert blob["n_pairs"] == 1
 
 
+def test_gp_marker_draft_pairs_with_keeper(tmp_path):
+    lab = _lab(tmp_path)
+    _write(lab, [_keeper("A", "T", 10.0, 18.0)],
+           [_draft("A", "T", 11.0, 19.0, source="gp-marker")])
+
+    blob = adapt.rebuild_album(lab, "A")
+
+    assert blob["n_pairs"] == 1
+
+
+def test_figure_hash_draft_never_pairs(tmp_path):
+    lab = _lab(tmp_path)
+    _write(lab, [_keeper("A", "T", 10.0, 18.0)],
+           [_draft("A", "T", 11.0, 19.0, source="figure-hash")])
+
+    blob = adapt.rebuild_album(lab, "A")
+
+    assert blob["n_pairs"] == 0
+
+
+def test_unknown_source_draft_never_pairs(tmp_path):
+    lab = _lab(tmp_path)
+    _write(lab, [_keeper("A", "T", 10.0, 18.0)],
+           [_draft("A", "T", 11.0, 19.0, source="halftime")])
+
+    blob = adapt.rebuild_album(lab, "A")
+
+    assert blob["n_pairs"] == 0
+
+
 # --- corpus-wide cold-start blob (rebuild_global / load_adapt fallback) ----
 
 

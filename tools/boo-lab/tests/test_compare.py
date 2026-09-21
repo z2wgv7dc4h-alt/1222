@@ -50,6 +50,16 @@ def test_two_draft_sources_emit_two_rows(tmp_path):
     assert {t["source"] for t in report["tracks"]} == {"msa-draft", "songformer-draft"}
 
 
+def test_tabnotes_structure_draft_is_scored_against_keeper(tmp_path):
+    lab = _lab(tmp_path,
+               [_keeper("riff", 0, 4)],
+               [_draft("riff", 0, 4, source="tabnotes-structure")])
+    report = compare.compare(lab)
+    t = report["tracks"][0]
+    assert t["source"] == "tabnotes-structure"
+    assert t["f_0_5"] > 0.0 and t["f_3_0"] > 0.0
+
+
 def test_offset_two_seconds_low_f05_high_f3(tmp_path):
     lab = _lab(tmp_path, [_keeper("riff", 0, 4)], [_draft("riff", 2, 6)])
     t = compare.compare(lab)["tracks"][0]

@@ -30,7 +30,10 @@ from pathlib import Path
 
 PAIR_TOL = 3.0
 CLAMP = 0.50
-DRAFT_SOURCES = frozenset({"guess", "msa-draft", "songformer-draft"})
+DRAFT_SOURCES = frozenset({
+    "guess", "msa-draft", "songformer-draft", "keeper-model",
+    "gp-marker", "tabnotes-density", "tabnotes-structure", "tabnotes-phrase",
+})
 GLOBAL_KEY = "__global__"
 
 
@@ -107,7 +110,8 @@ def rebuild_album(lab_root, album) -> dict:
         if is_keeper(r.get("source")) and r.get("heard") is True
         and (r.get("album") or "") == (album or "")
     ]
-    draft_rows = _read_jsonl(lab_root / "data" / "drafts.jsonl")
+    draft_rows = [r for r in _read_jsonl(lab_root / "data" / "drafts.jsonl")
+                  if r.get("source") in DRAFT_SOURCES]
     tracks = {r.get("track") or "" for r in keepers}
     # "Other tracks" means any track of the album (keepers OR drafts), so
     # Rebirth cannot teach a 13-track A Higher Place album just because it is
@@ -210,7 +214,8 @@ def rebuild_global(lab_root) -> dict:
 
     lab_root = Path(lab_root)
     section_rows = load_section_rows(lab_root / "data" / "sections.jsonl")
-    draft_rows = _read_jsonl(lab_root / "data" / "drafts.jsonl")
+    draft_rows = [r for r in _read_jsonl(lab_root / "data" / "drafts.jsonl")
+                  if r.get("source") in DRAFT_SOURCES]
     held = {(a, t) for (a, t) in load_holdout(lab_root)}
 
     keepers = [

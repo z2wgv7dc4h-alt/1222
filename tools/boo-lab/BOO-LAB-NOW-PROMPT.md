@@ -179,7 +179,7 @@ Stop.
 - [x] Job 1 figure_id default
 - [x] Job 2 one precedence helper
 - [x] Job 3 extract notes source
-- [ ] Job 4 compare/adapt sources
+- [x] Job 4 compare/adapt sources
 - [ ] Job 5 USER.md Part A
 
 ## After job 5 the human does this — you do not

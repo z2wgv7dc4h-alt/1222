@@ -2,7 +2,32 @@
 No guitarpro, no FLAC, no network."""
 from __future__ import annotations
 
-from boo_lab import cells
+from pathlib import Path
+
+import pytest
+
+guitarpro = pytest.importorskip("guitarpro")
+
+from gp_fixtures import make_song, make_track  # noqa: E402
+
+from boo_lab import cells  # noqa: E402
+
+FIX_PACK = Path(__file__).parent / "fixtures" / "tabnotes_tiny"
+
+
+def _fixture_pack():
+    from boo_lab import tabnotes as tn
+
+    return tn.load_pack(FIX_PACK)
+
+
+def _gp_path(tmp_path):
+    song = make_song(2, markers={0: "Verse"}, title="Fixture Song")
+    track = make_track(song, 1, {0: [40, None, 44], 1: [47, 40]}, instrument=30)
+    song.tracks = [track]
+    path = tmp_path / "fixture.gp5"
+    guitarpro.write(song, str(path))
+    return path
 
 
 def _frag(mi, pc=0, raw=None, role=None):
@@ -70,3 +95,51 @@ def test_build_cells_zero_rows_does_not_blank_existing(tmp_path):
 
     assert report["cells"] == 0
     assert out.read_text(encoding="utf-8") == before
+
+
+# --- song_cells notes_source branch ------------------------------------------
+
+
+def test_song_cells_pack_source_needs_no_gp_path(tmp_path):
+    result, _skipped = cells.song_cells(
+        tmp_path, {"album": "A", "track": "T"},
+        notes_source="pack", pack=_fixture_pack())
+
+    assert result
+    for cell in result:
+        assert cell["track"] == "tabnotes"
+        assert cell["chord_notes"]
+        assert all(cell["chord_notes"])
+    assert all(1 <= c["n_bars"] <= 4 for c in result)
+
+
+def test_song_cells_gp_source_default_unchanged(tmp_path):
+    gp = _gp_path(tmp_path)
+
+    result, _skipped = cells.song_cells(
+        tmp_path, {"album": "A", "track": "T", "gp_path": str(gp)})
+
+    assert result
+    assert any(c["track"] != "tabnotes" for c in result)
+
+
+def test_song_cells_explicit_gp_ignores_pack(tmp_path):
+    gp = _gp_path(tmp_path)
+
+    result, _skipped = cells.song_cells(
+        tmp_path, {"album": "A", "track": "T", "gp_path": str(gp)},
+        notes_source="gp", pack=_fixture_pack())
+
+    assert result
+    assert all(c["track"] != "tabnotes" for c in result)
+
+
+def test_song_cells_pack_source_without_pack_is_empty(tmp_path):
+    assert cells.song_cells(
+        tmp_path, {"album": "A", "track": "T"}, notes_source="pack") == ([], 0)
+
+
+def test_song_cells_unknown_notes_source_is_empty(tmp_path):
+    assert cells.song_cells(
+        tmp_path, {"album": "A", "track": "T"},
+        notes_source="nope", pack=_fixture_pack()) == ([], 0)

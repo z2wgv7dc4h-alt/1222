@@ -248,6 +248,37 @@ def extract_riffs(
     return [dataclasses.asdict(f) for f in fragments]
 
 
+def extract_riffs_from_pack(
+    pack,
+    source_song: str,
+    human_sections: list[tuple[float, float, str]] | None = None,
+    category: str = "guitar",
+) -> list[dict]:
+    """Pack-notes mirror of extract_riffs. Fragment-building itself is
+    figures._tab_fragments_and_slots's job (not reimplemented here);
+    this only adds the same human-keeper role override extract_riffs
+    already does for GP, keyed to the pack's own audio-clock seconds
+    (slots[i][1]) instead of a GP tempo-map walk."""
+    from .figures import _tab_fragments_and_slots
+
+    fragments, slots = _tab_fragments_and_slots(pack, category=category)
+    if not fragments:
+        return []
+    if human_sections:
+        start_sec_by_mi = {mi: sec for (mi, sec, _bar, _dur) in slots}
+        aligned = []
+        for f in fragments:
+            t = start_sec_by_mi.get(f.measure_index)
+            human_role = _human_role_at(human_sections, t) if t is not None else None
+            if human_role is not None:
+                f = dataclasses.replace(
+                    f, role=human_role,
+                    raw_marker=f.raw_marker or "human:sections.jsonl")
+            aligned.append(f)
+        fragments = aligned
+    return [dataclasses.asdict(f) for f in fragments]
+
+
 def _rhythm_track(song):
     named = []
     for t in song.tracks:

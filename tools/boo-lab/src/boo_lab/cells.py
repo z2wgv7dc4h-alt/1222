@@ -224,30 +224,54 @@ def _sync_ok(lab_root: Path, album: str, track: str) -> bool:
 
 
 def song_cells(lab_root, row, fragments=None, *, human_boxes=None,
-               fig_rows=None, trusted=None) -> tuple[list[dict], int]:
+               fig_rows=None, trusted=None, notes_source="gp",
+               pack=None) -> tuple[list[dict], int]:
     """Assemble one song's cells. `fragments` may be pre-extracted dicts
-    (extract_riffs); otherwise riff_bank is called. Reads only the lab stores."""
-    from .extract import _engine_riff_bank
-    from .figures import _playback_slots, load_figures
+    (extract_riffs); otherwise the source's own extractor is called --
+    `extract_riffs` for GP (default), `extract_riffs_from_pack` for a pack.
+    Reads only the lab stores."""
+    from .figures import _playback_slots, _tab_fragments_and_slots, load_figures
 
     album = row.get("album") or ""
     track = row.get("track") or ""
-    gp_raw = row.get("gp_path") or row.get("gp") or ""
-    gp = Path(gp_raw) if gp_raw else None
-    if gp is None or not gp.exists():
-        return [], 0
     if human_boxes is None:
         human_boxes = _human_boxes(Path(lab_root), album, track)
     if fig_rows is None:
         fig_rows = load_figures(lab_root, album, track)
     if trusted is None:
         trusted = _sync_ok(Path(lab_root), album, track)
-    try:
-        if fragments is None:
-            fragments = _engine_riff_bank().extract_fragments_from_file(gp, song_title=track)
-        slots = _playback_slots(gp)
-    except Exception:
+
+    if notes_source == "gp":
+        from .extract import _engine_riff_bank
+
+        gp_raw = row.get("gp_path") or row.get("gp") or ""
+        gp = Path(gp_raw) if gp_raw else None
+        if gp is None or not gp.exists():
+            return [], 0
+        try:
+            if fragments is None:
+                fragments = _engine_riff_bank().extract_fragments_from_file(
+                    gp, song_title=track)
+            slots = _playback_slots(gp)
+        except Exception:
+            return [], 0
+    elif notes_source == "pack":
+        if pack is None:
+            return [], 0
+        from . import extract
+
+        try:
+            if fragments is None:
+                sections = extract.load_human_sections(
+                    Path(lab_root) / "data").get((album, track))
+                fragments = extract.extract_riffs_from_pack(
+                    pack, track, human_sections=sections)
+            _frags2, slots = _tab_fragments_and_slots(pack)
+        except Exception:
+            return [], 0
+    else:
         return [], 0
+
     if not fragments or not slots:
         return [], 0
     return assemble_cells(fragments, slots, human_boxes, fig_rows, trusted,

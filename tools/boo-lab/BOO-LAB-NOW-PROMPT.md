@@ -178,7 +178,7 @@ Stop.
 
 - [x] Job 1 figure_id default
 - [x] Job 2 one precedence helper
-- [ ] Job 3 extract notes source
+- [x] Job 3 extract notes source
 - [ ] Job 4 compare/adapt sources
 - [ ] Job 5 USER.md Part A
 

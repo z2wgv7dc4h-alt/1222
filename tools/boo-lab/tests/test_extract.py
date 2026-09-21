@@ -230,6 +230,49 @@ def test_extract_riffs_missing_file_fails_closed(tmp_path):
         ex.extract_riffs(tmp_path / "missing.gp5", "Missing Song")
 
 
+# --- extract_riffs_from_pack -------------------------------------------------
+
+FIX_PACK = Path(__file__).parent / "fixtures" / "tabnotes_tiny"
+
+
+def _fixture_pack():
+    from boo_lab import tabnotes as tn
+
+    return tn.load_pack(FIX_PACK)
+
+
+def test_extract_riffs_from_pack_without_human_sections():
+    frags = ex.extract_riffs_from_pack(_fixture_pack(), "tabnotes")
+
+    assert len(frags) == 2
+    for f in frags:
+        assert all(k in f for k in ("cell", "deltas", "chord_notes"))
+        assert f["role"] is None
+        assert f["raw_marker"] is None
+        assert f["instrument"] == "guitar"
+        assert f["track"] == "tabnotes"
+
+
+def test_extract_riffs_from_pack_human_sections_override_role():
+    # fixture slots: bar 0 at 1.0s, bar 1 at 3.0s
+    frags = ex.extract_riffs_from_pack(
+        _fixture_pack(), "tabnotes", human_sections=[(0.0, 2.0, "breakdown")])
+
+    assert frags[0]["role"] == "breakdown"
+    assert frags[0]["raw_marker"] == "human:sections.jsonl"
+    assert frags[1]["role"] is None  # not covered by a human label
+    assert frags[1]["raw_marker"] is None
+
+
+def test_extract_riffs_from_pack_no_guitar_track_is_empty():
+    from boo_lab.tabnotes import TabNotesPack, TabTrack
+
+    pack = TabNotesPack(id="p", title="P",
+                        tracks=[TabTrack(index=0, name="Synth", category="other")])
+
+    assert ex.extract_riffs_from_pack(pack, "P") == []
+
+
 # --- estimate_from_gp --------------------------------------------------------
 
 

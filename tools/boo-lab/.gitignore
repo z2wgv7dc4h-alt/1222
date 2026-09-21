@@ -25,6 +25,7 @@ data/*.tmp
 *.gp4
 *.gp5
 *.gpx
+*.gp*
 *.gp
 *.zip
 # The bundled fixtures are hand-made for tests, not real tabs/packs.

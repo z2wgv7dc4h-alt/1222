@@ -614,18 +614,110 @@ def bar_events(pack: TabNotesPack, measure, track=None) -> list[TabEvent]:
     return [e for e in events_for(pack, track=track) if e.measure == mnum]
 
 
+def _beats_per_bar(time_signature) -> float:
+    """Quarter-note length of a bar from `4/4`, `(4, 4)`, or similar. Default 4."""
+    if time_signature is None or time_signature == "":
+        return 4.0
+    if isinstance(time_signature, (tuple, list)) and len(time_signature) >= 2:
+        try:
+            num, den = int(time_signature[0]), int(time_signature[1])
+            if den:
+                return float(num) * (4.0 / float(den))
+        except (TypeError, ValueError):
+            return 4.0
+        return 4.0
+    s = str(time_signature).strip()
+    if "/" in s:
+        a, b = s.split("/", 1)
+        try:
+            num, den = int(a.strip()), int(b.strip())
+            if den:
+                return float(num) * (4.0 / float(den))
+        except ValueError:
+            return 4.0
+    return 4.0
+
+
+def _bar_start_beats(pack: TabNotesPack, measure_num: int) -> float:
+    """Absolute beat index at the start of `measure_num`.
+
+    Prefer cumulative `length_beats` on pack measures (handles meter changes).
+    Else `measure_num * beats_per_bar` from that measure's time_signature.
+    """
+    measures = list(getattr(pack, "measures", None) or [])
+    if measures and all(getattr(m, "length_beats", None) for m in measures):
+        total = 0.0
+        for m in sorted(measures, key=lambda x: int(getattr(x, "measure", 0))):
+            mn = int(getattr(m, "measure", 0))
+            if mn >= int(measure_num):
+                return total
+            total += float(getattr(m, "length_beats") or 0.0)
+        return total
+    by_num = {int(getattr(m, "measure", i)): m for i, m in enumerate(measures)}
+    m = by_num.get(int(measure_num))
+    bpb = _beats_per_bar(getattr(m, "time_signature", None) if m else None)
+    return float(measure_num) * bpb
+
+
+def _event_art(e) -> str:
+    if getattr(e, "palm_mute", False):
+        return "p"
+    if getattr(e, "dead", False):
+        return "d"
+    if getattr(e, "hammer", False):
+        return "h"
+    return "-"
+
+
 def bar_fp_tab(pack: TabNotesPack, measure, track_idx) -> str:
-    """A bar fingerprint from `duration_beats` (quantized to 1/8 notes),
-    pitch classes (`pitch % 12`), and articulation (palm_mute/dead/hammer)
-    so a muted bar differs from an open one. Stable string, no role names."""
-    evs = sorted(bar_events(pack, measure, track=track_idx),
-                 key=lambda e: (e.onset_beat, e.onset_ms))
+    """Bar fingerprint from in-bar onset + duration (16ths), full MIDI pitch,
+    and articulation. Stable string, no role names.
+
+    Format per chord slot: `pos:dur:pitches:arts` joined by `|`.
+    Replaces the old pitch-class / eighths hash that collapsed 16ths to 0
+    and made through-composed metal look identical bar-to-bar.
+    """
+    mnum = measure if isinstance(measure, int) else getattr(measure, "measure", measure)
+    evs = sorted(
+        bar_events(pack, measure, track=track_idx),
+        key=lambda e: (e.onset_beat, e.string or 0, e.pitch if e.pitch is not None else -1),
+    )
+    if not evs:
+        return ""
+    bar_start = _bar_start_beats(pack, int(mnum))
+    rels = [float(e.onset_beat or 0.0) - bar_start for e in evs]
+    # If clock looks wrong (notes before bar), fall back to min-onset relative.
+    if rels and min(rels) < -0.125:
+        base = min(float(e.onset_beat or 0.0) for e in evs)
+        rels = [float(e.onset_beat or 0.0) - base for e in evs]
+
+    groups: dict[int, list] = {}
+    for e, rel in zip(evs, rels):
+        pos = int(round(rel * 4.0))
+        if pos < 0:
+            pos = 0
+        groups.setdefault(pos, []).append(e)
+
     parts = []
-    for e in evs:
-        eighths = int(round((e.duration_beats or 0.0) * 2))  # 1/8 note = 0.5 beat
-        art = "p" if e.palm_mute else ("d" if e.dead else ("h" if e.hammer else "-"))
-        pc = (e.pitch % 12) if e.pitch is not None else "x"
-        parts.append("%d%s%s" % (eighths, art, pc))
+    for pos in sorted(groups):
+        pitch_art: dict[int, str] = {}
+        max_dur = 1
+        for e in groups[pos]:
+            dur = max(1, int(round((e.duration_beats or 0.0) * 4.0)))
+            if dur > max_dur:
+                max_dur = dur
+            if e.pitch is None:
+                continue
+            pit = int(e.pitch)
+            if pit not in pitch_art:
+                pitch_art[pit] = _event_art(e)
+        if not pitch_art:
+            parts.append("%d:%d:x:%s" % (pos, max_dur, _event_art(groups[pos][0])))
+            continue
+        pits = sorted(pitch_art)
+        arts = ",".join(pitch_art[p] for p in pits)
+        pitch_s = ",".join(str(p) for p in pits)
+        parts.append("%d:%d:%s:%s" % (pos, max_dur, pitch_s, arts))
     return "|".join(parts)
 
 

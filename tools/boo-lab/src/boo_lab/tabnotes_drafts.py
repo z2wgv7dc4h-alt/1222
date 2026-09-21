@@ -368,6 +368,76 @@ def _phrase_fingerprint(pack, start: float, end: float, track_idx) -> str:
     return "||".join(parts)
 
 
+
+def _guitar_track_indices(pack) -> list[int]:
+    out = []
+    for t in getattr(pack, "tracks", None) or []:
+        cat = (getattr(t, "category", None) or "").lower()
+        name = (getattr(t, "instrument_name", None) or getattr(t, "name", None) or "").lower()
+        if getattr(t, "is_percussion", False):
+            continue
+        if cat == "guitar" or "guitar" in name:
+            out.append(int(getattr(t, "index", 0) or 0))
+    return out
+
+
+def _pick_structure_track(pack) -> int:
+    """Guitar track with the most unique nonempty bar fingerprints."""
+    idxs = _guitar_track_indices(pack)
+    if not idxs:
+        try:
+            from .figures import _tab_track_by_category
+            tr = _tab_track_by_category(pack, "guitar")
+            if tr is not None:
+                return int(getattr(tr, "index", 0) or 0)
+        except Exception:
+            pass
+        return 0
+    best_i, best_n = idxs[0], -1
+    for ti in idxs:
+        fps = set()
+        for m in getattr(pack, "measures", None) or []:
+            try:
+                fp = tabnotes.bar_fp_tab(pack, m, ti)
+            except Exception:
+                fp = ""
+            if fp:
+                fps.add(fp)
+        if len(fps) > best_n:
+            best_n = len(fps)
+            best_i = ti
+    return best_i
+
+
+def _span_art_stats(pack, start: float, end: float, track_idx: int) -> dict:
+    from collections import Counter
+    arts: Counter = Counter()
+    for m in getattr(pack, "measures", None) or []:
+        a = float(getattr(m, "start_sec_audio", 0.0) or 0.0)
+        b = _measure_audio_end(m)
+        if b <= start or a >= end:
+            continue
+        try:
+            evs = tabnotes.bar_events(pack, m, track=track_idx)
+        except Exception:
+            continue
+        for e in evs:
+            arts[tabnotes._event_art(e)] += 1
+    total = sum(arts.values())
+    out = {
+        "palm_frac": (arts.get("p", 0) / total) if total else 0.0,
+        "dead_frac": (arts.get("d", 0) / total) if total else 0.0,
+        "hammer_frac": (arts.get("h", 0) / total) if total else 0.0,
+        "arts_hint": None,
+        "n_notes": total,
+    }
+    if arts:
+        top, n = arts.most_common(1)[0]
+        if n * 2 >= total:
+            out["arts_hint"] = {"p": "palm_mute", "d": "dead", "h": "hammer"}.get(top)
+    return out
+
+
 def pack_phrase_spans(
     pack,
     *,
@@ -395,15 +465,8 @@ def pack_phrase_spans(
     if len(measures) < 4 or len(times) < 8:
         return []
 
-    # Primary guitar track for contour fingerprints
-    track_idx = 0
-    try:
-        from .figures import _tab_track_by_category
-        tr = _tab_track_by_category(pack, "guitar")
-        if tr is not None:
-            track_idx = int(getattr(tr, "index", 0) or 0)
-    except Exception:
-        track_idx = 0
+    # Guitar track with most unique nonempty bar_fps (pitch variety)
+    track_idx = _pick_structure_track(pack)
 
     rows: list[tuple[float, float, int, float, str]] = []
     for m in measures:
@@ -496,6 +559,7 @@ def pack_phrase_spans(
                 seen.append((fp, fid))
         phrases.append({
             "role": "riff", "start": s, "end": e, "figure_id": fid,
+            "guitar_track": track_idx,
         })
     from collections import Counter
     counts = Counter(p["figure_id"] for p in phrases)
@@ -523,13 +587,26 @@ def phrase_drafts_for_song(lab_root, album: str, track: str, *,
         return []
     from .schema import stamp_box
 
-    return [
-        stamp_box(s["start"], s["end"], s["role"], source=SOURCE_PHRASE,
-                  figure_id=s["figure_id"], heard=False,
-                  extra={"album": album, "track": track, "kind": "phrase",
-                         "unique": bool(s.get("unique", True))})
-        for s in spans
-    ]
+    out = []
+    for s in spans:
+        track_idx = int(s.get("guitar_track", 0) or 0)
+        extra = {
+            "album": album,
+            "track": track,
+            "kind": "phrase",
+            "unique": bool(s.get("unique", True)),
+            "guitar_track": track_idx,
+        }
+        stats = _span_art_stats(pack, float(s["start"]), float(s["end"]), track_idx)
+        if stats.get("arts_hint"):
+            extra["arts_hint"] = stats["arts_hint"]
+        if stats.get("n_notes"):
+            extra["palm_frac"] = round(float(stats["palm_frac"]), 4)
+        out.append(stamp_box(
+            s["start"], s["end"], s["role"], source=SOURCE_PHRASE,
+            figure_id=s["figure_id"], heard=False, extra=extra,
+        ))
+    return out
 
 
 def pack_structure_spans(pack, *, min_span: float = 2.0) -> list[dict]:

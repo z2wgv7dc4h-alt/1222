@@ -155,9 +155,9 @@ Chrome stays. No new buttons. No layout pass.
 
 ## P7 â€” extract / engine boundary
 
-- [ ] **P7.1 `extract.load_human_sections` uses `load_section_rows`.** Keep `_BOO_LAB_TO_ENGINE_ROLE` (riffâ†’verse, hookâ†’chorus, pulse/blastâ†’None). Add a test that a pulse keeper is dropped for the engine and a riff keeper becomes verse.
+- [x] **P7.1 `extract.load_human_sections` uses `load_section_rows`.** Keep `_BOO_LAB_TO_ENGINE_ROLE` (riffâ†’verse, hookâ†’chorus, pulse/blastâ†’None). Add a test that a pulse keeper is dropped for the engine and a riff keeper becomes verse.
 
-- [ ] **P7.2 Leave `sys.path` engine import.** Do not invent a second GP parser. Do not import `riff_model.py`.
+- [x] **P7.2 Leave `sys.path` engine import.** Do not invent a second GP parser. Do not import `riff_model.py`.
 
 ---
 

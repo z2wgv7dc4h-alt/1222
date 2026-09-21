@@ -81,7 +81,7 @@ Living docs after this pass: `USER.md` (operator), `LAW.md` (rules), `CURRENT.md
   - One short â€œnowâ€ blurb. Historical intern novels belong in CHANGELOG.
   - Test count = pytest output from P0.2.
 
-- [ ] **P2.5 README.md**
+- [x] **P2.5 README.md**
   - Replace absolute `C:\Users\RIGGUSPIG\...` with `<LAB>`, `<CORPUS>`, `<GP>`.
   - Command table matches `cli.py` subparsers (no ghost commands, no missing ones).
   - Thin install vs studio extras stated honestly (see P3.1).

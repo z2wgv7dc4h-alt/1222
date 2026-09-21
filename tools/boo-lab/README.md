@@ -10,17 +10,17 @@ Roles include **blast** (function, opposite of breakdown) and optional **`on_fig
 
 Repo on GitHub: `z2wgv7dc4h-alt/1222` under `tools/boo-lab`.
 
-## This machine
+## Paths
 
-Absolute Windows paths below are **this machine** only.
+Use placeholders ? never commit machine-absolute roots.
 
 ```
-LAB    C:\Users\RIGGUSPIG\Desktop\god-tier-metal\tools\boo-lab
-FLAC   C:\Users\RIGGUSPIG\Desktop\god-tier-metal\reference\audio-corpus
-GP     C:\Users\RIGGUSPIG\Desktop\god-tier-metal\reference\gp-tabs
+<LAB>     tools/boo-lab
+<CORPUS>  audio-corpus          (env BOO_FLAC_ROOT)
+<GP>      gp-tabs               (env BOO_GP_ROOT)
 ```
 
-`BOO_FLAC_ROOT` must be **`audio-corpus`**, not `born_of_osiris`. New bands sit beside BoO, not inside it.
+`BOO_FLAC_ROOT` must be the **corpus** root (`audio-corpus`), not a single band folder. New bands sit beside BoO, not inside it.
 
 ## Start
 
@@ -29,7 +29,7 @@ New here? Read **USER.md** first. Easiest (scans, hashes, full resumable `intern
 Manual equivalent (use the lab root under **This machine** above):
 
 ```
-cd <lab root from "This machine">
+cd <LAB>
 .venv\Scripts\activate
 python -m boo_lab.cli scan
 python -m boo_lab.cli hash
@@ -37,8 +37,7 @@ python -m boo_lab.cli interns
 python -m boo_lab.cli studio --port 8765
 ```
 
-Corpus roots come from `.env` (`BOO_FLAC_ROOT` = the **corpus** root, e.g.
-`...\reference\audio-corpus`, not a band folder; `BOO_GP_ROOT` = `...\reference\gp-tabs`).
+Corpus roots come from `.env`: `BOO_FLAC_ROOT=<CORPUS>`, `BOO_GP_ROOT=<GP>`.
 Open http://127.0.0.1:8765 — Ctrl+Shift+R after HTML changes. One server only.
 
 ## Install
@@ -100,7 +99,7 @@ The intern stack is a minefield; each fix is now code or a hard pin, not a sessi
 | a machine draft / unknown role-sourced as human | fail-closed schema: `is_keeper`, `canonical_role`, `stamp_box`, and the one `load_section_rows` reader |
 
 Behavior is pinned by `tests/test_natten_compat.py`, `test_device.py`, `test_doctor.py`, plus bad-input
-tests for the keeper law and Save path. Lab: **389 tests**; engine: **820 passed, 1 skipped**. Generated
+tests for the keeper law and Save path. Lab: **472 tests**; engine: **820 passed, 1 skipped**. Generated
 outputs (`data/{drafts,beats,compare,sync,agree}.*`, `data/sections.jsonl.bak`, `*.tmp`) and
 `*.egg-info/` are gitignored; the tracked asset stays `data/sections.jsonl` (human pins).
 
@@ -134,7 +133,7 @@ Snap beats / JSON / Next GP live under **Lab**; Drop / Push git / Remove album l
    (parsed natively, no conversion), else the `.gp5`. Or run one step: `boo-lab structure
    --album X`, then `boo-lab compare --album X`.
 
-Rules: skip **VAL** songs; never Guess a finished song; the interns (Guess / allin1 / SongFormer /
+Rules: do not train / `prefer=` on **VAL** songs (pinning OK); never Guess a finished song; the interns (Guess / allin1 / SongFormer /
 beat_this / Demucs) are optional **stencils**, not truth; `learn` only ranks draft sources; the structure **predictor** (`predict-train`) is what trains on keepers.
 
 ## The table columns
@@ -199,6 +198,10 @@ Then `python -m boo_lab.cli scan` and reload. Green GP7/GP5 = matched tab: the b
 | `compare [--album X]` | machine drafts vs human keepers |
 | `export-jams --out DIR` | JAMS 0.3 (figure/function layers) |
 | `pack-notes` | join keeper spans → live pack note JSONL (`work/pack-notes/`) |
+| `init-map` | create empty `data/map.csv` skeleton |
+| `figures` | figure-hash drafts ? `data/figures.jsonl` |
+| `tempo-hints` | tempo-automation hints ? `data/tempo_hints.jsonl` |
+| `tabnotes-drafts` | tab-notes structure/density/phrase drafts ? `data/drafts.jsonl` |
 
 ## Outputs (all local-first)
 

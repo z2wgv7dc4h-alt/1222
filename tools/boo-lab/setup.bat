@@ -40,7 +40,7 @@ if !errorlevel!==0 (
 )
 
 echo Installing boo-lab + core + interns ...
-python -m pip install !CONSTRAINT! -e "." python-multipart
+python -m pip install !CONSTRAINT! -e ".[studio]"
 python -m pip install !CONSTRAINT! -e ".[intern]"
 python -m pip install !CONSTRAINT! -e ".[pitch]"
 python -m pip install !CONSTRAINT! -e ".[align]"

@@ -92,7 +92,7 @@ Living docs after this pass: `USER.md` (operator), `LAW.md` (rules), `CURRENT.md
 
 ## P3 — install actually launches the studio
 
-- [ ] **P3.1 Declare real dependencies in `pyproject.toml`.**
+- [x] **P3.1 Declare real dependencies in `pyproject.toml`.**
   - core (pin + Save, no UI): `librosa`, `soundfile` (already)
   - new extra `studio`: `fastapi`, `uvicorn`, `python-multipart`
   - document that `guitarpro` is required for GP5 paths (put it on `studio` or a `gp5` extra — pick one and use it in setup.bat)

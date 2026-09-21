@@ -24,6 +24,9 @@ pitch = ["torchcrepe"]
 align = ["whisperx"]
 # JAMS 0.3 validation (jams_export writes the shape itself; this is optional).
 jams = ["jams"]
+# Local studio UI (http://127.0.0.1:8765). Thin pip install -e . is pin/Save
+# core only; opening the studio needs this extra. guitarpro covers GP5 paths.
+studio = ["fastapi", "uvicorn", "python-multipart", "guitarpro"]
 # Optional research "interns" -- never default dependencies. `natten` is
 # required by allin1's Dinat model; `_natten_compat` restores the pre-0.17 API
 # it expects so the new natten works on CPU/Windows. `madmom` is a real runtime

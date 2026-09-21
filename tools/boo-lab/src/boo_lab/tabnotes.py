@@ -680,7 +680,7 @@ def bar_fp_tab(pack: TabNotesPack, measure, track_idx) -> str:
     mnum = measure if isinstance(measure, int) else getattr(measure, "measure", measure)
     evs = sorted(
         bar_events(pack, measure, track=track_idx),
-        key=lambda e: (e.onset_beat, e.string or 0, e.pitch if e.pitch is not None else -1),
+        key=lambda e: (e.onset_beat, getattr(e, "string", None) or 0, e.pitch if e.pitch is not None else -1),
     )
     if not evs:
         return ""

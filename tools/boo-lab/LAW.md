@@ -4,7 +4,7 @@ Labelling lab. Not the generator.
 
 - Roles: intro, build, riff, hook, breakdown, blast, solo, chill, pulse, outro.
 - Human `sections.jsonl` beats Guess, GP markers, Demucs, librosa.
-- Keepers are `heard`. Machines may draft (`data/drafts.jsonl`: `msa-draft` / `songformer-draft` / `guess` / `keeper-model`); they never label.
+- Keepers are `heard`. Machines may draft (`data/drafts.jsonl`: `msa-draft` / `songformer-draft` / `guess` / `keeper-model` / `tabnotes-density` / `tabnotes-structure` / `tabnotes-phrase` / `blast-hint` / `gp-marker` / `figure-hash`); they never label.
 - `boo-lab structure` never writes `sections.jsonl` — drafts only.
 - Figure hashes (`figures.jsonl`, `source=figure-hash`) are drafts; they never write `sections.jsonl`.
 - Learn/rank may choose a draft intern; it still never labels (never writes `sections.jsonl`).

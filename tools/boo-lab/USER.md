@@ -115,7 +115,7 @@ Gold (keeper) — you heard it, you saved it. Lives in data/sections.jsonl.
 Source is human or guess-accepted.
 
 Stencil (draft) — Guess or an intern drew it. Lives in data/drafts.jsonl.
-Sources: guess, gp-marker, msa-draft, songformer-draft, keeper-model, tabnotes-density, tabnotes-structure, blast-hint.
+Sources: guess, gp-marker, msa-draft, songformer-draft, keeper-model, tabnotes-density, tabnotes-structure, tabnotes-phrase, blast-hint, figure-hash.
 It appears on the wave unheard. It dies on Save unless you tick heard.
 
 Tick heard on a Guess box and Save → gold, marked guess-accepted.

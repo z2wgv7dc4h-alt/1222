@@ -6,6 +6,7 @@ from boo_lab.audit import audit_lab
 from boo_lab.schema import (
     FIGURE_ROLES,
     FUNCTION_ROLES,
+    SOURCES,
     canonical_role,
     is_keeper,
     layer_for,
@@ -41,6 +42,18 @@ def test_canonical_role_returns_none_for_unmappable():
     assert canonical_role("verse") == "riff"
     assert all(canonical_role(r) == r for r in
                ("intro", "build", "riff", "hook", "breakdown", "solo", "chill", "pulse", "outro"))
+
+
+def test_sources_contains_gp_marker_and_figure_hash():
+    assert "gp-marker" in SOURCES
+    assert "figure-hash" in SOURCES
+    assert "human" in SOURCES
+    assert "guess-accepted" in SOURCES
+    for s in ("guess", "msa-draft", "songformer-draft", "keeper-model",
+              "tabnotes-density", "tabnotes-structure", "tabnotes-phrase",
+              "blast-hint"):
+        assert s in SOURCES
+    assert "adapt" not in SOURCES
 
 
 def test_stamp_box_rejects_unknown_role_and_source():

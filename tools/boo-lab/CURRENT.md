@@ -12,7 +12,7 @@ Living docs are `USER.md` / `LAW.md` / `CURRENT.md` / `README.md` / `STATUS.md` 
 
 > **Read this first.**
 > Keepers = `data/sections.jsonl` (`source=human`/`guess-accepted` **and** `heard=true`).
-> Drafts = `data/drafts.jsonl` (`msa-draft` / `songformer-draft` / `guess` / `gp-marker` / `keeper-model` / `tabnotes-density` / `blast-hint`) — **never keepers**.
+> Drafts = `data/drafts.jsonl` (`msa-draft` / `songformer-draft` / `guess` / `gp-marker` / `keeper-model` / `tabnotes-density` / `tabnotes-structure` / `tabnotes-phrase` / `blast-hint` / `figure-hash`) — **never keepers**.
 > Box fields: `start end role layer form figure_id on_figure unique instrument start_bar end_bar source heard` (+ optional `pack_id` / `pack_note_source` when a trusted pack matched on Save)..
 > Studio table columns match those; waveform is WaveSurfer, with a real mel spectrogram below it (Wave / Spec / Both).
 > `structure` writes `drafts.jsonl` only. `hear` and `sync` require **both** `--album` and `--track`.
@@ -73,7 +73,7 @@ Interns (allin1 / beat_this / torchcrepe) read `boo_lab/device.py`; they never h
 |---|---|
 | `data/map.csv` | scan result: album, track, flac path, gp path, match, `flac_sha256` |
 | `data/sections.jsonl` | **keeper** boxes only. Save **replaces** that track’s rows, keeps other tracks; one-step undo copy at `data/sections.jsonl.bak` |
-| `data/drafts.jsonl` | machine drafts (`msa-draft`, `songformer-draft`, `guess`, `keeper-model`). Never keepers |
+| `data/drafts.jsonl` | machine drafts (`msa-draft`, `songformer-draft`, `guess`, `gp-marker`, `keeper-model`, `tabnotes-density`, `tabnotes-structure`, `tabnotes-phrase`, `blast-hint`, `figure-hash`). Never keepers |
 | `data/holdout.csv` | fixed whole-song train/val reservation (`ensure_holdout`) |
 | `data/agree.jsonl` | two-pass keeper snapshots (`boo-lab agree --write`), pass 1/2 |
 | `data/compare.json` | drafts-vs-keepers report (`boo-lab compare`) |
@@ -597,7 +597,7 @@ at `import boo_lab` (so `doctor`/CLI/structure get it first). No old natten buil
 
 ## Research outputs (machines may draft, not label)
 
-- `data/drafts.jsonl` — allin1 `msa-draft`, SongFormer `songformer-draft`, Guess `guess`, keeper structure predictor `keeper-model`.
+- `data/drafts.jsonl` — allin1 `msa-draft`, SongFormer `songformer-draft`, Guess `guess`, `gp-marker`, keeper structure predictor `keeper-model`, `tabnotes-density`, `tabnotes-structure`, `tabnotes-phrase`, `blast-hint`, `figure-hash`.
 - `boo-lab agree --album X --track Y --write` — snapshot keepers as pass 1 (first) or pass 2 (re-pin); `--diff` gives role-agnostic boundary hit-rate @0.5s/@3.0s plus role/figure agreement. Never a pass 3.
 - `boo-lab compare [--album X]` — drafts vs keepers per song **and per source**: precision/recall/F @0.5/@3 plus role agreement; marks `split=holdout` (never skipped). Writes `data/compare.json`.
 - `boo-lab export-jams --out DIR` — one `.jams` per keeper song, `segment_lab_figure` + `segment_lab_function`; holdout skipped.

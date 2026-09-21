@@ -28,7 +28,7 @@ Stop after each P0 box. Commit that box only. Do not invent a new intern / draft
 
 The live bug: Guess/extract emit `gp-marker` and figures emit `figure-hash`, but `schema.SOURCES` does not include them. Save 400s an unknown source. A heard marker box cannot become a keeper.
 
-- [ ] **P1.1 Single source set.** In `src/boo_lab/schema.py` add every source the code actually emits, and nothing else:
+- [x] **P1.1 Single source set.** In `src/boo_lab/schema.py` add every source the code actually emits, and nothing else:
   - keepers: `human`, `guess-accepted`
   - drafts: `guess`, `msa-draft`, `songformer-draft`, `keeper-model`, `tabnotes-density`, `tabnotes-structure`, `tabnotes-phrase`, `blast-hint`, `gp-marker`, `figure-hash`
   - `adapt` is a stamp field, never a `source`. Leave it that way.

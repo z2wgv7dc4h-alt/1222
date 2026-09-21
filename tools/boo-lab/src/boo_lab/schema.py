@@ -17,8 +17,8 @@ FIGURE_ROLES = frozenset({"riff", "hook", "solo", "pulse"})
 # half-time Breakdown, so it never gets its own `riff-blast-A` figure names.
 FUNCTION_ROLES = frozenset({"intro", "build", "breakdown", "blast", "chill", "outro"})
 SOURCES = frozenset({"human", "guess-accepted", "guess", "msa-draft", "songformer-draft",
-                     "keeper-model", "tabnotes-density", "tabnotes-structure", "tabnotes-phrase",
-                     "blast-hint"})
+                      "keeper-model", "tabnotes-density", "tabnotes-structure", "tabnotes-phrase",
+                      "blast-hint", "gp-marker", "figure-hash"})
 KEEPER_SOURCES = frozenset({"human", "guess-accepted"})
 
 # Real instrument vocabulary for a box. Empty string is allowed (unknown/mixed).

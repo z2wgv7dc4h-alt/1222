@@ -212,8 +212,8 @@ def create_app(lab_root: Path, flac_root: Path | None, gp_root: Path | None) -> 
         return val
 
     def _tabnotes_index_match(track, album, rows) -> bool:
-        """Same fuzzy title/artist rule `tabnotes.discover_pack` uses, run
-        against the ingested index instead of the pack files on disk."""
+        """Same title-required rule as `tabnotes.discover_pack`, against the
+        ingested index. Artist-in-album alone never badges a pack."""
         from .tabnotes import _norm
 
         want = _norm(track)
@@ -221,15 +221,14 @@ def create_app(lab_root: Path, flac_root: Path | None, gp_root: Path | None) -> 
         for rec in rows:
             title = _norm(rec.get("title"))
             artist = _norm(rec.get("artist"))
-            score = 0
+            title_score = 0
             if title and want and title == want:
-                score += 2
-            elif title and want and (title in want or want in title):
-                score += 1
-            if artist and alb and (artist in alb or alb in artist):
-                score += 1
-            if score:
-                return True
+                title_score = 2
+            elif title and want and len(title) >= 4 and (title in want or want in title):
+                title_score = 1
+            if not title_score:
+                continue
+            return True
         return False
 
     def tracks():

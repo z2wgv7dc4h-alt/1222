@@ -712,8 +712,12 @@ def _pack_candidates(lab_root):
 
 
 def discover_pack(lab_root, album=None, track=None):
-    """Fuzzy title/artist match for a map row against `data/tabnotes/**`
-    (zip or unpacked). Returns a candidate path or `None`."""
+    """Match a map row to a local pack under `data/tabnotes/**`.
+
+    Requires a real *title* hit (exact or track contains pack title / vice
+    versa). Artist-in-album is only a tie-break bonus — never enough alone,
+    or every Born of Osiris album folder falsely badges Mindful.
+    """
     want = _norm(track)
     album_n = _norm(album)
     best = None
@@ -724,14 +728,17 @@ def discover_pack(lab_root, album=None, track=None):
             continue
         title = _norm(man.get("title"))
         artist = _norm(man.get("artist"))
-        score = 0
+        title_score = 0
         if title and want and title == want:
-            score += 2
-        elif title and want and (title in want or want in title):
-            score += 1
+            title_score = 2
+        elif title and want and len(title) >= 4 and (title in want or want in title):
+            title_score = 1
+        if not title_score:
+            continue
+        score = title_score
         if artist and album_n and (artist in album_n or album_n in artist):
             score += 1
-        if score and (best is None or score > best[0]):
+        if best is None or score > best[0]:
             best = (score, cand)
     return best[1] if best else None
 

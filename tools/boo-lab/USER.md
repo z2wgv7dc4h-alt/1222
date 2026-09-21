@@ -228,14 +228,10 @@ tabnotes-density`, in `data/drafts.jsonl`); Guess notes the song's
 predictor reads palm-mute / hammer density from the pack, so `predict` gets
 better with it. Re-run `boo-lab interns` after a sync to pick these up.
 
-## Learning (what gets smarter)
+## Learning (optional predictor)
 
-**Structure predictor (real learning):** after heard+Save, a background fine-tune
-updates `work/models/structure-v1/`. Run `boo-lab predict-train` / `boo-lab predict`
-anytime. Drafts land as `source=keeper-model` (never keepers). Guess can merge them.
-Starts from your first Save; quality climbs with more songs. VAL never trains.
-With zero keepers today there is nothing to train yet, so `predict` is a clean skip
-until you Save a first song — mark by ear, Save, and the next `interns` run picks it up.
+**Structure predictor (v1 scaffold):** optional draft source `keeper-model`. Needs non-holdout keepers before it is useful. Rebirth-only labs skip train unless `holdout_fallback` is explicit. After heard+Save it may fine-tune in the background; drafts only, never keepers. Frozen interns do not retrain.
+
 
 **adapt / learn (calibration):** timing/role/breakdown nudges; after 5 songs, which
 stencil to trust. Not musical IQ.

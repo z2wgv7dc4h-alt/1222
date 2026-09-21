@@ -145,7 +145,7 @@ Chrome stays. No new buttons. No layout pass.
 
 ## P6 â€” predictor honesty
 
-- [ ] **P6.1 Name the scaffold.** `predict.py` / CURRENT / USER: v1 is a scaffold. It must not claim â€œexponentially smarterâ€ or â€œnorth starâ€ in operator copy. Operator line: â€œoptional draft source `keeper-model`. Needs non-holdout keepers before it is useful. Rebirth-only labs skip train unless `holdout_fallback` is explicit.â€
+- [x] **P6.1 Name the scaffold.** `predict.py` / CURRENT / USER: v1 is a scaffold. It must not claim â€œexponentially smarterâ€ or â€œnorth starâ€ in operator copy. Operator line: â€œoptional draft source `keeper-model`. Needs non-holdout keepers before it is useful. Rebirth-only labs skip train unless `holdout_fallback` is explicit.â€
 
 - [ ] **P6.2 Default: do not train on holdout-only gold.** `holdout_fallback` stays opt-in (flag or env). A lab whose only keepers are VAL does not fine-tune on Save. Test that.
 

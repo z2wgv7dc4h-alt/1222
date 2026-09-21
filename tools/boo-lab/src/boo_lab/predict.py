@@ -1,14 +1,13 @@
-"""Keeper-trained structure predictor -- thin v1.
+"""Keeper-trained structure predictor -- thin v1 scaffold.
 
-The north-star lever: learn section boundaries + roles from the *heard*
-keepers the human already saved, so Guess can draft structure on a cold album
-from this lab's own labels instead of only frozen third-party interns.
+Optional draft source `keeper-model`. Needs non-holdout keepers before it is
+useful. Rebirth-only labs skip train unless `holdout_fallback` is explicit.
 
 Law (unchanged):
   * Trains on keepers only (`schema.is_keeper` + `heard is True`).
-  * Holdout / VAL songs never train. A cold-start lab whose *only* keepers sit
-    on holdout songs falls back to them for the v1 smoke (overfit) and records
-    `holdout_fallback: true`; a mixed lab excludes them, always.
+  * Holdout / VAL songs never train by default. A cold-start lab whose *only*
+    keepers sit on holdout songs does not fine-tune unless `holdout_fallback`
+    is explicitly enabled; a mixed lab excludes holdout keepers, always.
   * Writes drafts only (`source="keeper-model"`), never `sections.jsonl`.
   * Incremental: an existing `weights.pt` is loaded and fine-tuned.
   * Frozen interns are never retrained here.

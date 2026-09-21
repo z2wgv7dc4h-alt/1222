@@ -922,10 +922,17 @@ def create_app(lab_root: Path, flac_root: Path | None, gp_root: Path | None) -> 
 
         # Album-remove rewrites sections.jsonl. Use the one reader with
         # keepers_only=False so draft / non-keeper rows on OTHER albums
-        # survive (default keepers_only would wipe them). Then drop only
-        # rows for this album'''s tracks.
+        # survive (default keepers_only would wipe them). strict=True
+        # aborts before deleting files if any line is malformed.
+        try:
+            all_rows = load_section_rows(sec_path, keepers_only=False, strict=True)
+        except ValueError as exc:
+            return JSONResponse(
+                {"detail": "%s; fix before removing an album (nothing deleted)" % exc},
+                status_code=400,
+            )
         kept = [
-            r for r in load_section_rows(sec_path, keepers_only=False)
+            r for r in all_rows
             if not (r.get("album") == album and (r.get("track") or "") in tracks)
         ]
 

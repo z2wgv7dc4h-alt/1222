@@ -108,7 +108,7 @@ Living docs after this pass: `USER.md` (operator), `LAW.md` (rules), `CURRENT.md
   ```
   Comment: corpus root is `audio-corpus`, not a band folder.
 
-- [ ] **P3.4 Delete or neutralize machine-local leftovers.**
+- [x] **P3.4 Delete or neutralize machine-local leftovers.**
   - `src/boo_lab/WHERE.txt` — delete, or rewrite to placeholders. It still sets FLAC root to `born_of_osiris` (the ingest footgun).
   - `src/boo_lab/INSTALL.bat` — delete (root `INSTALL.bat` + `setup.bat` are enough) or make it call `setup.bat` with no hardcoded user path.
   - Grep `RIGGUSPIG` under `tools/boo-lab`. After this box the only hits should be CHANGELOG history if you insist on leaving old notes; prefer zero hits in code and operator docs.

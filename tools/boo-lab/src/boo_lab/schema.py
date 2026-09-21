@@ -186,16 +186,18 @@ def stamp_box(start: float, end: float, role: str | None, *, source: str = "huma
         )
     role = canon
     inst = (instrument or "").strip().lower()
+    fid = (figure_id or "").strip()
+    if fid and role in FIGURE_ROLES:
+        prefix, sep, suffix = fid.partition("-")
+        if sep and prefix.lower() != role and canonical_role(prefix) == role:
+            fid = role + sep + suffix
     rec: dict[str, Any] = {
         "start": float(start), "end": float(end), "role": role,
         "layer": layer_for(role),
         "form": (form or "A").strip().upper() or "A",
         # Figure roles may default "{role}-A" when blank; function roles
         # keep an empty figure_id unless the human typed one.
-        "figure_id": (
-            (figure_id or "").strip()
-            or (f"{role}-A" if role in FIGURE_ROLES else "")
-        ),
+        "figure_id": fid or (f"{role}-A" if role in FIGURE_ROLES else ""),
         "unique": bool(unique),
         "instrument": inst if inst in INSTRUMENTS else "",
         "start_bar": _bars(start_bar),

@@ -4,7 +4,7 @@ import dataclasses
 import sys
 from pathlib import Path
 
-from .schema import load_section_rows
+from .schema import canonical_role, load_section_rows
 
 
 def _engine_riff_bank():
@@ -157,20 +157,24 @@ def bars_for_times(gp_path: Path, start: float, end: float) -> tuple[int | None,
 
 
 # Marker words copied from 1222 riff_bank intent — keep in sync later.
+# Values are boo-lab's OWN role vocabulary (riff/hook/...), not the engine's
+# (verse/chorus/...). First substring match wins (infer_role walks this dict
+# in insertion order), so "pre" MUST precede "hook"/"chorus" or a real
+# "Pre-Chorus" marker would match "chorus" first and resolve to "hook".
 ROLE_WORDS = {
     "intro": "intro",
-    "verse": "verse",
-    "riff": "verse",
-    "hook": "chorus",
-    "chorus": "chorus",
-    "break": "breakdown",
+    "pre": "build",
     "breakdown": "breakdown",
+    "break": "breakdown",
+    "verse": "riff",
+    "riff": "riff",
+    "hook": "hook",
+    "chorus": "hook",
     "solo": "solo",
     "lead": "solo",
+    "build": "build",
     "bridge": "chill",
     "outro": "outro",
-    "build": "build",
-    "pre": "build",
     "chill": "chill",
     "clean": "chill",
     "ambient": "chill",
@@ -199,7 +203,7 @@ def infer_role(marker: str | None) -> str | None:
     t = marker.lower()
     for word, role in ROLE_WORDS.items():
         if word in t:
-            return role
+            return canonical_role(role)
     return None
 
 
@@ -542,7 +546,7 @@ def estimate_from_gp(gp_path: Path) -> dict:
             bpm = float(val)
         marker = _marker_text(measure)
         if marker:
-            role = infer_role(marker) or "riff"
+            role = canonical_role(infer_role(marker)) or "riff"
             form, token = _section_letter(marker)
             cuts.append((round(t, 3), role, marker, form, token))
         ts = getattr(measure, "timeSignature", None) or getattr(header, "timeSignature", None)
@@ -600,7 +604,7 @@ def estimate_from_gpif(gp_path: Path) -> dict:
             bpm = float(mb.tempo)
         if (mb.section or "").strip():
             marker = mb.section.strip()
-            role = infer_role(marker) or "riff"
+            role = canonical_role(infer_role(marker)) or "riff"
             form, token = _section_letter(marker)
             cuts.append((round(t, 3), role, marker, form, token))
         t += (mb.time_n * 4.0 / mb.time_d) * 60.0 / max(bpm, 1.0)

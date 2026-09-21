@@ -137,6 +137,15 @@ def test_stamp_box_figure_roles_default_figure_id_when_blank():
         assert stamp_box(0, 4, role, figure_id="X")["figure_id"] == "X"
 
 
+def test_stamp_box_rewrites_engine_alias_figure_id_prefix():
+    assert stamp_box(0, 4, "riff", figure_id="verse-A")["figure_id"] == "riff-A"
+    assert stamp_box(0, 4, "hook", figure_id="chorus-B")["figure_id"] == "hook-B"
+    # already-correct lab prefix is a no-op
+    assert stamp_box(0, 4, "riff", figure_id="riff-C1")["figure_id"] == "riff-C1"
+    # function role keeps blank figure_id (unaffected)
+    assert stamp_box(0, 4, "breakdown", figure_id="")["figure_id"] == ""
+
+
 def test_stamp_box_identity_round_trip():
     b = stamp_box(1, 3, "solo", form="b", unique=True, instrument="Lead",
                   start_bar=17, end_bar=20)

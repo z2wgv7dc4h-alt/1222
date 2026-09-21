@@ -104,6 +104,26 @@ def test_clean_drops_invalid_and_malformed_entries():
     assert g._clean(sections) == [{"role": "intro", "start": 0.0, "end": 1.0}]
 
 
+# --- _delab_figure_id --------------------------------------------------------
+
+
+def test_delab_figure_id_rewrites_alias_prefix_only():
+    sections = [
+        {"role": "riff", "figure_id": "verse-A"},
+        {"role": "riff", "figure_id": "riff-B"},
+        {"role": "hook", "figure_id": "chorus-C1"},
+        {"role": "breakdown", "figure_id": "verse-A"},  # function box untouched
+    ]
+
+    fixed = g._delab_figure_id(sections)
+
+    assert fixed == 2
+    assert sections[0]["figure_id"] == "riff-A"
+    assert sections[1]["figure_id"] == "riff-B"        # already lab, left alone
+    assert sections[2]["figure_id"] == "hook-C1"
+    assert sections[3]["figure_id"] == "verse-A"       # function role untouched
+
+
 # --- coverage-note logic (via estimate_hybrid) -------------------------------
 
 

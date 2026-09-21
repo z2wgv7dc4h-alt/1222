@@ -58,14 +58,17 @@ def test_bars_for_times_maps_seconds_to_measures(tmp_path):
     "marker,expected",
     [
         ("Intro", "intro"),
-        ("Verse 2", "verse"),
+        ("Verse 2", "riff"),
+        ("Riff", "riff"),
+        ("Hook", "hook"),
+        ("Chorus", "hook"),
         ("Breakdown", "breakdown"),
-        # ROLE_WORDS is checked in dict order and "chorus" precedes "pre",
-        # so a real "Pre-Chorus" marker resolves to "chorus" here (the
-        # engine's own _resolve_role orders its list differently).
-        ("Pre-Chorus", "chorus"),
+        # ROLE_WORDS is checked in dict order and "pre" precedes "hook"/
+        # "chorus", so a real "Pre-Chorus" marker resolves to "build" here.
+        ("Pre-Chorus", "build"),
         ("Build", "build"),
         ("Lead", "solo"),
+        ("C1 - Solo", "solo"),
         ("Bridge", "chill"),
         ("Synth", "pulse"),
         (None, None),
@@ -348,6 +351,22 @@ def test_estimate_from_gp_uses_markers_and_reports_duration(tmp_path):
     assert result["sections"][1]["start"] == 4.0
 
 
+@pytest.mark.parametrize(
+    "marker,role,figure_id",
+    [("Verse", "riff", "riff-A"), ("Chorus", "hook", "hook-A")],
+)
+def test_estimate_from_gp_marker_uses_lab_role(tmp_path, marker, role, figure_id):
+    song = make_song(1, markers={0: marker}, title="Fixture Song")
+    track = make_track(song, 1, {0: [40]}, instrument=30)
+    song.tracks = [track]
+    path = _write(song, tmp_path)
+
+    result = ex.estimate_from_gp(path)
+
+    assert result["sections"][0]["role"] == role
+    assert result["sections"][0]["figure_id"] == figure_id
+
+
 def test_estimate_from_gp_without_markers_is_honest(tmp_path):
     song = make_song(2, title="No Markers")
     track = make_track(song, 1, {0: [40], 1: [40]}, instrument=30)
@@ -383,6 +402,22 @@ def test_estimate_from_gpif_uses_masterbar_sections_and_playback_order():
     assert result["sections"][0]["role"] == "riff"
     assert result["sections"][0]["figure_id"] == "riff-A"
     assert result["sections"][0]["unique"] is False
+
+
+@pytest.mark.parametrize(
+    "marker,role,figure_id",
+    [("Verse", "riff", "riff-A"), ("Chorus", "hook", "hook-A")],
+)
+def test_estimate_from_gpif_marker_uses_lab_role(tmp_path, marker, role, figure_id):
+    from test_gpif import FLAT_XML
+
+    xml = FLAT_XML.replace("Verse", marker)
+    path = _write_gpif(tmp_path, xml=xml)
+
+    result = ex.estimate_from_gpif(path)
+
+    assert result["sections"][0]["role"] == role
+    assert result["sections"][0]["figure_id"] == figure_id
 
 
 def test_estimate_from_gpif_unparseable_file_fails_closed(tmp_path):

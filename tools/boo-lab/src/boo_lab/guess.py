@@ -6,6 +6,27 @@ import re
 from pathlib import Path
 
 
+def _delab_figure_id(sections: list[dict]) -> int:
+    """Rewrite a FIGURE box's figure_id prefix when it's still an
+    engine/MSA alias (verse-A, chorus-B) instead of this project's own
+    lab role -- keeps the letter/number suffix untouched. Function
+    boxes (breakdown/blast/...) are never touched, even if one somehow
+    carries a hyphenated figure_id. Returns how many were rewritten."""
+    from .schema import FIGURE_ROLES, canonical_role
+
+    fixed = 0
+    for s in sections:
+        role = canonical_role(s.get("role"))
+        if role not in FIGURE_ROLES:
+            continue
+        fid = s.get("figure_id") or ""
+        prefix, sep, suffix = fid.partition("-")
+        if sep and prefix.lower() != role and canonical_role(prefix) == role:
+            s["figure_id"] = role + sep + suffix
+            fixed += 1
+    return fixed
+
+
 def _gp5_roots() -> list[Path]:
     """GP search roots from `BOO_GP_ROOT` only (`gp5/`, `gp7/`, then root).
 
@@ -846,6 +867,10 @@ def estimate_hybrid(
                 "Guess reached %.1fs of %.1fs (%.0f%%) -- %.1fs uncovered at the end, paint it by hand"
                 % (covered_end, real_duration, pct, real_duration - covered_end)
             )
+
+    relabeled = _delab_figure_id(sections)
+    if relabeled:
+        notes.append("relabeled %d alias figure_id(s) (verse/chorus -> lab roles)" % relabeled)
 
     return {"bpm": bpm, "beats": beats[:400], "sections": sections, "notes": notes, "duration": real_duration}
 

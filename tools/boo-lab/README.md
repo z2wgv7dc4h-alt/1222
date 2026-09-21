@@ -51,18 +51,22 @@ cd tools\boo-lab
 setup.bat --flac <FLAC_ROOT> --gp <GP_ROOT>
 ```
 
-Manual equivalent, thin by default (librosa + soundfile):
+Manual equivalent:
 
 ```
 cd tools\boo-lab
 python -m venv .venv
-.venv\Scripts\python -m pip install -e .
+.venv\Scripts\python -m pip install -e ".[studio]"
 ```
+
+`pip install -e ".[studio]"` is the minimum that can open http://127.0.0.1:8765
+(fastapi, uvicorn, python-multipart, guitarpro for GP5). Thin `pip install -e .`
+is core only (librosa + soundfile) — enough to pin/Save from code, not enough for the studio UI.
 
 Optional extras (never default): `-e ".[dev]"` pytest; `-e ".[pitch]"` torchcrepe;
 `-e ".[align]"` whisperx; `-e ".[intern]"` allin1 + beat-this + natten + jams + mir_eval + madmom.
-None is required to pin and Save; missing interns just print a skip. (`madmom` is listed explicitly
-because allin1 imports it but its package metadata omits it.)
+Missing interns just print a skip. (`madmom` is listed explicitly because allin1 imports it
+but its package metadata omits it.)
 
 ## GPU
 

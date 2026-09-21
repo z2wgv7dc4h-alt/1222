@@ -41,7 +41,7 @@ def test_canonical_role_returns_none_for_unmappable():
     assert canonical_role("bogus") is None
     assert canonical_role("verse") == "riff"
     assert all(canonical_role(r) == r for r in
-               ("intro", "build", "riff", "hook", "breakdown", "solo", "chill", "pulse", "outro"))
+                ("intro", "build", "riff", "hook", "breakdown", "blast", "solo", "chill", "pulse", "outro"))
 
 
 def test_sources_contains_gp_marker_and_figure_hash():

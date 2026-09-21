@@ -46,7 +46,7 @@ The live bug: Guess/extract emit `gp-marker` and figures emit `figure-hash`, but
 
 - [ ] **P1.4 Stop inventing figure identity on blank Save.** `stamp_box` today forces `figure_id="{role}-A"` and `form="A"`. For function roles (`intro/build/breakdown/blast/chill/outro`) empty `figure_id` must stay empty unless the human typed one. Figure roles (`riff/hook/solo/pulse`) may default `"{role}-A"` only when blank. Add tests. Do not rewrite the existing 6 Rebirth rows.
 
-- [ ] **P1.5 Blast in the “all roles” test.** `tests/test_schema.py` `test_canonical_role_returns_none_for_unmappable` iterates roles and omits `blast`. Include every member of `ROLES`.
+- [x] **P1.5 Blast in the “all roles” test.** `tests/test_schema.py` `test_canonical_role_returns_none_for_unmappable` iterates roles and includes `blast`. Include every member of `ROLES`.
 
 ---
 

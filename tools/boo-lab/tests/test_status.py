@@ -50,6 +50,42 @@ def test_refresh_status_rewrites_only_the_block(tmp_path):
     assert "Prose 999 tests pass." in text                  # test line untouched
 
 
+def test_refresh_status_counts_figures_and_tempo_hints(tmp_path):
+    lab = _lab(tmp_path)
+    (lab / "data" / "figures.jsonl").write_text(
+        json.dumps({"album": "A", "track": "T", "figure_id": "riff-A"}) + "\n"
+        + json.dumps({"album": "A", "track": "T", "figure_id": "bass-riff-A"}) + "\n"
+        + json.dumps({"album": "A", "track": "U", "figure_id": "riff-A"}) + "\n",
+        encoding="utf-8",
+    )
+    (lab / "data" / "tempo_hints.jsonl").write_text(
+        json.dumps({"album": "A", "track": "T", "sec": 5.0}) + "\n",
+        encoding="utf-8",
+    )
+    status_path = lab / "STATUS.md"
+    status_path.write_text(
+        "# S\n\n" + status.START + "\nold\n" + status.END + "\n", encoding="utf-8")
+
+    status.refresh_status(lab, status_path=status_path)
+
+    text = status_path.read_text(encoding="utf-8")
+    assert "figures: 3 row(s) across 2 track(s)" in text
+    assert "tempo hints: 1 row(s) across 1 track(s)" in text
+
+
+def test_refresh_status_zero_figures_and_tempo_hints(tmp_path):
+    lab = _lab(tmp_path)  # no figures.jsonl / tempo_hints.jsonl written
+    status_path = lab / "STATUS.md"
+    status_path.write_text(
+        "# S\n\n" + status.START + "\nold\n" + status.END + "\n", encoding="utf-8")
+
+    status.refresh_status(lab, status_path=status_path)
+
+    text = status_path.read_text(encoding="utf-8")
+    assert "figures: 0 row(s) across 0 track(s)" in text
+    assert "tempo hints: 0 row(s) across 0 track(s)" in text
+
+
 def test_missing_markers_is_not_updated(tmp_path):
     lab = _lab(tmp_path)
     status_path = lab / "STATUS.md"

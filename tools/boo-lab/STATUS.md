@@ -9,11 +9,18 @@ Canonical detail: **CURRENT.md**; commands in **README.md**.
 - drafts: 1450 row(s); sources: msa-draft, songformer-draft
 - sync: 14 ok / 52 row(s)
 - map.csv: 83 row(s)
+- figures: 477 row(s) across 40 track(s)
+- tempo hints: 0 row(s) across 0 track(s)
 <!-- status:counts:end -->
 
 Works: studio keeps pins (`human`/`guess-accepted` + `heard`) in `sections.jsonl`; mel
 spectrogram under the WaveSurfer waveform; 6-stem picker; drafts; `hear`/`sync`/`hash`;
 `agree`/`compare`/`export-jams`/`beats`/`audit`/`report`; **362 tests pass**.
+Status counts (2026-09-21): `boo-lab status` now also counts `data/figures.jsonl`
+and `data/tempo_hints.jsonl` (rows + distinct tracks) — real disk numbers as of this
+refresh: **477 figure rows across 40 tracks**, **0 tempo-hint rows** (expected --
+`tempo_hints` only just joined the `interns` chain below; nothing has run it for
+real yet). Follow-up to the wiring-audit entry below.
 Wiring audit (2026-09-21): `tempo_hints.build_tempo_hints` was real, tested and
 CLI-reachable (`boo-lab tempo-hints`) but never ran as part of `boo-lab interns` --
 the exact "computed and never called from the real path" anti-pattern this project

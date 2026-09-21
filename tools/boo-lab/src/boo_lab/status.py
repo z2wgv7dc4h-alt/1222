@@ -58,6 +58,10 @@ def _map_rows(lab_root: Path, health: dict | None) -> int:
     return len(load_map(map_path))
 
 
+def _rows_and_tracks(rows: list[dict]) -> tuple[int, int]:
+    return len(rows), len({(r.get("album"), r.get("track")) for r in rows})
+
+
 def collect_counts(lab_root) -> dict:
     from .schema import load_section_rows
 
@@ -67,6 +71,10 @@ def collect_counts(lab_root) -> dict:
     keepers = load_section_rows(lab_root / "data" / "sections.jsonl")
     drafts = _read_jsonl(lab_root / "data" / "drafts.jsonl")
     sync = _read_jsonl(lab_root / "data" / "sync.jsonl")
+    figures = _read_jsonl(lab_root / "data" / "figures.jsonl")
+    tempo_hints = _read_jsonl(lab_root / "data" / "tempo_hints.jsonl")
+    figure_rows, figure_songs = _rows_and_tracks(figures)
+    tempo_hint_rows, tempo_hint_songs = _rows_and_tracks(tempo_hints)
     return {
         "keeper_rows": len(keepers),
         "keeper_tracks": len({(r.get("album"), r.get("track")) for r in keepers}),
@@ -75,6 +83,10 @@ def collect_counts(lab_root) -> dict:
         "sync_total": len(sync),
         "sync_ok": sum(1 for r in sync if r.get("sync_ok") is True),
         "map_rows": _map_rows(lab_root, health),
+        "figure_rows": figure_rows,
+        "figure_songs": figure_songs,
+        "tempo_hint_rows": tempo_hint_rows,
+        "tempo_hint_songs": tempo_hint_songs,
     }
 
 
@@ -88,6 +100,9 @@ def render_block(counts: dict) -> str:
         "- drafts: %d row(s); sources: %s" % (counts["draft_rows"], sources),
         "- sync: %d ok / %d row(s)" % (counts["sync_ok"], counts["sync_total"]),
         "- map.csv: %d row(s)" % counts["map_rows"],
+        "- figures: %d row(s) across %d track(s)" % (counts["figure_rows"], counts["figure_songs"]),
+        "- tempo hints: %d row(s) across %d track(s)"
+        % (counts["tempo_hint_rows"], counts["tempo_hint_songs"]),
         END,
     ])
 

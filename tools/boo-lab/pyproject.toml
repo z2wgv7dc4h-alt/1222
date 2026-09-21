@@ -37,6 +37,9 @@ studio = ["fastapi", "uvicorn", "python-multipart", "guitarpro"]
 # --no-build-isolation is needed.)
 intern = ["allin1", "beat-this", "natten", "jams", "mir_eval", "madmom"]
 
+[project.scripts]
+boo-lab = "boo_lab.cli:main"
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]

@@ -99,7 +99,7 @@ Living docs after this pass: `USER.md` (operator), `LAW.md` (rules), `CURRENT.md
   - `setup.bat` installs `.[studio]` as well as intern/pitch/align
   - README thin path: `pip install -e ".[studio]"` is the minimum that can open http://127.0.0.1:8765
 
-- [ ] **P3.2 `[project.scripts]`** `boo-lab = "boo_lab.cli:main"` so docs that say `boo-lab doctor` are not prose.
+- [x] **P3.2 `[project.scripts]`** `boo-lab = "boo_lab.cli:main"` so docs that say `boo-lab doctor` are not prose.
 
 - [ ] **P3.3 `.env.example` placeholders only.**
   ```

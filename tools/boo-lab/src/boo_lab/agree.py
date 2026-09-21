@@ -11,7 +11,7 @@ import json
 import time
 from pathlib import Path
 
-from .schema import canonical_role
+from .schema import canonical_role, load_section_rows
 
 
 def _read_jsonl(path: Path) -> list[dict]:
@@ -36,7 +36,7 @@ def keeper_boxes(lab_root: Path, album: str, track: str) -> list[dict]:
     """Current saved keeper boxes for one song (read-only)."""
     path = Path(lab_root) / "data" / "sections.jsonl"
     return [
-        rec for rec in _read_jsonl(path)
+        rec for rec in load_section_rows(path)
         if (rec.get("album") or "") == album and (rec.get("track") or "") == track
     ]
 

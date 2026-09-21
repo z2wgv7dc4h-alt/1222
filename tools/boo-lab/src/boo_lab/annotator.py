@@ -15,6 +15,7 @@ from .schema import (
     ROLES as _SCHEMA_ROLES,
     canonical_role,
     is_keeper,
+    load_section_rows,
     same_role_overlaps,
     stamp_box,
     write_jsonl_atomic,
@@ -527,21 +528,15 @@ def create_app(lab_root: Path, flac_root: Path | None, gp_root: Path | None) -> 
         if not row:
             raise HTTPException(404)
         # Finished song: it already has a heard keeper, so Guess stays out.
-        if sec_path.exists():
-            for line in sec_path.read_text(encoding="utf-8").splitlines():
-                if not line.strip():
-                    continue
-                try:
-                    rec = json.loads(line)
-                except json.JSONDecodeError:
-                    continue
-                if ((rec.get("album") or "") == (row.get("album") or "")
-                        and (rec.get("track") or "") == (row.get("track") or "")
-                        and is_keeper(rec.get("source")) and rec.get("heard") is True):
-                    return JSONResponse(
-                        {"detail": "This song already has keepers. Guess is for a first pass."},
-                        status_code=409,
-                    )
+        keepers = load_section_rows(sec_path)
+        if any((rec.get("album") or "") == (row.get("album") or "")
+                and (rec.get("track") or "") == (row.get("track") or "")
+                and is_keeper(rec.get("source")) and rec.get("heard") is True
+                for rec in keepers):
+            return JSONResponse(
+                {"detail": "This song already has keepers. Guess is for a first pass."},
+                status_code=409,
+            )
         flac = row.get("flac_path")
         gp = row.get("gp_path")
         from .guess import estimate_hybrid
@@ -569,13 +564,10 @@ def create_app(lab_root: Path, flac_root: Path | None, gp_root: Path | None) -> 
         if not meta:
             return []
         found = []
-        if sec_path.exists():
-            for line in sec_path.read_text(encoding="utf-8").splitlines():
-                if not line.strip():
-                    continue
-                rec = json.loads(line)
-                if rec.get("album") == meta["album"] and rec.get("track") == meta["track"]:
-                    found.append({**rec, "role": canonical_role(rec.get("role"))})
+        keepers = load_section_rows(sec_path)
+        for rec in keepers:
+            if rec.get("album") == meta["album"] and rec.get("track") == meta["track"]:
+                found.append({**rec, "role": canonical_role(rec.get("role"))})
         return found
 
     @app.get("/api/drafts")
@@ -746,9 +738,13 @@ def create_app(lab_root: Path, flac_root: Path | None, gp_root: Path | None) -> 
                 status_code=400,
             )
 
-        # Read every OTHER track's rows. A malformed existing line is skipped
-        # and COUNTED (reported back), never a silent drop -- one bad line must
-        # not permanently block saves for every track.
+        # Read every OTHER track's rows with a raw parse (not load_section_rows).
+        # This must preserve NON-KEEPER rows on other tracks: Save replaces only
+        # the current track's keeper rows and keeps the rest of the file intact,
+        # including draft rows that are not keepers. load_section_rows filters
+        # to keepers-only, which would silently drop those rows. A malformed
+        # existing line is skipped and COUNTED (reported back), never a silent
+        # drop -- one bad line must not permanently block saves for every track.
         old: list[dict] = []
         malformed_lines: list[int] = []
         if sec_path.exists():
@@ -924,34 +920,14 @@ def create_app(lab_root: Path, flac_root: Path | None, gp_root: Path | None) -> 
 
         tracks = {(r.get("track") or "") for r in targets}
 
-        # Parse sections.jsonl BEFORE deleting anything: a malformed line
-        # aborts the whole removal (fail closed) instead of crashing after
-        # files are already gone, and the rewrite below is atomic.
-        kept: list[dict] = []
-        malformed: list[int] = []
-        if sec_path.exists():
-            for lineno, line in enumerate(
-                sec_path.read_text(encoding="utf-8").splitlines(), start=1
-            ):
-                if not line.strip():
-                    continue
-                try:
-                    rec = json.loads(line)
-                except json.JSONDecodeError:
-                    malformed.append(lineno)
-                    continue
-                if not isinstance(rec, dict):
-                    malformed.append(lineno)
-                    continue
-                if rec.get("album") == album and (rec.get("track") or "") in tracks:
-                    continue
-                kept.append(rec)
-        if malformed:
-            return JSONResponse(
-                {"detail": "sections.jsonl has malformed line(s) %s; fix before "
-                           "removing an album (nothing deleted)" % malformed},
-                status_code=400,
-            )
+        # Album-remove rewrites sections.jsonl. Use the one reader with
+        # keepers_only=False so draft / non-keeper rows on OTHER albums
+        # survive (default keepers_only would wipe them). Then drop only
+        # rows for this album'''s tracks.
+        kept = [
+            r for r in load_section_rows(sec_path, keepers_only=False)
+            if not (r.get("album") == album and (r.get("track") or "") in tracks)
+        ]
 
         deleted: list[str] = []
         skipped: list[str] = []

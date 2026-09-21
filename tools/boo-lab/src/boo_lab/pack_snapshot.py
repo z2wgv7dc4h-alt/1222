@@ -218,24 +218,13 @@ def export_pack_notes(lab_root, out_path=None) -> dict:
     Default: `work/pack-notes/keepers-notes.jsonl`. Skips songs with no pack.
     Never writes sections.jsonl.
     """
-    from .schema import is_keeper
+    from .schema import load_section_rows
 
     lab_root = Path(lab_root)
     sec = lab_root / "data" / "sections.jsonl"
     out = Path(out_path) if out_path else lab_root / "work" / "pack-notes" / "keepers-notes.jsonl"
     out.parent.mkdir(parents=True, exist_ok=True)
-    rows = []
-    if sec.exists():
-        for line in sec.read_text(encoding="utf-8").splitlines():
-            if not line.strip():
-                continue
-            try:
-                rec = json.loads(line)
-            except json.JSONDecodeError:
-                continue
-            if not is_keeper(rec.get("source")) or not rec.get("heard"):
-                continue
-            rows.append(rec)
+    rows = load_section_rows(sec) if sec.exists() else []
     written = 0
     skipped = 0
     with out.open("w", encoding="utf-8") as f:

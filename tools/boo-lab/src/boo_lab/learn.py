@@ -162,15 +162,13 @@ def _write_rank(lab_root: Path, rank: dict) -> None:
 def figure_agree(lab_root) -> dict:
     """Read-only: keeper boxes that carry a `figure_id` vs `figures.jsonl`.
     Never renames a box."""
-    from .schema import is_keeper
+    from .schema import is_keeper, load_section_rows
 
     figs: dict[tuple, list[dict]] = defaultdict(list)
     for r in _read_jsonl(Path(lab_root) / "data" / "figures.jsonl"):
         figs[(r.get("album"), r.get("track"))].append(r)
     match = miss = 0
-    for rec in _read_jsonl(Path(lab_root) / "data" / "sections.jsonl"):
-        if not (is_keeper(rec.get("source")) and rec.get("heard") is True):
-            continue
+    for rec in load_section_rows(Path(lab_root) / "data" / "sections.jsonl"):
         fid = rec.get("figure_id")
         rows = figs.get((rec.get("album"), rec.get("track")))
         if not rows or not fid:

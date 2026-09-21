@@ -79,12 +79,12 @@ def test_skips_songs_missing_a_side(tmp_path):
     assert compare.compare(drafts_only)["micro"]["n_tracks"] == 0
 
 
-def test_legacy_missing_heard_is_kept_and_warned(tmp_path):
+def test_legacy_missing_heard_is_filtered_by_keeper_law(tmp_path):
     legacy = {"album": "A", "track": "T", "start": 0, "end": 4, "role": "riff"}
     lab = _lab(tmp_path, [legacy], [_draft("riff", 0, 4)])
     report = compare.compare(lab)
-    assert report["warned_legacy_heard_missing"] == 1
-    assert report["tracks"][0]["n_keep"] == 1
+    assert report["warned_legacy_heard_missing"] == 0
+    assert report["micro"]["n_tracks"] == 0
 
 
 def test_unheard_and_non_keeper_are_not_keepers(tmp_path):

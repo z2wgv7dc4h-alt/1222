@@ -44,7 +44,7 @@ def _lab(tmp_path):
     )
     (lab / "data" / "sections.jsonl").write_text(
         json.dumps({"album": "A", "track": "T", "start": 0.0, "end": 5.0,
-                    "role": "verse", "source": "human"}) + "\n",
+                    "role": "verse", "source": "human", "heard": True}) + "\n",
         encoding="utf-8",
     )
     stem = lab / "work" / "stems" / "htdemucs_6s" / "T" / "guitar.wav"

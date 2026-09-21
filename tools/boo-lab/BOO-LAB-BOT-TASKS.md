@@ -36,7 +36,7 @@ The live bug: Guess/extract emit `gp-marker` and figures emit `figure-hash`, but
 
 - [x] **P1.2 Save promotes every non-keeper source.** `annotator.py` already does `SOURCES - KEEPER_SOURCES` → `guess-accepted` when `heard`. Add a test that a heard `gp-marker` box and a heard `figure-hash` box Save as `guess-accepted` and land in `sections.jsonl`. Unknown source still 400s the whole save.
 
-- [ ] **P1.3 `load_section_rows` really is the one reader.** Replace ad-hoc `sections.jsonl` parsers in:
+- [x] **P1.3 `load_section_rows` really is the one reader.** Replace ad-hoc `sections.jsonl` parsers in:
   - `extract.load_human_sections`
   - `adapt._read_jsonl` (the sections path only)
   - `audit.py`

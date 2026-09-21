@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import dataclasses
-import json
 import sys
 from pathlib import Path
+
+from .schema import load_section_rows
 
 
 def _engine_riff_bank():
@@ -66,31 +67,17 @@ def load_human_sections(data_dir: Path) -> dict[tuple[str, str], list[tuple[floa
     fresh checkout)."""
     path = data_dir / "sections.jsonl"
     out: dict[tuple[str, str], list[tuple[float, float, str]]] = {}
-    if not path.exists():
-        return out
-    with path.open(encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-            if not line:
-                continue
-            # Fail closed per line: a malformed JSON line, a missing/
-            # unknown role, or a record missing start/end is skipped,
-            # never allowed to abort the whole read.
-            try:
-                rec = json.loads(line)
-                from .schema import is_keeper
-
-                if not is_keeper(rec.get("source")):
-                    continue
-                engine_role = _BOO_LAB_TO_ENGINE_ROLE.get(rec["role"])
-                if engine_role is None:
-                    continue
-                start = float(rec["start"])
-                end = float(rec["end"])
-            except (json.JSONDecodeError, KeyError, TypeError, ValueError):
-                continue
-            key = (rec.get("album"), rec.get("track"))
-            out.setdefault(key, []).append((start, end, engine_role))
+    for rec in load_section_rows(path):
+        engine_role = _BOO_LAB_TO_ENGINE_ROLE.get(rec["role"])
+        if engine_role is None:
+            continue
+        try:
+            start = float(rec["start"])
+            end = float(rec["end"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        key = (rec.get("album"), rec.get("track"))
+        out.setdefault(key, []).append((start, end, engine_role))
     return out
 
 

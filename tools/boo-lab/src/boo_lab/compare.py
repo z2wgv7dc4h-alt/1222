@@ -13,7 +13,7 @@ import json
 from pathlib import Path
 
 from .holdout import load_holdout, split_for
-from .schema import canonical_role, is_keeper, msa_label_to_lab
+from .schema import canonical_role, is_keeper, load_section_rows, msa_label_to_lab
 
 DRAFT_SOURCES = frozenset({"msa-draft", "guess", "songformer-draft", "keeper-model"})
 
@@ -38,25 +38,13 @@ def _norm_role(role: str | None) -> str:
 
 def keeper_rows(lab_root: Path) -> tuple[dict[tuple[str, str], list[dict]], int]:
     """`(by_song, warned)` -- keeper rows are `is_keeper(source)` AND
-    `heard is True`. A legacy row with no source counts as keeper when heard
-    is True; when `heard` is itself missing it is treated as a keeper for
-    this read-only command and counted in `warned`."""
+    `heard is True`. `schema.load_section_rows` enforces the full keeper
+    law; legacy rows without a valid source are filtered out."""
     by_song: dict[tuple[str, str], list[dict]] = {}
-    warned = 0
-    for rec in _read_jsonl(Path(lab_root) / "data" / "sections.jsonl"):
-        source = rec.get("source")
-        heard = rec.get("heard")
-        if source is None or source == "":
-            if heard is False:
-                continue
-            if heard is None:
-                warned += 1
-        else:
-            if not is_keeper(source) or heard is not True:
-                continue
+    for rec in load_section_rows(Path(lab_root) / "data" / "sections.jsonl"):
         key = (rec.get("album") or "", rec.get("track") or "")
         by_song.setdefault(key, []).append(rec)
-    return by_song, warned
+    return by_song, 0
 
 
 def draft_rows(lab_root: Path) -> dict[tuple[str, str], dict[str, list[dict]]]:

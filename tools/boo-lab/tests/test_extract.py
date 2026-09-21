@@ -91,13 +91,25 @@ def test_human_role_at_returns_covering_role_or_none():
 
 def test_load_human_sections_parses_and_translates_roles(tmp_path):
     (tmp_path / "sections.jsonl").write_text(
-        json.dumps({"album": "A", "track": "T", "start": 0.0, "end": 1.5, "role": "intro", "source": "human"}) + "\n"
-        + json.dumps({"album": "A", "track": "T", "start": 1.5, "end": 3.0, "role": "riff", "source": "human"}) + "\n"
-        + json.dumps({"album": "A", "track": "T", "start": 3.0, "end": 4.0, "role": "pulse", "source": "human"}) + "\n",
+        json.dumps({"album": "A", "track": "T", "start": 0.0, "end": 1.5, "role": "intro", "source": "human", "heard": True}) + "\n"
+        + json.dumps({"album": "A", "track": "T", "start": 1.5, "end": 3.0, "role": "riff", "source": "human", "heard": True}) + "\n"
+        + json.dumps({"album": "A", "track": "T", "start": 3.0, "end": 4.0, "role": "pulse", "source": "human", "heard": True}) + "\n",
         encoding="utf-8",
     )
     out = ex.load_human_sections(tmp_path)
     assert out == {("A", "T"): [(0.0, 1.5, "intro"), (1.5, 3.0, "verse")]}
+
+
+def test_load_human_sections_keeper_law_drops_unheard_and_drafts(tmp_path):
+    (tmp_path / "sections.jsonl").write_text(
+        json.dumps({"album": "A", "track": "T", "start": 0.0, "end": 1.0, "role": "intro", "source": "human", "heard": True}) + "\n"
+        + json.dumps({"album": "A", "track": "T", "start": 0.0, "end": 1.0, "role": "riff", "source": "human", "heard": False}) + "\n"
+        + json.dumps({"album": "A", "track": "T", "start": 0.0, "end": 1.0, "role": "riff", "source": "guess", "heard": True}) + "\n"
+        + json.dumps({"album": "A", "track": "T", "start": 0.0, "end": 1.0, "role": "riff", "source": "msa-draft", "heard": True}) + "\n",
+        encoding="utf-8",
+    )
+    out = ex.load_human_sections(tmp_path)
+    assert out == {("A", "T"): [(0.0, 1.0, "intro")]}
 
 
 def test_load_human_sections_missing_file_is_empty(tmp_path):
@@ -108,8 +120,8 @@ def test_load_human_sections_skips_malformed_and_incomplete_lines(tmp_path):
     (tmp_path / "sections.jsonl").write_text(
         "not json\n"
         "\n"
-        + json.dumps({"album": "A", "track": "T", "start": 0.0, "end": 1.0, "role": "intro", "source": "human"}) + "\n"
-        + json.dumps({"album": "A", "track": "T", "role": "build", "source": "human"}) + "\n"
+        + json.dumps({"album": "A", "track": "T", "start": 0.0, "end": 1.0, "role": "intro", "source": "human", "heard": True}) + "\n"
+        + json.dumps({"album": "A", "track": "T", "role": "build", "source": "human", "heard": True}) + "\n"
         + "{broken\n",
         encoding="utf-8",
     )

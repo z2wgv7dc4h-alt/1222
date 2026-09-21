@@ -85,11 +85,11 @@ def _pair(keepers: list[dict], drafts: list[dict], tol: float = PAIR_TOL) -> lis
 
 
 def albums_with_keepers(lab_root: Path) -> list[str]:
-    from .schema import is_keeper
+    from .schema import is_keeper, load_section_rows
 
     albums = {
         rec.get("album") or ""
-        for rec in _read_jsonl(Path(lab_root) / "data" / "sections.jsonl")
+        for rec in load_section_rows(Path(lab_root) / "data" / "sections.jsonl")
         if is_keeper(rec.get("source")) and rec.get("heard") is True and rec.get("album")
     }
     return sorted(albums)
@@ -98,10 +98,10 @@ def albums_with_keepers(lab_root: Path) -> list[str]:
 def rebuild_album(lab_root, album) -> dict:
     """Rebuild one album's calibration object from its heard keeper pairs."""
     from .holdout import load_holdout
-    from .schema import canonical_role, is_keeper, write_jsonl_atomic
+    from .schema import canonical_role, is_keeper, load_section_rows, write_jsonl_atomic
 
     lab_root = Path(lab_root)
-    section_rows = _read_jsonl(lab_root / "data" / "sections.jsonl")
+    section_rows = load_section_rows(lab_root / "data" / "sections.jsonl")
     keepers = [
         r for r in section_rows
         if is_keeper(r.get("source")) and r.get("heard") is True
@@ -206,10 +206,10 @@ def rebuild_global(lab_root) -> dict:
     logic as `rebuild_album`; `figures` is always empty here (see module
     docstring -- a figure_id is a per-song identifier, never pooled)."""
     from .holdout import load_holdout
-    from .schema import canonical_role, is_keeper, write_jsonl_atomic
+    from .schema import canonical_role, is_keeper, load_section_rows, write_jsonl_atomic
 
     lab_root = Path(lab_root)
-    section_rows = _read_jsonl(lab_root / "data" / "sections.jsonl")
+    section_rows = load_section_rows(lab_root / "data" / "sections.jsonl")
     draft_rows = _read_jsonl(lab_root / "data" / "drafts.jsonl")
     held = {(a, t) for (a, t) in load_holdout(lab_root)}
 

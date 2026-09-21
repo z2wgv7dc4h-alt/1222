@@ -11,7 +11,7 @@ import re
 from pathlib import Path
 
 from .holdout import ensure_holdout, load_holdout, split_for
-from .schema import FIGURE_ROLES, FUNCTION_ROLES, canonical_role, is_keeper
+from .schema import FIGURE_ROLES, FUNCTION_ROLES, canonical_role, is_keeper, load_section_rows
 
 
 def _read_jsonl(path: Path) -> list[dict]:
@@ -31,7 +31,7 @@ def _read_jsonl(path: Path) -> list[dict]:
 def keeper_boxes_by_song(lab_root: Path) -> dict[tuple[str, str], list[dict]]:
     """Keeper boxes only: `schema.is_keeper(source)` AND `heard`."""
     out: dict[tuple[str, str], list[dict]] = {}
-    for rec in _read_jsonl(Path(lab_root) / "data" / "sections.jsonl"):
+    for rec in load_section_rows(Path(lab_root) / "data" / "sections.jsonl"):
         if not is_keeper(rec.get("source")) or not rec.get("heard"):
             continue
         key = (rec.get("album") or "", rec.get("track") or "")

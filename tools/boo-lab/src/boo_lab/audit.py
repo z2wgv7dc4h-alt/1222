@@ -5,7 +5,7 @@ import json
 from collections import Counter
 from pathlib import Path
 
-from .schema import canonical_role, is_keeper, same_role_overlaps
+from .schema import canonical_role, is_keeper, load_section_rows, same_role_overlaps
 
 
 def _jsonl(path: Path) -> list[dict]:
@@ -18,8 +18,12 @@ def _jsonl(path: Path) -> list[dict]:
     return rows
 
 
+def _section_rows(lab_root: Path) -> list[dict]:
+    return load_section_rows(lab_root / "data" / "sections.jsonl")
+
+
 def audit_lab(lab_root: Path) -> dict:
-    secs = _jsonl(lab_root / "data" / "sections.jsonl")
+    secs = _section_rows(lab_root)
     drafts = _jsonl(lab_root / "data" / "drafts.jsonl")
     by_track: dict[tuple[str, str], list[dict]] = {}
     sources = Counter()

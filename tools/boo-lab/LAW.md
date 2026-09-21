@@ -16,9 +16,8 @@ Labelling lab. Not the generator.
 - Breakdown = function (usually drums half-time), may sit on the same guitar as Riff.
 - Prefer a GP7 `.gp`/`.gpx` (parsed GPIF) over `.gp5`; never convert GP7 to GP5.
 - Do not rename FLACs. Match tabs in `map.csv` instead.
-- Do not train a song model on raw mixed FLACs.
 - Do not put audio, Guitar Pro, or tokens in git. `data/` labels are fine.
-- Do not scrape tabs.
+
 
 New bands go in `audio-corpus/<band>/`, tabs in `gp-tabs/gp5/<band>/`.
 
@@ -33,4 +32,3 @@ New bands go in `audio-corpus/<band>/`, tabs in `gp-tabs/gp5/<band>/`.
 - Rebirth is labelled holdout by design — its keepers are real but held out of training and `prefer=`.
 - Prefer GP7 `.gp`/`.gpx` (parsed GPIF) over `.gp5` when both exist; no GP7→GP5 conversion.
 - A returning figure keeps its `figure_id`; a new idea gets a new id.
-- Do not train on raw mixed FLACs. Do not scrape tabs.

@@ -351,6 +351,138 @@ def test_guess_no_figure_drafts_when_times_not_trusted(tmp_path, monkeypatch):
     assert not [s for s in res["sections"] if s.get("source") == "guess"]
 
 
+# --- tempo-automation hints (informational note, never a box) ---------------
+
+
+def _wire_tempo_hints(tmp_path, monkeypatch, rows):
+    lab = tmp_path / "lab"
+    (lab / "data").mkdir(parents=True, exist_ok=True)
+    (lab / "data" / "tempo_hints.jsonl").write_text(
+        "".join(json.dumps(r) + "\n" for r in rows), encoding="utf-8")
+    flac = tmp_path / "song.flac"
+    flac.write_bytes(b"x")
+    monkeypatch.setattr(soundfile, "info",
+                        lambda *a, **k: types.SimpleNamespace(frames=int(22050 * 100), samplerate=22050))
+    monkeypatch.setattr(g, "GP5_ROOTS", [tmp_path / "no_gp5"])
+    monkeypatch.setattr(g, "_prefer_gp5", lambda gp, track: None)
+    import boo_lab.stems as st
+    monkeypatch.setattr(st, "ensure_drums", lambda f, c: (None, "none"))
+    monkeypatch.setattr(g, "_librosa_beats", lambda wav: {"beats": [], "bpm": None})
+    monkeypatch.setattr(g, "_half_time_spans", lambda beats, min_len=6.0: [])
+    monkeypatch.setattr(g, "_kick_spans", lambda wav: [])
+    return g.estimate_hybrid(flac, None, track="Fixture",
+                             cache=lab / "work" / "stems", album="A")
+
+
+def test_guess_notes_tempo_changes_as_text_not_a_box(tmp_path, monkeypatch):
+    rows = [{"album": "A", "track": "Fixture", "sec": 12.5,
+             "bpm_before": 135.0, "bpm_after": 141.0, "times_trusted": True}]
+
+    res = _wire_tempo_hints(tmp_path, monkeypatch, rows)
+
+    assert any("tempo changes x1" in n and "12.5s 135->141" in n for n in res["notes"])
+    assert not [s for s in res["sections"] if s.get("source") == "tempo-automation"]
+
+
+def test_guess_untrusted_tempo_hint_note_says_so(tmp_path, monkeypatch):
+    rows = [{"album": "A", "track": "Fixture", "sec": None,
+             "bpm_before": 135.0, "bpm_after": 141.0, "times_trusted": False}]
+
+    res = _wire_tempo_hints(tmp_path, monkeypatch, rows)
+
+    assert any("sync not ok" in n for n in res["notes"] if "tempo changes" in n)
+
+
+def test_guess_no_tempo_note_when_no_hints(tmp_path, monkeypatch):
+    res = _wire_tempo_hints(tmp_path, monkeypatch, [])
+    assert not [n for n in res["notes"] if "tempo changes" in n]
+
+
+# --- tab-notation kick spans (real kick notation beats a spectral guess) ----
+
+
+def test_tab_kick_spans_filters_pitch_36_and_tags_kick_notation():
+    from boo_lab.tabnotes import TabEvent, TabMeasure, TabNotesPack, TabTrack
+
+    # Same known-good shape as test_half_time_spans_detects_a_known_half_time_stretch:
+    # 24 dense (0.5s) kicks, then a real half-time stretch (16 kicks at 1.0s).
+    times = [i * 0.5 for i in range(24)] + [12.0 + i * 1.0 for i in range(16)]
+    tracks = [TabTrack(index=0, name="Drums", category="drums")]
+    measures = [TabMeasure(measure=0, start_ms=0.0, start_sec_audio=0.0, duration_ms=40000.0)]
+    events = [TabEvent(track=0, category="drums", measure=0, onset_ms=t * 1000.0, pitch=36)
+             for t in times]
+    # A non-kick drum hit (snare) interleaved -- the pitch filter must drop it.
+    events.append(TabEvent(track=0, category="drums", measure=0, onset_ms=100.0, pitch=40))
+    pack = TabNotesPack(id="p", title="P", tracks=tracks, events=events, measures=measures)
+
+    spans = g._tab_kick_spans(pack)
+
+    assert len(spans) == 1
+    assert spans[0]["source"] == "kick-notation" and spans[0]["role"] == "breakdown"
+    assert spans[0]["end"] - spans[0]["start"] >= 5.0
+
+
+def _wire_kick(tmp_path, monkeypatch, *, sync_ok, pack_found=True):
+    lab = tmp_path / "lab"
+    (lab / "data").mkdir(parents=True, exist_ok=True)
+    (lab / "data" / "sync.jsonl").write_text(
+        json.dumps({"album": "A", "track": "Fixture", "sync_ok": sync_ok}) + "\n",
+        encoding="utf-8")
+    flac = tmp_path / "song.flac"
+    flac.write_bytes(b"x")
+    monkeypatch.setattr(soundfile, "info",
+                        lambda *a, **k: types.SimpleNamespace(frames=int(22050 * 100), samplerate=22050))
+    monkeypatch.setattr(g, "GP5_ROOTS", [tmp_path / "no_gp5"])
+    monkeypatch.setattr(g, "_prefer_gp5", lambda gp, track: None)
+    import boo_lab.stems as st
+    monkeypatch.setattr(st, "ensure_drums", lambda f, c: (None, "none"))
+    monkeypatch.setattr(g, "_librosa_beats", lambda wav: {"beats": [], "bpm": None})
+    monkeypatch.setattr(g, "_half_time_spans", lambda beats, min_len=6.0: [])
+    monkeypatch.setattr(g, "_tab_kick_spans", lambda pack: [
+        {"role": "breakdown", "start": 5.0, "end": 12.0, "source": "kick-notation"}])
+
+    from boo_lab import tabnotes as tn
+    monkeypatch.setattr(tn, "discover_pack",
+                        lambda lab_root, album, track: ("fake-path" if pack_found else None))
+    monkeypatch.setattr(tn, "load_pack", lambda path: object())
+    return lab, flac
+
+
+def test_guess_prefers_tab_kick_notation_over_audio_when_sync_ok(tmp_path, monkeypatch):
+    lab, flac = _wire_kick(tmp_path, monkeypatch, sync_ok=True)
+    monkeypatch.setattr(g, "_kick_spans",
+                        lambda wav: (_ for _ in ()).throw(
+                            AssertionError("audio kick path must not run when tab notation is used")))
+
+    res = g.estimate_hybrid(flac, None, track="Fixture", cache=lab / "work" / "stems", album="A")
+
+    kicks = [s for s in res["sections"] if s.get("source") == "kick-notation"]
+    assert kicks and kicks[0]["start"] == 5.0
+    assert any("kick notation x1" in n for n in res["notes"])
+
+
+def test_guess_falls_back_to_audio_kick_when_sync_not_ok(tmp_path, monkeypatch):
+    lab, flac = _wire_kick(tmp_path, monkeypatch, sync_ok=False)
+    monkeypatch.setattr(g, "_kick_spans", lambda wav: [
+        {"role": "breakdown", "start": 1.0, "end": 9.0, "source": "kick"}])
+
+    res = g.estimate_hybrid(flac, None, track="Fixture", cache=lab / "work" / "stems", album="A")
+
+    assert not [s for s in res["sections"] if s.get("source") == "kick-notation"]
+    assert [s for s in res["sections"] if s.get("source") == "kick"]
+
+
+def test_guess_falls_back_to_audio_kick_when_no_pack(tmp_path, monkeypatch):
+    lab, flac = _wire_kick(tmp_path, monkeypatch, sync_ok=True, pack_found=False)
+    monkeypatch.setattr(g, "_kick_spans", lambda wav: [
+        {"role": "breakdown", "start": 1.0, "end": 9.0, "source": "kick"}])
+
+    res = g.estimate_hybrid(flac, None, track="Fixture", cache=lab / "work" / "stems", album="A")
+
+    assert not [s for s in res["sections"] if s.get("source") == "kick-notation"]
+    assert [s for s in res["sections"] if s.get("source") == "kick"]
+
+
 def _wire_breakdown(tmp_path, monkeypatch, album, med=8.0, blob_album=None):
     lab = tmp_path / "lab"
     (lab / "data").mkdir(parents=True, exist_ok=True)

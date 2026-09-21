@@ -322,6 +322,31 @@ raw tuplets/bends, and the first 3 guitar audio onsets; `--index` appends
 records `tabnotes`/`tabnotes_tracks`, and prefers it over any sibling
 `.gp5`/GPIF. No keepers, no roles; machines never write `sections.jsonl`.
 
+`figures.py` (2026-09-21) also discovers a pack (same precedence as `sync`, pack
+wins over any matched GP) and clusters two of its tracks: the `guitar`-category
+track (rhythm-register pick, lowest mean pitch) into ordinary `riff-*` figure
+rows, and the `bass`-category track the same way into `bass-riff-*` rows
+(`instrument: "bass"`, prefixed so a bass figure can never collide with a guitar
+one sharing a letter) — both tabnotes-only, `_engine_riff_bank`'s bass extractor
+is never called from here. A pack's `other`-category track (a named synth/
+keyboard — LAW.md's Pulse) becomes `role: "pulse"` rows via `_tab_pulse_windows`,
+decoupled from whether the guitar/bass clustering found anything, so a song whose
+guitar yields no riffs still gets Pulse. `guess.py`'s `_figure_drafts` already
+turns any `figures.jsonl` row into a draft box, so guitar/bass/pulse rows all
+reach Guess for free once `sync_ok` is true.
+
+`tempo_hints.py`/`data/tempo_hints.jsonl` (`boo-lab tempo-hints`, 2026-09-21):
+one row per BPM change in a pack's tempo automation (`tabnotes.tempo_map`).
+Deliberately informational, never a box — a tempo jump correlates with a section
+change in this genre but never implies a role. `guess.py` reads it and appends a
+plain-text note ("tempo changes x2: 10.5s 135->141, ..."), nothing more.
+
+`guess.py`'s breakdown detector (2026-09-21) prefers a pack's own kick notation
+(`_tab_kick_spans`, GM percussion pitch 36 — verified against a real corpus pack,
+not assumed) over the spectral-guess `_kick_spans` whenever `sync_ok` is true,
+same "tab data outranks an audio heuristic" precedent as GP markers; falls back
+to the audio heuristic when there's no pack or the clock isn't trusted.
+
 ## Learn (intern rank)
 
 `boo-lab learn [--album X]` rebuilds `data/intern_rank.json` from `compare.compare()` (never a

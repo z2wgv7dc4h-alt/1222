@@ -313,15 +313,33 @@ def estimate_hybrid(
             notes.append("pip install librosa soundfile")
         except Exception as e:
             notes.append("beats: %s" % e)
-        try:
-            kicks = _kick_spans(src)
-            if kicks:
-                sections.extend(kicks)
-                notes.append("kick IOI x%s" % len(kicks))
-        except ImportError:
-            pass
-        except Exception as e:
-            notes.append("kick: %s" % e)
+        # A tab-notes pack's own kick notation beats a spectral guess, same
+        # "human/tab data outranks an audio heuristic" precedent as GP
+        # markers -- only when the audio clock actually matched (sync_ok),
+        # since the spans are seconds off that pack's own clock.
+        tab_kicks: list[dict] = []
+        if lab_root is not None and sync_rec is not None and sync_rec.get("sync_ok") is True:
+            try:
+                from .tabnotes import discover_pack, load_pack
+
+                pack_path = discover_pack(lab_root, lookup_album, lookup_track)
+                if pack_path is not None:
+                    tab_kicks = _tab_kick_spans(load_pack(pack_path))
+            except Exception:
+                tab_kicks = []
+        if tab_kicks:
+            sections.extend(tab_kicks)
+            notes.append("kick notation x%s (tab)" % len(tab_kicks))
+        else:
+            try:
+                kicks = _kick_spans(src)
+                if kicks:
+                    sections.extend(kicks)
+                    notes.append("kick IOI x%s" % len(kicks))
+            except ImportError:
+                pass
+            except Exception as e:
+                notes.append("kick: %s" % e)
 
     if cache:
         try:
@@ -362,6 +380,26 @@ def estimate_hybrid(
         new_figs = _figure_drafts(lab_root, lookup_album, lookup_track, sections)
         sections.extend(new_figs)
         figures_drafts = len(new_figs)
+
+    # Tempo-automation boundaries: informational only, never a box -- a BPM
+    # jump correlates with a section change in this genre but never implies
+    # a role, so it's surfaced as a note for the human, not auto-applied.
+    if lab_root is not None:
+        try:
+            from .tempo_hints import load_tempo_hints
+
+            hints = load_tempo_hints(lab_root, lookup_album, lookup_track)
+        except Exception:
+            hints = []
+        if hints:
+            trusted_hint = bool(hints[0].get("times_trusted"))
+            shown = ", ".join(
+                "%s %g->%g" % (("%.1fs" % h["sec"]) if h.get("sec") is not None else "?s",
+                               h["bpm_before"], h["bpm_after"])
+                for h in hints[:6]
+            ) + (" ..." if len(hints) > 6 else "")
+            notes.append("tempo changes x%d%s: %s" % (
+                len(hints), "" if trusted_hint else " (sec untrusted; sync not ok)", shown))
 
     # Breakdown gate: keep audio breakdown drafts near this album's median
     # heard breakdown span (n>=2). n<2 keeps the current rules.
@@ -501,6 +539,25 @@ def _half_time_spans(beats: list[float], min_len: float = 6.0) -> list[dict]:
             )
         i = j
     return out
+
+
+def _tab_kick_spans(pack) -> list[dict]:
+    """Half-time breakdown spans from a tab-notes pack's own kick notation
+    -- GM percussion pitch 36 (Acoustic Bass Drum), verified against a real
+    corpus pack (600 of 1311 drum events, the single most common pitch, on
+    a real song) rather than assumed -- instead of guessing kick onsets
+    from a low-frequency spectral envelope. Same `_half_time_spans`
+    grouping as the audio path (`_kick_spans`), just fed real onset times.
+    `[]` when the pack has no drums track or no pitch-36 events."""
+    from .tabnotes import events_for
+
+    times = sorted(pack.audio_sec(e) for e in events_for(pack, category="drums")
+                   if e.pitch == 36)
+    spans = _half_time_spans(times, min_len=5.0)
+    for s in spans:
+        s["source"] = "kick-notation"
+        s["role"] = "breakdown"
+    return spans
 
 
 def _clean(sections: list[dict]) -> list[dict]:

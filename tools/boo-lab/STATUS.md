@@ -13,7 +13,22 @@ Canonical detail: **CURRENT.md**; commands in **README.md**.
 
 Works: studio keeps pins (`human`/`guess-accepted` + `heard`) in `sections.jsonl`; mel
 spectrogram under the WaveSurfer waveform; 6-stem picker; drafts; `hear`/`sync`/`hash`;
-`agree`/`compare`/`export-jams`/`beats`/`audit`/`report`; **342 tests pass**.
+`agree`/`compare`/`export-jams`/`beats`/`audit`/`report`; **360 tests pass**.
+Tabnotes bass/pulse/tempo/kick (2026-09-21): `figures.py` now clusters a tab-notes
+pack's `bass`-category track too (same RUNS/cluster machinery as guitar, `bass-`
+figure_id prefix + `instrument` field so a bass riff can never collide with a guitar
+one sharing a letter), decoupled from guitar-cluster success so either instrument can
+produce rows on its own. `_tab_pulse_windows` turns a pack's `other`-category track
+(a named synth/keyboard, LAW.md's Pulse) into `role="pulse"` draft rows — no GP-side
+equivalent, tabnotes-only. New `tempo_hints.py`/`data/tempo_hints.jsonl`
+(`boo-lab tempo-hints`) surfaces a pack's tempo-automation BPM changes as an
+informational note in Guess's output, never an auto-created box — a tempo bump
+correlates with a section change but never implies a role. `guess.py`'s breakdown
+detector now prefers real kick onsets from a pack's own drum notation (GM pitch 36,
+verified against a real corpus pack: 600 of 1311 drum events) over the spectral-guess
+`_kick_spans`, whenever `sync_ok` is true; falls back to the audio heuristic otherwise
+so a song without a pack is unaffected. All four additions are read-only/draft-only —
+nothing here writes `sections.jsonl`.
 GP7/GPIF (2026-09-18): `boo_lab/gpif.py` reads a `.gp`/`.gpx` `score.gpif` natively
 (flat GP8/alphaTab + nested), exposing title/artist/album, tracks (tuning, instrument,
 capo), masterbars (time sig/repeats/sections/tempo), beats (dynamic/chord/text) and notes

@@ -148,6 +148,10 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("--album")
     s.add_argument("--track")
 
+    s = sub.add_parser("tempo-hints", help="tempo-automation BPM changes from a tab-notes pack (drafts; never keepers)")
+    s.add_argument("--album")
+    s.add_argument("--track")
+
     s = sub.add_parser("annotate", help="local UI: listen to FLAC, click section bounds")
     s.add_argument("--port", type=int, default=8765)
 
@@ -434,6 +438,21 @@ def main(argv: list[str] | None = None) -> int:
         report = build_figures(root(), full, album=album, track=track)
         print("figures: %d song(s) processed, %d repeating cluster(s) -> %s"
               % (report["songs"], report["clusters"], report["out"]))
+        return 0
+
+    if args.cmd == "tempo-hints":
+        from .tempo_hints import build_tempo_hints
+
+        album = getattr(args, "album", None)
+        track = getattr(args, "track", None)
+        if (album is None) != (track is None):
+            print("need --album and --track together")
+            return 1
+        full = ([resolve(r, flac_root, gp_root) for r in load_map(map_path)]
+                if map_path.exists() else rows)
+        report = build_tempo_hints(root(), full, album=album, track=track)
+        print("tempo-hints: %d song(s) processed, %d row(s) -> %s"
+              % (report["songs"], report["written"], report["out"]))
         return 0
 
     if args.cmd == "stems":

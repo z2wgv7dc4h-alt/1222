@@ -10,7 +10,6 @@ Local engine: djent / deathcore / metalcore / tech. Bar: IA, BoO, VoM. Python wr
 - Do not edit `../Ww`. Do not extend `123/`.
 - Do not bulk-read scope. Open one heading if the ticket names it.
 - One ticket. Listed files only. Stop at acceptance.
-- Do not import `riff_model.py`. Do not train. Do not scrape Songsterr.
 - Labyrinth listen path = fragment bank, one riff tiled. GM preview is not NAM.
 - Lab for FLACs/tabs: `tools/boo-lab`. Do not invent a second parser if `riff_bank.py` already extracts.
 

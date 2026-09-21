@@ -59,7 +59,7 @@ Living docs after this pass: `USER.md` (operator), `LAW.md` (rules), `CURRENT.md
   - Sources list = P1.1.
   - Keep: machines never label; GP7 native; no FLAC rename; no audio/GP/tokens in git.
 
-- [ ] **P2.2 USER.md Part A â€” make it readable.**
+- [x] **P2.2 USER.md Part A â€” make it readable.**
   - Fix the smashed â€œMarkâ€ paragraph (zoom / Aâ€“B loop / click-away / drag edges are separate sentences).
   - Keys printed once.
   - VAL: â€œdo not use VAL songs to train or to vote `prefer=`. You may still pin them. Rebirth is VAL and is already pinned; leave it.â€

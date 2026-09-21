@@ -53,15 +53,16 @@ Manual full prep without opening the UI:
 
 ## Mark
 
-Double-click a box (or its table row) to zoom and **A–B loop** that part while you
-Click away from the looping box (or Esc / Space / Play box once) to stop. Right-click edit panel closes on outside click too.
-drag the edges. Esc or Space stops the loop. Play box still plays once.
+Double-click a box (or its table row) to zoom that part.
+The same double-click starts an **A?B loop** over the box.
+Click away from the looping box (or Esc / Space / Play box once) to stop the loop.
+Drag the box edges to trim it. Play box still plays once without looping.
+The right-click edit panel closes on an outside click.
 
-
-1. Click a song on the left. Skip anything tagged **VAL**.
-2. Wait until the clock shows the real song length. Not `0:00 / —`.
+1. Click a song on the left.
+2. Wait until the clock shows the real song length. Not `0:00 / -`.
 3. Press **1** (Riff) or another role button. A box appears.
-4. Drag the box to cover that part. Drag does not create a box — the button does.
+4. Drag the box to cover that part. Drag does not create a box ? the button does.
 5. If the same idea comes back, reuse the same **figure** name (`riff-A`).
    A new idea gets a new name (`riff-B`).
 6. Tick **heard** only after you listened to that box.
@@ -69,11 +70,12 @@ drag the edges. Esc or Space stops the loop. Play box still plays once.
 
 One album per sitting is enough.
 
-**Keys:** Space play · 1 riff · 2 hook · 3 breakdown · **T blast** · 4 solo · I intro · B build · C chill · P pulse · S save · J / K songs · Delete box · Ctrl+Z undo · Esc stops box loop / closes right-click
-B build · C chill · P pulse · S save · J / K songs · Delete box · Ctrl+Z undo ·
-? help.
+**VAL:** do not use VAL songs to train or to vote `prefer=`. You may still pin them. Rebirth is VAL and is already pinned; leave it.
+
+**Keys:** Space play ? 1 riff ? 2 hook ? 3 breakdown ? **T blast** ? 4 solo ? I intro ? B build ? C chill ? P pulse ? S save ? J / K songs ? Delete box ? Ctrl+Z undo ? Esc stops box loop / closes right-click ? ? help.
 
 ## Lanes and right-click
+
 
 Each role has its own lane on the wave (Intro at the top, Outro at the bottom).
 A box can only sit in its role's lane, so a Riff + Breakdown + Outro stack
@@ -88,7 +90,7 @@ hide bars and rows — they never edit. synth is an instrument (inst), not a rol
 Guess, Load drafts, Lyrics, Pack, Snap, JSON, Drop, git, Remove album,
 More columns.
 
-**VAL** = exam song. Do not mark it.
+**VAL** = holdout / exam song. Do not train on it or vote `prefer=` with it. Pinning is fine; Rebirth is already pinned.
 
 Guess refuses a song that already has saved boxes.
 Selected song is highlighted in the left list.

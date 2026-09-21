@@ -279,6 +279,70 @@ def test_save_rejects_unknown_or_missing_source(tmp_path):
     assert missing.status_code == 400 and "unknown source" in missing.json()["detail"]
 
 
+def test_save_promotes_heard_gp_marker_to_guess_accepted(tmp_path):
+    lab = _lab(tmp_path)
+    client = TestClient(ann.create_app(lab, None, None))
+    tid = client.get("/api/tracks").json()["tracks"][0]["id"]
+
+    resp = client.post("/api/sections/%d" % tid, json={"sections": [
+        {"role": "riff", "start": 0, "end": 2, "source": "gp-marker", "heard": True}]})
+
+    assert resp.status_code == 200 and resp.json()["saved"] == 1
+    row = _sections_rows(lab)[0]
+    assert row["source"] == "guess-accepted"
+    assert row["role"] == "riff" and row["heard"] is True
+
+
+def test_save_promotes_heard_figure_hash_to_guess_accepted(tmp_path):
+    lab = _lab(tmp_path)
+    client = TestClient(ann.create_app(lab, None, None))
+    tid = client.get("/api/tracks").json()["tracks"][0]["id"]
+
+    resp = client.post("/api/sections/%d" % tid, json={"sections": [
+        {"role": "riff", "start": 0, "end": 2, "source": "figure-hash", "heard": True}]})
+
+    assert resp.status_code == 200 and resp.json()["saved"] == 1
+    row = _sections_rows(lab)[0]
+    assert row["source"] == "guess-accepted"
+    assert row["role"] == "riff" and row["heard"] is True
+
+
+def test_save_rejects_unknown_source_400s_whole_save(tmp_path):
+    lab = _lab(tmp_path)
+    path = lab / "data" / "sections.jsonl"
+    other = {"album": "A", "track": "Other", "start": 0.0, "end": 1.0,
+             "role": "riff", "source": "human"}
+    path.write_text(json.dumps(other) + "\n", encoding="utf-8")
+    before = path.read_text(encoding="utf-8")
+    client = TestClient(ann.create_app(lab, None, None))
+    tid = client.get("/api/tracks").json()["tracks"][0]["id"]
+
+    bad = client.post("/api/sections/%d" % tid, json={"sections": [
+        {"role": "riff", "start": 0, "end": 2, "source": "not-a-real-source", "heard": True}]})
+
+    assert bad.status_code == 400 and "unknown source" in bad.json()["detail"]
+    assert path.read_text(encoding="utf-8") == before
+
+
+def test_save_preserves_other_track_rows_on_unknown_source(tmp_path):
+    lab = _lab(tmp_path)
+    path = lab / "data" / "sections.jsonl"
+    path.write_text(json.dumps({"album": "A", "track": "Other", "start": 0.0,
+                                "end": 1.0, "role": "riff", "source": "human"}) + "\n"
+        + json.dumps({"album": "A", "track": "T", "start": 0.0, "end": 5.0,
+                      "role": "verse", "source": "human"}) + "\n",
+        encoding="utf-8")
+    before = path.read_text(encoding="utf-8")
+    client = TestClient(ann.create_app(lab, None, None))
+    tid = client.get("/api/tracks").json()["tracks"][0]["id"]
+
+    bad = client.post("/api/sections/%d" % tid, json={"sections": [
+        {"role": "riff", "start": 0, "end": 2, "source": "bogus-source", "heard": True}]})
+
+    assert bad.status_code == 400
+    assert path.read_text(encoding="utf-8") == before
+
+
 def test_save_rejects_a_box_with_no_resolvable_role(tmp_path):
     lab = _lab(tmp_path)
     client = TestClient(ann.create_app(lab, None, None))

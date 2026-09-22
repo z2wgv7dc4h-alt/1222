@@ -2,30 +2,32 @@
 
 Living docs: USER.md (operator), LAW.md (rules), this file (short contract), README.md (install + commands), STATUS.md (counts), CHANGELOG.md (dated history). If they disagree, LAW + this file win; then fix the others.
 
+Parent `docs/CURRENT.md` is a pointer only. It must not describe keepers, test counts, or Rebirth.
+
 ## Keepers / drafts / writers
 
 - **Keepers** = data/sections.jsonl with source in human / guess-accepted and heard=true.
-- **Drafts** = data/drafts.jsonl (msa-draft, songformer-draft, guess, gp-marker, igure-hash, last-hint, 	abnotes-density, 	abnotes-structure, 	abnotes-phrase, keeper-model). Never keepers.
-- **Writers of sections.jsonl:** studio **Save**, oo-lab hear, album-remove. Save drops unheard boxes and replaces that track's rows only.
+- **Drafts** = data/drafts.jsonl (msa-draft, songformer-draft, guess, gp-marker, figure-hash, blast-hint, tabnotes-density, tabnotes-structure, tabnotes-phrase, keeper-model). Never keepers.
+- **Writers of sections.jsonl:** studio **Save**, `boo-lab hear`, album-remove. Save drops unheard boxes and replaces that track's rows only.
 - Machines may draft. **They never label.**
 
 Box fields: start end role layer form figure_id on_figure unique instrument start_bar end_bar source heard (+ optional pack_id / pack_note_source when a trusted pack matched on Save).
 
 ## Paths
 
-`
+```
 <LAB>     tools/boo-lab
 <CORPUS>  audio-corpus          (env BOO_FLAC_ROOT)
 <GP>      gp-tabs               (env BOO_GP_ROOT)
           gp5/<band>/           GP4/GP5
           gp7/<band>/           .gp / .gpx
-`
+```
 
 BOO_FLAC_ROOT must be the **corpus** root, not a single band folder (ingest footgun).
 
 ## Start
 
-`
+```
 cd <LAB>
 .venv\Scripts\activate
 set BOO_FLAC_ROOT=<CORPUS>
@@ -34,18 +36,21 @@ python -m boo_lab.cli scan
 python -m boo_lab.cli hash
 python -m boo_lab.cli interns
 python -m boo_lab.cli studio --port 8765
-`
+```
 
-START.bat = scan → hash → full interns (side window) → studio. Studio-only: python -m boo_lab.cli studio. http://127.0.0.1:8765 — Ctrl+Shift+R after HTML. oo-lab doctor must print cuda=True when a GPU is expected.
+START.bat = scan → hash → full interns (side window) → studio. Studio-only: `python -m boo_lab.cli studio`. http://127.0.0.1:8765 — Ctrl+Shift+R after HTML. `boo-lab doctor` must print cuda=True when a GPU is expected.
+
+Default `interns` on **empty gold** still runs stems/beats/structure/sync/figures (prep). It skips extract / compare / learn / predict until a non-holdout keeper exists. Pass `--steps` to force a skippable step.
 
 ## Data written
 
 | path | what |
 |---|---|
-| data/map.csv | scan: album, track, album_id, flac/gp paths, match, lac_sha256 (local-only; see .gitignore) |
+| data/map.csv | scan: album, track, album_id, flac/gp paths, match, flac_sha256 (local-only; see .gitignore) |
 | data/sections.jsonl | **keepers** only; Save keeps sections.jsonl.bak |
 | data/drafts.jsonl | machine drafts; never keepers |
 | data/holdout.csv | whole-song train/val reservation |
+| data/identity.csv | stable album_id / folder_name / track_token |
 | data/beats.jsonl | beat/downbeat grid |
 | data/sync.jsonl | tab-vs-audio: sync_ok, lag_sec, score |
 | data/figures.jsonl | figure-hash drafts |
@@ -59,30 +64,45 @@ Never commit FLACs, GP, stems, zips, tokens, .venv.
 Roles: intro, build, riff, hook, breakdown, blast, solo, chill, pulse, outro.
 
 - Different roles **may** overlap. Two boxes of the **same** role on the same seconds → Save refuses.
-- Breakdown / blast = functions (may sit on the same guitar as a riff). Never invent 
-iff-blast-A.
-- Pulse = named synth/keyboard figure, not “keys are audible.”
-- Optional on_figure on a function box links the igure_id it rides.
-- Figure roles default igure_id to {role}-A (or a tab letter); function roles may leave igure_id blank.
+- Breakdown / blast = functions (may sit on the same guitar as a riff). Never invent `riff-blast-A`.
+- Pulse = named synth/keyboard figure, not "keys are audible."
+- Optional on_figure on a function box links the figure_id it rides.
+- Figure roles default figure_id to {role}-A (or a tab letter); function roles may leave figure_id blank.
+
+## Engine boundary
+
+`extract` maps lab roles onto `engine/riff_bank.py`: riff→verse, hook→chorus. **pulse** and **blast** map to None and are dropped. That is deliberate (no fabricated engine role). A pulse-only or blast-only gold file is legal and extracts nothing. Pack still slices those boxes for listening.
+
+## Matching
+
+Song title matching goes through `normalize.track_key` / `album_key` (TWDA `∆` reads as `a`). Guess, catalogue, and the studio sidebar must not keep a private `∆→A` copy. `identity.album_id_for` wins when the pair is in `identity.csv`.
 
 ## Short law echoes
 
 - `data/rebirth-sections.jsonl` is a **dead snapshot** — invalid placeholder times, not keepers, not a writer path. It is never read by `load_section_rows`. Live keepers are only `data/sections.jsonl` (Save / hear / album-remove). Do not teach any command to write both.
 
-- Live keepers are empty until a human Saves a heard box; the deleted invalid Rebirth rows are not a restore-from target. A Save of a new track must go through `stamp_box`.
+- Live keepers are empty until a human Saves a heard box. The deleted invalid Rebirth rows are not a restore-from target. A Save of a new track must go through `stamp_box`.
 
-- compare scores on VAL/holdout songs are **diagnostics, not votes** (never `prefer=`); live Rebirth pins were wiped, so re-pinning is human-only.
+- Rebirth is VAL (listed in holdout.csv). Pinning it by ear is fine. It does not train and does not vote `prefer=`. It is **not** currently pinned.
 
-- Quality gates live in `audit.py`; they warn; they do not label. (overlaps, <1s boxes, function-swallow, empty figure_id, unopenable/mislabeled/stub GPs, identity gaps.)
+- compare scores on VAL/holdout songs are **diagnostics, not votes**.
+
+- Quality gates live in `audit.py`; they warn; they do not label. (overlaps, <1s boxes, function-swallow, empty figure_id, unopenable/mislabeled/stub GPs, identity gaps, snapshot drift.)
 
 - `phrase_spans` retune on import is **optional**; failure logs `phrase_retune skipped:` and keeps stock `tabnotes_drafts.pack_phrase_spans`.
 
-- Prefer GP7 .gp/.gpx (parsed GPIF) over .gp5; no GP7→GP5 conversion.
+- Prefer GP7 .gp/.gpx (parsed GPIF) over .gp5; no GP7→GP5 conversion. `gpif_to_gp5` stays unused.
 
-- When several GPs match one track, `catalogue.pick_gp` picks one: readable GP7 `.gp`/`.gpx` (GPIF sniffer) > GP3/4/5 > never a stub (under 10 KB, `*_solo*`/cover/bass-only/Misha-mix/intro-only) > largest; GP7 beats GP5. scan writes that as `gp` and lists runners-up in `notes`; `match=stub` when only stubs exist. Only match=`yes` is bankable — extract, figures, and holdout skip the rest. Files are never deleted or renamed.
+- When several GPs match one track, `catalogue.pick_gp` picks one: readable GP7 `.gp`/`.gpx` (GPIF sniffer) > GP3/4/5 > never a stub (under 10 KB, `*_solo*` / cover / bass-only / Misha-mix / intro-only) > largest; GP7 beats GP5. scan writes that as `gp` and lists runners-up in `notes`; `match=stub` when only stubs exist or the track name is not bankable. Only match=`yes` is bankable. Files are never deleted or renamed. After a gate change, **rescan** — a stale local `map.csv` can still show the old `match=yes`.
+
 - Do not rename FLACs; match tabs in map.csv.
-- Guess / structure / predict (keeper-model) write **drafts only**. Predictor v1 is an optional scaffold — needs non-holdout keepers; holdout-only labs skip Save train unless holdout_fallback is explicit.
-- VAL / holdout songs do not train or vote prefer=; pinning is fine (Rebirth is already pinned).
-- gpif_to_gp5 stays unused.
 
-Dated session notes, commit hashes, UI pixel novels, and predictor manifesto live in CHANGELOG.md.
+- Guess / structure / predict (keeper-model) write **drafts only**. Predictor v1 is an optional scaffold — needs non-holdout keepers; holdout-only labs skip Save train unless holdout_fallback is explicit.
+
+- `drums --per-track` / `vocals --per-track` write analysis rows with no keeper. They are not gold. Do not concatenate them onto `sections.jsonl`.
+
+- map.csv may have one more row than identity.csv (full-album FLAC next to `tracks/`). That orphan is not an album_id. Do not pin it.
+
+- Most tabs are off-clock (`sync` ~20/54). Guess drops markers when `sync_ok` is false. Pin those songs by ear.
+
+Dated session notes live in CHANGELOG.md.

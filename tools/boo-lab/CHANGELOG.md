@@ -1,3 +1,10 @@
+## 2026-09-22 — docs contract matches empty gold
+
+- LAW / lab CURRENT: Rebirth is VAL, **not** currently pinned. Dead snapshot is not keepers. pulse/blast drop at the engine boundary is stated. Matching must use `normalize.track_key`. Empty-gold interns skip extract/compare/learn/predict.
+- CURRENT.md rewritten without control bytes (`figure-hash` / `blast-hint` were corrupted).
+- Parent `docs/CURRENT.md` and `docs/STATUS.md` are pointers. They no longer quote 342 tests, Rebirth F-scores, or "already pinned."
+- STATUS.md Now line: 610 passed on this machine; other docs must not freeze a count.
+
 ## 2026-09-22 — scan never marks a Misha mix / stub as match=yes
 
 - `scan_roots` now also gates on the **track name**: a Misha mix / solo / cover / bass-only request (`is_bankable_track(track, flac name)` False) gets `match="stub"`, never `"yes"`, even when a large GP exists; the picked path stays only as a note and is not claimed. Stub GPs (e.g. a 4 KB `Illusionist.gp4`) already yielded `match="stub"` + empty `gp` via `pick_gp`/`is_stub_gp` on rescan.

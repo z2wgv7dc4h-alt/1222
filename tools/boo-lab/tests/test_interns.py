@@ -35,9 +35,21 @@ def test_runs_every_step_in_order(monkeypatch, tmp_path):
 
     report = interns.run_interns(lab)
 
-    assert calls == list(interns.STEPS)
+    skipped = set(interns._EMPTY_GOLD_SKIP)
+    assert calls == [s for s in interns.STEPS if s not in skipped]
     assert report["stems"] == {"step": "stems"}
     assert report["status"] == {"step": "status"}
+    for name in skipped:
+        assert report[name] == {"skipped": "no keepers"}
+
+
+def test_explicit_steps_run_extract_on_empty_gold(monkeypatch, tmp_path):
+    lab = _lab(tmp_path)
+    calls: list[str] = []
+    _fake_steps(monkeypatch, calls)
+    monkeypatch.setattr(interns, "_rows", lambda *a, **k: [])
+    interns.run_interns(lab, steps=["extract", "status"])
+    assert calls == ["extract", "status"]
 
 
 def test_subset_steps_preserve_given_order(monkeypatch, tmp_path):

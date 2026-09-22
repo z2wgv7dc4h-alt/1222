@@ -1,4 +1,6 @@
-# boo-lab bot list â€” 2026-09-21
+# boo-lab bot list — 2026-09-21
+
+Archived P0–P9 queue. Not current law. Rebirth is VAL; live gold may be empty. Do not restore the old six windows. Live contract: CURRENT.md / LAW.md / USER.md.
 
 Work only in `tools/boo-lab`. Do not touch `engine/` except existing `riff_bank` import. Do not train. Do not write `data/sections.jsonl` keepers. Do not Guess. Do not rename FLACs. Do not commit FLACs, GP, stems, tokens, `.venv`, `work/`.
 

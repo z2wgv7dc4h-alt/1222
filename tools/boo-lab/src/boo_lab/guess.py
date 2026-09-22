@@ -52,9 +52,9 @@ GP7_EXTS = (".gp", ".gpx")
 
 
 def _norm(s: str) -> str:
-    s = (s or "").replace("∆", "A").replace("Δ", "A").replace("δ", "a").lower()
-    s = re.sub(r"^\d+\s*[-_.]\s*", "", s)
-    return re.sub(r"[^a-z0-9]+", "", s)
+    """Compact track key. Delegates to normalize.track_key (∆ reads as a)."""
+    from .normalize import track_key
+    return track_key(s).replace(" ", "")
 
 
 def _prefer_tab(gp: Path | None, track: str) -> Path | None:

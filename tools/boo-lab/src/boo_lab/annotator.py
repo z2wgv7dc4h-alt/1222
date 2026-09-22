@@ -83,11 +83,8 @@ def create_app(lab_root: Path, flac_root: Path | None, gp_root: Path | None) -> 
     sec_path = lab_root / "data" / "sections.jsonl"
 
     def _norm_name(s: str) -> str:
-        import re
-        s = (s or "").replace("∆", "A").replace("Δ", "A").replace("δ", "a").lower()
-        # Strip leading track numbers: "02 - Foo", "02. Foo", or "02 Foo"
-        s = re.sub(r"^\d+(?:\s*[-_.]\s*|\s+)", "", s)
-        return re.sub(r"[^a-z0-9]+", "", s)
+        from .normalize import track_key
+        return track_key(s).replace(" ", "")
 
     _gp5_cache: dict = {"t": None, "idx": {}}
 

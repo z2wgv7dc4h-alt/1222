@@ -93,7 +93,11 @@ More columns.
 VAL songs do not train and do not vote prefer=. You may pin them by ear. Rebirth is VAL. The old six Rebirth rows were invalid times and were deleted. Re-pin by ear; do not restore the old windows.
 
 Guess refuses a song that already has saved boxes.
+Do not Guess a song whose list row says tab off-clock. Most tabs in this corpus are off-clock; pin those by ear.
 Selected song is highlighted in the left list.
+
+Do not pin the full-album FLAC row (the file sitting next to a `tracks/` folder). Pin the numbered track.
+After a scan-rule change, run `python -m boo_lab.cli scan` again so local `map.csv` drops stub/mix `match=yes` rows.
 
 ## Stuck
 

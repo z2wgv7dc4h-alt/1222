@@ -131,15 +131,13 @@ def _stem(p: Path) -> str:
 
 
 def _key(s: str) -> str:
+    """Compact album/track key. Title part uses normalize.track_key (∆ = a)."""
     import re
-    s = (s or "").replace("∆", "A").replace("Δ", "A").replace("δ", "a").lower()
-    # strip a leading track number whether or not a separator follows
-    # ("07 - Exist" and "07 Exist" both -> "exist").
-    s = re.sub(r"^\d+\s*[-_.]\s*|^\d+\s+", "", s)
-    # strip a leading band prefix however it is punctuated
-    s = re.sub(r"^born[\s._-]*of[\s._-]*osiris", "", s)
-    s = re.sub(r"s\d+$", "", s)
-    return re.sub(r"[^a-z0-9]+", "", s)
+    from .normalize import track_key
+    raw = s or ""
+    raw = re.sub(r"^born[\s._-]*of[\s._-]*osiris", "", raw, flags=re.I)
+    raw = re.sub(r"s\d+$", "", raw)
+    return track_key(raw).replace(" ", "")
 
 
 def _lead_num(s: str) -> str:

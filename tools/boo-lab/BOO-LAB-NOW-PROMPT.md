@@ -1,5 +1,7 @@
 # boo-lab NOW prompt — 2026-09-21
 
+Archived job queue. Not current law. Rebirth is VAL; the six placeholder rows were deleted. Do not restore them. Live contract: CURRENT.md / LAW.md / USER.md.
+
 Copy everything between BEGIN and END into the bot as the first message.
 One job per turn. Do not pin songs. Do not Guess. Do not train.
 

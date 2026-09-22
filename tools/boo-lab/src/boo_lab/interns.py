@@ -12,7 +12,9 @@ compare -> learn -> predict -> status. (Step ids `tempo_hints` /
 dispatch convention; the CLI commands are the hyphenated `boo-lab tempo-hints`
 and `boo-lab tabnotes-drafts`. `tabnotes_drafts` writes density drafts for
 packs whose song is `sync_ok`; `predict` infers keeper-model drafts only when
-a trained model exists, else it skips.)
+a trained model exists, else it skips.
+On empty gold the default order skips extract/compare/learn/predict unless
+those ids were passed explicitly in `steps`.)
 """
 from __future__ import annotations
 
@@ -24,6 +26,9 @@ from pathlib import Path
 STEPS = ("stems", "beats", "structure", "drums", "vocals", "lyrics",
          "sync", "tabnotes_drafts", "extract", "figures", "tempo_hints",
          "compare", "learn", "predict", "status")
+
+# Need keepers (and usually a non-holdout one) before these do useful work.
+_EMPTY_GOLD_SKIP = frozenset({"extract", "compare", "learn", "predict"})
 
 
 def _read_jsonl(path: Path) -> list[dict]:
@@ -237,10 +242,17 @@ def run_interns(lab_root, flac_root=None, gp_root=None, *, album=None,
                 steps=None, cache=None) -> dict:
     lab_root = Path(lab_root)
     cache = Path(cache) if cache else lab_root / "work" / "stems"
+    explicit = steps is not None
     steps = list(steps) if steps else list(STEPS)
     rows = _rows(lab_root, flac_root, gp_root, album)
     results: dict = {}
+    from .schema import load_section_rows
+    n_keepers = len(load_section_rows(lab_root / "data" / "sections.jsonl"))
     for step in steps:
+        if (not explicit) and n_keepers == 0 and step in _EMPTY_GOLD_SKIP:
+            results[step] = {"skipped": "no keepers"}
+            print("=== interns:", step, "SKIP no keepers ===")
+            continue
         print("=== interns:", step, "===")
         try:
             if step == "stems":

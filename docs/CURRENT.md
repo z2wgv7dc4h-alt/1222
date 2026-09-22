@@ -1,89 +1,40 @@
 # CURRENT
 
-updated: 2026-09-18
-pytest: engine **820 passed, 1 skipped**; boo-lab **342 passed**
+updated: 2026-09-22
+
+The lab is the active work. Its contract is **`tools/boo-lab/CURRENT.md`**. If this file disagrees with that one, that one wins; then fix this file.
+
+pytest: see `tools/boo-lab/STATUS.md` (lab) and `engine` suite locally. Do not keep a remembered test count here.
 
 ## Now
 
-The lab (`tools/boo-lab`) is the active work and its own source of truth:
-**`tools/boo-lab/CURRENT.md`**. It pins human keepers (`data/sections.jsonl`),
-drafts machine output (`data/drafts.jsonl`), and ships a full studio + CLI
-(spectrogram, draft/keeper schema, witnesses, agreement/JAMS exports).
-Engine work below is paused; nothing here consumes the lab yet.
+- Live lab gold (`tools/boo-lab/data/sections.jsonl`) is **empty** until a human Saves a heard box.
+- The six Rebirth placeholder rows were deleted. Rebirth stays VAL in `holdout.csv`. Do not restore the old windows.
+- Engine work is paused. `extract` may import `engine/riff_bank.py`; generation does not consume new lab pins yet.
+- Do not train. Do not import `riff_model.py`. Do not edit Ww from this repo.
 
-Lab pass (latest commit `37e5d96`): studio lanes are named once in a 44px left gutter and a tile shows only its `figure_id` (no repeated "Riff"). Before it `4e3d283` (GP rematch) / `c851856` (ingest tab-notes). GP7 is native — `boo_lab/gpif.py` parses a
-`.gp`/`.gpx` `score.gpif` (tracks/tunings/instrument, masterbars/time-sig/repeats/sections,
-beats, notes with computed midi + articulations); `sync` prefers a matching `.gp`/`.gpx`
-over a `.gp5` sibling; `tabnotes.py` reads an operator `.zip`/folder pack and `ingest`
-routes it to `data/tabnotes/`. `catalogue` now scores every GP (`exact > substring`,
-lead-number bonus, GP7 bonus) and assigns one GP per FLAC, so the full GP7 packs for
-Discovery / A Higher Place / Eternal Reign (under `gp-tabs/gp7/`, local) win. Interns run on
-**GPU by default** (`boo_lab/device.py`); allin1 is
-repaired for modern natten + madmom on py3.12/numpy2 by `boo_lab/_natten_compat.py` (also aliases the
-`collections` ABCs and runs at `import boo_lab`); `setup.bat` + `constraints.txt` + `boo-lab doctor`
-make a fresh machine reproducible. **Hardening**: the keeper law fails closed (one
-`schema.load_section_rows` reader; `is_keeper`/`canonical_role`/`stamp_box` reject unknowns), every
-`sections.jsonl` write is atomic with a `sections.jsonl.bak` one-step undo, and `beats`/`structure`/
-`sync`/`agree`/`drums`/`vocal_melody` no longer blank their output on a zero-row run. `structure` wrote
-**1450 drafts** across all six albums; `compare` on Rebirth (holdout): **F0.5=0.737 F3=0.800 role3=0.250**;
-`sync` **14/52** (GP7 tabs clock differently than the old `.gp5`s); engine **820 passed, 1 skipped**; boo-lab **342 passed**. Studio now draws beat/downbeat ticks and snaps box edges, plus per-role lanes (click selects, double-click seeks + zooms; right-click edits); Guess carries the tab's section letters/repeats, gates on `sync_ok`, and snaps its audio spans to the beat grid. The lab ships one resumable `boo-lab interns` pass, clocks GP7 `.gp`/`.gpx` natively, and ingests tab-notes packs into `data/tabnotes/`.
+Operator start: `tools/boo-lab/USER.md`, then `START.bat`.
 
-Real, done, verified, pushed this pass (tools/boo-lab/ + engine/riff_bank.py):
-- Labyrinth bank redesigned: ONE real song, ONE 2-4 bar contiguous riff,
-  tiled (the "role-bag medley" approach was heard, killed — see
-  docs/DECISIONS.md). `RiffBankCoverageError` hard-fails a labyrinth role
-  with no bank coverage instead of silently falling back to Markov.
-- `RiffFragment` gained `chord_notes`/`chord_frets` — real chords were
-  being collapsed to their top note only; now 35.6% of hits (real 2-note
-  chords) and 2.5% (3-note) are preserved, not discarded.
-- Real bass/lead-guitar/drum-onset/vocal-melody(pitch only, no lyrics)/
-  audio-fallback extraction, all built and wired.
-- boo-lab: real pytest suite (was zero), content-based mislabeled-.gpx
-  detection (a real corpus scan found 53 `.gp3/4/5`-extensioned files were
-  actually zip-based .gpx content), 6-stem demucs default (guitar now
-  separable from "other"), corpus-health report, train/val holdout,
-  human-role vocab bug fixed (boo-lab's own roles riff/hook/pulse were
-  never translated to the engine's verse/chorus/[none] before being
-  written to RiffFragment.role — dead code path so far, nothing corrupted
-  yet, but was live wrong).
-- Gitignored `tools/boo-lab/data/{riffs,vocal_melody,drum_patterns,
-  section_tempo}.jsonl` — real extracted note/pitch content, same
-  local-only posture as `engine/data/riff_bank.json`, this repo is public.
+## Do
 
-Not yet done: engine-side integration (bass/lead/drums/vocal-melody actually
-consumed by generation) and per-section tempo/time-signature. Everything the
-lab shipped this session is done: pack slices the 6-stem guitar/piano output,
-drum `low_confidence`, CREPE vocal melody, `flac_sha256`/`sync_ok` witnesses,
-box identity fields (`form`/`unique`/`instrument`/bars), and the studio
-spectrogram. Source of truth for all of it: `tools/boo-lab/CURRENT.md`.
+1. Pin by ear on FLACs you own. Heard + Save is gold.
+2. Engine labyrinth stays one song, one 2–4 bar cell, tile. Hard-fail an uncovered role (no silent Markov).
+3. Listen in tab view first.
 
-Do not write more X devices. Do not train. Do not import riff_model.py.
-Do not `/next` the old queue.
+## Do not
 
-1. `tools/boo-lab` — pin riffs on FLACs you own (`START.bat`).
-2. Engine — one `source_song`, 2-4 bar riff, tile. Hard-fail empty labyrinth roles (no silent Markov).
-3. Listen in **tab view** first. NAM/P8 only after that riff survives.
+- Write more X devices.
+- Treat `data/rebirth-sections.jsonl` as keepers.
+- Treat compare scores on VAL as `prefer=`.
+- Commit FLACs, GP files, stems, tokens, `map.csv`.
 
-## Local only (gitignored; missing on a fresh clone)
+## Local only (gitignored)
 
 | What | Path |
 |---|---|
-| Bank 2328 bars / 23 songs | `engine/data/riff_bank.json` |
+| Bank | `engine/data/riff_bank.json` |
 | GP sources | `reference/gp-tabs/` |
-| FluidSynth | `tools/fluidsynth/bin/fluidsynth.exe` |
-| Soundfont | `tools/soundfonts/GeneralUser-GS.sf2` |
-| ffmpeg | `tools/ffmpeg.exe` |
-| Demo | Desktop `phase2_riffbank_demo.mp3` |
+| Corpus | `reference/audio-corpus/` |
+| Lab map / drafts / stems | `tools/boo-lab/data/map.csv`, `drafts.jsonl`, `work/` |
 
-No bank file → labyrinth falls back to Markov. That is degradation, not a pass.
-
-## Gaps that are real
-
-- Bank: zero `chill` / `outro` fragments.
-- P8.2-P8.8 (buses, NAM, sfizz, mix): MISSING. P8.1 `.rpp` exists.
-- `riff_model.py` exists, unused for labyrinth. Do not import it.
-- Twin APIs still live (`structure.pickup` vs `_pickup_cells`; pinch). One winner later, not now.
-
-## History
-
-Session novels: `docs/archive/` (FCC Read denied). Pre-cleanup TASKS/CURRENT: git `ac047fd`. Do not resurrect them into the queue.
+History novels: `docs/archive/`. Lab session notes: `tools/boo-lab/CHANGELOG.md`.

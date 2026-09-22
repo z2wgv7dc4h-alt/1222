@@ -17,7 +17,7 @@
       radial-gradient(1200px 500px at 70% -10%, #1a140c 0%, transparent 50%),
       var(--bg); color:var(--text);
       font:15px/1.45 "Instrument Sans", "Segoe UI", system-ui, sans-serif; overflow:hidden; }
-    .app { display:grid; grid-template-columns:280px 1fr; grid-template-rows:1fr minmax(160px, 28vh); height:100vh; }
+    .app { display:grid; grid-template-columns:280px 1fr; grid-template-rows:1fr; height:100vh; }
     .app > aside:not(.drawer) { grid-row:1 / -1; background:linear-gradient(180deg,#14161c,#0d0f14);
       border-right:1px solid var(--line); overflow-y:scroll; overflow-x:hidden; }
     .app > aside h1 { margin:0; padding:22px 20px 6px; font-family:"Instrument Serif", serif; font-size:28px; font-weight:400; letter-spacing:.02em; color:var(--gold); }
@@ -53,7 +53,8 @@
     .dot { display:inline-block; width:6px; height:6px; border-radius:50%; margin-right:4px; background:#3a3a3e; }
     .dot.ok { background:#7dba7a; }
     .dot.part { background:#c4a35a; }
-    main { display:flex; flex-direction:column; min-width:0; padding:0 24px 120px; overflow:auto; grid-column:2; grid-row:1; }
+    main { display:flex; flex-direction:column; min-width:0; min-height:0; padding:0 24px 16px; overflow:auto; grid-column:2; grid-row:1; }
+    #sectable { min-height:160px; }
     header.now { display:flex; align-items:center; gap:14px; }
     header.now img { width:48px; height:48px; object-fit:cover; border-radius:6px; background:#111; border:1px solid var(--line); display:none; }
     header.now img.on { display:block; }
@@ -86,8 +87,7 @@
     .transport { display:flex; align-items:center; gap:8px; margin:2px 0 8px; flex-wrap:wrap; }
     .transport2 { display:flex; align-items:center; gap:8px; margin:0 0 10px; }
 #btnPlayBox.on { border-color:var(--gold); color:var(--gold); background:color-mix(in srgb, var(--gold) 14%, transparent); }
-.next-act { outline:2px solid var(--gold); outline-offset:2px; animation:nextpulse 1.3s ease-in-out infinite; }
-@keyframes nextpulse { 0%,100% { box-shadow:0 0 0 0 #d4b06a00; } 50% { box-shadow:0 0 0 3px #d4b06a44; } }
+.next-act { outline:2px solid var(--gold); outline-offset:2px; }
     .menu { position:relative; }
     .menu > summary { list-style:none; cursor:pointer; color:var(--mute); font-size:12px; letter-spacing:.08em; text-transform:uppercase; padding:6px 10px; border:1px solid var(--line); border-radius:6px; }
     .menu > summary::-webkit-details-marker { display:none; }
@@ -162,7 +162,7 @@
     .vizdock canvas { width:100%; height:100%; display:block; }
     .vizdock label { position:absolute; left:18px; top:10px; font-size:10px; letter-spacing:.2em; text-transform:uppercase; color:#7a6a4a; pointer-events:none; z-index:1; }
     .vizdock.hidden { display:none; }
-    .app.noviz { grid-template-rows:1fr 0; }
+    .app.noviz { grid-template-rows:1fr; }
     .viewbtns { position:absolute; right:16px; top:8px; display:inline-flex; gap:4px; z-index:2; }
     .viewbtns button { padding:1px 8px; font-size:10px; letter-spacing:.04em; border-radius:999px; color:var(--mute); }
     .viewbtns button.on { border-color:var(--gold); color:var(--gold); }
@@ -301,7 +301,7 @@
         <button type="button" class="pulse" data-role="pulse">Pulse</button>
         <button type="button" class="outro" data-role="outro">Outro</button>
       </div>
-      <div class="err" id="err">Space play · 1 riff 2 hook 3 slam T blast · I intro B build C chill P pulse · S save J/K songs</div>
+      <div class="err" id="err">Space play · 1 riff 2 hook 3 breakdown T blast · I intro B build C chill P pulse · S save J/K songs</div>
     </div>
     <div class="lane" id="wavelane">
       <div class="lane-lab">mix — one lane per role; drag boxes, click empty to seek</div>
@@ -416,7 +416,7 @@ let audioCtx=null, analyser=null, vizSrc=null, vizRAF=0;
 window._dirty=false; window._lastSaved=0;
 
 function fmt(t){ t=Math.max(0,+t||0); return Math.floor(t/60)+":"+String(Math.floor(t%60)).padStart(2,"0"); }
-const DEFAULT_ERR="Space play · 1 riff 2 hook 3 slam T blast · I intro B build C chill P pulse · S save J/K songs";
+const DEFAULT_ERR="Space play · 1 riff 2 hook 3 breakdown T blast · I intro B build C chill P pulse · S save J/K songs";
 // ONE next action, exactly one sentence. Errors still win (showErr explicit).
 function coach(){
   const t=tracks[trackId];
@@ -598,6 +598,7 @@ function specWindow(){
 // The ONLY "detail" jump: double-click a box/row. Pad ~10% of the box span
 // each side so its edges are visible; never called on load / Guess / click.
 function zoomSpecToBox(start,end){
+  buildSpec();  // user asked for a spec zoom: lazy FFT (never on ready)
   const dur=specFullDur();
   const span=Math.max(0.05, (+end||0)-(+start||0));
   const pad=span*0.10;
@@ -664,6 +665,7 @@ function setSpecMode(m){
   if(dock) dock.classList.toggle("hidden", m==="wave");
   if(app) app.classList.toggle("noviz", m==="wave");
   if(waveLane) waveLane.classList.toggle("hidden", m==="spec");
+  if(m!=="wave") buildSpec();  // FFT only when a spec view is opened, never on ready
   drawSpec();
 }
 (function(){
@@ -1080,8 +1082,7 @@ function makeWave(url){
     setPinsReady();  // real duration: role pins may create boxes now
     paintRegions();
     drawBeatGrid();
-    buildSpec();
-    showErr("");
+    showErr("");  // no whole-song FFT here; buildSpec runs when a spec view is opened
   });
   ws.on("error", (e)=>{
     const msg=(e && (e.message||e)) ? String(e.message||e) : "audio decode failed";

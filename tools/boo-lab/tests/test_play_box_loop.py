@@ -12,7 +12,10 @@ def _text() -> str:
 
 
 def test_table_strip_is_taller():
-    assert "grid-template-rows:1fr minmax(160px, 28vh)" in _text()
+    text = _text()
+
+    assert "grid-template-rows:1fr;" in text            # one work-surface row
+    assert "#sectable { min-height:160px; }" in text
 
 
 def test_loop_lights_the_play_box():

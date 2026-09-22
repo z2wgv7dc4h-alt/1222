@@ -172,9 +172,11 @@
     .stembtns button.on { border-color:var(--riff); color:var(--riff); background:rgba(255,168,16,0.14); }
     .stembtns button.off { opacity:.3; cursor:not-allowed; }
     .stembtns button.off:hover { border-color:var(--line); color:var(--mute); }
-    .conf { margin-left:8px; text-transform:none; letter-spacing:0; font-size:11px; color:#c4a35a; }
-    .conf.bad { color:var(--break); }
-    .conf.warn { color:#d4a257; }
+.conf { margin-left:8px; text-transform:none; letter-spacing:0; font-size:11px; color:#c4a35a; }
+.conf.bad { color:var(--break); }
+.conf.warn { color:#d4a257; }
+.srcpip { margin-left:6px; font-size:10px; color:#6a625a; text-transform:none; letter-spacing:0; }
+.srcpip::before { content:"· "; color:#4a4640; }
     button.danger { color:var(--break); border-color:#5a2a26; }
     button.danger:hover { border-color:var(--break); color:#ffb0a6; }
     /* per-role lanes: a region sits only in its role's strip */
@@ -1593,6 +1595,14 @@ function roleSelect(cur){
 function sourceSelect(cur){
   return "<select data-f='source'>"+SOURCE_OPTS.map(o=>"<option value='"+o+"'"+(o===cur?" selected":"")+">"+o+"</option>").join("")+"</select>";
 }
+// Muted pip so a draft's source is visible without More columns. Keepers
+// (human / guess-accepted) stay unmarked.
+function sourcePip(source){
+  const s=String(source||"human").toLowerCase();
+  if(s==="human"||s==="guess-accepted") return "";
+  const short=s.replace("tabnotes-","tn-").replace("-draft","");
+  return "<span class='srcpip' title='draft source: "+escAttr(s)+"'>"+escAttr(short)+"</span>";
+}
 function escAttr(s){ return String(s==null?"":s).replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;"); }
 function table(){
   const tb=document.getElementById("rows"); tb.innerHTML="";
@@ -1601,7 +1611,7 @@ function table(){
     if(i===sel) tr.className="on";
     tr.style.display=inLayer(p.role)?"":"none";
     const cRole=document.createElement("td"); cRole.innerHTML=roleSelect(p.role);
-    const cFig=document.createElement("td"); cFig.innerHTML="<input type='text' list='figureSuggests' data-f='figure_id' value='"+escAttr(p.figure_id|| (p.role+"-A"))+"'>"+(p.adapt?" <span class='conf' title='adapted from your last saves'>"+escAttr(p.adapt)+"</span>":"");
+    const cFig=document.createElement("td"); cFig.innerHTML="<input type='text' list='figureSuggests' data-f='figure_id' value='"+escAttr(p.figure_id|| (p.role+"-A"))+"'>"+(p.adapt?" <span class='conf' title='adapted from your last saves'>"+escAttr(p.adapt)+"</span>":"")+sourcePip(p.source);
     const cForm=document.createElement("td"); cForm.innerHTML="<input type='text' size='2' data-f='form' value='"+escAttr(p.form||"A")+"'>";
     const cUniq=document.createElement("td"); cUniq.innerHTML="<input type='checkbox' data-f='unique'"+(p.unique?" checked":"")+">";
     const cInst=document.createElement("td"); cInst.innerHTML=instSelect(p.instrument||"");

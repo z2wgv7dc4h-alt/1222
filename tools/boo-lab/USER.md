@@ -67,6 +67,8 @@ edit. synth is an instrument (inst), not a role.
 Guess, Load drafts, Lyrics, Pack, Snap, JSON, Drop, git, Remove album,
 More columns.
 
+Remove album asks you to type the album folder name to confirm; a cancel or a mismatch does nothing.
+
 Guess refuses a song that already has saved boxes.
 Do not Guess a song whose list row says tab off-clock. Most tabs in this corpus are off-clock; pin those by ear.
 Selected song is highlighted in the left list.

@@ -279,7 +279,7 @@
                 <label class="ingestbtn">Add folder<input id="ingestFolder" type="file" webkitdirectory directory style="display:none" /></label>
               </div>
             </div>
-            <button type="button" id="btnGit">Push git</button>
+            <button type="button" id="btnGit" title="labels only — no FLACs, no map.csv">Push git</button>
             <button type="button" id="btnRemoveAlbum" class="danger">Remove album</button>
           </div>
         </details>
@@ -1883,7 +1883,7 @@ document.getElementById("btnLyBack").onclick=()=>shiftLyrics(-0.2);
 document.getElementById("btnLyFwd").onclick=()=>shiftLyrics(0.2);
 document.getElementById("btnLySave").onclick=saveLyrics;
 document.getElementById("btnGit").onclick=()=>{
-  showErr("git push…");
+  showErr("git push: labels only — no FLACs, no map.csv…");
   fetch("/api/git/push",{method:"POST",headers:{"Content-Type":"application/json"},body:"{}"}).then(async r=>{
     const x=await r.json();
     showErr(x.ok?("pushed "+(x.root||"")):("git: "+(x.error||x.log||"failed")), !x.ok);
@@ -1892,7 +1892,10 @@ document.getElementById("btnGit").onclick=()=>{
 document.getElementById("btnRemoveAlbum").onclick=()=>{
   const t=tracks[trackId]; if(!t) return;
   const n=tracks.filter(x=>x.album===t.album).length;
-  if(!confirm('Remove album "'+t.album+'"?\n\nDeletes its '+n+' track(s) and GP files from the corpus, drops its labels + holdout rows, then rescans map.csv.\n\nCannot be undone.')) return;
+  // Type-to-confirm: cancel or a mismatch is a no-op (server still re-checks).
+  const typed=prompt('Type the album folder name to confirm removal:\n\n'+t.album+'\n\nDeletes its '+n+' track(s) and GP files from the corpus, drops its labels + holdout rows, then rescans map.csv.\n\nCannot be undone.');
+  if(typed===null) return;
+  if(typed.trim().toLowerCase()!==String(t.album||"").trim().toLowerCase()) return;
   showErr("removing album…");
   fetch("/api/album/remove",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({album:t.album,confirm:true})})
     .then(async r=>{

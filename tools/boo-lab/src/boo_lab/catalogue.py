@@ -12,6 +12,8 @@ from .gate import is_stub_gp
 FIELDS = [
     "album",
     "track",
+    # Stable song id from identity.csv (`boo.discovery`, ...); "" when unknown.
+    "album_id",
     "year",
     "flac",
     "gp",
@@ -282,8 +284,19 @@ def scan_roots(flac_root: Path | None, gp_root: Path | None) -> list[dict]:
             p for p in flac_root.rglob("*")
             if p.suffix.lower() in AUDIO_EXT and not _looks_like_disc_image(p)
         )
+        # Stable album ids come from the shipped identity.csv (never folder
+        # names); "" when the song has no identity row.
+        try:
+            from .identity import album_id_for as _album_id_for
+            from .identity import load_identity as _load_identity
+
+            identity_rows = _load_identity()
+        except Exception:
+            _album_id_for, identity_rows = None, None
         used_gp: set[Path] = set()
         for fp in flacs:
+            album = _album_of(fp)
+            track = fp.stem
             cands = [c for c in _gp_candidates(_stem(fp), gp_files)
                      if c not in used_gp]  # one GP file -> one FLAC
             gp = pick_gp(cands)
@@ -299,10 +312,17 @@ def scan_roots(flac_root: Path | None, gp_root: Path | None) -> list[dict]:
                 match = "stub"
             else:
                 match = "unknown"
+            album_id = ""
+            if _album_id_for is not None:
+                try:
+                    album_id = _album_id_for(album, track, rows=identity_rows) or ""
+                except Exception:
+                    album_id = ""
             rows.append(
                 {
-                    "album": _album_of(fp),
-                    "track": fp.stem,
+                    "album": album,
+                    "track": track,
+                    "album_id": album_id,
                     "year": "",
                     "flac": str(fp),
                     "gp": str(gp) if gp else "",

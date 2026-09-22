@@ -153,7 +153,7 @@ def test_resolve_row_unknown_track_is_none():
 
 def test_save_and_load_map_round_trip(tmp_path):
     rows = [{
-        "album": "A", "track": "T", "year": "", "flac": "f",
+        "album": "A", "track": "T", "album_id": "boo.ahp", "year": "", "flac": "f",
         "gp": "g", "tuning": "drop_g_7", "match": "yes", "notes": "n",
         "flac_sha256": "",
     }]
@@ -292,6 +292,48 @@ def test_scan_roots_matches_space_numbered_gp(tmp_path):
 
     assert rows[0]["match"] == "yes"
     assert rows[0]["gp"] == str(gp)
+
+
+def test_map_example_header_has_album_id_after_track():
+    lab = Path(__file__).resolve().parents[1]
+    header = (lab / "data" / "map.csv.example").read_text(encoding="utf-8").splitlines()[0]
+
+    cols = header.split(",")
+    assert "album_id" in cols
+    assert cols.index("album_id") == cols.index("track") + 1
+
+
+def test_save_map_round_trips_album_id(tmp_path):
+    path = tmp_path / "map.csv"
+    cat.save_map(path, [{"album": "A", "track": "T", "album_id": "boo.ahp"}])
+
+    assert cat.load_map(path)[0]["album_id"] == "boo.ahp"
+
+
+def _scan_one(tmp_path, folder, track):
+    flac_root = tmp_path / "corpus"
+    album = flac_root / folder
+    album.mkdir(parents=True)
+    (album / (track + ".flac")).write_bytes(b"x")
+    return cat.scan_roots(flac_root, None)
+
+
+def test_scan_writes_album_id_for_discovery_fye(tmp_path):
+    rows = _scan_one(tmp_path, "Born of Osiris - The Discovery (Fye Edition) (FLAC)", "14 XIV")
+
+    assert rows[0]["album_id"] == "boo.discovery"
+
+
+def test_scan_writes_album_id_for_soul_sphere(tmp_path):
+    rows = _scan_one(tmp_path, "Born of Osiris - Soul Sphere (2015)", "03 - Free Fall")
+
+    assert rows[0]["album_id"] == "boo.soul_sphere"
+
+
+def test_scan_writes_blank_album_id_for_unknown_folder(tmp_path):
+    rows = _scan_one(tmp_path, "Mystery Band - Mystery Album", "01 - Song")
+
+    assert rows[0]["album_id"] == ""
 
 
 def test_scan_roots_space_numbered_gp_does_not_overmatch(tmp_path):

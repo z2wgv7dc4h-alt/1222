@@ -1,3 +1,9 @@
+## 2026-09-22 — map rows carry `album_id`
+
+- `catalogue.FIELDS` gains `album_id` right after `track`; `scan_roots` stamps each row via `identity.album_id_for(album, track)` (`""` when unknown). `data/map.csv.example` header updated (`album,track,album_id,...`). `map.csv` stays gitignored and `push_lab` still never stages it.
+- `resolve_row` stays string-first; `album_id` is written, not required for lookup.
+- Tests: Discovery FYE + `14 XIV` → `boo.discovery`; Soul Sphere + `03 - Free Fall` → `boo.soul_sphere`; unknown folder → `""`; example header position; save/load round trip.
+
 ## 2026-09-22 — doctor/status honesty on empty gold
 
 - `status.collect_counts` / `render_block` now report keepers (from `load_section_rows`), `holdout: N song(s) reserved`, `identity: K row(s)` (0 when identity.py/CSV missing, no crash), `audit warnings: T` (line omitted when audit is unavailable), and `prefer=:` (`none` when keepers are empty or all holdout). `boo-lab status` prints all of them.

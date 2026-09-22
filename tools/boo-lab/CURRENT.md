@@ -42,7 +42,7 @@ START.bat = scan → hash → full interns (side window) → studio. Studio-only
 
 | path | what |
 |---|---|
-| data/map.csv | scan: album, track, flac/gp paths, match, lac_sha256 (local-only; see .gitignore) |
+| data/map.csv | scan: album, track, album_id, flac/gp paths, match, lac_sha256 (local-only; see .gitignore) |
 | data/sections.jsonl | **keepers** only; Save keeps sections.jsonl.bak |
 | data/drafts.jsonl | machine drafts; never keepers |
 | data/holdout.csv | whole-song train/val reservation |

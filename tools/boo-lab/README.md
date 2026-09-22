@@ -166,7 +166,7 @@ Then `python -m boo_lab.cli scan` and reload. Green GP7/GP5 = matched tab: the b
 
 | cmd | what |
 |---|---|
-| `scan` | rebuild `data/map.csv` (fuzzy FLAC↔tab) |
+| `scan` | rebuild `data/map.csv` (fuzzy FLAC↔tab; stamps `album_id`) |
 | `studio` / `annotate` | UI |
 | `ingest DROP --band NAME` | copy drop into corpus |
 | `stems` | Demucs 6-stem separation into `work/stems` |

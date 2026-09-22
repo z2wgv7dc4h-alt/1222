@@ -29,8 +29,8 @@ Browser: http://127.0.0.1:8765 — Ctrl+Shift+R after an HTML change.
 
 Double-click a box (or its table row) to zoom that part.
 The same double-click starts an **A–B loop** over the box.
-Click away from the looping box (or Esc / Space / Play box once) to stop the loop.
-Drag the box edges to trim it. Play box still plays once without looping.
+Click away from the looping box (or Esc / Space / Play box) to stop the loop.
+Drag the box edges to trim it. Play box lights while looping; with no loop armed it plays once.
 The right-click edit panel closes on an outside click.
 Double-click has ONE meaning: zoom the box and start its A–B loop. **heard** is a
 checkbox or the right-click menu. The **How** button in studio is this Mark list —

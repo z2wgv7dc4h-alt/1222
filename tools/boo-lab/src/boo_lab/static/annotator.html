@@ -17,7 +17,7 @@
       radial-gradient(1200px 500px at 70% -10%, #1a140c 0%, transparent 50%),
       var(--bg); color:var(--text);
       font:15px/1.45 "Instrument Sans", "Segoe UI", system-ui, sans-serif; overflow:hidden; }
-    .app { display:grid; grid-template-columns:280px 1fr; grid-template-rows:1fr 104px; height:100vh; }
+    .app { display:grid; grid-template-columns:280px 1fr; grid-template-rows:1fr minmax(160px, 28vh); height:100vh; }
     .app > aside:not(.drawer) { grid-row:1 / -1; background:linear-gradient(180deg,#14161c,#0d0f14);
       border-right:1px solid var(--line); overflow-y:scroll; overflow-x:hidden; }
     .app > aside h1 { margin:0; padding:22px 20px 6px; font-family:"Instrument Serif", serif; font-size:28px; font-weight:400; letter-spacing:.02em; color:var(--gold); }
@@ -85,6 +85,7 @@
     .lytools { display:flex; gap:6px; margin:0 0 6px; }
     .transport { display:flex; align-items:center; gap:8px; margin:2px 0 8px; flex-wrap:wrap; }
     .transport2 { display:flex; align-items:center; gap:8px; margin:0 0 10px; }
+#btnPlayBox.on { border-color:var(--gold); color:var(--gold); background:color-mix(in srgb, var(--gold) 14%, transparent); }
     .menu { position:relative; }
     .menu > summary { list-style:none; cursor:pointer; color:var(--mute); font-size:12px; letter-spacing:.08em; text-transform:uppercase; padding:6px 10px; border:1px solid var(--line); border-radius:6px; }
     .menu > summary::-webkit-details-marker { display:none; }
@@ -888,6 +889,8 @@ function setRowInst(i,v){
 // nudge edges while it repeats. Click away, Esc, Space, or Play box (once) stops the loop.
 function stopBoxLoop(){
   window._boxLoop=null;
+  const pb=document.getElementById("btnPlayBox");
+  if(pb){ pb.classList.remove("on"); pb.title=""; }
 }
 // Session-only memory of boxes that completed one full A-B pass. Never written
 // to sections.jsonl; it only lets `heard` warn (never refuse).
@@ -910,6 +913,8 @@ function startBoxLoop(i){
   const a=+p.start||0, b=Math.max(a+0.05, +p.end||0);
   window._boxLoop={a:a,b:b,idx:i};
   window._playUntil=null;  // loop owns the end, not one-shot play
+  const pb=document.getElementById("btnPlayBox");
+  if(pb){ pb.classList.add("on"); pb.title="looping — click to stop"; }
   showErr("looping box "+fmt(a)+" – "+fmt(b)+"  (click away / Esc / Space to stop)");
   try{ ws.setTime(a); }catch(e){}
   try{
@@ -1961,7 +1966,12 @@ document.getElementById("btnPack").onclick=()=>{
   }).catch(e=>showErr("pack: "+e,true));
 };
 document.getElementById("btnUndo").onclick=()=>{ if(!undo.length) return; regs=JSON.parse(undo.pop()); sel=Math.min(sel,regs.length-1); table(); paintRegions(); };
-document.getElementById("btnPlayBox").onclick=playBox;
+document.getElementById("btnPlayBox").onclick=()=>{
+  if(window._boxLoop){  // armed: this button now stops the loop (same as Esc)
+    stopBoxLoop(); try{ ws&&ws.pause(); }catch(e){} showErr("loop stopped"); return;
+  }
+  playBox();  // no loop: unchanged one-shot
+};
 document.getElementById("btnNext").onclick=nextGreen;
 // right-click edit panel + layer filter pills
 (function(){

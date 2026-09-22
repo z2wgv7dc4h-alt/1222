@@ -1,3 +1,10 @@
+## 2026-09-22 — bankable/stub gate (CATALOG skip list in code)
+
+- `gate.py` gains `is_bankable_track` (Misha mix / `demo mix` / `*_solo*` / sweep / cover / bass-only / intro-only) and `is_stub_gp` (missing, under 10 KB, or non-bankable name). Name/size checks only — no file is deleted or renamed.
+- `catalogue.scan_roots` writes `match="stub"` (never `"yes"`) when the chosen GP is a stub; `extract`/`figures`/`holdout` only treat `"yes"` as usable. `holdout.candidate_songs` skips non-bankable/stub map rows; the frozen `holdout.csv` is never re-rolled.
+- CURRENT.md documents the `stub` match string.
+- Tests: `tests/test_bankable_gate.py`; existing scan/holdout fixtures bumped to a realistic GP size.
+
 ## 2026-09-22 — comparable keys for inconsistent track/album tokens
 
 - New `src/boo_lab/normalize.py`: `track_key` (drop extension + leading number, casefold, TWDA `∆`→`a`, collapse punctuation) and `album_key` (casefold, strip year/band prefix, drop `(FLAC)`/`(Fye Edition)`/`(2015)` parentheticals). Matching only — never a filename, never a `holdout.csv` rewrite.

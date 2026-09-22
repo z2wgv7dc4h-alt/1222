@@ -32,12 +32,22 @@ def candidate_songs(rows: list[dict], sections: list[dict]) -> list[tuple[str, s
     every map row that is matched with a real GP file on disk, plus every
     track that carries real human labels (a labeled song is real training
     data even when it fell back to audio transcription)."""
+    from .gate import is_bankable_track, is_stub_gp
+
     candidates: set[tuple[str, str]] = set()
     for r in rows:
         match = (r.get("match") or "").lower()
         gp = r.get("gp_path") or r.get("gp") or ""
-        if match in _MATCH_YES and gp and Path(gp).exists():
-            candidates.add((r.get("album") or "", r.get("track") or ""))
+        track = r.get("track") or ""
+        if match not in _MATCH_YES or not gp or not Path(gp).exists():
+            continue
+        # A non-bankable track/GP (Misha mix, *_solo*, tiny stub, cover,
+        # bass-only) is not a holdout candidate. `ensure_holdout` honors an
+        # existing data/holdout.csv as-is, so this only changes a FUTURE
+        # empty-file reselect -- the frozen seven rows are never re-rolled.
+        if not is_bankable_track(track, Path(gp).name) or is_stub_gp(gp):
+            continue
+        candidates.add((r.get("album") or "", track))
     for rec in sections:
         if rec.get("album") and rec.get("track"):
             candidates.add((rec.get("album"), rec.get("track")))

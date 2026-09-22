@@ -27,7 +27,7 @@ def test_select_holdout_rejects_nonsense_stride():
 
 def test_candidate_songs_includes_matched_gp_and_labeled(tmp_path):
     gp = tmp_path / "x.gp5"
-    gp.write_bytes(b"x")
+    gp.write_bytes(b"x" * 10_000)
     rows = [
         {"album": "A", "track": "matched", "match": "yes", "gp_path": str(gp)},
         {"album": "A", "track": "missing_gp", "match": "yes", "gp_path": str(tmp_path / "nope.gp5")},
@@ -39,7 +39,7 @@ def test_candidate_songs_includes_matched_gp_and_labeled(tmp_path):
 
 def test_candidate_songs_missing_gp_column_uses_fallback(tmp_path):
     gp = tmp_path / "x.gp5"
-    gp.write_bytes(b"x")
+    gp.write_bytes(b"x" * 10_000)
     rows = [{"album": "A", "track": "T", "match": "yes", "gp": str(gp)}]
     assert h.candidate_songs(rows, []) == [("A", "T")]
 
@@ -62,7 +62,7 @@ def test_load_holdout_skips_blank_rows(tmp_path):
 
 def test_ensure_holdout_is_persisted_and_stable(tmp_path):
     gp = tmp_path / "x.gp5"
-    gp.write_bytes(b"x")
+    gp.write_bytes(b"x" * 10_000)
     rows = [{"album": "A", "track": f"T{i:02d}", "match": "yes", "gp_path": str(gp)} for i in range(20)]
 
     first = h.ensure_holdout(tmp_path, rows)

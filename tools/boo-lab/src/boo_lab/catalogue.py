@@ -7,6 +7,8 @@ import re
 import tempfile
 from pathlib import Path
 
+from .gate import is_stub_gp
+
 FIELDS = [
     "album",
     "track",
@@ -235,6 +237,15 @@ def scan_roots(flac_root: Path | None, gp_root: Path | None) -> list[dict]:
                        if c not in used_gp), None)  # one GP file -> one FLAC
             if gp is not None:
                 used_gp.add(gp)
+            # A chosen stub GP (tiny / *_solo* / Misha mix / cover / bass-only)
+            # is not a real tab: `match` becomes "stub", never "yes", so
+            # extract/figures/holdout all skip it. Never deletes the file.
+            if gp is None:
+                match = "unknown"
+            elif is_stub_gp(gp):
+                match = "stub"
+            else:
+                match = "yes"
             rows.append(
                 {
                     "album": _album_of(fp),
@@ -243,7 +254,7 @@ def scan_roots(flac_root: Path | None, gp_root: Path | None) -> list[dict]:
                     "flac": str(fp),
                     "gp": str(gp) if gp else "",
                     "tuning": "drop_g_7",
-                    "match": "yes" if gp else "unknown",
+                    "match": match,
                     "notes": "",
                     "flac_sha256": sha256_file(fp),
                 }

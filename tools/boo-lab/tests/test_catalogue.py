@@ -67,7 +67,7 @@ def test_scan_roots_assigns_each_gp_once(tmp_path):
         (album / "tracks" / name).write_bytes(b"x")
     gp_root = tmp_path / "gp"
     gp_root.mkdir()
-    (gp_root / "Born_Of_Osiris-The_Other_Half_Of_Me-s405302.gp").write_bytes(b"x")
+    (gp_root / "Born_Of_Osiris-The_Other_Half_Of_Me-s405302.gp").write_bytes(b"x" * 10_000)
 
     rows = {r["track"]: r for r in cat.scan_roots(flac_root, gp_root)}
 
@@ -230,7 +230,7 @@ def test_scan_roots_matches_a_flac_to_a_gp(tmp_path):
     gp_root = tmp_path / "gp"
     gp_root.mkdir()
     gp = gp_root / "Born_Of_Osiris-Rebirth-s12345.gp5"
-    gp.write_bytes(b"x")
+    gp.write_bytes(b"x" * 10_000)
 
     rows = cat.scan_roots(flac_root, gp_root)
 
@@ -286,7 +286,7 @@ def test_scan_roots_matches_space_numbered_gp(tmp_path):
     gp_root = tmp_path / "gp"
     gp_root.mkdir()
     gp = gp_root / "07 Exist.gp5"
-    gp.write_bytes(b"x")
+    gp.write_bytes(b"x" * 10_000)
 
     rows = cat.scan_roots(flac_root, gp_root)
 

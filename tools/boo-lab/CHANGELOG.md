@@ -1,3 +1,9 @@
+## 2026-09-22 — VAL copy de-conflicted (docs only)
+
+- USER.md VAL paragraphs (Part A + Part B) replaced with one text: pin by ear, no train / `prefer=`, Rebirth is VAL and already pinned — do not wipe it; Guess is still a stencil. Removed "Do not mark them.", "placeholders — wipe or re-pin.", and the "Mark VAL songs." do-not line.
+- README Start drops the stale "(use the lab root under This machine above)" reference. Paths stay `<LAB>` / `<CORPUS>` / `<GP>`.
+- Operator docs (USER/README/CURRENT/LAW/STATUS) now have zero `RIGGUSPIG` / "This machine" hits.
+
 ## 2026-09-22 — GP7 extract prefers GPIF; fuzzy figure clusters
 
 - `.gp`/`.gpx` `extract_riffs` runs the GPIF reader FIRST; pyguitarpro is only the empty/raise fallback, and `via_gpif` keeps human-override times on the GPIF clock (no reparse).

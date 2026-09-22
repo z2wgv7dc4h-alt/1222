@@ -26,7 +26,7 @@ Use placeholders ? never commit machine-absolute roots.
 
 New here? Read **USER.md** first. Easiest (scans, hashes, full resumable `interns` prep, then serves): run `START.bat`. Prep never Guess/Saves; Lab clicks load drafts / lyrics / Guess.
 
-Manual equivalent (use the lab root under **This machine** above):
+Manual equivalent:
 
 ```
 cd <LAB>

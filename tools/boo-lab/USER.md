@@ -70,7 +70,7 @@ The right-click edit panel closes on an outside click.
 
 One album per sitting is enough.
 
-**VAL:** may be pinned by ear; does not train; does not vote `prefer=`. Rebirth keepers were placeholders — wipe or re-pin. Guess is a stencil; do not Save a hash flood.
+VAL songs do not train and do not vote prefer=. You may pin them by ear. Rebirth is VAL and already pinned. Do not wipe it unless a human ticket says so. Guess is still a stencil.
 
 **Keys:** Space play · 1 riff · 2 hook · 3 breakdown · **T blast** · 4 solo · I intro · B build · C chill · P pulse · S save · J / K songs · Delete box · Ctrl+Z undo · Esc stops box loop / closes right-click · ? help.
 
@@ -90,7 +90,7 @@ hide bars and rows — they never edit. synth is an instrument (inst), not a rol
 Guess, Load drafts, Lyrics, Pack, Snap, JSON, Drop, git, Remove album,
 More columns.
 
-**VAL** = holdout / exam song. Do not train on it or vote `prefer=` with it. Pinning is fine; Rebirth keepers were placeholders — wipe or re-pin.
+VAL songs do not train and do not vote prefer=. You may pin them by ear. Rebirth is VAL and already pinned. Do not wipe it unless a human ticket says so. Guess is still a stencil.
 
 Guess refuses a song that already has saved boxes.
 Selected song is highlighted in the left list.
@@ -247,8 +247,7 @@ cells — one short 2-4 bar example per figure name you kept, not a 40-second bo
 
 ## VAL / holdout
 
-Some songs are reserved to test helpers later. The UI marks them VAL.
-Do not mark them. They do not vote for prefer=.
+VAL songs do not train and do not vote prefer=. You may pin them by ear. Rebirth is VAL and already pinned. Do not wipe it unless a human ticket says so. Guess is still a stencil.
 
 ## Pack, stems, lyrics
 
@@ -294,7 +293,6 @@ Short studio titles are fine; the lab maps year-prefixed folder names.
 
 ## Do not
 
-Mark VAL songs.
 Guess a finished song.
 Trust Guess on tab off-clock.
 Expect unheard boxes to survive Save.

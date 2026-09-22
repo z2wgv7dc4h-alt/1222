@@ -201,63 +201,23 @@
 <aside class="drawer" id="howto">
   <button type="button" class="close" id="btnCloseHow">Close</button>
   <h3>How to mark a song</h3>
-  <p><b>Quick start:</b> (1) pick a song on the left and wait until the clock shows its full length. (2) Press a role pin (or 1 for Riff). Then drag the box to fit. (3) Tick <b>heard</b> on every box you actually listened to. (4) Press <b>Save</b>.</p>
-  <p>Guess and Load drafts are suggestions. They are not saved until heard and Save. Do not Guess a finished song. Do not pin VAL.</p>
-  <p><b>Figure</b> is the riff's name. Same idea later = same figure (riff-A).</p>
-  <p>Drag a box to move it, drag its edge to resize, click empty sound to jump there. Boxes may overlap <i>only</i> when their roles differ (e.g. a Breakdown sitting on a Riff).</p>
+  <p><b>Clock must show the song's full length</b> before you draw — not <code>0:00 / -</code>.</p>
+  <ol>
+    <li>A <b>role button</b> creates the box; drag fits it. Drag never creates a box.</li>
+    <li>Same idea later = same <b>figure_id</b> (e.g. <code>riff-A</code>).</li>
+    <li><b>Double-click</b> a box = zoom + its <b>A–B loop</b>. <b>Esc</b> / click-away / <b>Space</b> stops the loop.</li>
+    <li>Tick <b>heard</b> after you looped it — the row checkbox or the right-click menu.</li>
+    <li><b>Save</b> drops every unheard box.</li>
+  </ol>
+  <p><b>VAL</b> songs MAY be pinned by ear; they do not train and do not vote <code>prefer=</code>.</p>
+  <p>Ignore <b>Guess</b> / <b>Load drafts</b> until you know the song by ear.</p>
   <h4>Lanes and right-click</h4>
   <ul>
     <li>One lane per role, top to bottom Intro → Outro. A box sits only in its role's lane, so a Riff + Breakdown + Outro stack shows as three bars at once.</li>
-    <li>Click a bar to select its table row (or click a row to light its bar). Right-click a bar to edit role / figure / heard / unique / inst, <b>Play box</b>, <b>Split at playhead</b>, or <b>Delete</b>. Double-click a bar to zoom to its box; tick heard in the row or right-click menu.</li>
-    <li><b>synth</b> is an instrument (inst), not a role. All / Figures / Functions filters only hide bars and rows — Guess still drafts only, never a keeper.</li>
+    <li>Click a bar to select its row (or a row to light its bar). Right-click a bar to edit role / figure / heard / unique / inst, <b>Play box</b>, <b>Split at playhead</b>, or <b>Delete</b>.</li>
   </ul>
-  <h4>What each table column means</h4>
-  <ul>
-    <li><b>role</b> — what the section is (pick from the list below). The only required label.</li>
-    <li><b>figure</b> — a name for the musical idea, e.g. <code>riff-A</code>. Same idea coming back? Keep the same name. New idea? New letter.</li>
-    <li><b>on figure</b> — for a function box (Blast / Breakdown / …), the figure it sits on, e.g. <code>riff-A</code>. Auto-filled when it overlaps a Riff; empty is fine. Under More columns.</li>
-    <li><b>form</b> — big-picture letter for the song part (A, B, C…). Usually leave it <code>A</code>.</li>
-    <li><b>uniq</b> — tick if this idea happens only once (nothing repeats it).</li>
-    <li><b>inst</b> — which instrument leads here (rhythm / lead / bass / synth…). Blank is fine.</li>
-    <li><b>bar0 / bar1</b> — the tab's measure numbers; filled in automatically on Save when a Guitar Pro tab matches, otherwise blank.</li>
-    <li><b>start / end</b> — seconds in the audio; set by the box you drew.</li>
-    <li><b>source</b> — where the row came from (<code>human</code>, or a draft like Guess / msa-draft). Leave it — Save handles it.</li>
-    <li><b>heard</b> — tick once you've truly listened. Unticked boxes are thrown away on Save.</li>
-  </ul>
-  <p><b>heard is the gate.</b> Only ticked boxes are saved (as <code>human</code>, or <code>guess-accepted</code> if the row started as a draft). Nothing unticked survives. <b>Undo</b> (button or Ctrl+Z) steps back through this session's edits; each Save also keeps the previous file as <code>data/sections.jsonl.bak</code>.</p>
-  <p><b>Same-role overlap</b> — two boxes of the <i>same</i> role overlapping by more than 50&nbsp;ms refuses the whole Save and names the pair. Different roles may overlap freely.</p>
-  <h4>Roles (pick the plainest one)</h4>
-  <ul>
-    <li><b>Intro</b> — the opening (pads, swell, count-in).</li>
-    <li><b>Riff</b> — the repeating guitar idea.</li>
-    <li><b>Hook</b> — the bit you hum / the chorus.</li>
-    <li><b>Breakdown</b> — the half-time slam. Can sit <i>on top of</i> a Riff if the guitar doesn't change.</li>
-    <li><b>Blast</b> — full-speed drums (blast beat): a function, the <i>opposite</i> of a Breakdown. May sit on the same guitar as a Riff. Not a figure — do not name it <code>riff-blast-A</code>.</li>
-    <li><b>Build</b> — a rise that isn't the hook itself.</li>
-    <li><b>Solo</b> — a lead / melodic excursion.</li>
-    <li><b>Chill</b> — the energy sits down (a real breather, not just a quiet intro).</li>
-    <li><b>Pulse</b> — a named synth / keyboard loop you can hum.</li>
-    <li><b>Outro</b> — the ending.</li>
-  </ul>
-  <p>Rule of thumb: Riff/Hook/Solo/Pulse describe a <i>figure</i>; Intro/Build/Breakdown/Blast/Chill/Outro describe a <i>function</i>. Figure and function boxes can overlap. When a function box sits on a figure, the <b>on figure</b> column (More columns) names which figure it rides.</p>
   <h4>Keys</h4>
-  <ul>
-    <li>Space — play / pause</li>
-    <li>1 riff · 2 hook · 3 breakdown · T blast · 4 solo</li>
-    <li>I intro · B build · C chill · P pulse</li>
-    <li>S save · N next with tab · J / K next / previous song</li>
-    <li>Delete — remove selected box · Ctrl+Z undo · ? this panel</li>
-  </ul>
-  <h4>Guess, drafts and the rest</h4>
-  <p><b>Guess</b> — proposes boxes from the Guitar Pro tab's markers (or a local tab-notes pack's own riff/bass/pulse figures, when one exists) plus audio cues (half-time / kick) on the isolated drums — a pack's own kick notation wins over the audio guess when its clock matches. They arrive as unheard <code>source=guess</code> rows. It labels only what it can justify; the status line tells you how far it got — paint the rest by hand. Hover the "N guessed" count for details (sync status, tempo-automation changes worth checking for a boundary, which kick source was used).</p>
-  <p><b>Load drafts</b> — pulls machine drafts (allin1 <code>msa-draft</code>, etc.) for this song and appends them unheard. Tick heard to keep one. Drafts are never saved by themselves, and Save never rewrites them.</p>
-  <p><b>Stem chips</b> — toggle any cached demucs stem (drums / bass / guitar / piano / other / vocals). With one or more on, the main transport plays the <b>sum of those stems</b> (the mix is muted for real), still synced to the playhead and the A–B box loop. All off plays the full mix. Chips for stems this song has not cached are greyed out.</p>
-  <p><b>Pack badge</b> — the song list shows <code>Pack</code> when a local tab-notes pack matches the song, or <code>TN</code> when that pack supplements a GP tab; the <b>Pack</b> filter shows only those songs.</p>
-  <p><b>Drum confidence</b> — if the classifier suspects it undercounted snares on a dense mix, it says so; treat those as "verify by ear".</p>
-  <p><b>VAL badge</b> — this song is held out for validation; leave it unpinned.</p>
-  <p><b>Lyrics</b> — fetch timed lines; click a line to seek; ± moves it 0.2&nbsp;s; Save writes under work/lyrics.</p>
-  <p><b>Pack</b> — after Save, cut per-box audio clips (mix + stems) into work/pack, tagged train/val.</p>
-  <p><b>Push git / Remove album / Drop</b> — commit and push the repo; delete a whole album from the corpus (asks first, only touches files under the configured roots); or add a band by dropping a zip/FLAC/GP.</p>
+  <p>Space play · 1 riff · 2 hook · 3 breakdown · <b>T blast</b> · 4 solo · I intro · B build · C chill · P pulse · S save · J / K songs · Delete box · Ctrl+Z undo · Esc stops loop / closes right-click · ? this panel.</p>
 </aside>
 <div class="app">
   <aside>

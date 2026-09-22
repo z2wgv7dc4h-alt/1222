@@ -1,3 +1,10 @@
+## 2026-09-22 — doctor/status honesty on empty gold
+
+- `status.collect_counts` / `render_block` now report keepers (from `load_section_rows`), `holdout: N song(s) reserved`, `identity: K row(s)` (0 when identity.py/CSV missing, no crash), `audit warnings: T` (line omitted when audit is unavailable), and `prefer=:` (`none` when keepers are empty or all holdout). `boo-lab status` prints all of them.
+- `boo-lab doctor` gains the same `lab:` block and reads cuda/gpu from `device.py`; empty gold still exits 0.
+- STATUS.md counts block regenerated to 0 keepers and the "Now" line states live keepers are empty until a human Saves a heard box (old "6 row(s)" gone).
+- Tests: `test_status.py` empty-gold / holdout-only prefer=none; `test_doctor.py` zero keepers + exit 0, and cuda reported from `device`.
+
 ## 2026-09-22 — remove gpif_to_gp5 from the live surface
 
 - `src/boo_lab/gpif_to_gp5.py` moved to `scripts/gpif_to_gp5.py`; zero `gpif_to_gp5` references remain under `src/`.

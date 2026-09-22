@@ -243,10 +243,16 @@ def main(argv: list[str] | None = None) -> int:
             print("status:", report.get("reason") or "not updated")
             return 1
         c = report["counts"]
-        print("status: keepers=%d/%d drafts=%d (%s) sync_ok=%d/%d map=%d -> %s"
-              % (c["keeper_rows"], c["keeper_tracks"], c["draft_rows"],
-                 ",".join(c["draft_sources"]) or "none", c["sync_ok"], c["sync_total"],
-                 c["map_rows"], report["path"]))
+        print("status: keepers: %d row(s) across %d track(s)"
+              % (c["keeper_rows"], c["keeper_tracks"]))
+        print("status: holdout: %d song(s) reserved" % c.get("holdout_songs", 0))
+        print("status: identity: %d row(s)" % c.get("identity_rows", 0))
+        if c.get("audit_warnings") is not None:
+            print("status: audit warnings: %d" % c["audit_warnings"])
+        print("status: prefer=: %s" % c.get("prefer", "none"))
+        print("status: drafts=%d (%s) sync_ok=%d/%d map=%d -> %s"
+              % (c["draft_rows"], ",".join(c["draft_sources"]) or "none",
+                 c["sync_ok"], c["sync_total"], c["map_rows"], report["path"]))
         return 0
 
     if args.cmd == "interns":

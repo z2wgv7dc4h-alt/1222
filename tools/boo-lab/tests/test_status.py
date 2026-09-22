@@ -34,7 +34,8 @@ def test_refresh_status_rewrites_only_the_block(tmp_path):
     lab = _lab(tmp_path)
     status_path = lab / "STATUS.md"
     status_path.write_text(
-        "# S\n\n" + status.START + "\nold\n" + status.END + "\n\nProse 999 tests pass.\n",
+        "# S\n\n" + status.START + "\nSTALE_BLOCK\n" + status.END
+        + "\n\nProse 999 tests pass.\n",
         encoding="utf-8",
     )
 
@@ -46,7 +47,7 @@ def test_refresh_status_rewrites_only_the_block(tmp_path):
     assert "drafts: 1 row(s); sources: msa-draft" in text
     assert "sync: 1 ok / 2 row(s)" in text
     assert "map.csv: 1 row(s)" in text
-    assert "old" not in text
+    assert "STALE_BLOCK" not in text
     assert "Prose 999 tests pass." in text                  # test line untouched
 
 
@@ -84,6 +85,31 @@ def test_refresh_status_zero_figures_and_tempo_hints(tmp_path):
     text = status_path.read_text(encoding="utf-8")
     assert "figures: 0 row(s) across 0 track(s)" in text
     assert "tempo hints: 0 row(s) across 0 track(s)" in text
+
+
+def test_empty_gold_reports_zero_keepers_and_prefer_none(tmp_path):
+    (tmp_path / "data").mkdir()
+    (tmp_path / "data" / "sections.jsonl").write_text("", encoding="utf-8")
+
+    counts = status.collect_counts(tmp_path)
+
+    assert counts["keeper_rows"] == 0 and counts["keeper_tracks"] == 0
+    assert counts["prefer"] == "none"
+    block = status.render_block(counts)
+    assert "keepers: 0 row(s) across 0 track(s)" in block
+    assert "prefer=: none" in block
+
+
+def test_holdout_only_keepers_report_prefer_none(tmp_path):
+    lab = tmp_path / "lab"
+    (lab / "data").mkdir(parents=True)
+    (lab / "data" / "holdout.csv").write_text(
+        "album,track\nA,T\n", encoding="utf-8")
+    (lab / "data" / "sections.jsonl").write_text(
+        json.dumps({"album": "A", "track": "T", "role": "riff",
+                    "source": "human", "heard": True}) + "\n", encoding="utf-8")
+
+    assert status.collect_counts(lab)["prefer"] == "none"
 
 
 def test_missing_markers_is_not_updated(tmp_path):

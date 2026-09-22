@@ -39,8 +39,10 @@ def run_doctor(lab_root: Path | None = None, require_interns: bool = False) -> i
     try:
         import torch
 
-        cuda = bool(torch.cuda.is_available())
-        gpu = torch.cuda.get_device_name(0) if cuda else ""
+        from . import device
+
+        cuda = device.torch_device() == "cuda"
+        gpu = device.gpu_name() if cuda else ""
         _line("torch", True, f"{torch.__version__}"
               + (f"  cuda=True  gpu={gpu}" if cuda else "  cuda=False"))
     except Exception as exc:  # noqa: BLE001
@@ -67,6 +69,23 @@ def run_doctor(lab_root: Path | None = None, require_interns: bool = False) -> i
     print(" extras:")
     for mod, extra in EXTRAS.items():
         _line(f"{mod}  (pip install -e \".[{extra}]\")", _has(mod))
+
+    if lab_root is not None:
+        print(" lab:")
+        try:
+            from .status import collect_counts
+
+            c = collect_counts(lab_root)
+        except Exception:
+            c = None
+        if c is not None:
+            print("  keepers: %d row(s) across %d track(s)"
+                  % (c["keeper_rows"], c["keeper_tracks"]))
+            print("  holdout: %d song(s) reserved" % c.get("holdout_songs", 0))
+            print("  identity: %d row(s)" % c.get("identity_rows", 0))
+            if c.get("audit_warnings") is not None:
+                print("  audit warnings: %d" % c["audit_warnings"])
+            print("  prefer=: %s" % c.get("prefer", "none"))
 
     print(" hints:")
     if not cuda:

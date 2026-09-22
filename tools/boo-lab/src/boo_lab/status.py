@@ -62,6 +62,52 @@ def _rows_and_tracks(rows: list[dict]) -> tuple[int, int]:
     return len(rows), len({(r.get("album"), r.get("track")) for r in rows})
 
 
+def _identity_rows(lab_root: Path) -> int:
+    """Real `identity.csv` row count; 0 when identity.py (or the CSV) is
+    missing -- never a crash."""
+    try:
+        from .identity import load_identity
+
+        return len(load_identity(lab_root))
+    except Exception:
+        return 0
+
+
+def _audit_warning_total(lab_root: Path) -> int | None:
+    """Total advisory warnings from `audit_lab`, or `None` (omit the line)
+    when audit is unavailable."""
+    try:
+        from .audit import audit_lab
+
+        report = audit_lab(lab_root)
+    except Exception:
+        return None
+    total = 0
+    for key, val in report.items():
+        if isinstance(val, list):
+            total += len(val)
+        elif key == "snapshot_drift" and isinstance(val, dict):
+            total += len(val.get("only_live") or []) + len(val.get("only_snapshot") or [])
+    return total
+
+
+def _prefer_label(lab_root: Path, keeper_rows: list[dict]) -> str:
+    """`prefer=` is `none` when there are no keepers or every keeper is a
+    holdout/VAL song; otherwise the ranked source (or `none`). Read-only --
+    never writes intern_rank.json."""
+    from .holdout import load_holdout
+
+    keys = {(r.get("album") or "", r.get("track") or "") for r in keeper_rows}
+    if not keys or keys <= load_holdout(lab_root):
+        return "none"
+    try:
+        from .learn import preferred_source
+
+        return preferred_source(lab_root) or "none"
+    except Exception:
+        return "none"
+
+
 def collect_counts(lab_root) -> dict:
     from .schema import load_section_rows
 
@@ -75,9 +121,20 @@ def collect_counts(lab_root) -> dict:
     tempo_hints = _read_jsonl(lab_root / "data" / "tempo_hints.jsonl")
     figure_rows, figure_songs = _rows_and_tracks(figures)
     tempo_hint_rows, tempo_hint_songs = _rows_and_tracks(tempo_hints)
+    holdout = 0
+    try:
+        from .holdout import load_holdout
+
+        holdout = len(load_holdout(lab_root))
+    except Exception:
+        holdout = 0
     return {
         "keeper_rows": len(keepers),
         "keeper_tracks": len({(r.get("album"), r.get("track")) for r in keepers}),
+        "holdout_songs": holdout,
+        "identity_rows": _identity_rows(lab_root),
+        "audit_warnings": _audit_warning_total(lab_root),
+        "prefer": _prefer_label(lab_root, keepers),
         "draft_rows": len(drafts),
         "draft_sources": sorted({r.get("source") for r in drafts if r.get("source")}),
         "sync_total": len(sync),
@@ -92,11 +149,18 @@ def collect_counts(lab_root) -> dict:
 
 def render_block(counts: dict) -> str:
     sources = ", ".join(counts["draft_sources"]) or "none"
-    return "\n".join([
+    lines = [
         START,
         "## Counts (from disk)",
         "",
         "- keepers: %d row(s) across %d track(s)" % (counts["keeper_rows"], counts["keeper_tracks"]),
+        "- holdout: %d song(s) reserved" % counts.get("holdout_songs", 0),
+        "- identity: %d row(s)" % counts.get("identity_rows", 0),
+    ]
+    if counts.get("audit_warnings") is not None:
+        lines.append("- audit warnings: %d" % counts["audit_warnings"])
+    lines += [
+        "- prefer=: %s" % counts.get("prefer", "none"),
         "- drafts: %d row(s); sources: %s" % (counts["draft_rows"], sources),
         "- sync: %d ok / %d row(s)" % (counts["sync_ok"], counts["sync_total"]),
         "- map.csv: %d row(s)" % counts["map_rows"],
@@ -104,7 +168,8 @@ def render_block(counts: dict) -> str:
         "- tempo hints: %d row(s) across %d track(s)"
         % (counts["tempo_hint_rows"], counts["tempo_hint_songs"]),
         END,
-    ])
+    ]
+    return "\n".join(lines)
 
 
 def refresh_status(lab_root, status_path=None) -> dict:

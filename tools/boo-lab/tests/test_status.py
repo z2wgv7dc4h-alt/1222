@@ -112,6 +112,23 @@ def test_holdout_only_keepers_report_prefer_none(tmp_path):
     assert status.collect_counts(lab)["prefer"] == "none"
 
 
+def test_status_never_writes_a_pytest_count(tmp_path):
+    lab = _lab(tmp_path)
+    status_path = lab / "STATUS.md"
+    status_path.write_text(
+        "# S\n\n" + status.START + "\nstale\n" + status.END
+        + "\n\nNow: run pytest -q; do not freeze the number here.\n",
+        encoding="utf-8",
+    )
+
+    status.refresh_status(lab, status_path=status_path)
+
+    text = status_path.read_text(encoding="utf-8")
+    assert "passed" not in text
+    assert text.rstrip().endswith("Now: run pytest -q; do not freeze the number here.")
+    assert "passed" not in status.render_block(status.collect_counts(lab))
+
+
 def test_missing_markers_is_not_updated(tmp_path):
     lab = _lab(tmp_path)
     status_path = lab / "STATUS.md"

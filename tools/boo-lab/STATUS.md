@@ -17,4 +17,4 @@ Canonical detail: **CURRENT.md**; commands in **README.md**.
 - tempo hints: 2 row(s) across 1 track(s)
 <!-- status:counts:end -->
 
-**Now:** Live keepers are empty until a human Saves a heard box (the six invalid Rebirth rows were deleted; Rebirth stays VAL/holdout). GP7 `.gp`/`.gpx` extract reads GPIF first; figure clusters fuzzy-merge by `bar_fp` ingredient Jaccard (`FIGURE_JACCARD` 0.80); Guess drops unique hashes once a repeating figure exists. Local pytest on 2026-09-22: **610 passed**. Re-run `pytest -q` and `boo-lab status` after every pass; do not keep a remembered number in other docs.
+**Now:** Live keepers are empty until a human Saves a heard box (the six invalid Rebirth rows were deleted; Rebirth stays VAL/holdout). GP7 `.gp`/`.gpx` extract reads GPIF first; figure clusters fuzzy-merge by `bar_fp` ingredient Jaccard (`FIGURE_JACCARD` 0.80); Guess drops unique hashes once a repeating figure exists. Run `pytest -q`; do not freeze the number here. Re-run `boo-lab status` after every pass.

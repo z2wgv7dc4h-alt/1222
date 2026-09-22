@@ -868,6 +868,9 @@ function startBoxLoop(i){
   }catch(e){}
   Promise.resolve(ws.play(a, b)).catch(()=>{ try{ ws.play(); }catch(e){} });
 }
+// The ONE double-click behaviour (table row and wave region both call this):
+// select, zoom, then A-B loop the box. It never toggles heard -- heard changes
+// only via the row checkbox (data-f=heard) or the right-click ctxHeard menu.
 function selectAndZoomBox(i){
   if(i<0||!regs[i]) return;
   sel=i;

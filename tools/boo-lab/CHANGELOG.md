@@ -1,3 +1,10 @@
+## 2026-09-22 — stable song identity (`album_id`)
+
+- New `src/boo_lab/identity.py`: `load_identity(lab_root)`, `resolve_song(album, track)` (exact then casefold), `album_id_for(album, track)`. A `tracks/` child folder is never an album.
+- New `data/identity.csv`: stable `album_id` values (`boo.ahp`, `boo.twda`, `boo.eternal_reign`, `boo.soul_sphere`, `boo.discovery`, `boo.simulation`) mapped from today's `folder_name` + `track_token`; Discovery Misha mixes stay `boo.discovery` with `notes="misha-mix; do not bank"`.
+- `data/holdout.csv` frozen at seven rows; the freeze note lives in `holdout.py` (CSV has no comment syntax `DictReader` skips). `catalogue.resolve_row` unchanged.
+- Tests: `test_identity.py`, `test_holdout_freeze.py`.
+
 ## 2026-09-22 — CATALOG.md matches the real FLAC tree
 
 - `data/CATALOG.md` rewritten from the committed `flacs.csv`: Soul Sphere folder = Soul Sphere (2015), Discovery FYE folder = The Discovery (2011) + 3 Misha mixes. The 2026-09-12 table that swapped those two rows is recorded as wrong (one story, not two).

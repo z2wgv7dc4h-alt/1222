@@ -19,6 +19,10 @@ _MATCH_YES = {"yes", "y", "1", "true"}
 
 HOLDOUT_FILENAME = "holdout.csv"
 
+# data/holdout.csv is FROZEN at its seven rows -- tests/test_holdout_freeze.py
+# pins them; do not re-roll, append, or rewrite. CSV has no comment syntax that
+# csv.DictReader skips, so this note lives here instead of in the file.
+
 # ~12.5% held out (within the requested 10-15%) -- deterministic every-Nth.
 _TARGET_EVERY = 8
 

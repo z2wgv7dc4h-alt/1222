@@ -2,6 +2,15 @@
 
 Dated 2026-09-22. Older notes are in git (`git log -- tools/boo-lab/CHANGELOG.md`).
 
+## 2026-09-22 — coach + next-act + new pin loops
+
+- One muted coach line under the pins names the single next action; one `.next-act`
+  outline marks the control it points at. Errors still win.
+- A role pin (or 1 2 3 T 4 I B C P) creates a box and starts its A–B loop; the next
+  figure letter is chosen by default (type the old id to reuse).
+- Docs: USER Part A, the How panel, README Start, and CURRENT now state the coach,
+  the Snap default, and the Guess brakes.
+
 ## 2026-09-22
 
 - Empty gold is legal: `data/sections.jsonl` may have zero keepers until a human

@@ -40,6 +40,14 @@ python -m boo_lab.cli studio --port 8765
 Corpus roots come from `.env`: `BOO_FLAC_ROOT=<CORPUS>`, `BOO_GP_ROOT=<GP>`.
 Open http://127.0.0.1:8765 — Ctrl+Shift+R after HTML changes. One server only.
 
+Studio rules in one breath: the clock must show the track's length before pins work;
+a role pin creates a box and starts its A–B loop (double-click also loops; heard is a
+checkbox); the muted coach line under the pins is the next step and **How** is the
+Mark list; a new pin takes the next figure letter — type the old id to reuse; Snap
+starts off (off-clock / mix / album cannot snap); Guess refuses off-clock / mix /
+album-file / an already-finished song; Save drops unheard; VAL may be pinned but does
+not train. Live gold may be empty (Rebirth is VAL) — do not restore the deleted snapshot.
+
 ## Install
 
 New machine: one shot (creates `.venv`, picks GPU-vs-CPU torch, installs core +

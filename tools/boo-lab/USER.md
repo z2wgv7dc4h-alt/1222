@@ -38,7 +38,7 @@ VAL may be pinned by ear.
 A new box starts its loop at once; the muted coach line under the pins names the next step.
 
 1. Click a song on the left.
-2. Wait until the clock shows the real song length. Not `0:00 / -`.
+2. Wait until the clock shows the real song length. Pins stay off until it does.
 3. Press **1** (Riff) or another role button. A box appears.
 4. Drag the box to cover that part. Drag does not create a box — the button does.
 5. A new idea gets the next letter by default (`riff-B`); type the old id
@@ -48,7 +48,7 @@ A new box starts its loop at once; the muted coach line under the pins names the
 
 One album per sitting is enough.
 
-VAL songs do not train and do not vote prefer=. You may pin them by ear. Rebirth is VAL. The old six Rebirth rows were invalid times and were deleted. Re-pin by ear; do not restore the old windows.
+VAL songs do not train and do not vote prefer=. You may pin them by ear. Live gold may be empty. Rebirth is VAL; the six invalid Rebirth rows were deleted — re-pin by ear, do not restore the old snapshot.
 
 **Keys:** Space play · 1 riff · 2 hook · 3 breakdown · **T blast** · 4 solo · I intro · B build · C chill · P pulse · S save · J / K songs · Delete box · Ctrl+Z undo · Esc stops box loop / closes right-click · ? help.
 
@@ -70,10 +70,8 @@ More columns.
 
 Remove album asks you to type the album folder name to confirm; a cancel or a mismatch does nothing.
 Snap starts off; an off-clock tab or a mix/album row cannot snap.
-Guess refuses off-clock (pin by ear), a mix row, or an album file (pin the numbered track).
-
-Guess refuses a song that already has saved boxes.
-Do not Guess a song whose list row says tab off-clock. Most tabs in this corpus are off-clock; pin those by ear.
+Guess refuses off-clock (pin by ear), a mix row, an album file (pin the numbered track), or a song that already has saved boxes.
+Most tabs in this corpus are off-clock; pin those by ear.
 Selected song is highlighted in the left list.
 
 Do not pin the full-album FLAC row (the file sitting next to a `tracks/` folder). Pin the numbered track.

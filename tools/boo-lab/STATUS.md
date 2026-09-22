@@ -17,4 +17,4 @@ Canonical detail: **CURRENT.md**; commands in **README.md**.
 - tempo hints: 2 row(s) across 1 track(s)
 <!-- status:counts:end -->
 
-**Now:** Live keepers are empty until a human Saves a heard box (the six invalid Rebirth rows were deleted; Rebirth stays VAL/holdout). GP7 `.gp`/`.gpx` extract reads GPIF first; figure clusters fuzzy-merge by `bar_fp` ingredient Jaccard (`FIGURE_JACCARD` 0.80); Guess drops unique hashes once a repeating figure exists. Run `pytest -q`; do not freeze the number here. Re-run `boo-lab status` after every pass.
+**Now:** Live keepers are empty until a human Saves a heard box (the six invalid Rebirth rows were deleted; Rebirth stays VAL/holdout). GP7 `.gp`/`.gpx` extract reads GPIF first; figure clusters fuzzy-merge by `bar_fp` ingredient Jaccard (`FIGURE_JACCARD` 0.80); Guess drops unique hashes once a repeating figure exists. Studio: pins wait for the clock, a new pin starts its A–B loop, one muted coach line names the next step; Snap is off by default; Guess refuses off-clock / mix / album / finished. Run `pytest -q`; do not freeze the number here. Re-run `boo-lab status` after every pass.

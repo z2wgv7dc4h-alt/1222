@@ -91,6 +91,9 @@ Song title matching goes through `normalize.track_key` / `album_key` (TWDA `∆`
 
 - Studio may warn on heard-without-loop (session memory only); it does not refuse — heard is still a human checkbox and Save is unchanged.
 
+- Studio: pins wait for the clock; a new role pin starts its A–B loop; one muted coach line under the pins names the next step and one `.next-act` outline marks it. A new box takes the next figure letter (type the old id to reuse).
+- Snap starts off; an off-clock / mix / album-file row disables it. Guess refuses off-clock / mix / album-file / an already-finished song, server-side too.
+
 - `phrase_spans` retune on import is **optional**; failure logs `phrase_retune skipped:` and keeps stock `tabnotes_drafts.pack_phrase_spans`.
 
 - Prefer GP7 .gp/.gpx (parsed GPIF) over .gp5; no GP7→GP5 conversion. `gpif_to_gp5` stays unused.

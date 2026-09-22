@@ -261,7 +261,8 @@ def _measure_cell_and_deltas_gpif(notes, length_beats):
     list, grouped by shared t_beat into chord hits, gaps become explicit
     rests. Mirrors figures._measure_cell_and_deltas_tab's algorithm;
     additionally fills chord_frets from real (string, fret) since GPIF
-    has it (the tab-notes pack path does not)."""
+    has it (the tab-notes pack path does not), and tags a hit
+    `hammer`/`dead` when GPIF says so (no new RiffFragment fields)."""
     by_onset: dict[float, list] = {}
     for n in notes:
         by_onset.setdefault(round(n.t_beat, 6), []).append(n)
@@ -281,6 +282,10 @@ def _measure_cell_and_deltas_gpif(notes, length_beats):
         hit = {"duration": round(dur, 6), "is_rest": False}
         if any(n.palm_mute for n in hit_notes):
             hit["palm_mute"] = True
+        if any(n.hammer for n in hit_notes):
+            hit["hammer"] = True
+        if any(n.dead for n in hit_notes):
+            hit["dead"] = True
         if any("harmonic" in (n.articulations or []) for n in hit_notes):
             hit["harmonic"] = True
         if any("vibrato" in (n.articulations or []) for n in hit_notes):
@@ -306,11 +311,13 @@ def _measure_cell_and_deltas_gpif(notes, length_beats):
 
 
 def extract_fragments_from_gpif(gp_path, song_title=None) -> list:
-    """GPIF-native fallback for a GP7/GP6 (.gp/.gpx) file pyguitarpro
-    can't read (or reads empty). Returns real engine RiffFragment
-    objects (via _engine_riff_bank(), same dataclass the pyguitarpro
-    path uses -- no second schema), one per WRITTEN bar that has notes
-    on the primary guitar track (no repeat expansion, matching
+    """PRIMARY GP7/GP6 (.gp/.gpx) reader -- a modern GP7 file can
+    "succeed" under pyguitarpro with a thin parse, so this native GPIF
+    note source runs FIRST in extract_riffs; pyguitarpro is only the
+    fallback when GPIF raises or yields nothing. Returns real engine
+    RiffFragment objects (via _engine_riff_bank(), same dataclass the
+    pyguitarpro path uses -- no second schema), one per WRITTEN bar that
+    has notes on the primary guitar track (no repeat expansion, matching
     extract_fragments_from_file's own measure_index convention).
     Raises ValueError when no guitar-family track has any notes (fails
     closed, same contract as the pyguitarpro path)."""
@@ -385,12 +392,13 @@ def extract_riffs(
 
     if is_gp7:
         try:
-            fragments = riff_bank.extract_fragments_from_file(gp_path, song_title=source_song)
+            fragments = extract_fragments_from_gpif(gp_path, song_title=source_song)
+            via_gpif = bool(fragments)
         except Exception:
             fragments = None
         if not fragments:
-            fragments = extract_fragments_from_gpif(gp_path, song_title=source_song)
-            via_gpif = bool(fragments)
+            via_gpif = False
+            fragments = riff_bank.extract_fragments_from_file(gp_path, song_title=source_song)
     else:
         fragments = riff_bank.extract_fragments_from_file(gp_path, song_title=source_song)
 

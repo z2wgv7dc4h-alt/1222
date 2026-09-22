@@ -333,6 +333,75 @@ def test_extract_riffs_falls_back_to_gpif_when_pyguitarpro_raises(tmp_path, monk
     assert frags[1]["role"] is None
 
 
+# --- GP7 extract prefers GPIF, gp5 stays pyguitarpro -------------------------
+
+
+@pytest.mark.parametrize("name", ["fixture.gp", "fixture.gpx"])
+def test_extract_riffs_gp7_reads_gpif_first(tmp_path, monkeypatch, name):
+    path = _write_gpif(tmp_path, name=name)
+    real_gpif = ex.extract_fragments_from_gpif
+    seen = []
+
+    def _spy_gpif(p, song_title=None):
+        seen.append("gpif")
+        return real_gpif(p, song_title=song_title)
+
+    rb = ex._engine_riff_bank()
+
+    def _no_pyguitarpro(*a, **k):
+        seen.append("pyguitarpro")
+        raise AssertionError("pyguitarpro must not run when GPIF succeeds")
+
+    monkeypatch.setattr(ex, "extract_fragments_from_gpif", _spy_gpif)
+    monkeypatch.setattr(rb, "extract_fragments_from_file", _no_pyguitarpro)
+
+    frags = ex.extract_riffs(path, "Gpif Tune")
+
+    assert seen == ["gpif"]
+    assert len(frags) == 2
+
+
+def test_extract_riffs_gp5_stays_pyguitarpro(tmp_path, monkeypatch):
+    song = make_song(1, title="Fixture Song")
+    track = make_track(song, 1, {0: [40]}, instrument=30)
+    song.tracks = [track]
+    path = _write(song, tmp_path)
+
+    def _no_gpif(*a, **k):
+        raise AssertionError("GPIF must not run on .gp5")
+
+    monkeypatch.setattr(ex, "extract_fragments_from_gpif", _no_gpif)
+
+    frags = ex.extract_riffs(path, "Fixture Song")
+    assert len(frags) == 1
+
+
+def test_extract_fragments_from_gpif_cell_hit_carries_hammer(tmp_path):
+    from test_gpif import FLAT_XML
+
+    path = _write_gpif(tmp_path, xml=FLAT_XML)
+
+    frags = ex.extract_fragments_from_gpif(path)
+
+    assert frags[0].measure_index == 0
+    assert frags[0].cell[0]["is_rest"] is False
+    assert frags[0].cell[0]["hammer"] is True
+
+
+def test_extract_fragments_from_gpif_cell_hit_carries_dead(tmp_path):
+    from test_gpif import FLAT_XML
+
+    dead_xml = FLAT_XML.replace(
+        '<Property name="Hammer"><Hammer>true</Hammer></Property>',
+        '<Property name="Dead"><Dead>true</Dead></Property>')
+    path = _write_gpif(tmp_path, xml=dead_xml)
+
+    frags = ex.extract_fragments_from_gpif(path)
+
+    assert frags[0].cell[0]["is_rest"] is False
+    assert frags[0].cell[0]["dead"] is True
+
+
 # --- estimate_from_gp --------------------------------------------------------
 
 

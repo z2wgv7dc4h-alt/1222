@@ -1,3 +1,9 @@
+## 2026-09-22 — CATALOG.md matches the real FLAC tree
+
+- `data/CATALOG.md` rewritten from the committed `flacs.csv`: Soul Sphere folder = Soul Sphere (2015), Discovery FYE folder = The Discovery (2011) + 3 Misha mixes. The 2026-09-12 table that swapped those two rows is recorded as wrong (one story, not two).
+- Absolute `C:\Users\...` paths replaced with `<CORPUS>/born_of_osiris`; uncertain tab/coverage lists dropped.
+- `tests/test_catalog_identity.py` fails if the swapped claim or the "Soul Sphere FLACs not in tree" claim returns.
+
 ## 2026-09-22 — VAL copy de-conflicted (docs only)
 
 - USER.md VAL paragraphs (Part A + Part B) replaced with one text: pin by ear, no train / `prefer=`, Rebirth is VAL and already pinned — do not wipe it; Guess is still a stencil. Removed "Do not mark them.", "placeholders — wipe or re-pin.", and the "Mark VAL songs." do-not line.

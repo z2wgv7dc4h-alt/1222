@@ -1,13 +1,13 @@
 # Corpus note
 
-Multi-band tree is `reference/audio-corpus/<band>/`. BoO remains the first band. Veil of Maya etc. must **not** live under `born_of_osiris/new_band`.
+Multi-band tree. Put a new band under `audio-corpus/<band>/`, never inside
+`born_of_osiris/`. BoO remains the first band.
 
-# BoO disk quirks — 2026-09-12
+# BoO disk identity
 
-Tabs: uploaded zip (91 Guitar Pro files after ignoring songsterr-downloader source).
-FLACs: `C:\Users\RIGGUSPIG\Desktop\god-tier-metal\reference\audio-corpus\born_of_osiris`
-
-Do not trust folder titles on the FLAC disk. Two folders are misnamed.
+FLACs live under `<CORPUS>/born_of_osiris`. Some folder titles are wrong — the
+file contents are the truth, not the folder name. This page tracks the real
+FLACs on disk (grounded in `data/flacs.csv` at scan time).
 
 ## Folder labels vs real albums
 
@@ -16,59 +16,46 @@ Do not trust folder titles on the FLAC disk. Two folders are misnamed.
 | 2009 - A Higher Place | A Higher Place (2009) — correct |
 | 2013 - Tomorrow We Die ∆live | Tomorrow We Die Alive (2013) — correct |
 | Born Of Osiris - The Eternal Reign - 2017 | The Eternal Reign (2017) remake of The New Reign — correct |
-| **Born of Osiris - Soul Sphere (2015)** | **The Discovery (2011)** including FYE Misha mixes. Not Soul Sphere. |
-| **Born of Osiris - The Discovery (Fye Edition) (FLAC)** | **The Simulation (2019)** 8 tracks. Not The Discovery. |
-| Born of Osiris - The Simulation (2019) | The Simulation (2019) — same 8 files as the FYE-misnamed folder |
+| Born of Osiris - Soul Sphere (2015) | Soul Sphere (2015) — correct title, 12 real Soul Sphere tracks (The Other Half of Me … The Composer) |
+| Born of Osiris - The Discovery (Fye Edition) (FLAC) | The Discovery (2011) — bad folder title, real Discovery 15 tracks + 3 Misha Mansoor demo mixes |
+| Born of Osiris - The Simulation (2019) | The Simulation (2019) — correct, 8 tracks |
 
-Soul Sphere (2015) FLACs are **not in this tree**. Tabs exist for some of those songs (Illuminate, Resilience, Goddess of the Dawn, Free Fall).
+A **2026-09-12** version of this table said the Soul Sphere folder was The
+Discovery and the FYE folder was The Simulation. That was **wrong** — the two
+rows were swapped. The table above is the corrected one; do not restore the old
+story. Soul Sphere (2015) FLACs **are** in this tree (under the Soul Sphere
+folder), not missing.
 
-## FLACs present (use `tracks/` when it exists)
+## FLACs present
 
-A Higher Place 2009: Rebirth, Elimination, The Accountable, Now Arise, Live Like I'm Real, Starved, Exist, Put To Rest, A Descent, A Higher Place, An Ascent, Thrive, Faces Of Death.
+`<CORPUS>/born_of_osiris/<folder>` track files:
 
-TWDA 2013: Machine, Divergency, Mindful, Exhilarate, Absolution, The Origin, Aeon III, Imaginary Condition, Illusionist, Source Field, Vengeance.
+- **A Higher Place (2009)** — 13 tracks: Rebirth, Elimination, The Accountable,
+  Now Arise, Live Like I'm Real, Starved, Exist, Put To Rest, A Descent,
+  A Higher Place, An Ascent, Thrive, Faces Of Death (+ a full-album file).
+- **Tomorrow We Die Alive (2013)** — 11 tracks: M∆chine, Divergency, Mindful,
+  Exhil∆r∆te, ∆bsolution, The Origin, ∆eon III, Im∆gin∆ry Condition,
+  Illusionist, Source Field, Venge∆nce (+ a full-album file).
+- **Soul Sphere (2015)** — 12 tracks: The Other Half of Me, Throw Me in the
+  Jungle, Free Fall, Illuminate, The Sleeping and the Dead, Tidebinder,
+  Resilience, Goddess of the Dawn, The Louder the Sound the More We All Believe,
+  Warlords, River of Time, The Composer.
+- **The Discovery (2011)** — 15 tracks: Follow the Signs, Singularity, Ascension,
+  Devastate, Recreate, Two Worlds of Design, A Solution, Shaping the Masterpiece,
+  Dissimulation, Automatic Motion, The Omniscient, Last Straw, Regenerate, XIV,
+  Behold; plus 3 Misha Mansoor demo mixes (Follow the Signs, Singularity,
+  Recreate) at the end.
+- **The Eternal Reign (2017)** — 9 tracks: Rosecrance, Empires Erased,
+  Open Arms To Damnation, Abstract Art, The New Reign, Brace Legs, Bow Down,
+  The Takeover, Glorious Day.
+- **The Simulation (2019)** — 8 tracks: The Accursed, Disconnectome,
+  Cycles of Tragedy, Under the Gun, Recursion, Analogs in a Cell,
+  Silence the Echo, One Without the Other.
 
-Eternal Reign 2017: Rosecrance, Empires Erased, Open Arms To Damnation, Abstract Art, The New Reign, Brace Legs, Bow Down, The Takeover, Glorious Day.
+## Operator rules
 
-The Discovery 2011 (in the “Soul Sphere” folder): Follow the Signs … Behold + 3 Misha mixes. Skip mixes for the bank.
-
-The Simulation 2019: The Accursed … One Without the Other. Two copies on disk; pick one folder.
-
-## Tab sources in the zip (duplicates)
-
-- `gprotab/` 10
-- `gtptabs/extracted/born_of_osiris/` 16
-- `musicnoteslib/` 11
-- zip root `Born_Of_Osiris-*-sNNNN.gp` 54 (Songsterr-style ids)
-
-Same song often appears 2–4 times. Prefer the **largest** full-song file. Skip `*_solo*`, `*_intro*`, `*bass*`, `*cover*`, files under ~10 KB (stubs).
-
-## Coverage vs FLACs
-
-Has FLAC + at least one usable-looking tab: Machine, Divergency, Exhilarate, Absolution, The Origin, Aeon III, Illusionist, Vengeance, Bow Down, Brace Legs, Empires Erased, Abstract Art, Rosecrance, Follow the Signs, Singularity, Ascension, Devastate, Recreate, Two Worlds of Design, Dissimulation, Automatic Motion, Last Straw, Regenerate, XIV, Behold, Exist, Now Arise, A Descent, The Takeover, Live Like I'm Real, Under the Gun, Analogs in a Cell.
-
-FLAC, **no tab in this zip**: Rebirth, Elimination, The Accountable, Starved, Put To Rest, A Higher Place, An Ascent, Thrive, Faces Of Death, Mindful, Imaginary Condition, Source Field, Open Arms To Damnation, The New Reign, Glorious Day, A Solution, Shaping the Masterpiece, The Omniscient, The Accursed, Disconnectome, Cycles of Tragedy, Recursion, Silence the Echo, One Without the Other.
-
-Tab, **no FLAC here** (later / other albums): Illuminate, Resilience, Goddess of the Dawn, Free Fall, White Nile, Shadowmourne, Poster Child, Through Shadows, Elevate, Threat of Your Presence, The Other Half of Me.
-
-Tiny / fragment tabs (do not bank as a song): Behold outro solo, Illusionist.gp4 (4 KB), Exhilarate.gp5 (3 KB — use exhilarate_2), Brace_Legs.gp5 1.5 KB, Follow the sings solo cover, Devastate Solo, Behold Sweep, Threat intro, Outro-s69180.
-
-## Preferred GP when several exist
-
-Use these as `map.csv` gp when you copy the zip onto the rig:
-
-| Track | Pick |
-|---|---|
-| Machine | largest of machine_2.gpx / Machine-s383457 / 7-string version |
-| Divergency | gprotab or gtptabs divergency.gp5 (145 KB) |
-| Exhilarate | exhilarate_2.gp5 (132 KB), not the 3 KB file |
-| Aeon III | aeon_iii.gp5 |
-| The Origin | the_origin.gp5 |
-| Follow the Signs | gtptabs follow_the_signs.gp5 (168 KB), not solo/bass variants |
-| Bow Down | bow_down.gp5 |
-| Empires Erased | musicnoteslib Empires_Erased.gpx or gtptabs jerome cover — mark match=unknown until you listen |
-| Behold | full song tab if any; behold_outro_solo is not the song |
-
-## Zip junk (ignore)
-
-`songsterr-downloader/` (~4700 files, app + test json). `New folder/CLAUDE.md`. Nested `gtptabs/born_of_osiris.zip` if already extracted.
+- Do not trust folder titles blindly — check the file contents/album.
+- Skip `*_solo*`, tiny stubs, cover/bass-only tabs, and Misha mixes when banking
+  a song.
+- Prefer the largest full-song GP when duplicates exist.
+- New bands sit under `audio-corpus/<band>/`, never inside `born_of_osiris/`.

@@ -263,7 +263,7 @@
             <button type="button" id="btnDrafts">Load drafts</button>
             <button type="button" id="btnLyrics">Lyrics</button>
             <button type="button" id="btnPack">Pack</button>
-            <label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;white-space:nowrap" title="Snap box edges to the nearest downbeat (run `boo-lab beats` first)"><input type="checkbox" id="snapBeat" checked> Snap beats</label>
+            <label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;white-space:nowrap" title="Off by default. Disabled when the tab is off-clock or the row is a mix/album file."><input type="checkbox" id="snapBeat"> Snap beats</label>
             <button type="button" id="btnDump">JSON</button>
             <button type="button" id="btnJams" title="Write this song's keepers as one JAMS 0.3 file under work/jams/">JAMS</button>
             <button type="button" id="btnNext">Next GP</button>
@@ -688,9 +688,17 @@ function drawBeatGrid(){
   line(beatsData.downbeats,"0.5",h*0.25);
 }
 
+// Snap starts off. It is refused (and the checkbox disabled) for an off-clock
+// tab or a mix / album-file row; snapTime is a no-op while disabled.
+function applySnapAvailability(t){
+  const cb=document.getElementById("snapBeat"); if(!cb) return;
+  const blocked=!!(t && (t.off_clock || t.mix || t.album_file));
+  cb.disabled=blocked;
+  if(blocked) cb.checked=false;
+}
 function snapTime(t){
   const on=document.getElementById("snapBeat");
-  if(on && !on.checked) return t;
+  if(!on || on.disabled || !on.checked) return t;
   let best=null,bd=1e9;
   for(const c of (beatsData.downbeats||[])){ const d=Math.abs(c-t); if(d<bd){bd=d;best=c;} }
   if(best!=null && bd<=0.25) return best;             // downbeat within 250 ms
@@ -1541,6 +1549,7 @@ document.querySelectorAll(".filters button").forEach(b=>{
 function select(i){
   trackId=i; const t=tracks[i];
   if(t && t.album) shut[t.album]=false;
+  applySnapAvailability(t);
   const titleEl=document.getElementById("title");
   const setTitle=()=>{ titleEl.textContent=t.track||""; };
   if(document.startViewTransition) document.startViewTransition(setTitle); else setTitle();

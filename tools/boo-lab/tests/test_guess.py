@@ -396,6 +396,58 @@ def test_figure_drafts_prefill_inst_from_figures_instrument(tmp_path):
     assert by_fig["riff-B"] == ""
 
 
+def _wire_figure_rows(tmp_path, monkeypatch, rows):
+    lab = tmp_path / "lab"
+    (lab / "data").mkdir(parents=True, exist_ok=True)
+    (lab / "data" / "sync.jsonl").write_text(
+        json.dumps({"album": "A", "track": "Fixture", "sync_ok": True}) + "\n",
+        encoding="utf-8")
+    (lab / "data" / "figures.jsonl").write_text(
+        "".join(json.dumps(r) + "\n" for r in rows), encoding="utf-8")
+    flac = tmp_path / "song.flac"
+    flac.write_bytes(b"x")
+    monkeypatch.setattr(soundfile, "info",
+                        lambda *a, **k: types.SimpleNamespace(frames=int(22050 * 100), samplerate=22050))
+    monkeypatch.setattr(g, "GP5_ROOTS", [tmp_path / "no_gp5"])
+    monkeypatch.setattr(g, "_prefer_tab", lambda gp, track: None)
+    import boo_lab.stems as st
+    monkeypatch.setattr(st, "ensure_drums", lambda f, c: (None, "none"))
+    monkeypatch.setattr(g, "_librosa_beats", lambda wav: {"beats": [], "bpm": None})
+    monkeypatch.setattr(g, "_half_time_spans", lambda beats, min_len=6.0: [])
+    monkeypatch.setattr(g, "_kick_spans", lambda wav: [])
+    return g.estimate_hybrid(flac, None, track="Fixture",
+                             cache=lab / "work" / "stems", album="A")
+
+
+def test_guess_drops_unique_hashes_when_a_repeat_exists(tmp_path, monkeypatch):
+    rows = [
+        {"album": "A", "track": "Fixture", "figure_id": "riff-A", "unique": False,
+         "times_trusted": True,
+         "occurrences": [{"start": 1.0, "end": 5.0, "start_bar": 1, "end_bar": 2},
+                         {"start": 20.0, "end": 24.0, "start_bar": 5, "end_bar": 6}]},
+        {"album": "A", "track": "Fixture", "figure_id": "riff-B", "unique": True,
+         "times_trusted": True,
+         "occurrences": [{"start": 40.0, "end": 44.0, "start_bar": 9, "end_bar": 10}]},
+    ]
+
+    res = _wire_figure_rows(tmp_path, monkeypatch, rows)
+
+    figs = [s for s in res["sections"] if s.get("source") == "guess"]
+    assert figs and all(s["figure_id"] == "riff-A" for s in figs)
+    assert not [s for s in figs if s["figure_id"] == "riff-B"]
+
+
+def test_guess_keeps_unique_hashes_when_no_repeat(tmp_path, monkeypatch):
+    rows = [{"album": "A", "track": "Fixture", "figure_id": "riff-B", "unique": True,
+             "times_trusted": True,
+             "occurrences": [{"start": 40.0, "end": 44.0, "start_bar": 9, "end_bar": 10}]}]
+
+    res = _wire_figure_rows(tmp_path, monkeypatch, rows)
+
+    figs = [s for s in res["sections"] if s.get("source") == "guess"]
+    assert figs and figs[0]["figure_id"] == "riff-B"
+
+
 # --- tempo-automation hints (informational note, never a box) ---------------
 
 

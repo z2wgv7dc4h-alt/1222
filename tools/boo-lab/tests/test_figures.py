@@ -114,6 +114,78 @@ def test_cluster_song_two_hashes_lettered_by_start():
     assert clusters[0]["unique"] is True
 
 
+def _fp_bar(pcs, rest=False):
+    rhythm = ((2, True),) if rest else ((2, False),)
+    return (rhythm, (), tuple((p,) for p in pcs))
+
+
+def _wfps(h, fps, start=0.0, letter=None, role="riff"):
+    n_bars = len(fps)
+    return {"hash": h, "start": start, "end": start + 2.0 * n_bars,
+            "start_bar": 1, "end_bar": n_bars, "n_bars": n_bars,
+            "letter": letter, "role": role, "fps": tuple(fps)}
+
+
+_NEAR_A = [_fp_bar([0]), _fp_bar([2]), _fp_bar([4]), _fp_bar([5])]
+_NEAR_B = [_fp_bar([0]), _fp_bar([2]), _fp_bar([4]), _fp_bar([5, 7])]
+
+
+def test_cluster_song_identical_fps_one_cluster_with_n_hits():
+    a = _wfps("H", [_fp_bar([0]), _fp_bar([5])], start=0.0)
+    b = _wfps("H", [_fp_bar([0]), _fp_bar([5])], start=8.0)
+
+    clusters = figures.cluster_song([a, b])
+
+    assert len(clusters) == 1
+    assert clusters[0]["n_hits"] == 2 and clusters[0]["unique"] is False
+    assert [o["start"] for o in clusters[0]["occurrences"]] == [0.0, 8.0]
+
+
+def test_cluster_song_near_equal_fps_merge_at_threshold():
+    a = _wfps("H1", _NEAR_A, start=0.0)
+    b = _wfps("H2", _NEAR_B, start=16.0)
+
+    clusters = figures.cluster_song([a, b])
+
+    assert len(clusters) == 1
+    c = clusters[0]
+    assert c["n_hits"] == 2 and c["unique"] is False
+    assert c["figure_id"] == "riff-A"
+    assert [o["start"] for o in c["occurrences"]] == [0.0, 16.0]
+
+
+def test_cluster_song_different_gp_letters_do_not_merge():
+    a = _wfps("H1", _NEAR_A, start=0.0, letter="A")
+    b = _wfps("H2", _NEAR_B, start=16.0, letter="B")
+
+    clusters = figures.cluster_song([a, b])
+
+    assert len(clusters) == 2
+    assert {c["figure_id"] for c in clusters} == {"riff-A", "riff-B"}
+
+
+def test_cluster_song_conflict_blocks_fuzzy_merge():
+    # Same GP letter on two exact groups -> both conflict -> near-equal fps
+    # must NOT fuzzy-merge.
+    a = _wfps("H1", _NEAR_A, start=0.0, letter="A")
+    b = _wfps("H2", _NEAR_B, start=16.0, letter="A")
+
+    clusters = figures.cluster_song([a, b])
+
+    assert len(clusters) == 2
+    assert all(c["conflict"] for c in clusters)
+    assert {c["figure_id"] for c in clusters} == {"riff-A"}
+
+
+def test_cluster_song_length_ratio_below_half_does_not_merge():
+    a = _wfps("H1", [_fp_bar([0])], start=0.0)
+    b = _wfps("H2", [_fp_bar([0]), _fp_bar([0]), _fp_bar([0])], start=8.0)
+
+    clusters = figures.cluster_song([a, b])
+
+    assert len(clusters) == 2
+
+
 def test_build_figures_zero_rows_does_not_blank_existing(tmp_path):
     lab = tmp_path / "lab"
     (lab / "data").mkdir(parents=True)

@@ -4,9 +4,10 @@ Given a matched GP5 or a local tab-notes pack (`tabnotes.py`; the pack wins
 when both are available, same precedence `sync.py` already uses), fingerprint
 each bar (`bar_fp`), segment playback order into maximal runs of equal bars,
 and emit windows that are RUNS -- an ostinato run is one window, never a pile
-of sliding 1-bar 2/4-bar windows. Cluster windows by exact fingerprint, name
-them by a consistent GP marker letter or `riff-A/B` by first start, and flag a
-letter that maps to two fingerprints (`conflict`). This is identity, not
+of sliding 1-bar 2/4-bar windows. Cluster windows by exact fingerprint, then
+fuzzy-merge near-equal clusters by bar_fp ingredient Jaccard (`FIGURE_JACCARD`),
+name them by a consistent GP marker letter or `riff-A/B` by first start, and flag
+a letter that maps to two fingerprints (`conflict`). This is identity, not
 segmentation: it never cuts new boxes and never invents boundaries.
 
 Repeating clusters (`n_hits >= 2`) stay the trusted identity stream. Unique
@@ -24,6 +25,12 @@ import json
 from pathlib import Path
 
 _ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+
+# Real near-equality threshold for the fuzzy figure merge: two windows whose
+# bar_fp ingredient sets (onsets/rests + pitch-class sets) are at least this
+# Jaccard-similar are the same real figure even when their exact hashes differ
+# (human/transcription jitter in one bar). Exact-hash groups always merge first.
+FIGURE_JACCARD = 0.80
 
 
 def _letters(i: int) -> str:
@@ -89,12 +96,91 @@ def _occ(w):
             "start_bar": w.get("start_bar"), "end_bar": w.get("end_bar")}
 
 
+def _fp_ingredients(window):
+    """Set of one window's own `bar_fp` ingredients -- onset/rest tokens plus
+    pitch-class-set tokens -- or `None` when the window carries no `fps`
+    (hand-built windows, or a caller that only holds a hash). Never guesses
+    ingredients back out of a hash."""
+    fps = window.get("fps")
+    if not fps:
+        return None
+    toks: set = set()
+    for fp in fps:
+        try:
+            rhythm, _deltas, pcs = fp
+        except (TypeError, ValueError):
+            return None
+        for dur, is_rest in rhythm:
+            toks.add(("o", int(dur), bool(is_rest)))
+        for hit in pcs:
+            toks.add(("p", tuple(int(p) for p in hit)))
+    return toks
+
+
+def _ingredient_jaccard(a, b) -> float:
+    if not a or not b:
+        return 0.0
+    return len(a & b) / float(len(a | b))
+
+
+def _length_ratio(a, b) -> float:
+    la = int(a.get("n_bars") or 0)
+    lb = int(b.get("n_bars") or 0)
+    if la <= 0 or lb <= 0:
+        return 0.0
+    return min(la, lb) / float(max(la, lb))
+
+
+def _can_fuzzy_merge(a, b) -> bool:
+    """Real merge gate for the fuzzy pass: neither side a GP-letter conflict,
+    not two different GP letters, roles match (both `riff` when unlabeled),
+    similar window length (>= 0.5), and bar_fp ingredient Jaccard >=
+    `FIGURE_JACCARD`."""
+    if a.get("conflict") or b.get("conflict"):
+        return False
+    la, lb = a.get("letter"), b.get("letter")
+    if la and lb and la != lb:
+        return False
+    if (a.get("role") or "riff") != (b.get("role") or "riff"):
+        return False
+    if _length_ratio(a, b) < 0.5:
+        return False
+    return _ingredient_jaccard(a.get("ingredients"), b.get("ingredients")) >= FIGURE_JACCARD
+
+
+def _merge_clusters(a, b) -> dict:
+    """Merge cluster `b` into earlier cluster `a`: keep `a`'s representative
+    hash/length, `a`'s figure identity unless only `b` has a GP letter, sum
+    `n_hits`, and sort occurrences by start."""
+    occ = sorted(a["occurrences"] + b["occurrences"], key=_first_key)
+    first = occ[0]
+    n_hits = a["n_hits"] + b["n_hits"]
+    return {
+        "hash": a.get("hash"),
+        "n_bars": a.get("n_bars"),
+        "start": first.get("start"),
+        "end": first.get("end"),
+        "start_bar": first.get("start_bar"),
+        "end_bar": first.get("end_bar"),
+        "n_hits": n_hits,
+        "unique": n_hits == 1,
+        "occurrences": occ,
+        "role": a.get("role") or b.get("role"),
+        "letter": a.get("letter") or b.get("letter"),
+        "conflict": False,
+        "ingredients": a.get("ingredients") or b.get("ingredients"),
+    }
+
+
 def cluster_song(windows) -> list[dict]:
-    """Cluster windows by EXACT fingerprint (no Jaccard merge).
+    """Cluster windows by EXACT fingerprint, then fuzzy-merge near-equal
+    clusters whose bar_fp ingredients clear `FIGURE_JACCARD` (same role,
+    comparable length, neither side a GP-letter conflict).
 
     `figure_id` = a consistent GP marker letter (`{role}-{letter}`) else
     `riff-A`, `riff-B`, ... by first start. `conflict` is true when one GP
-    letter maps to two different fingerprints."""
+    letter maps to two different fingerprints; a conflict blocks the fuzzy
+    merge entirely."""
     groups: dict[str, list[dict]] = {}
     for w in windows or []:
         groups.setdefault(w.get("hash"), []).append(w)
@@ -121,15 +207,12 @@ def cluster_song(windows) -> list[dict]:
             "occurrences": [_occ(w) for w in occ],
             "role": role,
             "letter": next(iter(letters)) if len(letters) == 1 else None,
+            "ingredients": _fp_ingredients(first),
         })
     out.sort(key=_first_key)
-    unnamed = 0
-    for c in out:
-        if c["letter"]:
-            c["figure_id"] = "%s-%s" % (c["role"] or "riff", c["letter"])
-        else:
-            c["figure_id"] = "riff-" + _letters(unnamed)
-            unnamed += 1
+
+    # GP-letter conflicts are read off the EXACT groups first (a letter mapping
+    # to two fingerprints) and must block any fuzzy merge below.
     by_letter: dict[str, set] = {}
     for c in out:
         if c["letter"]:
@@ -137,6 +220,29 @@ def cluster_song(windows) -> list[dict]:
     conflicts = {letter for letter, hashes in by_letter.items() if len(hashes) > 1}
     for c in out:
         c["conflict"] = bool(c["letter"] and c["letter"] in conflicts)
+
+    # Greedy earliest-first fuzzy merge: one merge per scan, repeat until none.
+    changed = True
+    while changed:
+        changed = False
+        for i in range(len(out)):
+            for j in range(i + 1, len(out)):
+                if _can_fuzzy_merge(out[i], out[j]):
+                    out[i] = _merge_clusters(out[i], out[j])
+                    del out[j]
+                    changed = True
+                    break
+            if changed:
+                break
+    out.sort(key=_first_key)
+
+    unnamed = 0
+    for c in out:
+        if c["letter"]:
+            c["figure_id"] = "%s-%s" % (c["role"] or "riff", c["letter"])
+        else:
+            c["figure_id"] = "riff-" + _letters(unnamed)
+            unnamed += 1
     return out
 
 
@@ -401,6 +507,9 @@ def _make_window(entries):
         "n_repeats": n_repeats,
         "letter": letter,
         "role": role,
+        # Real per-bar ingredients powering the fuzzy near-equal merge in
+        # cluster_song (never re-derived from the hash).
+        "fps": tuple(bar_fp(c) for c in cells),
     }
 
 

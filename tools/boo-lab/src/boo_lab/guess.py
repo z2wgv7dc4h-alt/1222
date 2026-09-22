@@ -718,7 +718,11 @@ def estimate_hybrid(
     figures_drafts = 0
     if plan["sync_ok"]:
         new_figs = _figure_drafts(lab_root, lookup_album, lookup_track, sections)
-        if pack_phrases > 0:
+        # When this song already has a repeating figure (any non-unique
+        # cluster), the unique one-shot hashes are noise beside it -- drop
+        # them. A song with ONLY unique hashes keeps them, so Guess is not
+        # empty. Pack phrases remain a separate reason to drop unique hashes.
+        if pack_phrases > 0 or any(not d.get("unique") for d in new_figs):
             new_figs = [d for d in new_figs if not d.get("unique")]
         kept = _suppress_figure_flood(new_figs, sections, duration=real_duration)
         if len(kept) != len(new_figs):

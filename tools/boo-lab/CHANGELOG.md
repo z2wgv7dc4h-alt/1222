@@ -1,3 +1,10 @@
+## 2026-09-22 — comparable keys for inconsistent track/album tokens
+
+- New `src/boo_lab/normalize.py`: `track_key` (drop extension + leading number, casefold, TWDA `∆`→`a`, collapse punctuation) and `album_key` (casefold, strip year/band prefix, drop `(FLAC)`/`(Fye Edition)`/`(2015)` parentheticals). Matching only — never a filename, never a `holdout.csv` rewrite.
+- `catalogue.resolve_row` tries the loose `track_key`/`album_key` only after exact, casefold, and the existing normalized steps.
+- `identity.resolve_song` keeps exact `folder_name`+`track_token` first; `track_key` is the second chance. `identity.album_id` still wins when a pair is present.
+- Tests: `tests/test_normalize.py` (+ `test_identity.py` second-chance).
+
 ## 2026-09-22 — health report stops mixing role vocabularies
 
 - `report.ROLE_VOCABULARY` is now `schema.ROLES` exactly (adds the missing `blast`).

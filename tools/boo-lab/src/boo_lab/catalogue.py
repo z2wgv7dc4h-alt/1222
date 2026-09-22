@@ -291,6 +291,23 @@ def _album_tightness(row_album: str | None, query: str, query_cf: str) -> int:
     return 0
 
 
+def _loose_resolve(rows: list[dict], album: str | None, track: str | None) -> dict | None:
+    """Last-resort comparable-key match (normalize.album_key/track_key): the
+    separator / `∆` / parenthetical spellings the exact and normalized steps
+    miss. Never beats an exact/casefold/normalized hit -- called only after
+    those fail."""
+    from .normalize import album_key, track_key
+
+    a_key = album_key(album)
+    t_key = track_key(track)
+    if not a_key or not t_key:
+        return None
+    for r in rows:
+        if album_key(r.get("album")) == a_key and track_key(r.get("track")) == t_key:
+            return r
+    return None
+
+
 def resolve_row(rows: list[dict], album: str | None, track: str | None) -> dict | None:
     """The one map-row resolver: exact → casefold → year-prefix album +
     normalized track. Returns the real row (or `None`), never a fabricated one.
@@ -320,12 +337,13 @@ def resolve_row(rows: list[dict], album: str | None, track: str | None) -> dict 
     a_core = _album_core(query)
     t_key = _track_key(track_q)
     if not a_core or not t_key:
-        return None
+        # (e) last-resort comparable keys (normalize.track_key) before giving up
+        return _loose_resolve(rows, query, track_q)
     cands = [r for r in rows
              if _album_core(r.get("album")) == a_core
              and _track_key(r.get("track")) == t_key]
     if not cands:
-        return None
+        return _loose_resolve(rows, query, track_q)
     # Prefer a row whose raw track still carries the queried number.
     q_digits = re.findall(r"\d+", track_q)
     if q_digits:

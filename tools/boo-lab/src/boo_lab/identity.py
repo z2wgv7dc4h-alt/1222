@@ -67,6 +67,16 @@ def resolve_song(album, track, rows: list[dict] | None = None) -> dict | None:
     for r in rows:
         if _norm(r.get("folder_name")) == album_key and _norm(r.get("track_token")) == track_key:
             return r
+    # Second chance: comparable keys (separator / `∆` / parenthetical spellings).
+    from .normalize import album_key as _album_key, track_key as _track_key
+
+    loose_album = _album_key(album)
+    loose_track = _track_key(track)
+    if loose_album and loose_track:
+        for r in rows:
+            if (_album_key(r.get("folder_name")) == loose_album
+                    and _track_key(r.get("track_token")) == loose_track):
+                return r
     return None
 
 

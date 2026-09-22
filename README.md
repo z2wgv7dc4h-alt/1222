@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/art/hero.jpg" alt="" width="100%">
+</p>
+
 # God Tier Metal
 
 **The lab is the active work.** Everything else is paused.

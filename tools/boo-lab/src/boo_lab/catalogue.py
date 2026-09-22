@@ -7,7 +7,7 @@ import re
 import tempfile
 from pathlib import Path
 
-from .gate import is_stub_gp
+from .gate import is_bankable_track, is_stub_gp
 
 FIELDS = [
     "album",
@@ -305,7 +305,12 @@ def scan_roots(flac_root: Path | None, gp_root: Path | None) -> list[dict]:
             # is never picked: `gp` stays empty and `match` is "stub", never
             # "yes", so extract/figures/holdout all skip it. No file is copied
             # or deleted; the runners-up are only listed in `notes`.
-            if gp is not None:
+            if not is_bankable_track(track, fp.name):
+                # The TRACK itself is a Misha mix / solo / cover / bass-only
+                # request -- never a real tab match, even if a big GP exists.
+                # Keep any picked path only as a note (do not claim it).
+                match = "stub"
+            elif gp is not None:
                 used_gp.add(gp)
                 match = "yes"
             elif cands:

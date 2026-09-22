@@ -1,3 +1,9 @@
+## 2026-09-22 — scan never marks a Misha mix / stub as match=yes
+
+- `scan_roots` now also gates on the **track name**: a Misha mix / solo / cover / bass-only request (`is_bankable_track(track, flac name)` False) gets `match="stub"`, never `"yes"`, even when a large GP exists; the picked path stays only as a note and is not claimed. Stub GPs (e.g. a 4 KB `Illusionist.gp4`) already yielded `match="stub"` + empty `gp` via `pick_gp`/`is_stub_gp` on rescan.
+- No file deleted; `rebirth-sections.jsonl` snapshot drift stays an audit warning (untouched).
+- Tests: Misha-mix filename not bankable; 4 KB `.gp4` is a stub; scan of both never returns `match="yes"`.
+
 ## 2026-09-22 — README/USER command table == cli subparsers
 
 - `cli.build_parser()` is now module-level (mechanical move; `main` calls it) so the CLI surface is introspectable. No command added/removed.

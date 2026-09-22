@@ -1,3 +1,9 @@
+## 2026-09-22 — README/USER command table == cli subparsers
+
+- `cli.build_parser()` is now module-level (mechanical move; `main` calls it) so the CLI surface is introspectable. No command added/removed.
+- README Commands table: one row per subparser (38 rows; `studio`/`annotate` and `gate`/`export-bank` split, garbled `?` arrows fixed). USER.md Commands lists the same 38 short names. Paths stay `<LAB>`/`<CORPUS>`/`<GP>`.
+- Tests: `tests/test_cli_surface.py` parses `argparse` and asserts README + USER list exactly the subparser set (and no README ghosts).
+
 ## 2026-09-22 — no keepers, no bank slices
 
 - Confirmed `pack` / `drums` / `vocals` / `jams` read keepers only via `load_section_rows`. `pack` now prints `pack: no keepers` and writes zero clips when the keeper file is empty; it never slices drafts.

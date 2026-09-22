@@ -32,13 +32,9 @@ def _resolved_names(album: str | None, track: str | None) -> tuple[str | None, s
     return album, track
 
 
-def main(argv: list[str] | None = None) -> int:
-    # Real album/track names in this corpus contain non-cp1252 characters
-    # (e.g. "∆"); never let a console-encoding error abort a command.
-    try:
-        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-    except Exception:
-        pass
+def build_parser() -> argparse.ArgumentParser:
+    """The one argument parser; its subparser names ARE the CLI surface."""
+
     p = argparse.ArgumentParser(prog="boo-lab")
     sub = p.add_subparsers(dest="cmd", required=True)
 
@@ -173,7 +169,17 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("drop", type=Path)
     s.add_argument("--band", default="", help="optional; inferred from the file/folder name when blank")
 
-    args = p.parse_args(argv)
+    return p
+
+
+def main(argv: list[str] | None = None) -> int:
+    # Real album/track names in this corpus contain non-cp1252 characters
+    # (e.g. "∆"); never let a console-encoding error abort a command.
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+    args = build_parser().parse_args(argv)
     env_file = root() / ".env"
     if env_file.exists():
         for line in env_file.read_text(encoding="utf-8").splitlines():

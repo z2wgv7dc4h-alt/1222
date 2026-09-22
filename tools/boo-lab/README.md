@@ -166,42 +166,44 @@ Then `python -m boo_lab.cli scan` and reload. Green GP7/GP5 = matched tab: the b
 
 | cmd | what |
 |---|---|
+| `init-map` | create empty `data/map.csv` skeleton |
 | `scan` | rebuild `data/map.csv` (fuzzy FLAC↔tab; stamps `album_id`) |
-| `studio` / `annotate` | UI |
-| `ingest DROP --band NAME` | copy drop into corpus |
+| `hash [--album X]` | fill empty `flac_sha256` cells in `map.csv` |
+| `ingest DROP --band NAME` | copy a drop (file/zip/folder) into the corpus, then prep |
+| `studio` | local UI: listen to FLAC, click section bounds |
+| `annotate` | same as `studio` (local UI) |
 | `stems` | Demucs 6-stem separation into `work/stems` |
 | `pack` | slice mix/drums/bass/other/guitar/piano/vocals/no-vox per keeper box |
 | `drums [--per-track]` | drum onsets + measured `low_confidence` per keeper section, or one whole-track row per song |
 | `vocals [--per-track]` | vocal melody (CREPE) per keeper section, or one whole-track row per song |
 | `lyrics` | LRCLIB text + WhisperX force-aligned times when a vocals stem is cached (WhisperX times win) |
-| `interns [--album X] [--steps a,b,c]` | run the whole analysis chain in order, cache-first and failure-isolated |
 | `structure` | MSA/SongFormer drafts → `data/drafts.jsonl` (allin1 optional; cache-first) |
 | `beats` | beat/downbeat grid → `data/beats.jsonl` (beat_this → allin1) |
-| `gpif --path FILE` | read a GP7/GP6 `.gp`/`.gpx` score (duration, bars, notes, markers, `n_with_midi`); GP7 is read natively, never converted |
+| `interns [--album X] [--steps a,b,c]` | run the whole analysis chain in order, cache-first and failure-isolated |
+| `gpif --path FILE` | read a GP7/GP6 `.gp`/`.gpx` score (duration, bars, notes, markers, `n_with_midi`); read natively, never converted |
 | `tabnotes --path F [--json] [--index]` | read a local tab-notes pack (`.zip`/folder): tracks, both clocks, raw tuplets/bends; `--index` → `data/tabnotes_index.jsonl` |
+| `tabnotes-drafts` | tab-notes structure/density/phrase drafts → `data/drafts.jsonl` |
+| `tempo-hints` | tempo-automation hints → `data/tempo_hints.jsonl` |
+| `figures` | figure-hash drafts → `data/figures.jsonl` |
 | `gp-export` | probe `.gp`/`.gpx`: already parse (run `scan`) or record `gpx-unsupported`/`gp7-unsupported` (no GP7→GP5 conversion) |
+| `extract` | riff bank from GP (tab) or audio fallback → `data/riffs.jsonl` |
+| `gate` | score the tab-vs-audio boundary lock against a threshold → `data/gate.csv` |
+| `export-bank` | write the gated riff bank (`--out`) |
+| `pack-notes` | join keeper spans → live pack note JSONL (`work/pack-notes/`) |
+| `compare [--album X]` | machine drafts vs human keepers |
+| `agree --album X --track Y [--write\|--diff]` | two-pass keeper agreement |
 | `learn` | rebuild `data/intern_rank.json`: rank draft sources from keepers (5-song vote, F@0.5) |
+| `adapt` | rebuild `data/adapt.json`: per-album edge/role/figure calibration from heard pairs |
 | `predict-train [--album X]` | fine-tune structure predictor on heard keepers → `work/models/structure-v1/` |
 | `predict [--album X] [--track Y]` | keeper-model drafts → `data/drafts.jsonl` (never sections.jsonl) |
-| `status` | refresh the `STATUS.md` counts block from data files |
-| `adapt` | rebuild `data/adapt.json`: per-album edge/role/figure calibration from heard pairs |
-| `doctor` | torch/GPU + optional-intern check with install hints |
-| `audit` | pin hygiene (sources, overlaps, heard, short boxes) |
-| `extract` | riff bank from GP (tab) or audio fallback → `data/riffs.jsonl` |
-| `gate` / `export-bank` | gated riff export |
-| `report` | pipeline state → `data/corpus_health.json` |
-| `holdout` | fixed whole-song train/val split → `data/holdout.csv` |
-| `hear --album X --track Y` | flip `heard=true` on one song's keepers (needs both flags) |
 | `sync --album X --track Y` | tab-vs-audio witness → `data/sync.jsonl` (needs both flags) |
-| `hash [--album X]` | fill empty `flac_sha256` cells in `map.csv` |
-| `agree --album X --track Y [--write\|--diff]` | two-pass keeper agreement |
-| `compare [--album X]` | machine drafts vs human keepers |
+| `hear --album X --track Y` | flip `heard=true` on one song's keepers (needs both flags) |
+| `holdout` | fixed whole-song train/val split → `data/holdout.csv` |
 | `export-jams --out DIR` | JAMS 0.3 (figure/function layers) |
-| `pack-notes` | join keeper spans → live pack note JSONL (`work/pack-notes/`) |
-| `init-map` | create empty `data/map.csv` skeleton |
-| `figures` | figure-hash drafts ? `data/figures.jsonl` |
-| `tempo-hints` | tempo-automation hints ? `data/tempo_hints.jsonl` |
-| `tabnotes-drafts` | tab-notes structure/density/phrase drafts ? `data/drafts.jsonl` |
+| `report` | pipeline state → `data/corpus_health.json` |
+| `status` | refresh the `STATUS.md` counts block from data files |
+| `audit` | pin hygiene + quality-gate warnings (sources, overlaps, short boxes, unopenable/mislabeled GPs) |
+| `doctor` | torch/GPU + optional-intern check with install hints |
 
 ## Outputs (all local-first)
 

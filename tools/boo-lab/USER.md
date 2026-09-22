@@ -277,18 +277,44 @@ stem and its real times win over LRCLIB's; without a stem, LRCLIB times stand.
 
 ## Commands
 
-    python -m boo_lab.cli doctor
+    python -m boo_lab.cli init-map
     python -m boo_lab.cli scan
+    python -m boo_lab.cli hash
+    python -m boo_lab.cli ingest
     python -m boo_lab.cli studio
+    python -m boo_lab.cli annotate
+    python -m boo_lab.cli stems
+    python -m boo_lab.cli pack
+    python -m boo_lab.cli drums
+    python -m boo_lab.cli vocals
+    python -m boo_lab.cli lyrics
+    python -m boo_lab.cli structure
+    python -m boo_lab.cli beats
     python -m boo_lab.cli interns
-    python -m boo_lab.cli interns --album ALBUM
-    python -m boo_lab.cli learn
-    python -m boo_lab.cli predict-train --album ALBUM
-    python -m boo_lab.cli predict --album ALBUM
-    python -m boo_lab.cli sync --album ALBUM --track TRACK
-    python -m boo_lab.cli figures --album ALBUM --track TRACK
-    python -m boo_lab.cli gpif --path FILE
+    python -m boo_lab.cli gpif
+    python -m boo_lab.cli tabnotes
+    python -m boo_lab.cli tabnotes-drafts
+    python -m boo_lab.cli tempo-hints
+    python -m boo_lab.cli figures
+    python -m boo_lab.cli gp-export
+    python -m boo_lab.cli extract
+    python -m boo_lab.cli gate
+    python -m boo_lab.cli export-bank
+    python -m boo_lab.cli pack-notes
     python -m boo_lab.cli compare
+    python -m boo_lab.cli agree
+    python -m boo_lab.cli learn
+    python -m boo_lab.cli adapt
+    python -m boo_lab.cli predict-train
+    python -m boo_lab.cli predict
+    python -m boo_lab.cli sync
+    python -m boo_lab.cli hear
+    python -m boo_lab.cli holdout
+    python -m boo_lab.cli export-jams
+    python -m boo_lab.cli report
+    python -m boo_lab.cli status
+    python -m boo_lab.cli audit
+    python -m boo_lab.cli doctor
 
 Short studio titles are fine; the lab maps year-prefixed folder names.
 

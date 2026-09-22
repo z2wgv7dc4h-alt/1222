@@ -35,6 +35,7 @@ The right-click edit panel closes on an outside click.
 Double-click has ONE meaning: zoom the box and start its A–B loop. **heard** is a
 checkbox or the right-click menu. The **How** button in studio is this Mark list —
 VAL may be pinned by ear.
+A new box starts its loop at once; the muted coach line under the pins names the next step.
 
 1. Click a song on the left.
 2. Wait until the clock shows the real song length. Not `0:00 / -`.

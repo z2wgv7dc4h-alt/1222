@@ -86,6 +86,8 @@
     .transport { display:flex; align-items:center; gap:8px; margin:2px 0 8px; flex-wrap:wrap; }
     .transport2 { display:flex; align-items:center; gap:8px; margin:0 0 10px; }
 #btnPlayBox.on { border-color:var(--gold); color:var(--gold); background:color-mix(in srgb, var(--gold) 14%, transparent); }
+.next-act { outline:2px solid var(--gold); outline-offset:2px; animation:nextpulse 1.3s ease-in-out infinite; }
+@keyframes nextpulse { 0%,100% { box-shadow:0 0 0 0 #d4b06a00; } 50% { box-shadow:0 0 0 3px #d4b06a44; } }
     .menu { position:relative; }
     .menu > summary { list-style:none; cursor:pointer; color:var(--mute); font-size:12px; letter-spacing:.08em; text-transform:uppercase; padding:6px 10px; border:1px solid var(--line); border-radius:6px; }
     .menu > summary::-webkit-details-marker { display:none; }
@@ -408,20 +410,44 @@ let stemSel=new Set(), stemFocus="drums", stemBufs={}, stemDecode={}, stemBufTra
 let stemNodes=[], stemClock=null;
 let beatsData={beats:[],downbeats:[]}, snapping=false;
 let audioCtx=null, analyser=null, vizSrc=null, vizRAF=0;
+// Coach state (session only, never written anywhere): unsaved edits + the
+// keeper count from the last Save on this song.
+window._dirty=false; window._lastSaved=0;
 
 function fmt(t){ t=Math.max(0,+t||0); return Math.floor(t/60)+":"+String(Math.floor(t%60)).padStart(2,"0"); }
 const DEFAULT_ERR="Space play · 1 riff 2 hook 3 slam T blast · I intro B build C chill P pulse · S save J/K songs";
+// ONE next action, exactly one sentence. Errors still win (showErr explicit).
 function coach(){
-  if(!ws || (ws.getDuration()||0)<2) return "Wait. Clock must show the full length before you draw.";
   const t=tracks[trackId];
-  if(t && String(t.split||"").toLowerCase()==="val") return "VAL — leave unpinned";
-  if(window._adaptNudge>0) return "Adapted "+window._adaptNudge+" drafts from your last saves on this album.";
-  if(window._draftNudge>0) return window._draftNudge+" draft"+(window._draftNudge===1?"":"s")+" — tick heard on the ones you accept, then Save.";
-  if(window._conflictHint) return window._conflictHint;
-  if(!regs.length) return window._figureHint || "Press a role pin (or 1 for Riff) — pins create boxes; drag fits them.";
-  const unh=regs.filter(p=>!p.heard).length;
-  if(unh) return unh+" not heard — Save will drop them";
-  return regs.length+" boxes. Save writes keepers.";
+  if(!t) return "Pick a numbered track. Skip mix / album for the first song.";
+  if(!pinsReady()) return "Wait for the clock. Pins stay off until the length appears.";
+  if(!regs.length) return "Press 1 (riff) or another role. Drag does not create a box.";
+  const L=window._boxLoop;
+  if(L && L.idx!=null && regs[L.idx] && !regs[L.idx].heard) return "Tick heard on that row.";
+  if(!regs.some(p=>p.heard)) return "Double-click the bar to loop it.";
+  if(window._dirty) return "Save — unheard boxes will be dropped.";
+  if(window._lastSaved>=1) return window._lastSaved+" keepers on this song. Next part, or J / K for another track.";
+  return "Double-click the bar to loop it.";
+}
+// One `.next-act` outline on the control the coach is pointing at.
+function highlightNext(){
+  document.querySelectorAll(".next-act").forEach(el=>el.classList.remove("next-act"));
+  const t=tracks[trackId];
+  if(!t || !pinsReady()) return;
+  if(!regs.length){
+    const r=document.querySelector(".pins button[data-role='riff']");
+    if(r) r.classList.add("next-act");
+    return;
+  }
+  const L=window._boxLoop;
+  if(L && L.idx!=null && regs[L.idx] && !regs[L.idx].heard){
+    const tr=document.querySelectorAll("#rows tr")[L.idx];
+    const cb=tr && tr.querySelector("input[data-f='heard']");
+    if(cb) cb.classList.add("next-act");
+    return;
+  }
+  if(!L){ const b=document.getElementById("btnPlayBox"); if(b) b.classList.add("next-act"); return; }
+  if(window._dirty && regs.some(p=>p.heard)){ const s=document.getElementById("btnSave"); if(s) s.classList.add("next-act"); }
 }
 function showErr(m, bad){
   const el=document.getElementById("err");
@@ -431,6 +457,7 @@ function showErr(m, bad){
   el.textContent=msg||DEFAULT_ERR;
   el.classList.toggle("bad", !!bad);
   el.dataset.explicit=explicit?"1":"0";
+  highlightNext();
 }
 function draftNudge(n, adapted){
   n=+n||0; adapted=+adapted||0;
@@ -915,7 +942,7 @@ function startBoxLoop(i){
   window._playUntil=null;  // loop owns the end, not one-shot play
   const pb=document.getElementById("btnPlayBox");
   if(pb){ pb.classList.add("on"); pb.title="looping — click to stop"; }
-  showErr("looping box "+fmt(a)+" – "+fmt(b)+"  (click away / Esc / Space to stop)");
+  showErr("");  // coach points at the next action (tick heard / Save)
   try{ ws.setTime(a); }catch(e){}
   try{
     const hit=regionsPlug && regionsPlug.getRegions().find(r=>r._idx===i);
@@ -1155,13 +1182,13 @@ function makeWave(url){
         if(!onLoopBox){
           stopBoxLoop();
           try{ ws&&ws.pause(); }catch(e){}
-          showErr("loop stopped");
+          showErr("");
         }
       }
     }, true);
     document.addEventListener("keydown",ev=>{
       if(ev.key!=="Escape") return;
-      if(window._boxLoop){ stopBoxLoop(); try{ ws&&ws.pause(); }catch(e){} showErr("loop stopped"); ev.stopPropagation(); }
+      if(window._boxLoop){ stopBoxLoop(); try{ ws&&ws.pause(); }catch(e){} showErr(""); ev.stopPropagation(); }
       else if(ctxIdx>=0){ closeCtx(); ev.stopPropagation(); }
       else if(specView){ resetSpecView(); ev.stopPropagation(); }  // zoom reset
     }, true);
@@ -1572,7 +1599,9 @@ function select(i){
     badge.className="badge on"+(split==="val"?" val":"");
     badge.title=(split==="val"?"whole-song validation (holdout)":"training")+" split";
   }
-  renderList(); showErr(""); regs=[]; sel=-1; window._lyricLines=null; spec=null;
+  renderList(); regs=[]; sel=-1; window._lyricLines=null; spec=null;
+  window._dirty=false; window._lastSaved=0;  // coach state resets per song
+  showErr("");
   specView=null; specPrevView=null;  // new song opens at full-song spectrogram
   window._figureHint=""; window._conflictHint=""; window._draftNudge=0; window._adaptNudge=0; window._figHints=[];
   const stems=t.stems||[];
@@ -1611,7 +1640,7 @@ function select(i){
   });
 }
 
-function snap(){ undo.push(JSON.stringify(regs)); if(undo.length>40) undo.shift(); }
+function snap(){ undo.push(JSON.stringify(regs)); if(undo.length>40) undo.shift(); window._dirty=true; }
 // Best-overlap figure for a function box: the riff/hook/solo/pulse whose span
 // shares the most seconds with `p`. Never invents a name; "" when none.
 function bestOnFigure(p, skipIdx){
@@ -1664,7 +1693,9 @@ function add(role){
   // Blast/Breakdown/etc. pinned over a Riff carry that figure's id.
   if(FUNCTION_ROLES.includes(canonRole(role))) box.on_figure=bestOnFigure(box,-1);
   regs.push(box); sel=regs.length-1;
-  table(); paintRegions(); showErr("");
+  table(); paintRegions();
+  startBoxLoop(sel);  // a new box starts its A-B loop (same helper as double-click)
+  showErr("");
 }
 document.querySelectorAll(".pins button").forEach(b=>b.onclick=()=>add(b.dataset.role));
 document.getElementById("btnPlay").onclick=toggle;
@@ -1740,11 +1771,13 @@ function table(){
         const f=inp.dataset.f;
         if(f==="heard"){
           p.heard=!!inp.checked;
+          window._dirty=true;
           if(p.heard && heardUnlooped(p)){
             showErr("heard without a loop this session — loop it or leave it");
             inp.title="not looped this session";
           } else {
             inp.title="";
+            showErr("");
           }
           return;
         }
@@ -1871,7 +1904,9 @@ function save(){
     if(x.malformed_lines_skipped) msg+=" · "+x.malformed_lines_skipped+" malformed line(s) skipped";
     msg+=" · backup: sections.jsonl.bak";
     window._draftNudge=0; window._adaptNudge=0;
-    showErr(msg);
+    window._dirty=false;
+    window._lastSaved=+x.saved||0;
+    showErr("");  // coach: "N keepers on this song..."
     document.getElementById("sub").textContent="saved "+x.saved;
   }).catch(e=>showErr("save failed: "+e, true));
 }
@@ -1968,7 +2003,7 @@ document.getElementById("btnPack").onclick=()=>{
 document.getElementById("btnUndo").onclick=()=>{ if(!undo.length) return; regs=JSON.parse(undo.pop()); sel=Math.min(sel,regs.length-1); table(); paintRegions(); };
 document.getElementById("btnPlayBox").onclick=()=>{
   if(window._boxLoop){  // armed: this button now stops the loop (same as Esc)
-    stopBoxLoop(); try{ ws&&ws.pause(); }catch(e){} showErr("loop stopped"); return;
+    stopBoxLoop(); try{ ws&&ws.pause(); }catch(e){} showErr(""); return;
   }
   playBox();  // no loop: unchanged one-shot
 };
@@ -2004,8 +2039,11 @@ document.getElementById("btnNext").onclick=nextGreen;
   document.getElementById("ctxHeard").onchange=e=>{
     if(ctxIdx<0) return;
     regs[ctxIdx].heard=!!e.target.checked; setRowField(ctxIdx,"heard",e.target.checked);
+    window._dirty=true;
     if(regs[ctxIdx].heard && heardUnlooped(regs[ctxIdx])){
       showErr("heard without a loop this session — loop it or leave it");
+    } else {
+      showErr("");
     }
   };
   document.getElementById("ctxUnique").onchange=e=>{

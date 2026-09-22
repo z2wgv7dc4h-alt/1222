@@ -2,6 +2,8 @@
 
 Local engine: djent / deathcore / metalcore / tech. Bar: IA, BoO, VoM. Python writes notes. React edits. Reaper renders. No cloud writer. No slam pack.
 
+**The lab (`tools/boo-lab`) is the active work; the engine is paused.**
+
 ## Law
 
 - Grid is the writer. Audio is paint after the score.
@@ -16,7 +18,8 @@ Local engine: djent / deathcore / metalcore / tech. Bar: IA, BoO, VoM. Python wr
 ## Build
 
 ```
-cd engine && python -m pytest -q
+cd tools/boo-lab && python -m pytest -q   # active: the lab
+cd engine && python -m pytest -q          # paused
 ```
 
 ## Session

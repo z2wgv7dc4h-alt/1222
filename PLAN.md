@@ -1,4 +1,6 @@
-# PLAN
+# PLAN (engine — PAUSED)
+
+Engine is paused; the lab (`tools/boo-lab`) is the active work.
 
 preset JSON → fretboard + scale + seed
   → rhythm cells (tile / IRVD / feels)

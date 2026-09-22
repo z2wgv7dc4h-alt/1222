@@ -2,7 +2,8 @@
 
 # Scope headings (not the whole file)
 
-File: `god-tier-metal-scope.md` in the repo root (copy from the handoff zip).
+File: `docs/archive/god-tier-metal-scope.md` (archived; copy from the handoff zip).
+This index is not a backlog.
 Rule: `grep` or read **only** the heading named here. Never the full 1130 lines
 for ordinary task work.
 

@@ -3,6 +3,7 @@ GOD TIER METAL — FCC
 Folder: Desktop\god-tier-metal
 Remote: https://github.com/z2wgv7dc4h-alt/1222
 Lab: tools\boo-lab   (START.bat)   also https://github.com/z2wgv7dc4h-alt/boo-lab
+ACTIVE: the lab (START.bat). Engine paused — do not start engine boxes.
 
 Do NOT type /next as a habit. It used to walk a novel and invent X devices.
 

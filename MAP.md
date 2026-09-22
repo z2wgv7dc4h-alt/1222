@@ -10,12 +10,14 @@ docs/CURRENT.md    state
 docs/DECISIONS.md  keep/kill
 docs/STATUS.md     wiring evidence (not listen)
 PROGRESS.md        archive log
-SCOPE-INDEX.md     headings into god-tier-metal-scope.md
-engine/            writer
-editor/            timeline UI
-tools/boo-lab/     FLAC pin UI + GP extract
+SCOPE-INDEX.md     headings into docs/archive/god-tier-metal-scope.md
+engine/            writer (PAUSED)
+editor/            timeline UI (paused)
+tools/boo-lab/     FLAC pin UI + GP extract (ACTIVE)
 reference/         local only, gitignored
 ```
+
+Active: `tools/boo-lab` (START.bat). Engine is paused.
 
 Ww is beside this folder. Do not write there.
 123 is archive. Do not extend it.

@@ -179,7 +179,7 @@ Then `python -m boo_lab.cli scan` and reload. Green GP7/GP5 = matched tab: the b
 | `beats` | beat/downbeat grid → `data/beats.jsonl` (beat_this → allin1) |
 | `gpif --path FILE` | read a GP7/GP6 `.gp`/`.gpx` score (duration, bars, notes, markers, `n_with_midi`); GP7 is read natively, never converted |
 | `tabnotes --path F [--json] [--index]` | read a local tab-notes pack (`.zip`/folder): tracks, both clocks, raw tuplets/bends; `--index` → `data/tabnotes_index.jsonl` |
-| `gp-export` | probe `.gp`/`.gpx`: already parse (run `scan`) or record `gpx-unsupported`/`gp7-unsupported` (+ GPIF `converted`/`drops`) |
+| `gp-export` | probe `.gp`/`.gpx`: already parse (run `scan`) or record `gpx-unsupported`/`gp7-unsupported` (no GP7→GP5 conversion) |
 | `learn` | rebuild `data/intern_rank.json`: rank draft sources from keepers (5-song vote, F@0.5) |
 | `predict-train [--album X]` | fine-tune structure predictor on heard keepers → `work/models/structure-v1/` |
 | `predict [--album X] [--track Y]` | keeper-model drafts → `data/drafts.jsonl` (never sections.jsonl) |

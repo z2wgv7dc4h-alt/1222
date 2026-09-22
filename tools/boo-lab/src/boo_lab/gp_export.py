@@ -59,23 +59,6 @@ def classify(path, riff_bank=None) -> tuple[bool, str]:
         return False, "gpx-unsupported" if reason == "gpx_unsupported" else "gp7-unsupported"
 
 
-def _try_gpif_convert(lab_root, path):
-    """A parsed GPIF score -> ``work/gp5-from-gpif/<stem>.from-gpif.gp5``.
-
-    Returns ``(converted, drops, out_or_None)``. Never raises, never spawns a
-    TuxGuitar/converter subprocess -- only the in-repo GPIF reader/writer."""
-    try:
-        from .gpif import load_score
-        from .gpif_to_gp5 import gpif_to_gp5
-
-        score = load_score(path)
-        out = Path(lab_root) / "work" / "gp5-from-gpif" / (Path(path).stem + ".from-gpif.gp5")
-        written, drops = gpif_to_gp5(score, out)
-        return True, drops, written
-    except Exception:
-        return False, [], None
-
-
 def export_gp(lab_root, gp_root) -> dict:
     """Probe every `.gp`/`.gpx` under `gp_root`; record the unsupported ones.
 
@@ -97,12 +80,10 @@ def export_gp(lab_root, gp_root) -> dict:
             if good:
                 ok.append(str(path))
             else:
-                converted, drops, gp5 = _try_gpif_convert(lab_root, path)
-                row = {"path": str(path), "ext": path.suffix.lower(),
-                       "reason": reason, "converted": converted, "drops": drops}
-                if gp5 is not None:
-                    row["gp5"] = str(gp5)
-                unsupported.append(row)
+                # No GP7->GP5 conversion is wired (LAW: "stays unused"). The
+                # file is only recorded with a stable reason.
+                unsupported.append({"path": str(path), "ext": path.suffix.lower(),
+                                    "reason": reason})
     wrote = False
     if files and root is not None and root.exists():
         from .schema import write_jsonl_atomic

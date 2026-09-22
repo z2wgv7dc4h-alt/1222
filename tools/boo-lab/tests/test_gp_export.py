@@ -54,7 +54,7 @@ def test_missing_gp_root_does_not_crash(tmp_path):
     assert report["unsupported"] == []
 
 
-def test_gpif_zip_is_converted_and_recorded(tmp_path):
+def test_gpif_zip_records_unsupported_without_converting(tmp_path):
     gp_root = tmp_path / "gp"
     (gp_root / "gp7").mkdir(parents=True)
     shutil.copy(FIX, gp_root / "gp7" / "tiny.gp")
@@ -63,9 +63,10 @@ def test_gpif_zip_is_converted_and_recorded(tmp_path):
     report = gp_export.export_gp(lab, gp_root)
 
     row = _rows(lab)[0]
-    assert row["converted"] is True and row["drops"] == []
-    assert (lab / "work" / "gp5-from-gpif" / "tiny.from-gpif.gp5").exists()
-    assert report["unsupported"][0]["converted"] is True
+    assert row["reason"] == "gpx-unsupported"
+    assert "converted" not in row           # no GP7->GP5 conversion is wired
+    assert "converted" not in report["unsupported"][0]
+    assert not (lab / "work" / "gp5-from-gpif").exists()
 
 
 def test_parsing_file_needs_no_export(tmp_path, monkeypatch):

@@ -99,8 +99,6 @@ def main(argv: list[str] | None = None) -> int:
 
     s = sub.add_parser("gpif", help="read a GP7 .gpx/.gp GPIF score (duration/notes; no sections.jsonl)")
     s.add_argument("--path", type=Path, required=True)
-    s.add_argument("--write-gp5", type=Path, default=None,
-                   help="also write <stem>.from-gpif.gp5 into this DIR")
 
     s = sub.add_parser("tabnotes", help="read a local tab-notes pack (.zip or folder; no sections.jsonl)")
     s.add_argument("--path", type=Path, required=True)
@@ -274,17 +272,6 @@ def main(argv: list[str] | None = None) -> int:
         print("gpif %s: duration_sec=%.3f n_bars=%d n_notes=%d n_markers=%d n_with_midi=%d"
               % (args.path, duration_sec(score), len(score.masterbars),
                  len(score.notes), count_markers(score), n_midi))
-        if getattr(args, "write_gp5", None):
-            from .gpif_to_gp5 import gpif_to_gp5
-
-            dest = Path(args.write_gp5) / (Path(args.path).stem + ".from-gpif.gp5")
-            try:
-                written, drops = gpif_to_gp5(score, dest)
-            except Exception as exc:  # noqa: BLE001 - a bad score is a clean CLI error
-                print("gpif --write-gp5:", exc)
-                return 1
-            print("wrote", written)
-            print("drops:", ", ".join(drops) if drops else "none")
         return 0
 
     if args.cmd == "tabnotes":
@@ -606,12 +593,9 @@ def main(argv: list[str] | None = None) -> int:
         from .gp_export import export_gp
 
         report = export_gp(root(), getattr(args, "gp_root", None) or gp_root)
-        if report["converter"]:
-            print("converter:", report["converter"])
-        converted = sum(1 for r in report["unsupported"] if r.get("converted"))
-        print("gp-export: %d file(s); %d parse; %d unsupported; %d from GPIF -> %s"
+        print("gp-export: %d file(s); %d parse; %d unsupported -> %s"
               % (report["scanned"], len(report["ok"]), len(report["unsupported"]),
-                 converted, report["out"]))
+                 report["out"]))
         if report["ok"]:
             print("these .gp/.gpx already parse — run `boo-lab scan` to point map.csv at them")
         return 0

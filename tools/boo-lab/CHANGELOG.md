@@ -1,3 +1,10 @@
+## 2026-09-22 — remove gpif_to_gp5 from the live surface
+
+- `src/boo_lab/gpif_to_gp5.py` moved to `scripts/gpif_to_gp5.py`; zero `gpif_to_gp5` references remain under `src/`.
+- Removed the `gpif --write-gp5` CLI flag and the `gp-export` GP7→GP5 conversion (`_try_gpif_convert`, `converted`/`drops` rows). `gpif` still reads GPIF; `gp-export` still records unsupported reasons. No tab is converted, no `.gp5` written.
+- CURRENT keeps "gpif_to_gp5 stays unused." README `gp-export` row updated.
+- Tests: `test_gpif_to_gp5.py` rewritten to assert the converter is not importable/wired (sync GPIF fallback still tested); `test_gp_export.py` asserts no conversion.
+
 ## 2026-09-22 — quality gates restored as audit warnings
 
 - `audit.py` now warns (never blocks Save, never rewrites): function-swallow, figure-role empty `figure_id` (already `schema_gaps`), `map_unopenable` (match=yes GP missing or unreadable via GPIF/pyguitarpro), `mislabeled_gps` (a `.gp3/4/5` whose content is zip/GPIF), `stub_matches` (match=yes on a < 10 KB / solo / bass / cover / mix GP), and `identity_gaps` (keeper album/track with no `identity.csv` row; skipped if identity.py is missing). Same-role overlap and <1s counts already existed.

@@ -72,6 +72,71 @@ def test_tracks_expose_split_and_available_stems(tmp_path):
     assert t["split"] in {"train", "val"}
 
 
+def _badge_lab(tmp_path, rows, holdout=(), sync=()):
+    lab = tmp_path / "lab"
+    (lab / "data").mkdir(parents=True)
+    recs = []
+    for r in rows:
+        r = dict(r)
+        base = "".join(ch if ch.isalnum() else "_" for ch in r["track"])[:40] or "track"
+        flac = tmp_path / "audio" / (base + ".flac")
+        flac.parent.mkdir(parents=True, exist_ok=True)
+        flac.write_bytes(b"x")
+        r["flac"] = str(flac)
+        recs.append(r)
+    save_map(lab / "data" / "map.csv", recs)
+    if holdout:
+        (lab / "data" / "holdout.csv").write_text(
+            "album,track\n" + "".join("%s,%s\n" % h for h in holdout), encoding="utf-8")
+    if sync:
+        (lab / "data" / "sync.jsonl").write_text(
+            "".join(json.dumps(s) + "\n" for s in sync), encoding="utf-8")
+    return lab
+
+
+def _row(album, track):
+    return {"album": album, "track": track, "year": "", "gp": "", "tuning": "",
+            "match": "unknown", "notes": ""}
+
+
+def _tracks(lab):
+    client = TestClient(ann.create_app(lab, None, None))
+    return client.get("/api/tracks").json()["tracks"]
+
+
+def test_tracks_badge_val_for_holdout(tmp_path):
+    lab = _badge_lab(
+        tmp_path, [_row("2009 - A Higher Place", "01 - Rebirth")],
+        holdout=[("2009 - A Higher Place", "01 - Rebirth")])
+
+    t = _tracks(lab)[0]
+
+    assert t["val"] is True and t["split"] == "val"
+
+
+def test_tracks_badge_mix_for_misha_mix(tmp_path):
+    lab = _badge_lab(tmp_path, [_row(
+        "Born of Osiris - The Discovery (Fye Edition) (FLAC)",
+        "16 Follow the Signs (Misha Mansoor Demo Mix)")])
+
+    assert _tracks(lab)[0]["mix"] is True
+
+
+def test_tracks_badge_off_clock_when_sync_false(tmp_path):
+    lab = _badge_lab(
+        tmp_path, [_row("A", "T")],
+        sync=[{"album": "A", "track": "T", "sync_ok": False}])
+
+    assert _tracks(lab)[0]["off_clock"] is True
+
+
+def test_tracks_badge_album_file_next_to_tracks_dir(tmp_path):
+    lab = _badge_lab(tmp_path, [_row("Album", "T")])
+    (tmp_path / "audio" / "tracks").mkdir(parents=True, exist_ok=True)
+
+    assert _tracks(lab)[0]["album_file"] is True
+
+
 def test_sections_legacy_role_is_canonicalized_on_read_and_write(tmp_path):
     lab = _lab(tmp_path)
     client = TestClient(ann.create_app(lab, None, None))

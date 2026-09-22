@@ -109,9 +109,14 @@ def ensure_holdout(lab_root: Path, rows: list[dict]) -> set[tuple[str, str]]:
     return holdout
 
 
+def is_holdout(album: str | None, track: str | None, holdout: set[tuple[str, str]]) -> bool:
+    """True when one whole song is in the reserved VAL/holdout set."""
+    return ((album or ""), (track or "")) in holdout
+
+
 def split_for(album: str | None, track: str | None, holdout: set[tuple[str, str]]) -> str:
     """Real `"val"`/`"train"` tag for one whole song."""
-    return "val" if ((album or ""), (track or "")) in holdout else "train"
+    return "val" if is_holdout(album, track, holdout) else "train"
 
 
 def tag(record: dict, holdout: set[tuple[str, str]]) -> dict:

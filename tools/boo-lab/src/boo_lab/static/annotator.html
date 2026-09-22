@@ -46,6 +46,8 @@
     .t .meta { display:block; font-size:11px; color:var(--mute); margin-top:2px; }
     .t .meta .sep { color:#4a4640; margin:0 3px; }
     .t .meta .offclock { color:#6a625a; }
+.t .meta .mixtag { color:#b08968; }
+.t .meta .albumtag { color:#8a8f98; }
     .t .valtag { color:var(--gold); border:1px solid #6a5a3a; border-radius:999px; font-size:9px; letter-spacing:.08em; padding:0 5px; margin-left:6px; vertical-align:middle; }
     .t .meta .packtag { color:#7dba7a; }
     .dot { display:inline-block; width:6px; height:6px; border-radius:50%; margin-right:4px; background:#3a3a3e; }
@@ -1377,11 +1379,13 @@ function renderList(){
     const kind=(t.gp_kind||"").toUpperCase();
     const gpWord=!t.has_gp?"no tab":(t.gp_partial?"partial "+(kind||"tab"):(kind||"tab"));
     const flacWord=t.has_flac?"FLAC":"no FLAC";
-    const offClock=t.sync_ok===false?" <span class='offclock'>tab off-clock</span>":"";
-    const valTag=String(t.split||"").toLowerCase()==="val"?"<span class='valtag' title='whole-song validation (holdout)'>VAL</span>":"";
+    const offClock=t.off_clock?" <span class='offclock'>off-clock</span>":"";
+    const valTag=(t.val||String(t.split||"").toLowerCase()==="val")?"<span class='valtag' title='whole-song validation (holdout)'>VAL</span>":"";
+    const mixTag=t.mix?" <span class='mixtag' title='non-bankable name (mix / solo / cover / bass / intro)'>mix</span>":"";
+    const albumTag=t.album_file?" <span class='albumtag' title='whole-album file; pin the numbered track'>album</span>":"";
     const packWord=t.has_pack?(t.pack_source==="tn"?"TN":"Pack"):"";
     const packTag=packWord?("<span class='sep'>·</span><span class='packtag' title='local tab-notes pack available'>"+packWord+"</span>"):"";
-    d.innerHTML="<span>"+(t.track||"")+valTag+"</span><span class='meta'><span class='dot "+(t.has_flac?"ok":"")+"'></span>"+flacWord+"<span class='sep'>·</span><span class='dot "+gpClass+"'></span>"+gpWord+offClock+packTag+"</span>";
+    d.innerHTML="<span>"+(t.track||"")+valTag+"</span><span class='meta'><span class='dot "+(t.has_flac?"ok":"")+"'></span>"+flacWord+"<span class='sep'>·</span><span class='dot "+gpClass+"'></span>"+gpWord+offClock+mixTag+albumTag+packTag+"</span>";
     d.onclick=()=>select(tracks.indexOf(t)); box.appendChild(d);
   });
   const on=box.querySelector(".t.on");

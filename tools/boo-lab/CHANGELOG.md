@@ -5,6 +5,12 @@
 - Parent `docs/CURRENT.md` and `docs/STATUS.md` are pointers. They no longer quote 342 tests, Rebirth F-scores, or "already pinned."
 - STATUS.md Now line: 610 passed on this machine; other docs must not freeze a count.
 
+## 2026-09-22 — song list badges (VAL / off-clock / mix / album)
+
+- `/api/tracks` now returns server flags `val` (`holdout.is_holdout`), `off_clock` (a sync row with `sync_ok is false`), `mix` (`not gate.is_bankable_track`), and `album_file` (FLAC next to a `tracks/` folder). Added `holdout.is_holdout(album, track, holdout)`; `split_for` uses it.
+- `renderList` shows muted `off-clock` / `mix` / `album` spans on the `.meta` line (VAL kept), using the server flags -- no client-side holdout/sync parsing. Row stays clickable; Save/Guess untouched.
+- USER.md lists the badges. Tests: `test_annotator.py` val/mix/off_clock/album_file.
+
 ## 2026-09-22 — scan never marks a Misha mix / stub as match=yes
 
 - `scan_roots` now also gates on the **track name**: a Misha mix / solo / cover / bass-only request (`is_bankable_track(track, flac name)` False) gets `match="stub"`, never `"yes"`, even when a large GP exists; the picked path stays only as a note and is not claimed. Stub GPs (e.g. a 4 KB `Illusionist.gp4`) already yielded `match="stub"` + empty `gp` via `pick_gp`/`is_stub_gp` on rescan.

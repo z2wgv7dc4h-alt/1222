@@ -122,7 +122,7 @@ figure — name of the idea (`riff-A`, or tab letter `B`). Reuse it when the ide
 
 ## The page
 
-Left: songs. Tags: FLAC, GP7/GP5/Tab, no tab, Pack/TN, tab off-clock, VAL.
+Left: songs. Badges: FLAC, GP7/GP5/Tab, no tab, Pack/TN, VAL, off-clock, mix, album.
 Middle: waveform (and optional spectrogram). Boxes live here.
 Role pins: create a box.
 heard: the gate.

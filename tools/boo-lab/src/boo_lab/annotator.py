@@ -236,10 +236,28 @@ def create_app(lab_root: Path, flac_root: Path | None, gp_root: Path | None) -> 
             rows = [resolve(r, flac_root, gp_root) for r in load_map(map_path)]
         except Exception:
             return []
-        from .holdout import ensure_holdout, split_for
+        from .gate import is_bankable_track
+        from .holdout import ensure_holdout, is_holdout, split_for
         from .stems import find_stem
 
         holdout = ensure_holdout(lab_root, rows)
+        # Per-song sync witness, read once -- the "off-clock" badge is a server
+        # flag so the JS never re-parses sync.jsonl.
+        sync_by: dict[tuple[str, str], dict] = {}
+        try:
+            spath = lab_root / "data" / "sync.jsonl"
+            if spath.exists():
+                for line in spath.read_text(encoding="utf-8").splitlines():
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        rec = json.loads(line)
+                    except Exception:
+                        continue
+                    sync_by[(rec.get("album") or "", rec.get("track") or "")] = rec
+        except Exception:
+            sync_by = {}
         stem_cache = lab_root / "work" / "stems"
         idx = _gp5_index()
         tn_index = _tabnotes_index_rows()
@@ -326,11 +344,25 @@ def create_app(lab_root: Path, flac_root: Path | None, gp_root: Path | None) -> 
                     stems = [n for n in STEM_NAMES if find_stem(Path(fp), stem_cache, n)]
                 except Exception:
                     stems = []
+            album = r.get("album")
+            track = r.get("track")
+            srec = sync_by.get((album or "", track or ""))
+            val = is_holdout(album, track, holdout)
+            off_clock = bool(srec is not None and srec.get("sync_ok") is False)
+            mix = not is_bankable_track(track, Path(fp).name if fp else "")
+            album_file = False
+            if fp and flac_ok:
+                try:
+                    from .catalogue import _looks_like_disc_image
+
+                    album_file = _looks_like_disc_image(Path(fp))
+                except Exception:
+                    album_file = False
             out.append(
                 {
                     "id": i,
-                    "album": r.get("album"),
-                    "track": r.get("track"),
+                    "album": album,
+                    "track": track,
                     "tuning": r.get("tuning"),
                     "has_flac": flac_ok,
                     "has_gp": bool(gp5),
@@ -347,7 +379,13 @@ def create_app(lab_root: Path, flac_root: Path | None, gp_root: Path | None) -> 
                     "has_cover": bool(_cover_near(fp)),
                     "has_pack": has_pack,
                     "pack_source": pack_source,
-                    "split": split_for(r.get("album"), r.get("track"), holdout),
+                    "split": split_for(album, track, holdout),
+                    # Server-computed badges: the JS never re-reads holdout.csv
+                    # or sync.jsonl.
+                    "val": val,
+                    "off_clock": off_clock,
+                    "mix": mix,
+                    "album_file": album_file,
                     "stems": stems,
                 }
             )

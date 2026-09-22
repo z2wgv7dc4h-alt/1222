@@ -110,8 +110,9 @@
     .pins button.chill { border-color:#6a9e9a; color:#6a9e9a; }
     .pins button.pulse { border-color:#b07ad4; color:#b07ad4; }
     .pins button.outro { border-color:#888; color:#888; }
-    .pins button { padding:7px 6px; border-radius:8px; background:transparent; }
-    .pins button:hover, .pins button:active { background:color-mix(in srgb, currentColor 12%, transparent); }
+.pins button { padding:7px 6px; border-radius:8px; background:transparent; }
+.pins button:hover, .pins button:active { background:color-mix(in srgb, currentColor 12%, transparent); }
+.pins button:disabled, .pins button.muted { opacity:.45; cursor:not-allowed; }
     table { width:100%; border-collapse:collapse; }
     th, td { text-align:left; padding:8px 6px; border-bottom:1px solid var(--line); font-size:14px; }
     th { color:var(--mute); font-weight:500; }
@@ -1024,6 +1025,7 @@ function applyLayer(){
 function makeWave(url){
   destroyWave();
   const clk=document.getElementById("clock"); if(clk) clk.textContent="0:00 / —";
+  setPinsReady();  // new song: pins stay off until WaveSurfer reports a duration
   const RP=RegionsApi();
   if(!window.WaveSurfer || !RP){ showErr("wavesurfer failed to load — check network"); return; }
   ws=WaveSurfer.create({
@@ -1042,6 +1044,7 @@ function makeWave(url){
   regionsPlug=ws.registerPlugin(RP.create());
   ws.on("ready",()=>{
     document.getElementById("clock").textContent=fmt(0)+" / "+fmt(ws.getDuration()||0);
+    setPinsReady();  // real duration: role pins may create boxes now
     paintRegions();
     drawBeatGrid();
     buildSpec();
@@ -1616,8 +1619,22 @@ function bestOnFigure(p, skipIdx){
   });
   return best;
 }
+// Role pins wait for a real duration: no box while the clock still reads
+// "0:00 / —". Buttons are disabled + muted; role keys no-op with a message.
+function pinsReady(){
+  const clk=document.getElementById("clock");
+  return !!(ws && typeof ws.getDuration==="function" && ws.getDuration()>1 &&
+            clk && !/^0:00 \/ —/.test(clk.textContent||""));
+}
+function setPinsReady(){
+  const on=pinsReady();
+  document.querySelectorAll(".pins button").forEach(b=>{
+    b.disabled=!on;
+    b.classList.toggle("muted", !on);
+  });
+}
 function add(role){
-  if(!ws || (ws.getDuration()||0)<2){ showErr("Wait. Clock must show the full length before you draw.", true); return; }
+  if(!pinsReady()){ showErr("wait for the clock", true); return; }
   const t=ws.getCurrentTime();
   const dur=ws.getDuration();
   snap();
@@ -2030,19 +2047,19 @@ document.getElementById("btnMoreCols").onclick=function(){
   sync();
 })();
 
+setPinsReady();  // page load: pins wait for a selected song + real duration
 document.body.addEventListener("keydown",e=>{
   if(e.target.tagName==="INPUT"||e.target.tagName==="SELECT") return;
   if(e.code==="Space"){ e.preventDefault(); toggle(); }
-  if(e.key==="1") add("riff");
-  if(e.key==="2") add("hook");
-  if(e.key==="3") add("breakdown");
-  if(e.key==="t"||e.key==="T") add("blast");
-  if(e.key==="4") add("solo");
+  const roleKey={"1":"riff","2":"hook","3":"breakdown","t":"blast","T":"blast",
+                 "4":"solo","i":"intro","I":"intro","b":"build","B":"build",
+                 "c":"chill","C":"chill","p":"pulse","P":"pulse"}[e.key];
+  if(roleKey){
+    if(!pinsReady()){ showErr("wait for the clock"); return; }
+    add(roleKey);
+    return;
+  }
   if(e.key==="s"||e.key==="S") save();
-  if(e.key==="i"||e.key==="I") add("intro");
-  if(e.key==="b"||e.key==="B") add("build");
-  if(e.key==="c"||e.key==="C") add("chill");
-  if(e.key==="p"||e.key==="P") add("pulse");
   if(e.key==="n"||e.key==="N") nextGreen();
   if(e.key==="j"||e.key==="J"){ if(trackId<tracks.length-1) select(trackId+1); }
   if(e.key==="k"||e.key==="K"){ if(trackId>0) select(trackId-1); }

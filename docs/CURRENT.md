@@ -37,4 +37,4 @@ Operator start: `tools/boo-lab/USER.md`, then `START.bat`.
 | Corpus | `reference/audio-corpus/` |
 | Lab map / drafts / stems | `tools/boo-lab/data/map.csv`, `drafts.jsonl`, `work/` |
 
-History novels: `docs/archive/`. Lab session notes: `tools/boo-lab/CHANGELOG.md`.
+Old novels live in git, not this tree. Lab notes: `tools/boo-lab/CHANGELOG.md`.

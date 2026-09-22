@@ -10,6 +10,7 @@ node_modules/
 *.flac
 *.mid
 render/
+/.claude/
 .claude/logs/
 .claude/settings.local.json
 CLAUDE.local.md

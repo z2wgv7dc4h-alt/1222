@@ -73,6 +73,8 @@ iff-blast-A.
 
 - compare scores on VAL/holdout songs are **diagnostics, not votes** (never `prefer=`); live Rebirth pins were wiped, so re-pinning is human-only.
 
+- Quality gates live in `audit.py`; they warn; they do not label. (overlaps, <1s boxes, function-swallow, empty figure_id, unopenable/mislabeled/stub GPs, identity gaps.)
+
 - `phrase_spans` retune on import is **optional**; failure logs `phrase_retune skipped:` and keeps stock `tabnotes_drafts.pack_phrase_spans`.
 
 - Prefer GP7 .gp/.gpx (parsed GPIF) over .gp5; no GP7→GP5 conversion.

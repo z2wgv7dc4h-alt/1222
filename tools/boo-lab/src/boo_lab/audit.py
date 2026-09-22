@@ -5,6 +5,7 @@ import json
 from collections import Counter
 from pathlib import Path
 
+from .gate import is_stub_gp
 from .schema import (
     FIGURE_ROLES,
     FUNCTION_ROLES,
@@ -17,6 +18,9 @@ from .schema import (
 # Read-only reference copy of the live Rebirth windows (never a writer path --
 # see CURRENT.md). audit compares its windows to the live rows, nothing more.
 _SNAPSHOT_NAME = "rebirth-sections.jsonl"
+
+_MATCH_YES = {"yes", "y", "1", "true"}
+_LEGACY_GP_EXTS = (".gp3", ".gp4", ".gp5")
 
 
 def _jsonl(path: Path) -> list[dict]:
@@ -120,6 +124,93 @@ def _snapshot_drift(lab_root: Path, secs: list[dict]) -> dict:
     }
 
 
+def _map_rows(lab_root: Path) -> list[dict]:
+    """Raw `data/map.csv` rows (gitignored, may be absent -> [])."""
+    path = lab_root / "data" / "map.csv"
+    if not path.exists():
+        return []
+    try:
+        from .catalogue import load_map
+
+        return load_map(path)
+    except Exception:
+        return []
+
+
+def _is_zip_gpif(path) -> bool:
+    """Content sniff: the existing GPIF reader opens it (zip with
+    `Content/score.gpif`). Reused -- never a second sniffer."""
+    try:
+        from .gpif import open_gp
+
+        with open_gp(Path(path)):
+            return True
+    except Exception:
+        return False
+
+
+def _gp_readable(path) -> bool:
+    """True when the real reader for this extension can open it: GPIF for
+    `.gp`/`.gpx`, pyguitarpro for GP3/4/5. Never guesses."""
+    p = Path(path)
+    if not p.exists() or not p.is_file():
+        return False
+    if p.suffix.lower() in (".gp", ".gpx"):
+        return _is_zip_gpif(p)
+    try:
+        import guitarpro
+
+        guitarpro.parse(str(p))
+        return True
+    except Exception:
+        return False
+
+
+def _map_warnings(rows: list[dict]) -> dict:
+    """Map-level quality gates: match=yes GP unopenable / stub, and a legacy
+    GP extension whose content is actually zip/GPIF (mislabeled)."""
+    unopenable: list[dict] = []
+    stubs: list[dict] = []
+    mislabeled: list[dict] = []
+    for r in rows:
+        gp = r.get("gp_path") or r.get("gp") or ""
+        p = Path(gp) if gp else None
+        if gp and p is not None and p.suffix.lower() in _LEGACY_GP_EXTS \
+                and _is_zip_gpif(p):
+            mislabeled.append({"album": r.get("album") or "", "track": r.get("track") or "",
+                               "gp": gp})
+        if (r.get("match") or "").lower() not in _MATCH_YES:
+            continue
+        if not gp or p is None or not p.exists():
+            unopenable.append({"album": r.get("album") or "", "track": r.get("track") or "",
+                               "gp": gp, "reason": "missing"})
+        elif not _gp_readable(p):
+            unopenable.append({"album": r.get("album") or "", "track": r.get("track") or "",
+                               "gp": gp, "reason": "unreadable"})
+        if p is not None and p.exists() and is_stub_gp(p):
+            stubs.append({"album": r.get("album") or "", "track": r.get("track") or "", "gp": gp})
+    return {"map_unopenable": unopenable, "stub_matches": stubs, "mislabeled_gps": mislabeled}
+
+
+def _identity_gaps(secs: list[dict]) -> list[dict] | None:
+    """Keeper `(album, track)` pairs with no `identity.csv` row. `None` (skip)
+    when identity.py is unavailable."""
+    try:
+        from . import identity
+    except Exception:
+        return None
+    gaps: list[dict] = []
+    seen: set[tuple[str, str]] = set()
+    for rec in secs:
+        key = (rec.get("album") or "", rec.get("track") or "")
+        if not any(key) or key in seen:
+            continue
+        seen.add(key)
+        if identity.album_id_for(key[0], key[1]) is None:
+            gaps.append({"album": key[0], "track": key[1]})
+    return gaps
+
+
 def audit_lab(lab_root: Path) -> dict:
     secs = _section_rows(lab_root)
     drafts = _jsonl(lab_root / "data" / "drafts.jsonl")
@@ -165,7 +256,25 @@ def audit_lab(lab_root: Path) -> dict:
         "schema_gaps": _schema_gaps(secs),
         "swallow_warnings": _swallow_warnings(secs),
         "snapshot_drift": _snapshot_drift(lab_root, secs),
+        "identity_gaps": _identity_gaps(secs),
+        **_map_warnings(_map_rows(lab_root)),
     }
+
+
+def _print_list(label: str, items: list, fmt) -> None:
+    """Print one warning list, capped at 12 rows + `… N more`."""
+    print(f"  {label:<24} {len(items)}")
+    for it in items[:12]:
+        print("    " + fmt(it))
+    if len(items) > 12:
+        print(f"    … {len(items) - 12} more")
+
+
+def _print_keys(label: str, items: list) -> None:
+    for it in items[:12]:
+        print(f"    {label} {it}")
+    if len(items) > 12:
+        print(f"    … {len(items) - 12} more {label.strip()}")
 
 
 def print_audit(report: dict) -> None:
@@ -179,34 +288,32 @@ def print_audit(report: dict) -> None:
     print(f"  boxes < 1s:              {report['boxes_under_1s']}")
     print(f"  sources:                 {report['sources'] or '{}'}")
     print(f"  roles:                   {report['roles'] or '{}'}")
-    ov = report["same_role_overlaps"]
-    print(f"  same-role overlaps:      {len(ov)}")
-    for hit in ov[:12]:
-        print(f"    {hit['album']} / {hit['track']}  {hit['role']}  boxes {hit['i']}+{hit['j']}")
-    if len(ov) > 12:
-        print(f"    … {len(ov) - 12} more")
 
-    gaps = report.get("schema_gaps", [])
-    print(f"  schema gaps:             {len(gaps)}")
-    for g in gaps[:12]:
-        print(f"    {g['album']} / {g['track']}  {g['role']}  {', '.join(g['reasons'])}")
-    if len(gaps) > 12:
-        print(f"    … {len(gaps) - 12} more")
+    _print_list("same-role overlaps:",
+                report["same_role_overlaps"],
+                lambda h: f"{h['album']} / {h['track']}  {h['role']}  boxes {h['i']}+{h['j']}")
+    _print_list("schema gaps:", report.get("schema_gaps", []),
+                lambda g: f"{g['album']} / {g['track']}  {g['role']}  {', '.join(g['reasons'])}")
+    _print_list("swallow warnings:", report.get("swallow_warnings", []),
+                lambda w: (f"{w['album']} / {w['track']}  {w['role']} covers "
+                           f"{w['start']:.2f}-{w['end']:.2f}  swallows {', '.join(w['swallows'])}"))
+    _print_list("map not openable:", report.get("map_unopenable", []),
+                lambda m: f"{m['album']} / {m['track']}  [{m['reason']}]  {m['gp']}")
+    _print_list("mislabeled GP ext:", report.get("mislabeled_gps", []),
+                lambda m: f"{m['album']} / {m['track']}  {m['gp']}")
+    _print_list("stub match=yes:", report.get("stub_matches", []),
+                lambda m: f"{m['album']} / {m['track']}  {m['gp']}")
 
-    swallows = report.get("swallow_warnings", [])
-    print(f"  swallow warnings:        {len(swallows)}")
-    for w in swallows[:12]:
-        print(f"    {w['album']} / {w['track']}  {w['role']} covers {w['start']:.2f}-{w['end']:.2f}"
-              f"  swallows {', '.join(w['swallows'])}")
-    if len(swallows) > 12:
-        print(f"    … {len(swallows) - 12} more")
+    ident = report.get("identity_gaps")
+    if ident is None:
+        print("  identity gaps:            (skipped: no identity.py)")
+    else:
+        _print_list("identity gaps:", ident, lambda g: f"{g['album']} / {g['track']}")
 
     drift = report.get("snapshot_drift", {})
     only_live = drift.get("only_live", [])
     only_snap = drift.get("only_snapshot", [])
     print(f"  snapshot drift:          {len(only_live) + len(only_snap)}"
           f"  ({drift.get('snapshot', '?')}{'' if drift.get('present') else ' missing'})")
-    for key in only_live[:12]:
-        print(f"    only live:     {key}")
-    for key in only_snap[:12]:
-        print(f"    only snapshot: {key}")
+    _print_keys("only live:    ", only_live)
+    _print_keys("only snapshot:", only_snap)

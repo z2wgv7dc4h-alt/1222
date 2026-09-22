@@ -1,3 +1,10 @@
+## 2026-09-22 — quality gates restored as audit warnings
+
+- `audit.py` now warns (never blocks Save, never rewrites): function-swallow, figure-role empty `figure_id` (already `schema_gaps`), `map_unopenable` (match=yes GP missing or unreadable via GPIF/pyguitarpro), `mislabeled_gps` (a `.gp3/4/5` whose content is zip/GPIF), `stub_matches` (match=yes on a < 10 KB / solo / bass / cover / mix GP), and `identity_gaps` (keeper album/track with no `identity.csv` row; skipped if identity.py is missing). Same-role overlap and <1s counts already existed.
+- Every list prints capped at 12 + `… N more`. With empty gold the keeper-gate lists are empty and audit still exits 0; the Rebirth snapshot is never read as keepers.
+- CURRENT.md bullet: quality gates live in audit.py; they warn; they do not label.
+- Tests: `tests/test_audit.py` warnings 5–8, empty-gold no-crash, and the print cap.
+
 ## 2026-09-22 — one-tab picker (`pick_gp`)
 
 - New `catalogue.pick_gp(candidates)`: readable GP7 `.gp`/`.gpx` via the existing GPIF sniffer (`gpif.open_gp`, no second sniffer) > GP3/4/5 by extension > never a stub (`is_stub_gp`: < 10 KB or solo/cover/bass-only/Misha-mix/intro name) > largest (size tie keeps `_gp_candidates` match order) > GP7 beats GP5.

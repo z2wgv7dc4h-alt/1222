@@ -234,7 +234,8 @@ better with it. Re-run `boo-lab interns` after a sync to pick these up.
 
 
 **adapt / learn (calibration):** timing/role/breakdown nudges; after 5 songs, which
-stencil to trust. Not musical IQ.
+stencil to trust. Not musical IQ. Compare scores on VAL songs are diagnostics, not
+votes. Live Rebirth pins were wiped; re-pinning is human-only.
 
 **Frozen interns never retrain** from your marks (Demucs, WhisperX, allin1, beat_this, …).
 

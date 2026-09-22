@@ -71,6 +71,8 @@ iff-blast-A.
 
 - Live keepers are empty until a human Saves a heard box; the deleted invalid Rebirth rows are not a restore-from target. A Save of a new track must go through `stamp_box`.
 
+- compare scores on VAL/holdout songs are **diagnostics, not votes** (never `prefer=`); live Rebirth pins were wiped, so re-pinning is human-only.
+
 - `phrase_spans` retune on import is **optional**; failure logs `phrase_retune skipped:` and keeps stock `tabnotes_drafts.pack_phrase_spans`.
 
 - Prefer GP7 .gp/.gpx (parsed GPIF) over .gp5; no GP7→GP5 conversion.

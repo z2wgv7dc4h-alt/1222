@@ -1,3 +1,10 @@
+## 2026-09-22 — scoring honesty after empty gold
+
+- `compare.compare` marks each track `not_used_for_prefer` and prints holdout/VAL rows as `holdout / not used for prefer=`; a track with no keepers is skipped, never an error and never an invented box.
+- `learn` already votes only non-holdout songs (`_qualifying(include_holdout=False)`); with empty or holdout-only gold it yields `prefer=none`. `adapt`/`predict` already exclude holdout songs.
+- USER.md / CURRENT.md: compare on VAL is a diagnostic, not a vote; wiped Rebirth pins are human-re-pin only.
+- Tests: `tests/test_empty_gold_learn.py` (empty gold, holdout-only Rebirth fixture, holdout excluded from the vote set, a real non-holdout vote can still run, compare labelling/skip). `intern_rank.json` stays gitignored.
+
 ## 2026-09-22 — drop invalid Rebirth placeholder keepers
 
 - `data/sections.jsonl` rewritten with `schema.write_jsonl_atomic` to ZERO rows — the six invalid Rebirth windows are deleted. Live keepers are empty until a human Saves a heard box.

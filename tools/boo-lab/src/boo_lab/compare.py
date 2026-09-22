@@ -160,7 +160,10 @@ def compare(lab_root: Path, album: str | None = None, track: str | None = None) 
             m["album"] = a
             m["track"] = t
             m["source"] = source
-            m["split"] = "holdout" if split_for(a, t, holdout) == "val" else "train"
+            is_holdout = split_for(a, t, holdout) == "val"
+            m["split"] = "holdout" if is_holdout else "train"
+            # A holdout/VAL song is scored as a diagnostic only -- never a vote.
+            m["not_used_for_prefer"] = is_holdout
             tracks.append(m)
 
     def _f(c: dict) -> float:
@@ -183,9 +186,11 @@ def format_report(report: dict) -> str:
     lines = ["%-28s %-8s %-15s %6s %7s %6s %6s %8s %s" % (
         "album", "track", "source", "n_keep", "n_draft", "F0.5", "F3", "role3", "split")]
     for t in report["tracks"]:
+        split_label = ("holdout / not used for prefer="
+                       if t.get("not_used_for_prefer") else (t.get("split") or "train"))
         lines.append("%-28s %-8s %-15s %6d %7d %6.3f %6.3f %8.3f %s" % (
             (t["album"] or "")[:28], (t["track"] or "")[:8], (t.get("source") or "")[:15],
-            t["n_keep"], t["n_draft"], t["f_0_5"], t["f_3_0"], t["role_agree_3_0"], t["split"]))
+            t["n_keep"], t["n_draft"], t["f_0_5"], t["f_3_0"], t["role_agree_3_0"], split_label))
     m = report["micro"]
     lines.append("micro (tracks=%d rows=%d): F0.5=%.3f F3=%.3f role3=%.3f"
                  % (m["n_tracks"], m["n_rows"], m["f_0_5"], m["f_3_0"], m["role_agree_3_0"]))

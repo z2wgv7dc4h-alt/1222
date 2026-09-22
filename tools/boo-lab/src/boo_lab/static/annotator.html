@@ -177,6 +177,7 @@
 .conf.warn { color:#d4a257; }
 .srcpip { margin-left:6px; font-size:10px; color:#6a625a; text-transform:none; letter-spacing:0; }
 .srcpip::before { content:"· "; color:#4a4640; }
+.overlap-bad { outline:2px solid #e0533a !important; outline-offset:-1px; }
     button.danger { color:var(--break); border-color:#5a2a26; }
     button.danger:hover { border-color:var(--break); color:#ffb0a6; }
     /* per-role lanes: a region sits only in its role's strip */
@@ -800,6 +801,32 @@ function highlightSel(){
     });
   }catch(e){}
 }
+// 50 ms threshold -- matches schema.same_role_overlap_pairs, the SAME rule
+// Save refuses. This is paint only: it never blocks or changes a box.
+const OVERLAP_EPS = 0.05;
+function sameRoleOverlapIdx(){
+  const bad=new Set();
+  for(let i=0;i<regs.length;i++){
+    const a=regs[i]; if(!a) continue;
+    for(let j=i+1;j<regs.length;j++){
+      const b=regs[j]; if(!b || a.role!==b.role) continue;
+      const ov=Math.min(+a.end||0,+b.end||0)-Math.max(+a.start||0,+b.start||0);
+      if(ov>OVERLAP_EPS){ bad.add(i); bad.add(j); }
+    }
+  }
+  return bad;
+}
+function paintOverlap(){
+  if(!regionsPlug) return;
+  let bad=new Set();
+  try{ bad=sameRoleOverlapIdx(); }catch(e){ bad=new Set(); }
+  try{
+    regionsPlug.getRegions().forEach(r=>{
+      if(!r.element) return;
+      r.element.classList.toggle("overlap-bad", r._idx!=null && bad.has(r._idx));
+    });
+  }catch(e){}
+}
 function paintRegions(){
   if(!regionsPlug) return;
   lock=true;
@@ -820,6 +847,7 @@ function paintRegions(){
   lock=false;
   highlightSel();
   updateGutter();
+  paintOverlap();
 }
 
 function pullRegions(){
@@ -1066,6 +1094,7 @@ function makeWave(url){
     if(lock) return;
     snapRegion(reg);
     updateRegionContent(reg, (reg._idx!=null)?regs[reg._idx]:null);
+    paintOverlap();  // live same-role >50ms warning while dragging / resizing
   });
   regionsPlug.on("region-created",(reg)=>{
     const i=parseInt(String(reg.id||"").replace("r",""),10);
@@ -1075,7 +1104,7 @@ function makeWave(url){
   regionsPlug.on("region-double-clicked",(reg)=>{ const i=reg&&reg._idx; if(i!=null) selectAndZoomBox(i); });
   if(!window._booWaveUp){
     window._booWaveUp=true;
-    document.getElementById("wave").addEventListener("pointerup",()=>{ if(!lock){ pullRegions(); table(); }});
+    document.getElementById("wave").addEventListener("pointerup",()=>{ if(!lock){ pullRegions(); table(); paintOverlap(); }});
     document.getElementById("wave").addEventListener("contextmenu",ev=>{
       ev.preventDefault();
       if(!ws) return;

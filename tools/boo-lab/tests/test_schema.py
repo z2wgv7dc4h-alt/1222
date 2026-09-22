@@ -92,6 +92,31 @@ def test_same_role_overlap_detected():
     assert hits == [(0, 1, "riff")]
 
 
+def test_same_role_overlap_pairs_is_the_one_epsilon_definition():
+    from boo_lab.schema import same_role_overlap_pairs
+
+    boxes = [
+        {"role": "riff", "start": 0.0, "end": 4.0},
+        {"role": "riff", "start": 3.96, "end": 6.0},   # 40 ms into box 0: legal
+        {"role": "riff", "start": 3.94, "end": 9.0},   # 60 ms into box 0: painted
+        {"role": "breakdown", "start": 0.0, "end": 9.0},
+    ]
+
+    pairs = same_role_overlap_pairs(boxes)
+
+    assert (0, 2, "riff") in pairs
+    assert (0, 1, "riff") not in pairs   # <= 50 ms never counts
+    assert all(p[2] == "riff" for p in pairs)  # different roles stay legal
+    assert same_role_overlaps(boxes) == pairs
+
+
+
+def test_overlap_epsilon_is_50ms():
+    from boo_lab.schema import OVERLAP_EPS_SECONDS
+
+    assert OVERLAP_EPS_SECONDS == 0.05
+
+
 def test_stamp_box():
     b = stamp_box(0, 1, "hook", source="msa-draft")
     assert b["layer"] == "figure" and b["source"] == "msa-draft"

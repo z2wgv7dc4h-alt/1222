@@ -135,7 +135,16 @@ def write_jsonl_atomic(
         raise
 
 
-def same_role_overlaps(boxes: list[dict[str, Any]]) -> list[tuple[int, int, str]]:
+# Real overlap epsilon: a same-role overlap must exceed 50 ms to count. The
+# studio's drag/resize paint uses the SAME number (see the `.overlap-bad` JS),
+# so it can never disagree with Save's refusal.
+OVERLAP_EPS_SECONDS = 0.05
+
+
+def same_role_overlap_pairs(boxes: list[dict[str, Any]]) -> list[tuple[int, int, str]]:
+    """Real `(i, j, role)` pairs of same-role boxes overlapping by more than
+    `OVERLAP_EPS_SECONDS` (50 ms). The one definition Save and the studio's
+    paint-only warning both reference."""
     hits: list[tuple[int, int, str]] = []
     for i, a in enumerate(boxes):
         ra = canonical_role(a.get("role"))
@@ -146,9 +155,14 @@ def same_role_overlaps(boxes: list[dict[str, Any]]) -> list[tuple[int, int, str]
             if canonical_role(b.get("role")) != ra:
                 continue
             sb, eb = float(b.get("start", 0)), float(b.get("end", 0))
-            if min(ea, eb) - max(sa, sb) > 0.05:
+            if min(ea, eb) - max(sa, sb) > OVERLAP_EPS_SECONDS:
                 hits.append((i, j, ra))
     return hits
+
+
+def same_role_overlaps(boxes: list[dict[str, Any]]) -> list[tuple[int, int, str]]:
+    """Backward-compatible alias of `same_role_overlap_pairs`."""
+    return same_role_overlap_pairs(boxes)
 
 
 def _bars(value: Any) -> int | None:

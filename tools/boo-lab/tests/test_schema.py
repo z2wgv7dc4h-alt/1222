@@ -156,6 +156,21 @@ def test_stamp_box_identity_round_trip():
     assert json.loads(json.dumps(b))["end_bar"] == 20
 
 
+def test_stamp_box_pulse_keeper_is_a_figure_with_an_id():
+    b = stamp_box(0.0, 4.0, "pulse", heard=True, source="human")
+    assert b["layer"] == "figure"
+    assert b["figure_id"]  # non-empty ("pulse-A")
+    assert b["heard"] is True and b["source"] == "human"
+
+
+def test_stamp_box_intro_function_keeps_blank_figure_id():
+    b = stamp_box(0.0, 4.0, "intro", heard=True, source="human")
+    assert b["layer"] == "function"
+    assert b["figure_id"] == ""
+    # a typed figure_id is the only thing that fills it
+    assert stamp_box(0.0, 4.0, "intro", figure_id="custom-A")["figure_id"] == "custom-A"
+
+
 def test_stamp_box_rejects_bad_instrument_and_bars():
     b = stamp_box(0, 1, "riff", instrument="kazoo", start_bar="x", end_bar=-3)
     assert b["instrument"] == ""

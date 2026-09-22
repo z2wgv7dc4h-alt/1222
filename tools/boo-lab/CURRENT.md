@@ -69,6 +69,8 @@ iff-blast-A.
 
 - `data/rebirth-sections.jsonl` is a **reference snapshot** of the Rebirth pins, not the writer path. Live keepers are only `data/sections.jsonl` (Save / hear / album-remove). Do not teach any command to write both.
 
+- Pre-stamp Rebirth rows are grandfathered (accepted as-is by `load_section_rows`); audit flags their schema gaps as warnings only. A Save of a new track must go through `stamp_box` — it never back-fills the old rows.
+
 - `phrase_spans` retune on import is **optional**; failure logs `phrase_retune skipped:` and keeps stock `tabnotes_drafts.pack_phrase_spans`.
 
 - Prefer GP7 .gp/.gpx (parsed GPIF) over .gp5; no GP7→GP5 conversion.

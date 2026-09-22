@@ -1,3 +1,9 @@
+## 2026-09-22 — audit keeper warnings + Rebirth snapshot
+
+- `audit.py` gains advisory `schema_gaps` (keeper missing `layer`, or figure-role keeper with empty `figure_id`), `swallow_warnings` (a function box covering >= 90% of the track span with another function role inside), and `snapshot_drift` (live windows vs `data/rebirth-sections.jsonl`). Never rewrites a file, never fails Save; counts unchanged.
+- `data/rebirth-sections.jsonl` is now a true snapshot of the live 6 Rebirth windows with `heard=true` (same times/roles/source). CURRENT.md keeps the "reference snapshot, not the writer path" line and adds the grandfather + `stamp_box` rule.
+- Tests: `test_audit.py`, `test_rebirth_snapshot.py`, plus `stamp_box` pulse/intro checks in `test_schema.py`.
+
 ## 2026-09-22 — stable song identity (`album_id`)
 
 - New `src/boo_lab/identity.py`: `load_identity(lab_root)`, `resolve_song(album, track)` (exact then casefold), `album_id_for(album, track)`. A `tracks/` child folder is never an album.

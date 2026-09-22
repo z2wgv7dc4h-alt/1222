@@ -1,3 +1,10 @@
+## 2026-09-22 — health report stops mixing role vocabularies
+
+- `report.ROLE_VOCABULARY` is now `schema.ROLES` exactly (adds the missing `blast`).
+- Lab coverage (`role_totals` / `roles_zero_coverage`) comes only from `data/sections.jsonl` keepers via `load_section_rows`; engine/MSA labels (`verse`/`chorus`/`interlude`) are no longer summed into lab riff coverage. Per-file `role_counts` stay as raw provenance.
+- Health JSON paths are now relative to the lab root (`_rel`), never `C:\Users\...`; the riff-bank failure `source` is relative too.
+- Tests: `tests/test_health_roles.py`.
+
 ## 2026-09-22 — audit keeper warnings + Rebirth snapshot
 
 - `audit.py` gains advisory `schema_gaps` (keeper missing `layer`, or figure-role keeper with empty `figure_id`), `swallow_warnings` (a function box covering >= 90% of the track span with another function role inside), and `snapshot_drift` (live windows vs `data/rebirth-sections.jsonl`). Never rewrites a file, never fails Save; counts unchanged.

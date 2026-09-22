@@ -5,22 +5,24 @@ import os
 import sys
 from pathlib import Path
 
-# This project's own real role vocabulary, per tools/boo-lab/CURRENT.md's
-# "## Roles" section. The report explicitly calls out any of these with zero
-# real entries anywhere.
-ROLE_VOCABULARY = [
-    "intro",
-    "build",
-    "riff",
-    "hook",
-    "breakdown",
-    "solo",
-    "chill",
-    "pulse",
-    "outro",
-]
+from .schema import ROLES, canonical_role, load_section_rows
+
+# The one lab role vocabulary: schema.ROLES exactly (includes `blast`). Health
+# never mixes engine/MSA labels (verse/chorus/interlude) into lab coverage --
+# that engine mapping lives only in extract.py's _BOO_LAB_TO_ENGINE_ROLE.
+ROLE_VOCABULARY = list(ROLES)
 
 _MATCH_YES = {"yes", "y", "1", "true"}
+
+
+def _rel(lab_root: Path, path: Path) -> str:
+    """Path relative to the lab root, POSIX separators -- health JSON never
+    leaks a machine-absolute `C:\\Users\\...` root."""
+    try:
+        rel = os.path.relpath(str(path), str(lab_root))
+    except ValueError:
+        rel = str(path)
+    return rel.replace("\\", "/")
 
 # Real pipeline files this report checks. `keys` is the real identity tuple
 # used for the distinct count; `extras` lists extra per-value breakdowns to
@@ -95,7 +97,7 @@ def _map_summary(rows: list[dict]) -> dict:
     }
 
 
-def _riff_bank_failure_breakdown(gp_source: Path) -> dict:
+def _riff_bank_failure_breakdown(gp_source: Path, lab_root: Path) -> dict:
     """Actually run `engine/riff_bank.build_riff_bank` for all three
     instrument families over `gp_source` and count real failure reasons per
     category (via `riff_bank.classify_failure_reason`) -- surfacing WHY
@@ -130,7 +132,7 @@ def _riff_bank_failure_breakdown(gp_source: Path) -> dict:
             "by_category": dict(sorted(by_category.items(), key=lambda kv: (-kv[1], kv[0]))),
             "by_reason": dict(sorted(by_reason.items(), key=lambda kv: (-kv[1], kv[0]))),
         }
-    return {"available": True, "source": str(gp_source), "by_instrument": by_instrument}
+    return {"available": True, "source": _rel(lab_root, gp_source), "by_instrument": by_instrument}
 
 
 def build_report(lab_root: Path, gp_source: Path | None = None) -> dict:
@@ -146,13 +148,12 @@ def build_report(lab_root: Path, gp_source: Path | None = None) -> dict:
     out_path = lab_root / "data" / "corpus_health.json"
 
     files: dict[str, dict] = {}
-    role_totals: dict[str, int] = {}
     missing: list[str] = []
 
     for spec in _SPECS:
         base = repo_root if spec["rel"].startswith("engine/") else lab_root
         path = base / spec["rel"]
-        entry: dict = {"path": str(path), "exists": path.exists()}
+        entry: dict = {"path": _rel(lab_root, path), "exists": path.exists()}
         rows = None
         if entry["exists"]:
             if spec["kind"] == "map":
@@ -172,9 +173,9 @@ def build_report(lab_root: Path, gp_source: Path | None = None) -> dict:
             entry["distinct_key"] = ",".join(spec["keys"])
             roles = _counts(rows, "role")
             if roles or any("role" in r for r in rows):
+                # Raw per-file provenance only -- never summed into lab
+                # coverage (engine `verse`/`chorus` must not become lab riff).
                 entry["role_counts"] = roles
-                for role, n in roles.items():
-                    role_totals[role] = role_totals.get(role, 0) + n
             for extra in spec.get("extras", []):
                 if extra != "role":
                     entry[f"{extra}_counts"] = _counts(rows, extra)
@@ -182,12 +183,21 @@ def build_report(lab_root: Path, gp_source: Path | None = None) -> dict:
             entry["map"] = _map_summary(rows)
         files[spec["name"]] = entry
 
+    # Lab coverage comes ONLY from the keeper rows (schema.load_section_rows),
+    # normalized to the lab vocabulary. Engine/MSA labels are never summed here.
+    keepers = load_section_rows(lab_root / "data" / "sections.jsonl")
+    role_totals: dict[str, int] = {}
+    for rec in keepers:
+        role = canonical_role(rec.get("role"))
+        if role in ROLE_VOCABULARY:
+            role_totals[role] = role_totals.get(role, 0) + 1
+
     zero_coverage = [r for r in ROLE_VOCABULARY if role_totals.get(r, 0) == 0]
     if gp_source is None:
         env_val = os.environ.get("BOO_GP_ROOT") or ""
         gp_source = Path(env_val) if env_val else None
     failures = (
-        _riff_bank_failure_breakdown(gp_source)
+        _riff_bank_failure_breakdown(gp_source, lab_root)
         if gp_source is not None
         else {"available": False, "reason": "no GP source dir (set BOO_GP_ROOT or pass --gp-root)"}
     )

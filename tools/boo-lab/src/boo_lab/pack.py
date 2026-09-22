@@ -85,6 +85,9 @@ def build_pack(lab_root: Path, rows: list[dict], cache: Path) -> dict:
     holdout = ensure_holdout(lab_root, rows)
     sec_path = lab_root / "data" / "sections.jsonl"
     sections = load_section_rows(sec_path)
+    if not sections:
+        # No keepers means no boxes to slice -- never invent clips from drafts.
+        print("pack: no keepers")
     by_song: dict[tuple[str, str], list[dict]] = {}
     for s in sections:
         by_song.setdefault((s.get("album") or "", s.get("track") or ""), []).append(s)

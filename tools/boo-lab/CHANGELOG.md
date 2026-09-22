@@ -1,3 +1,9 @@
+## 2026-09-22 — no keepers, no bank slices
+
+- Confirmed `pack` / `drums` / `vocals` / `jams` read keepers only via `load_section_rows`. `pack` now prints `pack: no keepers` and writes zero clips when the keeper file is empty; it never slices drafts.
+- `extract` / `export-bank` stay off the dead `rebirth-sections.jsonl` and off drafts. `jams` still refuses on no keepers / VAL.
+- Tests: `tests/test_no_keepers.py` (pack empty → 0 clips + "no keepers"; one heard keeper → 1 box; drums/vocals 0 rows; extract ignores snapshot+drafts; export-bank empty).
+
 ## 2026-09-22 — map rows carry `album_id`
 
 - `catalogue.FIELDS` gains `album_id` right after `track`; `scan_roots` stamps each row via `identity.album_id_for(album, track)` (`""` when unknown). `data/map.csv.example` header updated (`album,track,album_id,...`). `map.csv` stays gitignored and `push_lab` still never stages it.

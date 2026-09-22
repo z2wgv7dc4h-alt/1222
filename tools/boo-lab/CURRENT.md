@@ -89,6 +89,8 @@ Song title matching goes through `normalize.track_key` / `album_key` (TWDA `∆`
 
 - Quality gates live in `audit.py`; they warn; they do not label. (overlaps, <1s boxes, function-swallow, empty figure_id, unopenable/mislabeled/stub GPs, identity gaps, snapshot drift.)
 
+- Studio may warn on heard-without-loop (session memory only); it does not refuse — heard is still a human checkbox and Save is unchanged.
+
 - `phrase_spans` retune on import is **optional**; failure logs `phrase_retune skipped:` and keeps stock `tabnotes_drafts.pack_phrase_spans`.
 
 - Prefer GP7 .gp/.gpx (parsed GPIF) over .gp5; no GP7→GP5 conversion. `gpif_to_gp5` stays unused.

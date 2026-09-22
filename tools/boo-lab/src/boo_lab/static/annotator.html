@@ -852,6 +852,15 @@ function setRowInst(i,v){
 function stopBoxLoop(){
   window._boxLoop=null;
 }
+// Session-only memory of boxes that completed one full A-B pass. Never written
+// to sections.jsonl; it only lets `heard` warn (never refuse).
+window._looped = window._looped || new Set();
+function markLooped(i){
+  if(i!=null && regs[i]) window._looped.add(regs[i]);
+}
+function heardUnlooped(p){
+  return !(window._looped && window._looped.has(p));
+}
 function syncBoxLoopBounds(){
   const L=window._boxLoop; if(!L||L.idx==null||!regs[L.idx]) return;
   const p=regs[L.idx];
@@ -939,6 +948,7 @@ function playBox(){
   stopBoxLoop();
   const a=+regs[sel].start, b=Math.max(a+0.05, +regs[sel].end);
   window._playUntil=b;
+  window._playBoxIdx=sel;  // a full one-shot play counts as one A-B pass
   showErr("box "+fmt(a)+" → "+fmt(b));
   table();
   const hit=regionsPlug && regionsPlug.getRegions().find(r=>r._idx===sel);
@@ -1016,10 +1026,12 @@ function makeWave(url){
       // live-follow drag/resize of the looping box
       if(L.idx!=null && regs[L.idx]){ L.a=+regs[L.idx].start||0; L.b=Math.max(L.a+0.05, +regs[L.idx].end||0); }
       if(t>=L.b-0.03 || t<L.a-0.05){
+        if(t>=L.b-0.03) markLooped(L.idx);  // reached the end: one full A-B pass
         try{ ws.setTime(L.a); }catch(e){}
       }
     } else if(window._playUntil!=null && t>=window._playUntil-0.03){
       window._playUntil=null;
+      markLooped(window._playBoxIdx);
       try{ ws.pause(); }catch(e){}
     }
     if(drumsWs && ws.isPlaying()) try{ drumsWs.setTime(t); }catch(e){}
@@ -1651,7 +1663,16 @@ function table(){
     tr.querySelectorAll("input").forEach(inp=>{
       inp.onchange=()=>{
         const f=inp.dataset.f;
-        if(f==="heard"){ p.heard=!!inp.checked; return; }
+        if(f==="heard"){
+          p.heard=!!inp.checked;
+          if(p.heard && heardUnlooped(p)){
+            showErr("heard without a loop this session — loop it or leave it");
+            inp.title="not looped this session";
+          } else {
+            inp.title="";
+          }
+          return;
+        }
         if(f==="unique"){ p.unique=!!inp.checked; return; }
         if(f==="figure_id"){ p.figure_id=inp.value.trim(); refreshFigureSuggests(); return; }
         if(f==="on_figure"){ p.on_figure=inp.value.trim(); return; }
@@ -1896,6 +1917,9 @@ document.getElementById("btnNext").onclick=nextGreen;
   document.getElementById("ctxHeard").onchange=e=>{
     if(ctxIdx<0) return;
     regs[ctxIdx].heard=!!e.target.checked; setRowField(ctxIdx,"heard",e.target.checked);
+    if(regs[ctxIdx].heard && heardUnlooped(regs[ctxIdx])){
+      showErr("heard without a loop this session — loop it or leave it");
+    }
   };
   document.getElementById("ctxUnique").onchange=e=>{
     if(ctxIdx<0) return;

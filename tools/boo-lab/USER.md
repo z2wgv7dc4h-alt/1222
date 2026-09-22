@@ -70,7 +70,7 @@ The right-click edit panel closes on an outside click.
 
 One album per sitting is enough.
 
-VAL songs do not train and do not vote prefer=. You may pin them by ear. Rebirth is VAL and already pinned. Do not wipe it unless a human ticket says so. Guess is still a stencil.
+VAL songs do not train and do not vote prefer=. You may pin them by ear. Rebirth is VAL. The old six Rebirth rows were invalid times and were deleted. Re-pin by ear; do not restore the old windows.
 
 **Keys:** Space play · 1 riff · 2 hook · 3 breakdown · **T blast** · 4 solo · I intro · B build · C chill · P pulse · S save · J / K songs · Delete box · Ctrl+Z undo · Esc stops box loop / closes right-click · ? help.
 
@@ -90,7 +90,7 @@ hide bars and rows — they never edit. synth is an instrument (inst), not a rol
 Guess, Load drafts, Lyrics, Pack, Snap, JSON, Drop, git, Remove album,
 More columns.
 
-VAL songs do not train and do not vote prefer=. You may pin them by ear. Rebirth is VAL and already pinned. Do not wipe it unless a human ticket says so. Guess is still a stencil.
+VAL songs do not train and do not vote prefer=. You may pin them by ear. Rebirth is VAL. The old six Rebirth rows were invalid times and were deleted. Re-pin by ear; do not restore the old windows.
 
 Guess refuses a song that already has saved boxes.
 Selected song is highlighted in the left list.
@@ -247,7 +247,7 @@ cells — one short 2-4 bar example per figure name you kept, not a 40-second bo
 
 ## VAL / holdout
 
-VAL songs do not train and do not vote prefer=. You may pin them by ear. Rebirth is VAL and already pinned. Do not wipe it unless a human ticket says so. Guess is still a stencil.
+VAL songs do not train and do not vote prefer=. You may pin them by ear. Rebirth is VAL. The old six Rebirth rows were invalid times and were deleted. Re-pin by ear; do not restore the old windows.
 
 ## Pack, stems, lyrics
 

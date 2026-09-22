@@ -1,3 +1,11 @@
+## 2026-09-22 — drop invalid Rebirth placeholder keepers
+
+- `data/sections.jsonl` rewritten with `schema.write_jsonl_atomic` to ZERO rows — the six invalid Rebirth windows are deleted. Live keepers are empty until a human Saves a heard box.
+- `data/rebirth-sections.jsonl` kept as a **dead** snapshot: the old six windows with `"invalid": true`, explicitly not keepers and not a writer path. `load_section_rows` never reads it.
+- `data/holdout.csv` unchanged (Rebirth stays VAL). Rebirth-only entries dropped from local (uncommitted) `learn-log.jsonl` / `adapt.json`; no new start/end times invented.
+- USER.md VAL copy updated (re-pin by ear; do not restore old windows); CURRENT.md labels the dead snapshot and the empty live file.
+- Tests: `test_rebirth_snapshot.py` rewritten (dead/invalid copy, live has no Rebirth keepers, no keeper-read of the snapshot).
+
 ## 2026-09-22 — bankable/stub gate (CATALOG skip list in code)
 
 - `gate.py` gains `is_bankable_track` (Misha mix / `demo mix` / `*_solo*` / sweep / cover / bass-only / intro-only) and `is_stub_gp` (missing, under 10 KB, or non-bankable name). Name/size checks only — no file is deleted or renamed.

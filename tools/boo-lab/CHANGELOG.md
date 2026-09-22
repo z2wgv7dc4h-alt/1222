@@ -1,3 +1,10 @@
+## 2026-09-22 — GP7 extract prefers GPIF; fuzzy figure clusters
+
+- `.gp`/`.gpx` `extract_riffs` runs the GPIF reader FIRST; pyguitarpro is only the empty/raise fallback, and `via_gpif` keeps human-override times on the GPIF clock (no reparse).
+- `_measure_cell_and_deltas_gpif` tags a cell hit `hammer`/`dead` from GPIF note flags (no new RiffFragment fields).
+- `figures.cluster_song`: exact-hash groups first, then fuzzy-merge near-equal clusters (bar_fp ingredient Jaccard >= `FIGURE_JACCARD` 0.80, length ratio >= 0.5, same role, neither GP-letter conflict); per-bar `fps` ingredients ride on each window.
+- Guess drops unique `figure-hash` drafts once the song has any repeating figure; unique-only songs keep them. `_suppress_figure_flood` and caps unchanged.
+
 ## 2026-09-21 — pack_id on Save + live note join (not dense aggregates)
 
 ## 2026-09-21 — CURRENT.md cut to contract (P2.3)

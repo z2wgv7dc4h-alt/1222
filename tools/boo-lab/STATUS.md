@@ -6,11 +6,11 @@ Canonical detail: **CURRENT.md**; commands in **README.md**.
 ## Counts (from disk)
 
 - keepers: 6 row(s) across 1 track(s)
-- drafts: 1642 row(s); sources: msa-draft, songformer-draft
-- sync: 20 ok / 53 row(s)
+- drafts: 1659 row(s); sources: msa-draft, songformer-draft, tabnotes-density
+- sync: 20 ok / 54 row(s)
 - map.csv: 72 row(s)
-- figures: 610 row(s) across 41 track(s)
-- tempo hints: 0 row(s) across 0 track(s)
+- figures: 659 row(s) across 41 track(s)
+- tempo hints: 2 row(s) across 1 track(s)
 <!-- status:counts:end -->
 
-**Now:** Labelling repair queue cleared on main ? schema/Save/install/git/docs/predictor honesty/extract/save-hooks/P8 leftovers done. **473 tests** pass (`pytest -q`).
+**Now:** GP7 `.gp`/`.gpx` extract reads GPIF first (cell hits carry hammer/dead); figure clusters fuzzy-merge by `bar_fp` ingredient Jaccard (`FIGURE_JACCARD` 0.80), and Guess drops unique hashes once a repeating figure exists. **524 tests** pass (`pytest -q`).

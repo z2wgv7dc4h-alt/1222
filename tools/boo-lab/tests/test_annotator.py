@@ -706,3 +706,43 @@ def test_tracks_has_pack_false_without_pack(tmp_path):
     t = client.get("/api/tracks").json()["tracks"][0]
     assert t["has_pack"] is False
     assert t["pack_source"] == ""
+
+
+# --- Guess brakes (server-side, fail-closed) ---------------------------------
+
+
+def test_estimate_refuses_off_clock(tmp_path):
+    lab = _badge_lab(tmp_path, [_row("A", "T")],
+                     sync=[{"album": "A", "track": "T", "sync_ok": False}])
+    client = TestClient(ann.create_app(lab, None, None))
+    tid = client.get("/api/tracks").json()["tracks"][0]["id"]
+
+    r = client.get("/api/estimate/%d" % tid)
+
+    assert r.status_code == 409
+    assert "off-clock" in r.json()["detail"]
+
+
+def test_estimate_refuses_mix(tmp_path):
+    lab = _badge_lab(tmp_path, [_row(
+        "Born of Osiris - The Discovery (Fye Edition) (FLAC)",
+        "16 Follow the Signs (Misha Mansoor Demo Mix)")])
+    client = TestClient(ann.create_app(lab, None, None))
+    tid = client.get("/api/tracks").json()["tracks"][0]["id"]
+
+    r = client.get("/api/estimate/%d" % tid)
+
+    assert r.status_code == 409
+    assert "mix" in r.json()["detail"]
+
+
+def test_estimate_refuses_album_file(tmp_path):
+    lab = _badge_lab(tmp_path, [_row("Album", "T")])
+    (tmp_path / "audio" / "tracks").mkdir(parents=True, exist_ok=True)
+    client = TestClient(ann.create_app(lab, None, None))
+    tid = client.get("/api/tracks").json()["tracks"][0]["id"]
+
+    r = client.get("/api/estimate/%d" % tid)
+
+    assert r.status_code == 409
+    assert "album file" in r.json()["detail"]

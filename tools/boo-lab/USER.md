@@ -69,6 +69,7 @@ More columns.
 
 Remove album asks you to type the album folder name to confirm; a cancel or a mismatch does nothing.
 Snap starts off; an off-clock tab or a mix/album row cannot snap.
+Guess refuses off-clock (pin by ear), a mix row, or an album file (pin the numbered track).
 
 Guess refuses a song that already has saved boxes.
 Do not Guess a song whose list row says tab off-clock. Most tabs in this corpus are off-clock; pin those by ear.

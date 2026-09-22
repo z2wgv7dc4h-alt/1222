@@ -1737,6 +1737,10 @@ function dump(){
   a.click();
 }
 function estimate(){
+  const t=tracks[trackId];
+  if(t && t.off_clock){ showErr("off-clock — pin by ear", true); return; }
+  if(t && t.mix){ showErr("mix — do not Guess", true); return; }
+  if(t && t.album_file){ showErr("album file — pin the numbered track", true); return; }
   const finished=regs.some(p=>(p.source==="human"||p.source==="guess-accepted")&&p.heard);
   if(finished){ showErr("This song already has keepers. Guess is for a first pass.", true); return; }
   const merge = regs.length>0;

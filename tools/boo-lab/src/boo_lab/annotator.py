@@ -562,6 +562,15 @@ def create_app(lab_root: Path, flac_root: Path | None, gp_root: Path | None) -> 
         row = _resolved(track_id)
         if not row:
             raise HTTPException(404)
+        # Fail-closed server-side: Guess refuses a row it cannot trust, even if
+        # a client somehow calls this directly.
+        meta = _meta(track_id) or {}
+        if meta.get("off_clock"):
+            return JSONResponse({"detail": "off-clock — pin by ear"}, status_code=409)
+        if meta.get("mix"):
+            return JSONResponse({"detail": "mix — do not Guess"}, status_code=409)
+        if meta.get("album_file"):
+            return JSONResponse({"detail": "album file — pin the numbered track"}, status_code=409)
         # Finished song: it already has a heard keeper, so Guess stays out.
         keepers = load_section_rows(sec_path)
         if any((rec.get("album") or "") == (row.get("album") or "")

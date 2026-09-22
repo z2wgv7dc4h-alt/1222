@@ -60,3 +60,10 @@ data/flacs.csv
 data/corpus_health.json
 data/learn-log.jsonl
 
+# Local agent settings + hand-made backups / patch drafts (never repo files).
+.claude/
+*.bak
+*.bak-*
+data/*.bak-*
+boo-lab-docs-and-gaps.patch
+

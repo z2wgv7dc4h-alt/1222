@@ -208,6 +208,57 @@ def _find_gp(stem: str, gps: dict[str, Path]) -> Path | None:
     return cands[0] if cands else None
 
 
+# GP7/GP6 zip containers vs legacy GP3/4/5 binaries. `.gp`/`.gpx` are treated
+# as GP7 only when the existing GPIF sniffer says so; otherwise they fall back
+# with the legacy extensions.
+_GP7_EXTS = (".gp", ".gpx")
+_GP5_EXTS = (".gp3", ".gp4", ".gp5")
+_GP_EXTS = _GP7_EXTS + _GP5_EXTS
+
+
+def _is_gpif_zip(path: Path) -> bool:
+    """True when the real GPIF reader can open this file (a zip with a
+    `Content/score.gpif` entry). Reuses `gpif.open_gp` -- no second sniffer."""
+    try:
+        from .gpif import open_gp
+
+        with open_gp(path):
+            return True
+    except Exception:
+        return False
+
+
+def _largest(paths: list[Path]) -> Path:
+    """Largest file; a size tie keeps input order (so `_gp_candidates`'
+    match-quality order is the final tiebreak)."""
+    best = paths[0]
+    best_size = best.stat().st_size
+    for p in paths[1:]:
+        size = p.stat().st_size
+        if size > best_size:
+            best, best_size = p, size
+    return best
+
+
+def pick_gp(candidates: list[Path]) -> Path | None:
+    """Choose ONE tab from several GP candidates for one track.
+
+    Priority: readable GP7 `.gp`/`.gpx` (GPIF sniffer) > readable GP3/4/5
+    (by extension) > never a stub (solo/bass/cover/intro, or < 10 KB) >
+    largest wins > GP7 beats GP5. `None` when no candidate is usable (a stub
+    is never returned). Never copies or deletes a loser."""
+    valid = [Path(p) for p in (candidates or []) if not is_stub_gp(p)]
+    if not valid:
+        return None
+    gpif = [p for p in valid if p.suffix.lower() in _GP7_EXTS and _is_gpif_zip(p)]
+    if gpif:
+        return _largest(gpif)
+    legacy = [p for p in valid if p.suffix.lower() in _GP_EXTS]
+    if legacy:
+        return _largest(legacy)
+    return None
+
+
 def scan_roots(flac_root: Path | None, gp_root: Path | None) -> list[dict]:
     """One row per track FLAC. Album = album folder, not 'tracks'."""
     gp_files: list[tuple[set, Path]] = []
@@ -233,19 +284,21 @@ def scan_roots(flac_root: Path | None, gp_root: Path | None) -> list[dict]:
         )
         used_gp: set[Path] = set()
         for fp in flacs:
-            gp = next((c for c in _gp_candidates(_stem(fp), gp_files)
-                       if c not in used_gp), None)  # one GP file -> one FLAC
+            cands = [c for c in _gp_candidates(_stem(fp), gp_files)
+                     if c not in used_gp]  # one GP file -> one FLAC
+            gp = pick_gp(cands)
+            losers = [c for c in cands if c != gp]
+            # A stub candidate (tiny / *_solo* / Misha mix / cover / bass-only)
+            # is never picked: `gp` stays empty and `match` is "stub", never
+            # "yes", so extract/figures/holdout all skip it. No file is copied
+            # or deleted; the runners-up are only listed in `notes`.
             if gp is not None:
                 used_gp.add(gp)
-            # A chosen stub GP (tiny / *_solo* / Misha mix / cover / bass-only)
-            # is not a real tab: `match` becomes "stub", never "yes", so
-            # extract/figures/holdout all skip it. Never deletes the file.
-            if gp is None:
-                match = "unknown"
-            elif is_stub_gp(gp):
+                match = "yes"
+            elif cands:
                 match = "stub"
             else:
-                match = "yes"
+                match = "unknown"
             rows.append(
                 {
                     "album": _album_of(fp),
@@ -255,7 +308,7 @@ def scan_roots(flac_root: Path | None, gp_root: Path | None) -> list[dict]:
                     "gp": str(gp) if gp else "",
                     "tuning": "drop_g_7",
                     "match": match,
-                    "notes": "",
+                    "notes": "also: " + ", ".join(p.name for p in losers) if losers else "",
                     "flac_sha256": sha256_file(fp),
                 }
             )

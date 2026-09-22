@@ -250,8 +250,8 @@ def test_scan_roots_numbered_gp_beats_songsterr_for_the_album_track(tmp_path):
 
     gp_root = tmp_path / "gp"
     (gp_root / "album").mkdir(parents=True)
-    (gp_root / "album" / "02 Singularity.gp5").write_bytes(b"x")
-    (gp_root / "Singularity-s83278.gp").write_bytes(b"x")
+    (gp_root / "album" / "02 Singularity.gp5").write_bytes(b"x" * 10_000)
+    (gp_root / "Singularity-s83278.gp").write_bytes(b"x" * 10_000)
 
     rows = {r["track"]: r for r in cat.scan_roots(flac_root, gp_root)}
 

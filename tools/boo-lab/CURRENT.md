@@ -77,7 +77,7 @@ iff-blast-A.
 
 - Prefer GP7 .gp/.gpx (parsed GPIF) over .gp5; no GP7→GP5 conversion.
 
-- scan writes match=`stub` when the chosen GP is a stub (under 10 KB, or a `*_solo*`/cover/bass-only/Misha-mix/intro-only name); only match=`yes` is bankable — extract, figures, and holdout skip the rest. Files are never deleted or renamed.
+- When several GPs match one track, `catalogue.pick_gp` picks one: readable GP7 `.gp`/`.gpx` (GPIF sniffer) > GP3/4/5 > never a stub (under 10 KB, `*_solo*`/cover/bass-only/Misha-mix/intro-only) > largest; GP7 beats GP5. scan writes that as `gp` and lists runners-up in `notes`; `match=stub` when only stubs exist. Only match=`yes` is bankable — extract, figures, and holdout skip the rest. Files are never deleted or renamed.
 - Do not rename FLACs; match tabs in map.csv.
 - Guess / structure / predict (keeper-model) write **drafts only**. Predictor v1 is an optional scaffold — needs non-holdout keepers; holdout-only labs skip Save train unless holdout_fallback is explicit.
 - VAL / holdout songs do not train or vote prefer=; pinning is fine (Rebirth is already pinned).

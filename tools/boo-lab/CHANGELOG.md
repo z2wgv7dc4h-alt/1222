@@ -1,3 +1,9 @@
+## 2026-09-22 — one-tab picker (`pick_gp`)
+
+- New `catalogue.pick_gp(candidates)`: readable GP7 `.gp`/`.gpx` via the existing GPIF sniffer (`gpif.open_gp`, no second sniffer) > GP3/4/5 by extension > never a stub (`is_stub_gp`: < 10 KB or solo/cover/bass-only/Misha-mix/intro name) > largest (size tie keeps `_gp_candidates` match order) > GP7 beats GP5.
+- `scan_roots` sets the `gp` column from `pick_gp`, lists runners-up in `notes` (`also: ...`), and keeps `match="stub"` when only stubs exist. No loser file is copied or deleted. Guess is not run; no drafts/sections written.
+- Tests: `tests/test_pick_gp.py`; the numbered-vs-songsterr scan test now uses realistic sizes.
+
 ## 2026-09-22 — scoring honesty after empty gold
 
 - `compare.compare` marks each track `not_used_for_prefer` and prints holdout/VAL rows as `holdout / not used for prefer=`; a track with no keepers is skipped, never an error and never an invented box.

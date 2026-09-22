@@ -21,35 +21,9 @@ Audio and Guitar Pro files stay on this PC. Git only stores code and labels.
 
 ## Open
 
-Double-click START.bat in the boo-lab folder.
-It rescans, hashes new FLACs, opens the **studio immediately**, and kicks full
-intern prep (stems, beats, structure drafts, drums, vocals, lyrics, sync,
-extract, figures, tempo hints, compare, learn, predict, status) in a **side
-window** so a SongFormer EMA hang cannot block labeling. That prep is
-resumable and cache-first; it only fills what is missing. Per-track SongFormer
-times out after 360s (BOO_SONGFORMER_TIMEOUT_SEC) and kills its process tree.
-(predict is a clean skip until a keeper-trained model exists — with zero keepers
-today, nothing to train yet.) It never runs Guess and never Saves keepers.
-Prep-only (no studio): PREP.bat.
+Double-click START.bat. Browser opens. Prep may run in another window; ignore it.
 
-After prep finishes in the side window: **Load drafts** and **Lyrics** have something waiting.
-**Guess** still computes when you click (uses sync/stems/tab on disk).
-**Heard + Save** stays yours.
-
-Browser: http://127.0.0.1:8765
-Old page: Ctrl+Shift+R.
-
-Thin studio-only (skips prep — use when prep already finished):
-
-    cd tools/boo-lab
-    .venv/Scripts/activate
-    python -m boo_lab.cli studio
-
-Manual full prep without opening the UI:
-
-    python -m boo_lab.cli scan
-    python -m boo_lab.cli hash
-    python -m boo_lab.cli interns
+Browser: http://127.0.0.1:8765 — Ctrl+Shift+R after an HTML change.
 
 ## Mark
 
@@ -58,6 +32,9 @@ The same double-click starts an **A–B loop** over the box.
 Click away from the looping box (or Esc / Space / Play box once) to stop the loop.
 Drag the box edges to trim it. Play box still plays once without looping.
 The right-click edit panel closes on an outside click.
+Double-click has ONE meaning: zoom the box and start its A–B loop. **heard** is a
+checkbox or the right-click menu. The **How** button in studio is this Mark list —
+VAL may be pinned by ear.
 
 1. Click a song on the left.
 2. Wait until the clock shows the real song length. Not `0:00 / -`.
@@ -82,15 +59,13 @@ A box can only sit in its role's lane, so a Riff + Breakdown + Outro stack
 shows as three bars at once. Click a bar to select its row; click a row to
 light its bar. Right-click a bar to edit role / figure / heard / unique / inst,
 Play box, Split at playhead (when the playhead is inside), or Delete.
-Double-click a bar to toggle heard. The All / Figures / Functions buttons only
-hide bars and rows — they never edit. synth is an instrument (inst), not a role.
+The All / Figures / Functions buttons only hide bars and rows — they never
+edit. synth is an instrument (inst), not a role.
 
 ## Ignore until you need them
 
 Guess, Load drafts, Lyrics, Pack, Snap, JSON, Drop, git, Remove album,
 More columns.
-
-VAL songs do not train and do not vote prefer=. You may pin them by ear. Rebirth is VAL. The old six Rebirth rows were invalid times and were deleted. Re-pin by ear; do not restore the old windows.
 
 Guess refuses a song that already has saved boxes.
 Do not Guess a song whose list row says tab off-clock. Most tabs in this corpus are off-clock; pin those by ear.

@@ -40,8 +40,8 @@ VAL may be pinned by ear.
 2. Wait until the clock shows the real song length. Not `0:00 / -`.
 3. Press **1** (Riff) or another role button. A box appears.
 4. Drag the box to cover that part. Drag does not create a box — the button does.
-5. If the same idea comes back, reuse the same **figure** name (`riff-A`).
-   A new idea gets a new name (`riff-B`).
+5. A new idea gets the next letter by default (`riff-B`); type the old id
+   (`riff-A`) to reuse it.
 6. Tick **heard** only after you listened to that box.
 7. Press **Save**. Boxes without heard are deleted.
 

@@ -1619,6 +1619,20 @@ function bestOnFigure(p, skipIdx){
   });
   return best;
 }
+// Next free letter for a new box of `role`, e.g. riff-A taken -> riff-B.
+// Stupid on purpose: look at the suffix after the last hyphen, take the first
+// A-Z not already used, then AA.. if all are. Never reuses A silently.
+function nextFigureId(role, existingIds){
+  const used=new Set();
+  (existingIds||[]).forEach(id=>{
+    const s=String(id||"");
+    if(!s.startsWith(role+"-")) return;
+    const suffix=s.slice(role.length+1);
+    if(/^[A-Z]+$/.test(suffix)) used.add(suffix);
+  });
+  for(let i=0;i<26;i++){ const c=String.fromCharCode(65+i); if(!used.has(c)) return role+"-"+c; }
+  for(let i=26;;i++){ let n=i, s=""; do{ s=String.fromCharCode(65+(n%26))+s; n=Math.floor(n/26)-1; }while(n>=0); if(!used.has(s)) return role+"-"+s; }
+}
 // Role pins wait for a real duration: no box while the clock still reads
 // "0:00 / —". Buttons are disabled + muted; role keys no-op with a message.
 function pinsReady(){
@@ -1638,7 +1652,8 @@ function add(role){
   const t=ws.getCurrentTime();
   const dur=ws.getDuration();
   snap();
-  const box={role,start:t,end:Math.min(dur, t+8),figure_id:role+"-A",
+  const box={role,start:t,end:Math.min(dur, t+8),
+    figure_id:nextFigureId(role, regs.map(p=>p.figure_id)),
     form:"A",unique:false,instrument:"",start_bar:null,end_bar:null,
     on_figure:"",source:"human",heard:false};
   // Blast/Breakdown/etc. pinned over a Riff carry that figure's id.
